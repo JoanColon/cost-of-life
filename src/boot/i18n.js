@@ -4,7 +4,9 @@ import messages from '@/i18n'
 
 export default defineBoot(({ app }) => {
   const i18n = createI18n({
+    legacy: false,
     locale: 'en-US',
+    fallbackLocale: 'en-US',
     globalInjection: true,
     messages,
   })

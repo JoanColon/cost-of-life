@@ -1,0 +1,247 @@
+.balance-net strong {
+  font-size: 24px;
+}
+
+.allowance-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.allowance-summary > div {
+  min-width: 0;
+}
+
+.allowance-summary span,
+.allowance-meta {
+  color: #adadad;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.allowance-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text);
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.allowance-summary > div:first-child strong {
+  color: #f5b800;
+}
+
+.allowance-summary > div:last-child {
+  text-align: right;
+}
+
+.allowance-copy {
+  margin: 0;
+}
+
+.allowance-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.pending-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: rgba(245, 184, 0, 0.4);
+}
+
+.pending-banner span {
+  display: block;
+  margin-top: 2px;
+  color: #adadad;
+  font-size: 13px;
+}
+
+.quick-crimes,
+.prevented-entry {
+  margin-top: 20px;
+}
+
+.quick-grid,
+.category-grid,
+.settings-category-grid,
+.amount-grid,
+.stats-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.crime-quick-button,
+.category-choice,
+.strictness-choice {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #191919;
+  color: var(--app-text);
+  cursor: pointer;
+}
+
+.crime-quick-button {
+  display: flex;
+  min-height: 62px;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 10px;
+  text-align: left;
+}
+
+.crime-quick-button:active,
+.category-choice--selected,
+.strictness-choice--selected {
+  border-color: #f5b800;
+  background: rgba(245, 184, 0, 0.1);
+}
+
+.crime-quick-button__emoji {
+  font-size: 22px;
+}
+
+.crime-quick-button__label {
+  align-self: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.verdict-banner {
+  position: fixed;
+  right: 16px;
+  bottom: 88px;
+  left: 16px;
+  z-index: 10;
+  max-width: 520px;
+  margin: 0 auto;
+  border: 1px solid rgba(245, 184, 0, 0.4);
+  border-radius: 8px;
+  background: #f5b800;
+  color: #101010;
+  font-weight: 900;
+  text-align: center;
+}
+
+.amount-sheet {
+  position: relative;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  padding: 24px 16px 28px;
+  border-radius: 18px 18px 0 0;
+}
+
+.amount-sheet__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+/* Subscription sheet extends the quick amount pattern with provider and recurrence steps. */
+.subscription-sheet {
+  max-height: 86vh;
+  overflow: auto;
+}
+
+.subscription-sheet__header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.subscription-sheet__header > div:only-child {
+  grid-column: 1 / -1;
+}
+
+.amount-sheet__icon,
+.pending-case__emoji {
+  font-size: 36px;
+}
+
+.amount-sheet__title {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.amount-sheet__prompt {
+  margin: 8px 0 18px;
+  color: #adadad;
+}
+
+.amount-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.amount-choice {
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #262626;
+  color: var(--app-text);
+  font-weight: 900;
+}
+
+.amount-choice--later {
+  color: #f5b800;
+}
+
+.other-amount {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 16px;
+}
+
+.other-amount__button {
+  min-height: 40px;
+}
+
+.subscription-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.subscription-group__label {
+  color: #f5b800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.subscription-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.subscription-choice {
+  min-height: 58px;
+  justify-content: flex-start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #262626;
+  color: var(--app-text);
+  font-weight: 800;
+}
+
+.subscription-choice .q-icon {
+  margin-right: 8px;
+  color: #f5b800;
+}

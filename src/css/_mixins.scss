@@ -1,0 +1,11 @@
+@mixin dashboard-card {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+@mixin focus-ring {
+  outline: 3px solid rgb(22 136 248 / 22%);
+  outline-offset: 3px;
+}

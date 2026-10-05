@@ -1,1 +1,30 @@
-// app global css
+@use './tokens';
+
+// Shared responsive foundations for web and native shells.
+html,
+body,
+#q-app {
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-family-app);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(22 136 248 / 18%);
+}

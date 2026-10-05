@@ -36,9 +36,6 @@ export default defineConfig((ctx) => {
         // node: 'node22'
       },
 
-      // https://v2.quasar.dev/quasar-cli-vite/page-routing-with-vue-router#filename-based-routing
-      filenameBasedRouting: true,
-
       vueRouterMode: 'hash', // available values: 'hash', 'history'
       // vueRouterBase,
 
@@ -73,16 +70,20 @@ export default defineConfig((ctx) => {
             include: [ctx.appPaths.resolve.app('src/i18n')],
           },
         ],
-        [
-          'vite-plugin-checker',
-          {
-            eslint: {
-              lintCommand: 'eslint -c ./eslint.config.js "./src*/**/*.{js,mjs,cjs,vue}"',
-              useFlatConfig: true,
-            },
-          },
-          { server: false },
-        ],
+        ...(ctx.dev
+          ? [
+              [
+                'vite-plugin-checker',
+                {
+                  eslint: {
+                    lintCommand: 'eslint -c ./eslint.config.js "./src*/**/*.{js,mjs,cjs,vue}"',
+                    useFlatConfig: true,
+                  },
+                },
+                { server: false },
+              ],
+            ]
+          : []),
       ],
     },
 
@@ -108,7 +109,7 @@ export default defineConfig((ctx) => {
       // directives: [],
 
       // Quasar plugins
-      plugins: [],
+      plugins: ['Notify'],
     },
 
     // animations: 'all', // --- includes all animations

@@ -1,0 +1,32 @@
+:root {
+  --app-text: #f5f5f5;
+  --app-text-strong: #ffffff;
+  --app-text-soft: #d8d8d8;
+  --app-title-text: #f9ecd8;
+}
+
+body {
+  background: #101010;
+  color: var(--app-text);
+}
+
+button {
+  font: inherit;
+}
+
+.basic-chart {
+  width: 100%;
+  min-width: 0;
+  touch-action: manipulation;
+}
+
+.share-export-host {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  pointer-events: none;
+}

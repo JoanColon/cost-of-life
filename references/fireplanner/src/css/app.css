@@ -1,0 +1,30 @@
+/* app global css */
+/* .q-btn{
+  background-color: #fca311;
+  color:white;
+} */
+
+.submit-btn {
+  background-color: #fca311;
+  color: white;
+}
+
+.sub-title {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.white-container {
+  display: flex;
+  justify-content: space-between;
+  border-radius: 15px;
+  background: white;
+  width: 97%;
+  padding-left: 10px;
+  /* height: 95%; */
+}
+
+/* .lg-screen{
+  margin: auto;
+  width: 80%;
+} */

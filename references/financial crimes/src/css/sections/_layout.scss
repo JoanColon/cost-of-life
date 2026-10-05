@@ -1,0 +1,210 @@
+.app-shell {
+  background: linear-gradient(180deg, rgba(245, 184, 0, 0.06), transparent 260px), #101010;
+}
+
+.app-menu-button {
+  position: fixed;
+  top: calc(21px + env(safe-area-inset-top));
+  left: max(12px, calc((100vw - 720px) / 2 + 12px));
+  z-index: 20;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 12, 12, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.app-drawer {
+  background: #191919;
+  color: var(--app-text);
+}
+
+.app-drawer__brand {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(24px + env(safe-area-inset-top)) 18px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-drawer__brand strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-title-text);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.app-drawer__credits {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  color: var(--app-muted-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.app-drawer__close {
+  margin-top: -4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.app-drawer__nav {
+  padding: 10px;
+}
+
+.app-drawer__nav .q-item {
+  min-height: 48px;
+  margin-top: 4px;
+  border-radius: 8px;
+  color: var(--app-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.app-drawer__item--active {
+  background: #f5b800;
+  color: #101010 !important;
+}
+
+.bottom-nav .q-tab {
+  min-width: 0;
+}
+
+.bottom-nav .q-tab__label {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page {
+  box-sizing: border-box;
+  width: min(100%, 720px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: calc(22px + env(safe-area-inset-top)) 16px 104px;
+  overflow-x: hidden;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  padding-left: 42px;
+  margin-bottom: 18px;
+}
+
+.screen-header h1,
+.onboarding-panel h1,
+.onboarding-panel h2,
+.edit-dialog h2,
+.pending-case h3 {
+  margin: 0;
+  color: var(--app-title-text);
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+.screen-header h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(23px, 6.7vw, 38px);
+  font-weight: 900;
+  line-height: 0.98;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-title {
+  color: var(--app-title-text);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(23px, 6.6vw, 38px);
+  font-weight: 900;
+  line-height: 0.98;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.section-kicker,
+.section-heading,
+.panel-label,
+.status-line {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.section-kicker,
+.section-heading,
+.panel-label {
+  color: #f5b800;
+}
+
+.status-line {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 0;
+  color: #f5b800;
+}
+
+.allowance-copy,
+.allowance-meta,
+.empty-state__text,
+.crime-card__meta,
+.crime-card__note,
+.panel p,
+.pending-case p {
+  color: #adadad;
+  font-size: 15px;
+}
+
+.privacy-panel p {
+  margin: 10px 0 0;
+  line-height: 1.45;
+}
+
+.panel,
+.pending-banner,
+.stat-card,
+.crime-card,
+.empty-state,
+.amount-sheet,
+.edit-dialog,
+.case-files-dialog {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #191919;
+  color: var(--app-text);
+}
+
+.panel,
+.pending-banner,
+.empty-state {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.allowance-summary,
+.balance-row,
+.balance-net {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

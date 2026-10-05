@@ -1,0 +1,1005 @@
+.court-page {
+  width: min(100%, 520px);
+  padding: calc(10px + env(safe-area-inset-top)) 10px 104px;
+  background: radial-gradient(circle at 50% 0, rgba(245, 184, 0, 0.12), transparent 230px), #080909;
+}
+
+.court-hero {
+  position: relative;
+  display: grid;
+  min-height: clamp(210px, 32vh, 310px);
+  place-items: end center;
+  overflow: hidden;
+  border: 1px solid rgba(245, 184, 0, 0.24);
+  border-radius: 8px;
+  background-position: center 34%;
+  background-size: cover;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+}
+
+.court-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0) 38%, rgba(8, 9, 9, 0.62) 72%, #080909 100%),
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.38),
+      transparent 25%,
+      transparent 75%,
+      rgba(0, 0, 0, 0.38)
+    );
+}
+
+.court-tabs {
+  position: relative;
+  z-index: 3;
+  min-height: 42px;
+  margin-top: -22px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(20, 22, 22, 0.96);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.42),
+    0 -1px 0 rgba(245, 184, 0, 0.16);
+}
+
+.court-tabs .q-tab {
+  min-height: 34px;
+  padding: 0 5px;
+  border-radius: 7px;
+  color: #c7c7c7;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.court-tabs .q-tab__icon {
+  margin-right: 3px;
+  font-size: 16px;
+}
+
+.court-tabs .q-tab__content {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 2px;
+  min-width: 0;
+}
+
+.court-tabs .q-tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.court-tabs__tab--active,
+.court-tabs .q-tab--active {
+  background: linear-gradient(180deg, #ffd84a, #f2ad17);
+  color: #101010 !important;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+}
+
+.court-tabs .q-tab__indicator {
+  display: none;
+}
+
+.court-period-card {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(25, 25, 25, 0.82);
+}
+
+.court-period-selectors {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 8px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.court-period-select {
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.24);
+  color: #9a9a9a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.court-period-select--active {
+  border-color: #f5b800;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.court-period-select .q-field__control {
+  min-height: 32px;
+  height: 32px;
+  background: transparent;
+}
+
+.court-period-select .q-field__prepend,
+.court-period-select .q-field__append {
+  height: 32px;
+}
+
+.court-period-select .q-field__native,
+.court-period-select .q-field__label,
+.court-period-select .q-field__prepend,
+.court-period-select .q-field__append {
+  color: #9a9a9a;
+}
+
+.court-period-select--active .q-field__prepend,
+.court-period-select--active .q-field__append {
+  color: #f5b800;
+}
+
+.court-period-select--active .q-field__native {
+  color: #ffffff;
+}
+
+.court-period-select .q-field__native {
+  min-width: 0;
+  height: 32px;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.court-panels {
+  height: auto !important;
+  overflow: visible;
+  background: transparent;
+}
+
+.court-panels .q-panel,
+.court-panels .q-panel-parent,
+.court-panels .q-tab-panel {
+  height: auto !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.court-panel {
+  padding: 0;
+  background: transparent;
+  color: var(--app-text);
+}
+
+.court-empty {
+  margin-top: 0;
+}
+
+.monthly-verdict,
+.scrutiny-report,
+.rehabilitation-report {
+  text-align: center;
+}
+
+.verdict-period {
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.monthly-verdict h1,
+.scrutiny-report h1,
+.rehabilitation-report h1 {
+  margin: 8px 0 8px;
+  color: var(--app-title-text);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(32px, 10vw, 48px);
+  font-weight: 900;
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+
+.scrutiny-report h1,
+.rehabilitation-report h1 {
+  font-size: clamp(28px, 8vw, 40px);
+}
+
+.monthly-verdict p,
+.scrutiny-report p,
+.rehabilitation-report p {
+  max-width: 330px;
+  margin: 3px auto;
+  color: var(--app-text-soft);
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.scrutiny-report p strong {
+  color: #ffd13d;
+  font-weight: 950;
+}
+
+.face-jury-button {
+  width: min(100%, 360px);
+  min-height: 62px;
+  margin-top: 24px;
+  border-radius: 999px;
+  color: #101010;
+  font-size: 20px;
+  font-weight: 950;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.38);
+}
+
+.face-jury-button .q-icon {
+  font-size: 28px;
+}
+
+.deliberation-box,
+.verdict-result,
+.wanted-panel,
+.rehab-current,
+.rehab-control,
+.rehab-result,
+.investment-panel {
+  margin-top: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025));
+  color: var(--app-text);
+}
+
+.deliberation-box {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  text-align: left;
+}
+
+.deliberation-box__label {
+  color: #f5b800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.verdict-result {
+  padding: 18px 14px;
+  text-align: left;
+}
+
+.verdict-dialog {
+  width: min(96vw, calc((88vh - 74px) * 0.8), 470px);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--app-text);
+}
+
+.criminal-card-dialog {
+  width: min(96vw, calc((88vh - 74px) * 0.8), 480px);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #07152d;
+}
+
+.criminal-card-dialog-shell .q-dialog__backdrop {
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(2px);
+}
+
+.verdict-dialog-shell .q-dialog__backdrop {
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(2px);
+}
+
+.verdict-dialog__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.verdict-share-button {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 999px;
+  background: var(--verdict-accent, #ff363b) !important;
+  font-size: 14px;
+  font-weight: 950;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.38);
+}
+
+.verdict-dialog__actions {
+  padding: 14px 22px 0;
+}
+
+.verdict-dialog .q-inner-loading,
+.criminal-card-dialog .q-inner-loading {
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.58);
+  color: var(--app-text-strong);
+  font-weight: 900;
+  backdrop-filter: blur(2px);
+}
+
+.verdict-dialog .q-spinner,
+.criminal-card-dialog .q-spinner {
+  color: var(--verdict-accent, #ff363b);
+}
+
+.verdict-result__case,
+.verdict-result__offense span,
+.verdict-circumstances span,
+.rehab-current span,
+.investment-panel small {
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.verdict-result h2 {
+  margin: 8px 0;
+  color: #ffd13d;
+  font-size: clamp(38px, 12vw, 58px);
+  font-weight: 950;
+  line-height: 0.95;
+  text-align: center;
+}
+
+.verdict-result__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.verdict-result__facts span,
+.verdict-result__offense,
+.verdict-share-card {
+  padding: 12px;
+  border: 1px solid rgba(245, 184, 0, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.verdict-result__offense {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.verdict-result__offense strong {
+  color: var(--app-text-strong);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.verdict-result__offense small {
+  color: var(--app-text-soft);
+}
+
+.verdict-circumstances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.verdict-circumstances > div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.verdict-circumstances strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.verdict-result__quote {
+  margin: 12px 0 0;
+  color: var(--app-text-soft);
+  font-family: Georgia, 'Times New Roman', serif;
+  text-align: center;
+}
+
+.verdict-share-card {
+  display: grid;
+  gap: 2px;
+  margin-top: 12px;
+  text-align: center;
+}
+
+.verdict-share-card span,
+.verdict-share-card small {
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.verdict-share-card strong {
+  color: #ffd13d;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.scrutiny-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.scrutiny-stat {
+  min-height: 56px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  text-align: left;
+}
+
+.scrutiny-stat span {
+  display: block;
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.scrutiny-stat strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text-strong);
+  font-size: 17px;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.wanted-panel,
+.rehab-current,
+.rehab-control,
+.rehab-result,
+.investment-panel {
+  padding: 14px;
+  text-align: left;
+}
+
+.wanted-chart-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.wanted-chart-row {
+  display: grid;
+  grid-template-columns: 22px minmax(68px, 86px) minmax(0, 1fr) 44px;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.wanted-chart-row:focus-visible {
+  outline: 2px solid rgba(245, 184, 0, 0.65);
+  outline-offset: 4px;
+}
+
+.wanted-chart-row:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wanted-chart-rank {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: #ffd13d;
+  color: #101010;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.wanted-chart-rank--prevented {
+  background: #39d98a;
+}
+
+.wanted-chart-name {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  align-items: center;
+  color: var(--app-text-strong);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wanted-chart-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wanted-chart-bar {
+  min-width: 0;
+}
+
+.wanted-chart-amount {
+  color: #ffd13d;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 950;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.wanted-chart-amount--prevented {
+  color: #39d98a;
+}
+
+.criminal-timeline-panel {
+  overflow: hidden;
+}
+
+.court-chart-heading {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.court-chart-info-button {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+}
+
+.court-chart-info-button .q-icon {
+  font-size: 17px;
+}
+
+.criminal-timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.criminal-timeline-header > span {
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.criminal-timeline-insight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.criminal-timeline-insight__copy {
+  min-width: 0;
+}
+
+.criminal-timeline-insight__copy > strong {
+  display: block;
+  color: var(--app-text-strong);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.criminal-timeline-insight p {
+  margin: 5px 0 0;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.criminal-timeline-insight__numbers {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #a8a8a8;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.criminal-timeline-insight__numbers strong {
+  color: #ffd13d;
+}
+
+.criminal-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+  color: var(--app-text-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.criminal-timeline-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.criminal-timeline-legend i {
+  display: inline-block;
+  width: 18px;
+}
+
+.criminal-timeline-legend__damage {
+  height: 8px;
+  border-radius: 2px;
+  background: #f5b800;
+}
+
+.criminal-timeline-legend__law {
+  height: 0;
+  border-top: 2px dashed #ff6b6b;
+}
+
+.criminal-timeline-chart {
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.criminal-timeline-chart-shell {
+  position: relative;
+}
+
+.criminal-timeline-hotspots {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  bottom: 38px;
+  left: 8px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--timeline-columns), minmax(0, 1fr));
+}
+
+.criminal-timeline-hotspot {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  touch-action: manipulation;
+}
+
+.criminal-timeline-hotspot:focus-visible {
+  outline: 2px solid rgba(245, 184, 0, 0.65);
+  outline-offset: -3px;
+}
+
+.category-detail-sheet__summary.timeline-detail-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.timeline-detail-verdict {
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-detail-verdict > strong {
+  color: #ffd13d;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.timeline-detail-verdict p {
+  margin: 0;
+  color: var(--app-text-soft);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.court-chart-info-sheet__body {
+  display: grid;
+  gap: 14px;
+}
+
+.court-chart-info-sheet__body p {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.court-chart-info-sheet__body .court-chart-info-sheet__note {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--app-text-soft);
+  font-size: 14px;
+}
+
+.category-detail-sheet {
+  width: min(100%, 520px);
+  max-height: 82vh;
+  margin: 0 auto;
+  overflow: auto;
+  border-radius: 18px 18px 0 0;
+  background: #141515;
+  color: var(--app-text);
+}
+
+.category-detail-sheet__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.category-detail-sheet__header h2 {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0 0;
+  color: var(--app-text-strong);
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.category-detail-sheet__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.category-detail-sheet__summary > div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.category-detail-sheet__summary span,
+.category-detail-crime span {
+  display: block;
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.category-detail-sheet__summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #ffd13d;
+  font-size: 18px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-detail-sheet__list {
+  display: grid;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.category-detail-crime {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.category-detail-crime strong {
+  min-width: 0;
+}
+
+.category-detail-crime > div strong {
+  display: block;
+  overflow: hidden;
+  color: var(--app-text-strong);
+  font-size: 14px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-detail-crime__amount {
+  color: #ffd13d;
+  font-size: 13px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.category-detail-crime__amount--prevented {
+  color: #39d98a;
+}
+
+.rehab-current {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.rehab-current strong {
+  color: var(--app-text-strong);
+  font-size: 30px;
+  font-weight: 950;
+}
+
+.rehab-control {
+  display: grid;
+  gap: 10px;
+}
+
+.rehab-toggle,
+.rate-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.rehab-toggle .q-btn,
+.rate-toggle .q-btn {
+  min-height: 42px;
+  font-weight: 950;
+}
+
+.rehab-result {
+  display: grid;
+  gap: 2px;
+  border-color: rgba(36, 214, 195, 0.45);
+  background: linear-gradient(180deg, rgba(36, 214, 195, 0.22), rgba(11, 79, 68, 0.52));
+  text-align: center;
+}
+
+.rehab-result strong {
+  color: #38ffe9;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.rehab-result span {
+  color: #c4fff7;
+  font-weight: 850;
+}
+
+.investment-panel__header {
+  display: grid;
+  gap: 12px;
+}
+
+.investment-panel p {
+  margin: 4px 0 0;
+  color: var(--app-text-soft);
+}
+
+.investment-chart-shell {
+  position: relative;
+  margin-top: 14px;
+}
+
+.investment-chart-shell,
+.investment-chart-shell .basic-chart {
+  cursor: pointer;
+}
+
+.investment-chart-hotspot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 33.333%;
+  height: 178px;
+  border: 0;
+  background: transparent;
+  appearance: none;
+}
+
+.investment-chart-hotspot:nth-of-type(1) {
+  left: 0;
+}
+
+.investment-chart-hotspot:nth-of-type(2) {
+  left: 33.333%;
+}
+
+.investment-chart-hotspot:nth-of-type(3) {
+  left: 66.666%;
+}
+
+.investment-chart-hotspot:focus-visible {
+  outline: 2px solid rgba(56, 255, 233, 0.65);
+  outline-offset: -4px;
+}
+
+.investment-detail-sheet .category-detail-sheet__summary strong {
+  color: #38ffe9;
+}
+
+.investment-detail-sheet__note {
+  display: grid;
+  gap: 4px;
+  padding-top: 0;
+}
+
+.investment-detail-sheet__note span {
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.investment-detail-sheet__note strong {
+  color: var(--app-text-strong);
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.investment-detail-sheet__note p {
+  margin: 8px 0 0;
+  color: var(--app-text-soft);
+  font-size: 12px;
+}
+
+@media (min-width: 640px) {
+  .quick-grid,
+  .category-grid,
+  .settings-category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .investment-panel__header {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+}

@@ -1,0 +1,12 @@
+@use '@fontsource/special-elite/latin-400.css' as special-elite-font;
+@use '@fontsource/kalam/latin-400.css' as kalam-font;
+@use './sections/base';
+@use './sections/layout';
+@use './sections/home';
+@use './sections/onboarding';
+@use './sections/record';
+@use './sections/court';
+@use './sections/achievements';
+@use './sections/settings';
+@use './cards/monthly-verdict-card';
+@use './cards/criminal-card';

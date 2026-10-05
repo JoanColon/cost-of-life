@@ -1,0 +1,304 @@
+.record-group {
+  margin-top: 18px;
+}
+
+.record-date-filter {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(245, 184, 0, 0.24);
+  border-radius: 8px;
+  background: #191919;
+}
+
+.record-date-filter__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.record-date-filter__title {
+  color: var(--app-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.record-date-filter__count {
+  color: #f5b800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.record-date-filter__presets {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.record-date-filter__select {
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.24);
+  color: #9a9a9a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.record-date-filter__select .q-field__control {
+  min-height: 32px;
+  height: 32px;
+  background: transparent;
+}
+
+.record-date-filter__select .q-field__prepend,
+.record-date-filter__select .q-field__append {
+  height: 32px;
+}
+
+.record-date-filter__select .q-field__native,
+.record-date-filter__select .q-field__label,
+.record-date-filter__select .q-field__prepend,
+.record-date-filter__select .q-field__append {
+  color: #9a9a9a;
+}
+
+.record-date-filter__select--active {
+  border-color: #f5b800;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.record-date-filter__select--active .q-field__prepend,
+.record-date-filter__select--active .q-field__append {
+  color: #f5b800;
+}
+
+.record-date-filter__select--active .q-field__native {
+  color: #ffffff;
+}
+
+.record-date-filter__select .q-field__native {
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-date-filter__summary {
+  display: grid;
+  gap: 4px;
+  color: var(--app-text-soft);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.record-date-filter__summary strong {
+  color: #f5b800;
+  font-weight: 950;
+}
+
+.record-date-filter__summary strong.record-date-filter__summary-prevented {
+  color: #39d98a;
+}
+
+.record-categories {
+  display: grid;
+  gap: 10px;
+}
+
+.record-accordion {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #191919;
+}
+
+.record-accordion .q-item {
+  min-height: 76px;
+  color: var(--app-text);
+}
+
+.record-accordion__emoji {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(245, 184, 0, 0.35);
+  border-radius: 8px;
+  background: rgba(245, 184, 0, 0.08);
+  font-size: 24px;
+}
+
+.record-accordion__category {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.record-accordion__meta {
+  color: #adadad;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.record-accordion__total {
+  color: #f5b800;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.record-accordion__total--prevented {
+  color: #39d98a;
+}
+
+.record-accordion__body {
+  padding: 0 12px 12px;
+}
+
+.crime-card {
+  margin-top: 10px;
+  padding: 14px;
+}
+
+.crime-card--prevented {
+  border-color: rgba(57, 217, 138, 0.22);
+  background: linear-gradient(180deg, rgba(57, 217, 138, 0.08), rgba(255, 255, 255, 0.03));
+}
+
+.crime-card__main {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.crime-card__emoji {
+  font-size: 22px;
+}
+
+.crime-card__name {
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.crime-card__amount {
+  max-width: 110px;
+  color: #f5b800;
+  font-weight: 900;
+  text-align: right;
+}
+
+.crime-card--prevented .crime-card__amount {
+  color: #39d98a;
+}
+
+.crime-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+  color: #adadad;
+}
+
+.edit-dialog {
+  width: min(92vw, 520px);
+}
+
+.case-files-dialog {
+  width: min(100%, 720px);
+  min-height: 100vh;
+  margin: 0 auto;
+  border-radius: 0;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-confirm-dialog__message {
+  color: #adadad;
+  line-height: 1.45;
+}
+
+.pending-case {
+  text-align: center;
+}
+
+.stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stat-card {
+  min-height: 116px;
+  padding: 14px;
+}
+
+.stat-card span {
+  display: block;
+  color: #adadad;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.stat-card--positive strong,
+.balance-verdict--good {
+  color: #39d98a;
+}
+
+.balance-row {
+  padding: 10px 0;
+  color: #c7c7c7;
+}
+
+.balance-net {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.balance-verdict {
+  margin-top: 14px;
+  color: #ff5c5c;
+  font-weight: 900;
+}
+
+.bottom-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 16, 16, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.q-field--dark .q-field__control {
+  background: rgba(255, 255, 255, 0.04);
+}

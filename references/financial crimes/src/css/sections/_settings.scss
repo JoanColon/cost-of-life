@@ -1,0 +1,275 @@
+.allowance-setting,
+.ai-setting {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-setting {
+  padding-top: 6px;
+}
+
+.ai-setting .panel-label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ai-info-button {
+  cursor: pointer;
+}
+
+.ai-setting > div > span {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.upgrade-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.upgrade-panel__status,
+.upgrade-panel__pro-active,
+.upgrade-panel__share {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.upgrade-panel__status span,
+.upgrade-panel__pro-active span {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.upgrade-panel__pro-active {
+  justify-content: flex-start;
+  padding: 14px;
+  border: 1px solid rgba(255, 209, 61, 0.45);
+  border-radius: 8px;
+  background: rgba(255, 209, 61, 0.08);
+}
+
+.upgrade-panel__pro-active strong {
+  color: #ffd13d;
+  font-size: 16px;
+}
+
+.upgrade-options {
+  display: grid;
+  gap: 10px;
+}
+
+.upgrade-option {
+  min-height: 58px;
+  width: 100%;
+}
+
+.upgrade-option .q-btn__content {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+}
+
+.upgrade-option--pro {
+  min-height: 76px;
+  background: rgba(255, 209, 61, 0.06);
+}
+
+.upgrade-option__copy,
+.upgrade-option__price {
+  display: flex;
+  flex-direction: column;
+}
+
+.upgrade-option__copy {
+  min-width: 0;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.upgrade-option__title {
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.upgrade-option__description,
+.upgrade-panel__unavailable {
+  color: var(--app-text-soft);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.upgrade-option__price {
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.upgrade-option__price strong {
+  color: #ffd13d;
+  font-size: 15px;
+}
+
+.upgrade-option__badge {
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: #ffd13d;
+  color: #111;
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.upgrade-panel__share {
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.upgrade-panel__share p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.app-tooltip {
+  background: rgba(0, 0, 0, 0.92);
+  color: var(--app-text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.privacy-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ai-report-dialog {
+  width: min(92vw, 520px);
+}
+
+.ai-report-dialog__copy {
+  margin: 0;
+  color: var(--app-text-soft);
+  line-height: 1.45;
+}
+
+.contact-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.contact-panel p {
+  margin: 0;
+}
+
+.contact-panel__field {
+  display: grid;
+  gap: 5px;
+}
+
+.contact-panel__field > span {
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.contact-panel__field a {
+  width: fit-content;
+  color: #ffd13d;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.contact-panel__user-id {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.contact-panel__user-id code {
+  min-width: 0;
+  color: var(--app-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.contact-panel__note {
+  color: var(--app-text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.allowance-setting strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text);
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.allowance-history-dialog {
+  padding-bottom: 8px;
+}
+
+.allowance-history-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.allowance-history-editor__header,
+.allowance-history-editor__row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+}
+
+.allowance-history-editor__header {
+  grid-template-columns: 1fr auto;
+}
+
+.allowance-history-editor__rows {
+  display: grid;
+  gap: 10px;
+  max-height: min(50vh, 420px);
+  overflow: auto;
+}
+
+.allowance-history-editor__row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.allowance-history-editor__row input[type='month']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 1;
+}
+
+.settings-category-grid .category-choice {
+  min-height: 62px;
+  gap: 8px;
+  padding: 10px;
+}
+
+.settings-category-grid .category-choice span {
+  font-size: 22px;
+}

@@ -1,0 +1,564 @@
+.achievements-page {
+  background: radial-gradient(circle at 50% 0, rgba(245, 184, 0, 0.12), transparent 260px), #101010;
+}
+
+.achievement-detail-dialog .section-kicker {
+  font-size: 10px;
+}
+
+.achievements-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.achievements-filter {
+  min-width: 0;
+  min-height: 30px;
+
+  border: 1px solid rgba(245, 184, 0, 0.22);
+  border-radius: 8px;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.achievements-collection {
+  margin-top: 7px;
+}
+
+.achievements-collection__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+  margin-bottom: 5px;
+}
+
+.achievements-collection__header span {
+  color: #f5b800;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  gap: 6px;
+}
+
+.achievements-grid--conviction,
+.achievements-grid--achievement {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.achievements-grid--all {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.achievement-badge {
+  position: relative;
+
+  display: grid;
+  grid-template-rows: 66px 28px 13px;
+
+  align-items: center;
+  justify-items: center;
+
+  min-width: 0;
+  height: 120px;
+
+  padding: 4px 5px 5px;
+
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+
+  background: linear-gradient(180deg, rgba(245, 184, 0, 0.08), rgba(255, 255, 255, 0.025)), #181818;
+
+  color: var(--app-text);
+
+  text-align: center;
+
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.achievement-badge--conviction {
+  background: linear-gradient(180deg, rgba(255, 54, 59, 0.08), rgba(255, 255, 255, 0.025)), #181818;
+}
+
+/* Convictions: compensación visual por el padding interno de los PNG */
+.achievement-badge--conviction .achievement-badge__image-wrap {
+  transform: translateY(4px);
+}
+
+.achievement-badge--conviction .achievement-badge__image {
+  transform: translateY(2px);
+}
+
+.achievement-badge--conviction:active .achievement-badge__image {
+  transform: translateY(2px) scale(0.97);
+}
+
+.achievement-badge__image-wrap {
+  display: grid;
+  place-items: center;
+
+  width: 68px;
+  height: 68px;
+
+  margin: 0 auto;
+
+  justify-self: center;
+  align-self: center;
+}
+
+.achievement-badge__image {
+  display: block;
+
+  width: 64px;
+  height: 64px;
+
+  margin: 0 auto;
+
+  object-fit: contain;
+  object-position: center;
+
+  transition:
+    filter 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.achievement-badge:active .achievement-badge__image {
+  transform: scale(0.97);
+}
+
+.achievement-badge--locked .achievement-badge__image {
+  filter: grayscale(1) brightness(0.48);
+  opacity: 0.42;
+}
+
+.achievement-badge__lock {
+  position: absolute;
+
+  right: 6px;
+  bottom: 6px;
+
+  display: grid;
+  place-items: center;
+
+  width: 20px;
+  height: 20px;
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+
+  background: rgba(0, 0, 0, 0.82);
+  color: #f5b800;
+
+  font-size: 11px;
+  z-index: 2;
+}
+
+.achievement-badge__name,
+.achievement-badge__state {
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.achievement-badge__name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 28px;
+
+  margin: 0;
+  padding: 0 4px;
+
+  overflow: hidden;
+
+  font-size: 9.4px;
+  font-weight: 950;
+  line-height: 1.08;
+
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.achievement-badge__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 13px;
+
+  margin: 0;
+  padding: 0 20px 0 2px;
+
+  color: #adadad;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 7.9px;
+  font-weight: 900;
+  line-height: 1;
+
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.achievement-detail-dialog,
+.achievement-unlock-dialog {
+  position: relative;
+
+  width: min(92vw, 430px);
+
+  border: 1px solid rgba(245, 184, 0, 0.26);
+  border-radius: 8px;
+
+  background: #181818;
+  color: var(--app-text);
+}
+
+.achievement-detail-dialog__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(8px);
+}
+
+.achievement-detail-dialog__body,
+.achievement-unlock-dialog__body {
+  display: grid;
+  justify-items: center;
+
+  gap: 10px;
+
+  padding: 20px 18px 14px;
+
+  text-align: center;
+}
+
+.achievement-detail-dialog__image,
+.achievement-unlock-dialog__image {
+  width: min(72vw, 220px);
+
+  aspect-ratio: 1;
+
+  object-fit: contain;
+}
+
+.achievement-detail-dialog__image--locked {
+  filter: grayscale(1) brightness(0.48);
+  opacity: 0.5;
+}
+
+.achievement-detail-dialog h2,
+.achievement-unlock-dialog h2 {
+  margin: 0;
+
+  color: var(--app-title-text);
+
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(28px, 8vw, 40px);
+  font-weight: 900;
+  line-height: 0.98;
+
+  text-transform: uppercase;
+}
+
+.achievement-detail-dialog p,
+.achievement-unlock-dialog p {
+  max-width: 320px;
+
+  margin: 0;
+
+  color: var(--app-text-soft);
+
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.achievement-detail-dialog__month,
+.achievement-unlock-dialog__month {
+  color: #f5b800;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+
+  text-transform: uppercase;
+}
+
+.achievement-detail-dialog__actions {
+  justify-content: center;
+  padding: 0 18px 16px;
+}
+
+.achievement-detail-dialog__share {
+  width: min(100%, 260px);
+  min-height: 42px;
+
+  border: 1px solid rgba(245, 184, 0, 0.3);
+  border-radius: 999px;
+
+  background: rgba(245, 184, 0, 0.16);
+
+  font-weight: 950;
+}
+
+.achievement-share-card {
+  position: relative;
+
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  grid-template-rows: 190px 1fr;
+
+  width: 1080px;
+  height: 1920px;
+  padding: 0 92px 86px;
+  overflow: hidden;
+
+  background:
+    radial-gradient(circle at 50% 24%, rgba(245, 184, 0, 0.2), transparent 410px),
+    linear-gradient(180deg, #25200f 0%, #101010 46%, #060606 100%);
+  color: var(--app-text);
+  box-sizing: border-box;
+}
+
+.achievement-share-card::before {
+  position: absolute;
+  inset: 38px;
+
+  border: 3px solid rgba(245, 184, 0, 0.35);
+  border-radius: 28px;
+
+  content: '';
+}
+
+.achievement-share-card__stamp {
+  position: relative;
+  z-index: 1;
+
+  align-self: end;
+
+  color: #f5b800;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 34px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.achievement-share-card__content {
+  position: relative;
+  z-index: 1;
+
+  display: grid;
+  grid-template-rows: 600px 48px auto minmax(88px, auto) 96px;
+  justify-items: center;
+  align-items: center;
+
+  width: 100%;
+  min-height: 0;
+  gap: 22px;
+  padding-top: 72px;
+
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.achievement-share-card__image {
+  width: 600px;
+  height: 600px;
+
+  object-fit: contain;
+}
+
+.achievement-share-card__type,
+.achievement-share-card__month {
+  color: #f5b800;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1;
+
+  text-transform: uppercase;
+}
+
+.achievement-share-card h1 {
+  max-width: 860px;
+  margin: 0;
+
+  color: var(--app-title-text);
+
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 90px;
+  font-weight: 950;
+  line-height: 0.92;
+
+  text-transform: uppercase;
+}
+
+.achievement-share-card p {
+  max-width: 800px;
+  margin: 0;
+
+  color: var(--app-text-soft);
+
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.14;
+}
+
+.achievement-share-card__month {
+  align-self: end;
+  width: 100%;
+  padding-bottom: 8px;
+
+  font-size: 30px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.achievement-unlock-dialog-shell .q-dialog__backdrop {
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(2px);
+}
+
+.achievement-unlock-dialog__button {
+  width: min(100%, 260px);
+  min-height: 44px;
+
+  margin-bottom: 10px;
+
+  border-radius: 999px;
+
+  font-weight: 950;
+}
+
+@media (min-width: 560px) {
+  .achievement-badge {
+    height: 126px;
+    grid-template-rows: 72px 29px 13px;
+  }
+
+  .achievement-badge__image-wrap {
+    width: 72px;
+    height: 72px;
+  }
+
+  .achievement-badge__image {
+    width: 68px;
+    height: 68px;
+  }
+
+  .achievement-badge__name {
+    font-size: 9.9px;
+  }
+
+  .achievement-badge__state {
+    font-size: 8px;
+  }
+
+  .achievement-badge--conviction .achievement-badge__image-wrap {
+    transform: translateY(4px);
+  }
+
+  .achievement-badge--conviction .achievement-badge__image {
+    transform: translateY(2px);
+  }
+
+  .achievement-badge--conviction:active .achievement-badge__image {
+    transform: translateY(2px) scale(0.97);
+  }
+}
+
+@media (max-height: 760px) {
+  .achievements-filters {
+    margin-top: 4px;
+  }
+
+  .achievements-collection {
+    margin-top: 5px;
+  }
+
+  .achievements-collection__header {
+    margin-bottom: 4px;
+  }
+
+  .achievements-grid {
+    gap: 5px;
+  }
+
+  .achievement-badge {
+    height: 114px;
+    grid-template-rows: 62px 27px 12px;
+
+    padding: 3px 4px 4px;
+  }
+
+  .achievement-badge__image-wrap {
+    width: 62px;
+    height: 62px;
+  }
+
+  .achievement-badge__image {
+    width: 59px;
+    height: 59px;
+  }
+
+  .achievement-badge__name {
+    height: 27px;
+
+    padding: 0 3px;
+
+    font-size: 8.9px;
+    line-height: 1.06;
+  }
+
+  .achievement-badge__state {
+    height: 12px;
+
+    padding-right: 18px;
+
+    font-size: 7.5px;
+  }
+
+  .achievement-badge__lock {
+    right: 5px;
+    bottom: 5px;
+
+    width: 18px;
+    height: 18px;
+
+    font-size: 10px;
+  }
+
+  .achievement-badge--conviction .achievement-badge__image-wrap {
+    transform: translateY(3px);
+  }
+
+  .achievement-badge--conviction .achievement-badge__image {
+    transform: translateY(1px);
+  }
+
+  .achievement-badge--conviction:active .achievement-badge__image {
+    transform: translateY(1px) scale(0.97);
+  }
+}

@@ -1,11 +1,12 @@
 import { defineRouter } from '#q-app'
-import { routes, handleHotUpdate } from 'vue-router/auto-routes'
 import {
   createMemoryHistory,
   createRouter,
   createWebHashHistory,
   createWebHistory,
 } from 'vue-router'
+import { authUser, waitForAuth } from '@/services/auth'
+import routes from './routes'
 
 /*
  * If not building with SSR mode, you can
@@ -33,10 +34,17 @@ export default defineRouter((/* { store, ssrContext } */) => {
     history: createHistory(import.meta.env.QUASAR_VUE_ROUTER_BASE),
   })
 
-  // enable HMR for it
-  if (import.meta.hot) {
-    handleHotUpdate(Router)
-  }
+  Router.beforeEach(async (to) => {
+    await waitForAuth()
+
+    if (to.meta.requiresAuth && !authUser.value) {
+      return { name: 'login', query: { redirect: to.fullPath } }
+    }
+
+    if (to.name === 'login' && authUser.value) {
+      return { name: 'home' }
+    }
+  })
 
   return Router
 })
