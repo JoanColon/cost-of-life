@@ -2,14 +2,12 @@
   <q-page class="category-page">
     <main class="category-shell">
       <div v-if="pageLoading" class="loading-state">
-        <q-spinner color="primary" size="2rem" />
-        <span>{{ t('assets.loading') }}</span>
+        <q-spinner color="primary" size="2rem" /><span>{{ t('liabilities.loading') }}</span>
       </div>
-
-      <section v-else-if="pageError || assetsStore.error" class="error-state">
+      <section v-else-if="pageError || liabilitiesStore.error" class="error-state">
         <q-icon name="cloud_off" />
-        <h1>{{ t('assets.errors.loadTitle') }}</h1>
-        <p>{{ t('assets.errors.load') }}</p>
+        <h1>{{ t('liabilities.errors.loadTitle') }}</h1>
+        <p>{{ t('liabilities.errors.load') }}</p>
         <q-btn
           unelevated
           no-caps
@@ -29,11 +27,11 @@
               no-caps
               color="grey-7"
               icon="arrow_back"
-              :label="t('assets.backToAssets')"
-              :to="assetsRoute"
+              :label="t('liabilities.backToLiabilities')"
+              :to="liabilitiesRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('assets.eyebrow') }}</div>
+            <div class="eyebrow">{{ t('liabilities.eyebrow') }}</div>
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -42,26 +40,25 @@
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
           <div>
-            <span>{{ t('assets.total') }}</span>
-            <strong>{{ formatCurrency(categoryTotal) }}</strong>
-            <small>{{ itemSummary }}</small>
+            <span>{{ t('liabilities.total') }}</span
+            ><strong>{{ formatCurrency(categoryTotal) }}</strong
+            ><small>{{ itemSummary }}</small>
           </div>
         </section>
 
-        <section v-if="allCategoryAssets.length" class="asset-list">
-          <article v-for="asset in scopedAssets" :key="asset.id" class="asset-row">
-            <div class="asset-main">
-              <span class="asset-icon"><q-icon :name="category.icon" /></span>
-              <span class="asset-copy">
-                <strong>{{ asset.name }}</strong>
-                <small>{{ assetSubtitle(asset) }}</small>
-              </span>
+        <section v-if="allCategoryLiabilities.length" class="liability-list">
+          <article v-for="liability in scopedLiabilities" :key="liability.id" class="liability-row">
+            <div class="liability-main">
+              <span class="liability-icon"><q-icon :name="category.icon" /></span>
+              <span class="liability-copy"
+                ><strong>{{ liability.name }}</strong
+                ><small>{{ t(category.descriptionKey) }}</small></span
+              >
             </div>
-
             <div class="ownership-display">
               <span class="avatar-cluster" aria-hidden="true">
                 <q-avatar
-                  v-for="share in visibleOwnershipShares(asset.ownership)"
+                  v-for="share in visibleOwnershipShares(liability.ownership)"
                   :key="share.memberId"
                   size="2.35rem"
                   class="ownership-avatar"
@@ -75,51 +72,48 @@
                 </q-avatar>
               </span>
             </div>
-
-            <strong class="asset-value">{{ formatCurrency(asset.scopedValue) }}</strong>
-
+            <strong class="liability-value">{{ formatCurrency(liability.scopedValue) }}</strong>
             <q-btn
               flat
               round
               dense
               icon="more_vert"
               color="grey-7"
-              :aria-label="t('assets.moreActions', { name: asset.name })"
+              :aria-label="t('liabilities.moreActions', { name: liability.name })"
             >
               <q-menu anchor="bottom right" self="top right">
-                <q-list dense class="asset-menu">
-                  <q-item clickable v-close-popup @click="edit(asset)">
-                    <q-item-section avatar><q-icon name="edit" /></q-item-section>
-                    <q-item-section>{{ t('assets.editDetails') }}</q-item-section>
-                  </q-item>
-                  <q-item clickable>
-                    <q-item-section avatar><q-icon name="account_tree" /></q-item-section>
-                    <q-item-section>{{ t('assets.model') }}</q-item-section>
-                  </q-item>
+                <q-list dense class="liability-menu">
+                  <q-item clickable v-close-popup @click="edit(liability)"
+                    ><q-item-section avatar><q-icon name="edit" /></q-item-section
+                    ><q-item-section>{{ t('liabilities.editDetails') }}</q-item-section></q-item
+                  >
+                  <q-item clickable
+                    ><q-item-section avatar><q-icon name="account_tree" /></q-item-section
+                    ><q-item-section>{{ t('liabilities.model') }}</q-item-section></q-item
+                  >
                   <q-item
                     clickable
                     v-close-popup
                     class="text-negative"
-                    @click="requestDelete(asset)"
+                    @click="requestDelete(liability)"
+                    ><q-item-section avatar><q-icon name="delete_outline" /></q-item-section
+                    ><q-item-section>{{ t('common.delete') }}</q-item-section></q-item
                   >
-                    <q-item-section avatar><q-icon name="delete_outline" /></q-item-section>
-                    <q-item-section>{{ t('common.delete') }}</q-item-section>
-                  </q-item>
                 </q-list>
               </q-menu>
             </q-btn>
           </article>
-
           <button type="button" class="add-row" @click="add">
-            <q-icon name="add" />
-            <span>{{ t(category.addLabelKey) }}</span>
+            <q-icon name="add" /><span>{{ t(category.addLabelKey) }}</span>
           </button>
         </section>
 
         <section v-else class="empty-card">
           <span class="empty-icon"><q-icon :name="category.icon" /></span>
-          <h2>{{ t('assets.empty.contextualTitle', { items: t(category.itemNamePluralKey) }) }}</h2>
-          <p>{{ t('assets.empty.description') }}</p>
+          <h2>
+            {{ t('liabilities.empty.contextualTitle', { items: t(category.itemNamePluralKey) }) }}
+          </h2>
+          <p>{{ t('liabilities.empty.description') }}</p>
           <q-btn
             unelevated
             no-caps
@@ -132,34 +126,35 @@
       </template>
     </main>
 
-    <q-dialog v-model="assetDialog" persistent>
-      <AssetForm
-        v-if="category"
+    <q-dialog v-model="liabilityDialog" persistent>
+      <LiabilityForm
         :category="category"
-        :asset="editingAsset"
-        :defaults="assetDefaults"
+        :liability="editingLiability"
+        :defaults="liabilityDefaults"
         :members="members"
         :saving="formSaving"
-        @save="saveAsset"
-        @cancel="closeAssetDialog"
-        @delete="requestDelete(editingAsset)"
+        @save="saveLiability"
+        @cancel="closeLiabilityDialog"
+        @delete="requestDelete(editingLiability)"
       />
     </q-dialog>
 
-    <q-dialog v-model="confirmDelete">
+    <q-dialog v-model="confirmDelete" persistent>
       <q-card class="confirm-card">
-        <q-card-section>
-          <h2>{{ t('assets.delete.title') }}</h2>
-          <p>{{ t('assets.delete.description', { name: deletingAsset?.name }) }}</p>
-        </q-card-section>
+        <q-card-section
+          ><h2>{{ t('liabilities.delete.title') }}</h2>
+          <p>
+            {{ t('liabilities.delete.description', { name: deletingLiability?.name }) }}
+          </p></q-card-section
+        >
         <q-card-actions align="between">
           <q-btn
-            flat
+            unelevated
             no-caps
             color="negative"
             :label="t('common.delete')"
             :loading="formSaving"
-            @click="deleteAsset"
+            @click="deleteLiability"
           />
           <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
         </q-card-actions>
@@ -173,12 +168,12 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import AssetForm from '@/components/assets/AssetForm.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
-import { getAssetCategory } from '@/config/asset-categories'
+import LiabilityForm from '@/components/liabilities/LiabilityForm.vue'
+import { getLiabilityCategory } from '@/config/liability-categories'
 import { authUser } from '@/services/auth'
-import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/utils/asset-calculations'
 import { formatCurrency } from '@/utils/formatters'
@@ -188,23 +183,26 @@ const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const assetsStore = useAssetsStore()
+const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const preparing = ref(false)
 const pageError = ref(null)
-const assetDialog = ref(false)
-const editingAsset = ref(null)
-const deletingAsset = ref(null)
+const liabilityDialog = ref(false)
+const editingLiability = ref(null)
+const deletingLiability = ref(null)
 const confirmDelete = ref(false)
 const formSaving = ref(false)
 let preparationId = 0
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const categoryId = computed(() => String(route.params.category))
-const assetsRoute = computed(() => ({ name: 'assets', params: { workspaceId: workspaceId.value } }))
-const category = computed(() => getAssetCategory(categoryId.value))
-const categoryConfig = computed(() => assetsStore.summary?.categories?.[categoryId.value])
+const liabilitiesRoute = computed(() => ({
+  name: 'liabilities',
+  params: { workspaceId: workspaceId.value },
+}))
+const category = computed(() => getLiabilityCategory(categoryId.value))
+const categoryConfig = computed(() => liabilitiesStore.summary?.categories?.[categoryId.value])
 const workspace = computed(
   () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
 )
@@ -214,35 +212,33 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
-const allCategoryAssets = computed(() => assetsStore.itemsForCategory(categoryId.value))
-const assetDefaults = computed(() => {
+const allCategoryLiabilities = computed(() => liabilitiesStore.itemsForCategory(categoryId.value))
+const liabilityDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config) return null
-
   const firstItem = Number(config.itemCount || 0) === 0
   return {
-    subtype: category.value?.subtypes?.[0] || null,
     name: '',
-    currentValue: firstItem ? (config.manualValue ?? 0) : 0,
+    balance: firstItem ? (config.manualValue ?? 0) : 0,
     ownership: cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value)),
   }
 })
-const scopedAssets = computed(() =>
-  allCategoryAssets.value.map((asset) => ({
-    ...asset,
-    scopedValue: applyOwnership(asset.currentValue, asset.ownership, selectedMemberId.value),
+const scopedLiabilities = computed(() =>
+  allCategoryLiabilities.value.map((liability) => ({
+    ...liability,
+    scopedValue: applyOwnership(liability.balance, liability.ownership, selectedMemberId.value),
   })),
 )
 const categoryTotal = computed(() =>
-  assetsStore.totalForCategory(categoryId.value, selectedMemberId.value),
+  liabilitiesStore.totalForCategory(categoryId.value, selectedMemberId.value),
 )
 const itemSummary = computed(() => {
   const count = Number(categoryConfig.value?.itemCount || 0)
-  const itemKey = count === 1 ? category.value.itemNameKey : category.value.itemNamePluralKey
-  return t('assets.itemSummary', { count, items: t(itemKey) })
+  const key = count === 1 ? category.value.itemNameKey : category.value.itemNamePluralKey
+  return t('liabilities.itemSummary', { count, items: t(key) })
 })
 const pageLoading = computed(
-  () => preparing.value || assetsStore.loading || assetsStore.categoryLoading,
+  () => preparing.value || liabilitiesStore.loading || liabilitiesStore.categoryLoading,
 )
 
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
@@ -251,19 +247,14 @@ async function preparePage(force = false) {
   const currentPreparation = ++preparationId
   preparing.value = true
   pageError.value = null
-
   try {
-    await assetsStore.loadSummary(workspaceId.value, force)
+    await liabilitiesStore.loadSummary(workspaceId.value, force)
     if (currentPreparation !== preparationId) return
-
-    const currentCategory = category.value
-    const config = categoryConfig.value
-    if (!assetsStore.setupCompleted || !currentCategory || !config?.enabled) {
-      await router.replace(assetsRoute.value)
+    if (!liabilitiesStore.setupCompleted || !category.value || !categoryConfig.value?.enabled) {
+      await router.replace(liabilitiesRoute.value)
       return
     }
-
-    await assetsStore.loadCategory(workspaceId.value, categoryId.value, force)
+    await liabilitiesStore.loadCategory(workspaceId.value, categoryId.value, force)
   } catch (error) {
     pageError.value = error
   } finally {
@@ -271,52 +262,45 @@ async function preparePage(force = false) {
   }
 }
 
-function assetSubtitle(asset) {
-  return asset.subtype ? t(`assets.subtypes.${asset.subtype}`) : t(category.value.descriptionKey)
-}
-
 function add() {
-  editingAsset.value = null
-  assetDialog.value = true
+  editingLiability.value = null
+  liabilityDialog.value = true
+}
+function edit(liability) {
+  editingLiability.value = liability
+  liabilityDialog.value = true
+}
+function closeLiabilityDialog() {
+  liabilityDialog.value = false
+  editingLiability.value = null
 }
 
-function edit(asset) {
-  editingAsset.value = asset
-  assetDialog.value = true
-}
-
-function closeAssetDialog() {
-  assetDialog.value = false
-  editingAsset.value = null
-}
-
-async function saveAsset(payload) {
+async function saveLiability(payload) {
   if (formSaving.value) return
-  const assetId = editingAsset.value?.id
+  const liabilityId = editingLiability.value?.id
   formSaving.value = true
-  const saved = await persist(() => {
-    if (assetId) {
-      return assetsStore.editAsset(workspaceId.value, assetId, payload, authUser.value.uid)
-    }
-    return assetsStore.addAsset(workspaceId.value, payload, authUser.value.uid)
-  })
+  const saved = await persist(() =>
+    liabilityId
+      ? liabilitiesStore.editLiability(workspaceId.value, liabilityId, payload, authUser.value.uid)
+      : liabilitiesStore.addLiability(workspaceId.value, payload, authUser.value.uid),
+  )
   formSaving.value = false
-  if (saved) closeAssetDialog()
+  if (saved) closeLiabilityDialog()
 }
 
-function requestDelete(asset) {
-  if (!asset) return
-  deletingAsset.value = asset
+function requestDelete(liability) {
+  if (!liability) return
+  deletingLiability.value = liability
   confirmDelete.value = true
 }
 
-async function deleteAsset() {
-  if (!deletingAsset.value) return
+async function deleteLiability() {
+  if (!deletingLiability.value) return
   formSaving.value = true
   const saved = await persist(() =>
-    assetsStore.deleteAsset(
+    liabilitiesStore.deleteLiability(
       workspaceId.value,
-      deletingAsset.value.id,
+      deletingLiability.value.id,
       authUser.value.uid,
       memberIds.value,
     ),
@@ -324,19 +308,17 @@ async function deleteAsset() {
   formSaving.value = false
   if (saved) {
     confirmDelete.value = false
-    deletingAsset.value = null
-    closeAssetDialog()
+    deletingLiability.value = null
+    closeLiabilityDialog()
   }
 }
 
 function visibleOwnershipShares(ownership) {
   return (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
 }
-
 function memberFor(memberId) {
   return members.value.find((member) => member.id === memberId)
 }
-
 function initials(name) {
   return name
     .split(/\s+/)
@@ -350,10 +332,10 @@ function initials(name) {
 async function persist(action) {
   try {
     await action()
-    $q.notify({ type: 'positive', message: t('assets.saved'), position: 'top' })
+    $q.notify({ type: 'positive', message: t('liabilities.saved'), position: 'top' })
     return true
   } catch {
-    $q.notify({ type: 'negative', message: t('assets.errors.save'), position: 'top' })
+    $q.notify({ type: 'negative', message: t('liabilities.errors.save'), position: 'top' })
     return false
   }
 }
@@ -361,7 +343,6 @@ async function persist(action) {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
-
 .category-page {
   min-height: calc(100dvh - 64px);
   padding: clamp(1.5rem, 4vw, 3rem);
@@ -395,11 +376,8 @@ async function persist(action) {
 }
 .error-state h1 {
   margin: 1rem 0 0;
-  font-size: 2rem;
 }
 .error-state p {
-  max-width: 32rem;
-  margin: 0.75rem 0 1.25rem;
   color: var(--color-copy);
 }
 .category-header {
@@ -429,7 +407,7 @@ h1 {
   letter-spacing: -0.05em;
 }
 .summary-card,
-.asset-list,
+.liability-list,
 .empty-card {
   @include dashboard-card;
   margin-top: 1.35rem;
@@ -458,24 +436,24 @@ h1 {
   margin-top: 0.5rem;
 }
 .summary-icon,
-.asset-icon,
+.liability-icon,
 .empty-icon {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
+  background: var(--color-red-soft, #fdebed);
+  color: var(--color-danger);
 }
 .summary-icon {
   width: 4.8rem;
   height: 4.8rem;
   font-size: 2rem;
 }
-.asset-list {
+.liability-list {
   overflow: hidden;
 }
-.asset-row {
+.liability-row {
   display: grid;
   grid-template-columns: minmax(14rem, 1fr) auto auto auto;
   align-items: center;
@@ -485,35 +463,30 @@ h1 {
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
 }
-.asset-main {
+.liability-main {
   display: flex;
   align-items: center;
   gap: 0.9rem;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  text-align: left;
 }
-.asset-icon {
+.liability-icon {
   width: 2.75rem;
   height: 2.75rem;
   background: #f0f5f9;
   color: #334964;
   font-size: 1.25rem;
 }
-.asset-copy {
+.liability-copy {
   min-width: 0;
 }
-.asset-copy strong,
-.asset-copy small {
+.liability-copy strong,
+.liability-copy small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.asset-copy small {
+.liability-copy small {
   margin-top: 0.2rem;
   color: var(--color-copy);
 }
@@ -533,37 +506,34 @@ h1 {
   font-size: 0.75rem;
   font-weight: 750;
 }
-.asset-value {
-  color: var(--color-ink);
-  font-size: 1.15rem;
-  font-weight: 700;
-  white-space: nowrap;
+.liability-value {
+  min-width: 7rem;
+  text-align: right;
 }
-.asset-menu {
-  min-width: 12rem;
+.liability-menu {
+  min-width: 11rem;
 }
 .add-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  min-height: 4.4rem;
-  padding: 0.8rem 1.25rem;
+  min-height: 4.6rem;
+  padding: 0.9rem 1.4rem;
   border: 0;
   background: var(--color-surface);
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: 750;
   cursor: pointer;
 }
-.add-row:hover {
-  background: var(--color-blue-soft);
-}
 .add-row .q-icon {
-  padding: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
   background: var(--color-primary);
   color: white;
-  font-size: 1.1rem;
 }
 .empty-card {
   display: grid;
@@ -574,24 +544,25 @@ h1 {
 .empty-icon {
   width: 4rem;
   height: 4rem;
-  margin-bottom: 0.75rem;
   font-size: 1.8rem;
 }
-.empty-card h2,
-.confirm-card h2 {
-  margin: 0;
-  color: var(--color-ink);
+.empty-card h2 {
+  margin: 1rem 0 0;
 }
-.empty-card p,
-.confirm-card p {
-  margin: 0.45rem 0 1.25rem;
+.empty-card p {
+  margin: 0.55rem 0 1.25rem;
 }
 .confirm-card {
   width: min(28rem, calc(100vw - 2rem));
   border-radius: var(--radius-md);
 }
-
-@media (max-width: 760px) {
+.confirm-card h2 {
+  margin: 0;
+}
+.confirm-card p {
+  color: var(--color-copy);
+}
+@media (max-width: 699px) {
   .category-page {
     padding: 1.2rem;
   }
@@ -602,26 +573,24 @@ h1 {
   .category-header :deep(.member-selector) {
     max-width: 52%;
   }
-  .summary-icon {
-    width: 3.8rem;
-    height: 3.8rem;
-    font-size: 1.55rem;
-  }
-  .asset-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+  .liability-row {
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.45rem;
   }
-  .asset-main {
-    grid-column: 1 / span 2;
+  .liability-main {
+    grid-column: 1;
   }
   .ownership-display {
     grid-column: 1;
+    grid-row: 2;
   }
-  .asset-value {
+  .liability-value {
     grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
   }
-  .asset-row > .q-btn {
-    grid-column: 3;
+  .liability-row > .q-btn {
+    grid-column: 2;
     grid-row: 1;
   }
 }

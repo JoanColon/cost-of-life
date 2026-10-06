@@ -21,7 +21,11 @@
           </div>
           <q-icon name="chevron_right" class="breakdown-chevron" />
         </button>
-        <div class="breakdown-row">
+        <button
+          class="breakdown-row breakdown-action"
+          type="button"
+          @click="$emit('open-liabilities')"
+        >
           <div class="breakdown-icon liabilities">
             <q-icon name="credit_card" />
           </div>
@@ -29,7 +33,8 @@
             <span>{{ t('dashboard.financialPosition.liabilities') }}</span>
             <strong>{{ formatCurrency(data.liabilities) }}</strong>
           </div>
-        </div>
+          <q-icon name="chevron_right" class="breakdown-chevron" />
+        </button>
       </div>
     </div>
   </DashboardCard>
@@ -41,7 +46,7 @@ import DashboardCard from './DashboardCard.vue'
 import { formatCurrency } from '@/utils/formatters'
 
 defineProps({ data: { type: Object, required: true } })
-defineEmits(['open', 'open-assets'])
+defineEmits(['open', 'open-assets', 'open-liabilities'])
 const { t } = useI18n()
 </script>
 

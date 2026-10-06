@@ -4,6 +4,8 @@ import AssetsPage from '@/pages/AssetsPage.vue'
 import CreateWorkspacePage from '@/pages/CreateWorkspacePage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
+import LiabilitiesPage from '@/pages/LiabilitiesPage.vue'
+import LiabilityCategoryPage from '@/pages/LiabilityCategoryPage.vue'
 import NotFoundPage from '@/pages/NotFoundPage.vue'
 import WorkspaceDashboardPage from '@/pages/WorkspaceDashboardPage.vue'
 import WorkspaceSectionPage from '@/pages/WorkspaceSectionPage.vue'
@@ -43,6 +45,16 @@ const routes = [
         path: 'workspaces/:workspaceId/assets/:category',
         name: 'asset-category',
         component: AssetCategoryPage,
+      },
+      {
+        path: 'workspaces/:workspaceId/liabilities',
+        name: 'liabilities',
+        component: LiabilitiesPage,
+      },
+      {
+        path: 'workspaces/:workspaceId/liabilities/:category',
+        name: 'liability-category',
+        component: LiabilityCategoryPage,
       },
       {
         path: 'workspaces/:workspaceId/cost-of-life',

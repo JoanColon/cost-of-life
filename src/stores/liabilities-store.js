@@ -1,30 +1,29 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { assetCategoryIds } from '@/config/asset-categories'
+import { liabilityCategoryIds } from '@/config/liability-categories'
 import {
-  createAsset as createAssetDocument,
-  getAssetsSummary,
-  getCategoryAssets,
-  removeAsset as removeAssetDocument,
-  removeAssetCategory as removeAssetCategoryDocuments,
-  saveAssetsSetup,
-  updateAsset as updateAssetDocument,
-  updateAssetsCategories,
-  updateSimpleCategoryOwnership as updateSimpleCategoryOwnershipDocument,
-  updateSimpleCategoryValue as updateSimpleCategoryValueDocument,
-} from '@/services/firebase/assets.service'
+  createLiability as createLiabilityDocument,
+  getCategoryLiabilities,
+  getLiabilitiesSummary,
+  removeLiability as removeLiabilityDocument,
+  removeLiabilityCategory as removeLiabilityCategoryDocuments,
+  saveLiabilitiesSetup,
+  updateLiability as updateLiabilityDocument,
+  updateLiabilityCategories,
+  updateSimpleLiabilityOwnership as updateSimpleLiabilityOwnershipDocument,
+  updateSimpleLiabilityValue as updateSimpleLiabilityValueDocument,
+} from '@/services/firebase/liabilities.service'
 import {
   allocateValueByOwnership,
   categoryEffectiveValue,
   cloneOwnership,
   createEqualOwnership,
   isItemizedCategory,
-  totalAssets,
 } from '@/utils/asset-calculations'
 
-export const useAssetsStore = defineStore('assets', () => {
+export const useLiabilitiesStore = defineStore('liabilities', () => {
   const summary = ref(null)
-  const assetsByCategory = ref({})
+  const liabilitiesByCategory = ref({})
   const loading = ref(false)
   const categoryLoading = ref(false)
   const error = ref(null)
@@ -42,16 +41,14 @@ export const useAssetsStore = defineStore('assets', () => {
 
   async function loadSummary(workspaceId, force = false) {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
-
     loading.value = true
     error.value = null
     summary.value = null
-    assetsByCategory.value = {}
+    liabilitiesByCategory.value = {}
     loadedCategoryIds.value = new Set()
     const requestId = ++summaryRequestId
-
     try {
-      const state = await getAssetsSummary(workspaceId)
+      const state = await getLiabilitiesSummary(workspaceId)
       if (requestId !== summaryRequestId) return
       summary.value = state
       loadedWorkspaceId.value = workspaceId
@@ -71,18 +68,20 @@ export const useAssetsStore = defineStore('assets', () => {
 
     const category = summary.value.categories[categoryId]
     if (!isItemizedCategory(category)) {
-      assetsByCategory.value = { ...assetsByCategory.value, [categoryId]: [] }
+      liabilitiesByCategory.value = { ...liabilitiesByCategory.value, [categoryId]: [] }
       loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
       return
     }
 
     categoryLoading.value = true
     const requestId = ++categoryRequestId
-
     try {
-      const assets = await getCategoryAssets(workspaceId, categoryId)
+      const liabilities = await getCategoryLiabilities(workspaceId, categoryId)
       if (requestId !== categoryRequestId) return
-      assetsByCategory.value = { ...assetsByCategory.value, [categoryId]: assets }
+      liabilitiesByCategory.value = {
+        ...liabilitiesByCategory.value,
+        [categoryId]: liabilities,
+      }
       loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
     } catch (loadError) {
       if (requestId !== categoryRequestId) return
@@ -94,7 +93,7 @@ export const useAssetsStore = defineStore('assets', () => {
 
   async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
     const categories = buildCategories(selectedCategoryIds, {}, memberIds)
-    await saveAssetsSetup(workspaceId, categories, userId)
+    await saveLiabilitiesSetup(workspaceId, categories, userId)
     summary.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
@@ -105,82 +104,72 @@ export const useAssetsStore = defineStore('assets', () => {
       summary.value?.categories || {},
       memberIds,
     )
-    await updateAssetsCategories(workspaceId, categories, userId)
+    await updateLiabilityCategories(workspaceId, categories, userId)
     summary.value = { ...(summary.value || {}), setupCompleted: true, categories }
   }
 
   async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
-    const category = await updateSimpleCategoryValueDocument(workspaceId, categoryId, value, userId)
-    replaceCategory(categoryId, category)
+    replaceCategory(
+      categoryId,
+      await updateSimpleLiabilityValueDocument(workspaceId, categoryId, value, userId),
+    )
   }
 
   async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, userId) {
-    const category = await updateSimpleCategoryOwnershipDocument(
-      workspaceId,
+    replaceCategory(
       categoryId,
-      ownership,
-      userId,
+      await updateSimpleLiabilityOwnershipDocument(workspaceId, categoryId, ownership, userId),
     )
-    replaceCategory(categoryId, category)
   }
 
-  async function addAsset(workspaceId, asset, userId) {
-    const result = await createAssetDocument(workspaceId, asset, userId)
-    const categoryAssets = itemsForCategory(asset.category)
-    assetsByCategory.value = {
-      ...assetsByCategory.value,
-      [asset.category]: [...categoryAssets, result.asset],
+  async function addLiability(workspaceId, liability, userId) {
+    const result = await createLiabilityDocument(workspaceId, liability, userId)
+    liabilitiesByCategory.value = {
+      ...liabilitiesByCategory.value,
+      [liability.category]: [...itemsForCategory(liability.category), result.liability],
     }
-    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(asset.category)
-    replaceCategory(asset.category, result.category)
-    return result.asset
+    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(liability.category)
+    replaceCategory(liability.category, result.category)
+    return result.liability
   }
 
-  async function editAsset(workspaceId, assetId, changes, userId) {
-    const asset = findLoadedAsset(assetId)
-    if (!asset) throw new Error('Asset not found')
-
-    const result = await updateAssetDocument(workspaceId, assetId, changes, userId)
-    assetsByCategory.value = {
-      ...assetsByCategory.value,
-      [asset.category]: itemsForCategory(asset.category).map((candidate) =>
-        candidate.id === assetId ? result.asset : candidate,
+  async function editLiability(workspaceId, liabilityId, changes, userId) {
+    const liability = findLoadedLiability(liabilityId)
+    if (!liability) throw new Error('Liability not found')
+    const result = await updateLiabilityDocument(workspaceId, liabilityId, changes, userId)
+    liabilitiesByCategory.value = {
+      ...liabilitiesByCategory.value,
+      [liability.category]: itemsForCategory(liability.category).map((candidate) =>
+        candidate.id === liabilityId ? result.liability : candidate,
       ),
     }
-    replaceCategory(asset.category, result.category)
+    replaceCategory(liability.category, result.category)
   }
 
-  async function deleteAsset(workspaceId, assetId, userId, memberIds) {
-    const asset = findLoadedAsset(assetId)
-    if (!asset) throw new Error('Asset not found')
-
-    const result = await removeAssetDocument(workspaceId, assetId, userId, memberIds)
-    assetsByCategory.value = {
-      ...assetsByCategory.value,
+  async function deleteLiability(workspaceId, liabilityId, userId, memberIds) {
+    if (!findLoadedLiability(liabilityId)) throw new Error('Liability not found')
+    const result = await removeLiabilityDocument(workspaceId, liabilityId, userId, memberIds)
+    liabilitiesByCategory.value = {
+      ...liabilitiesByCategory.value,
       [result.categoryId]: itemsForCategory(result.categoryId).filter(
-        (candidate) => candidate.id !== assetId,
+        (candidate) => candidate.id !== liabilityId,
       ),
     }
     replaceCategory(result.categoryId, result.category)
   }
 
   async function deleteCategory(workspaceId, categoryId, userId) {
-    await removeAssetCategoryDocuments(workspaceId, categoryId, userId)
-
+    await removeLiabilityCategoryDocuments(workspaceId, categoryId, userId)
     const categories = { ...(summary.value?.categories || {}) }
     delete categories[categoryId]
     summary.value = { ...summary.value, categories }
-
-    const nextAssetsByCategory = { ...assetsByCategory.value }
-    delete nextAssetsByCategory[categoryId]
-    assetsByCategory.value = nextAssetsByCategory
-    const nextLoadedIds = new Set(loadedCategoryIds.value)
-    nextLoadedIds.delete(categoryId)
-    loadedCategoryIds.value = nextLoadedIds
+    const nextItems = { ...liabilitiesByCategory.value }
+    delete nextItems[categoryId]
+    liabilitiesByCategory.value = nextItems
   }
 
   function itemsForCategory(categoryId) {
-    return assetsByCategory.value[categoryId] || []
+    return liabilitiesByCategory.value[categoryId] || []
   }
 
   function totalForCategory(categoryId, memberId = 'all') {
@@ -188,30 +177,34 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   function total(memberId = 'all') {
-    return totalAssets(summary.value, memberId)
+    return (
+      Math.round(
+        Object.values(summary.value?.categories || {}).reduce(
+          (sum, category) => sum + categoryEffectiveValue(category, memberId),
+          0,
+        ) * 100,
+      ) / 100
+    )
   }
 
   function replaceCategory(categoryId, category) {
     summary.value = {
       ...(summary.value || {}),
-      categories: {
-        ...(summary.value?.categories || {}),
-        [categoryId]: category,
-      },
+      categories: { ...(summary.value?.categories || {}), [categoryId]: category },
     }
   }
 
-  function findLoadedAsset(assetId) {
-    return Object.values(assetsByCategory.value)
+  function findLoadedLiability(liabilityId) {
+    return Object.values(liabilitiesByCategory.value)
       .flat()
-      .find((asset) => asset.id === assetId)
+      .find((liability) => liability.id === liabilityId)
   }
 
   function reset() {
     summaryRequestId += 1
     categoryRequestId += 1
     summary.value = null
-    assetsByCategory.value = {}
+    liabilitiesByCategory.value = {}
     loading.value = false
     categoryLoading.value = false
     error.value = null
@@ -221,11 +214,9 @@ export const useAssetsStore = defineStore('assets', () => {
 
   return {
     summary,
-    assetsByCategory,
     loading,
     categoryLoading,
     error,
-    loadedWorkspaceId,
     setupCompleted,
     enabledCategories,
     loadSummary,
@@ -234,9 +225,9 @@ export const useAssetsStore = defineStore('assets', () => {
     saveCategorySelection,
     updateSimpleCategoryValue,
     updateSimpleCategoryOwnership,
-    addAsset,
-    editAsset,
-    deleteAsset,
+    addLiability,
+    editLiability,
+    deleteLiability,
     deleteCategory,
     itemsForCategory,
     totalForCategory,
@@ -247,12 +238,10 @@ export const useAssetsStore = defineStore('assets', () => {
 
 function buildCategories(selectedCategoryIds, existingCategories, memberIds) {
   const selected = new Set(selectedCategoryIds)
-
   return Object.fromEntries(
-    assetCategoryIds.map((categoryId) => {
+    liabilityCategoryIds.map((categoryId) => {
       const previous = existingCategories[categoryId]
       if (previous) return [categoryId, { ...previous, enabled: selected.has(categoryId) }]
-
       const ownership = createEqualOwnership(memberIds)
       return [
         categoryId,

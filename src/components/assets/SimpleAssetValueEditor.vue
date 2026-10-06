@@ -1,21 +1,23 @@
 <template>
-  <button
-    type="button"
+  <span
     class="simple-value"
-    :aria-label="t('assets.quickEdit.editLabel', { value: formattedValue })"
-    :disabled="saving"
-    @click.stop
+    :class="{ disabled: disabled || saving }"
+    role="button"
+    :aria-label="ariaLabel || t('assets.quickEdit.editLabel', { value: formattedValue })"
+    :aria-disabled="disabled || saving"
+    :tabindex="disabled || saving ? -1 : 0"
   >
     <q-spinner v-if="saving" color="primary" size="1.1rem" />
     <template v-else>
       <span>{{ formattedValue }}</span>
-      <q-icon name="edit" class="edit-icon" aria-hidden="true" />
+      <q-icon v-if="!disabled" name="edit" class="edit-icon" aria-hidden="true" />
     </template>
 
     <q-popup-edit
       v-model="editorValue"
       buttons
-      :title="t('assets.quickEdit.title')"
+      :disable="disabled || saving"
+      :title="title || t('assets.quickEdit.title')"
       :label-set="t('common.save')"
       :label-cancel="t('common.cancel')"
       :validate="isValidValue"
@@ -35,13 +37,13 @@
           min="0"
           step="0.01"
           :prefix="currencySymbol"
-          :label="t('assets.form.totalValue')"
+          :label="inputLabel || t('assets.form.totalValue')"
           :rules="[valueRule]"
           @keyup.enter="scope.set"
         />
       </template>
     </q-popup-edit>
-  </button>
+  </span>
 </template>
 
 <script setup>
@@ -54,6 +56,10 @@ const props = defineProps({
   value: { type: Number, default: 0 },
   formattedValue: { type: String, required: true },
   saving: { type: Boolean, default: false },
+  disabled: { type: Boolean, default: false },
+  ariaLabel: { type: String, default: '' },
+  title: { type: String, default: '' },
+  inputLabel: { type: String, default: '' },
 })
 
 const emit = defineEmits(['save'])
@@ -119,8 +125,13 @@ function save(value) {
   @include focus-ring;
 }
 
-.simple-value:disabled {
-  cursor: wait;
+.simple-value.disabled {
+  cursor: default;
+}
+
+.simple-value.disabled:hover {
+  background: transparent;
+  color: var(--color-ink);
 }
 
 .edit-icon {

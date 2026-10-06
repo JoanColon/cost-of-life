@@ -22,6 +22,7 @@
           :data="dashboardData"
           @open="openSection('financial-position')"
           @open-assets="openSection('assets')"
+          @open-liabilities="openSection('liabilities')"
         />
         <MilestonesCard
           class="milestones-card"
@@ -51,6 +52,7 @@ import { getMockDashboard } from '@/mocks/workspace-dashboard'
 import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -58,6 +60,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const assetsStore = useAssetsStore()
+const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 
@@ -75,11 +78,13 @@ const selectedMemberId = computed({
 const dashboardData = computed(() => {
   const mockDashboard = getMockDashboard(selectedMemberId.value, memberIds.value)
   const assets = assetsStore.total(selectedMemberId.value)
+  const liabilities = liabilitiesStore.total(selectedMemberId.value)
 
   return {
     ...mockDashboard,
     assets,
-    netWorth: assets - mockDashboard.liabilities,
+    liabilities,
+    netWorth: assets - liabilities,
   }
 })
 
@@ -98,7 +103,8 @@ const greeting = computed(() => {
 watch(
   workspaceId,
   (id) => {
-    assetsStore.load(id)
+    assetsStore.loadSummary(id)
+    liabilitiesStore.loadSummary(id)
   },
   { immediate: true },
 )

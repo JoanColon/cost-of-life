@@ -1,33 +1,33 @@
 <template>
-  <q-page class="assets-page">
-    <main class="assets-shell">
-      <div v-if="assetsStore.loading" class="loading-state">
+  <q-page class="liabilities-page">
+    <main class="liabilities-shell">
+      <div v-if="liabilitiesStore.loading" class="loading-state">
         <q-spinner color="primary" size="2rem" />
-        <span>{{ t('assets.loading') }}</span>
+        <span>{{ t('liabilities.loading') }}</span>
       </div>
 
-      <section v-else-if="assetsStore.error" class="error-state">
+      <section v-else-if="liabilitiesStore.error" class="error-state">
         <q-icon name="cloud_off" />
-        <h1>{{ t('assets.errors.loadTitle') }}</h1>
-        <p>{{ t('assets.errors.load') }}</p>
+        <h1>{{ t('liabilities.errors.loadTitle') }}</h1>
+        <p>{{ t('liabilities.errors.load') }}</p>
         <q-btn
           unelevated
           no-caps
           color="primary"
           icon="refresh"
           :label="t('common.retry')"
-          @click="assetsStore.loadSummary(workspaceId, true)"
+          @click="liabilitiesStore.loadSummary(workspaceId, true)"
         />
       </section>
 
-      <AssetCategorySetup
-        v-else-if="!assetsStore.setupCompleted"
+      <LiabilityCategorySetup
+        v-else-if="!liabilitiesStore.setupCompleted"
         :saving="saving"
         @save="completeSetup"
       />
 
       <template v-else>
-        <header class="assets-header">
+        <header class="liabilities-header">
           <div>
             <q-btn
               flat
@@ -39,19 +39,19 @@
               :to="workspaceHomeRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('assets.eyebrow') }}</div>
-            <h1>{{ t('assets.title') }}</h1>
+            <div class="eyebrow">{{ t('liabilities.eyebrow') }}</div>
+            <h1>{{ t('liabilities.title') }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
 
         <section class="total-card">
-          <span>{{ t('assets.totalAssets') }}</span>
+          <span>{{ t('liabilities.totalLiabilities') }}</span>
           <strong>{{ formatCurrency(total) }}</strong>
           <small>{{ scopeLabel }}</small>
         </section>
 
-        <section class="category-list" :aria-label="t('assets.enabledCategories')">
+        <section class="category-list" :aria-label="t('liabilities.enabledCategories')">
           <div v-for="category in enabledCategories" :key="category.id" class="category-row">
             <button type="button" class="category-main" @click="openCategory(category.id)">
               <span class="category-icon"><q-icon :name="category.icon" /></span>
@@ -84,13 +84,15 @@
               :formatted-value="categoryValue(category.id)"
               :saving="isCategorySaving(category.id)"
               :disabled="isItemizedCategory(category.id)"
+              :title="t('liabilities.quickEdit.title')"
+              :input-label="t('liabilities.form.totalBalance')"
               @save="saveSimpleCategoryValue(category.id, $event)"
             />
 
             <button
               type="button"
               class="category-link"
-              :aria-label="t('assets.openCategory', { category: t(category.nameKey) })"
+              :aria-label="t('liabilities.openCategory', { category: t(category.nameKey) })"
               @click="openCategory(category.id)"
             >
               <q-icon name="chevron_right" class="chevron" />
@@ -102,7 +104,7 @@
               dense
               icon="more_vert"
               color="grey-7"
-              :aria-label="t('assets.moreActions', { name: t(category.nameKey) })"
+              :aria-label="t('liabilities.moreActions', { name: t(category.nameKey) })"
               @click.stop
             >
               <q-menu anchor="bottom right" self="top right">
@@ -127,7 +129,7 @@
           no-caps
           icon="tune"
           color="primary"
-          :label="t('assets.editCategories')"
+          :label="t('liabilities.editCategories')"
           class="edit-categories"
           @click="editingCategories = true"
         />
@@ -136,9 +138,9 @@
 
     <q-dialog v-model="editingCategories" :maximized="$q.screen.lt.sm">
       <q-card class="category-dialog">
-        <AssetCategorySetup
+        <LiabilityCategorySetup
           edit-mode
-          :initial-selected="assetsStore.enabledCategories"
+          :initial-selected="liabilitiesStore.enabledCategories"
           :saving="saving"
           @save="requestCategorySave"
           @cancel="editingCategories = false"
@@ -148,17 +150,17 @@
 
     <q-dialog v-model="confirmDisable">
       <q-card class="confirm-card">
-        <q-card-section>
-          <h2>{{ t('assets.setup.disableTitle') }}</h2>
-          <p>{{ t('assets.setup.disableDescription') }}</p>
-        </q-card-section>
+        <q-card-section
+          ><h2>{{ t('liabilities.setup.disableTitle') }}</h2>
+          <p>{{ t('liabilities.setup.disableDescription') }}</p></q-card-section
+        >
         <q-card-actions align="right">
           <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
           <q-btn
             unelevated
             no-caps
             color="primary"
-            :label="t('assets.setup.disableAction')"
+            :label="t('liabilities.setup.disableAction')"
             @click="savePendingCategories"
           />
         </q-card-actions>
@@ -167,16 +169,16 @@
 
     <q-dialog v-model="confirmCategoryDelete">
       <q-card class="confirm-card">
-        <q-card-section>
-          <h2>{{ t('assets.deleteCategory.title') }}</h2>
+        <q-card-section
+          ><h2>{{ t('liabilities.deleteCategory.title') }}</h2>
           <p>
             {{
-              t('assets.deleteCategory.description', {
+              t('liabilities.deleteCategory.description', {
                 name: deletingCategory ? t(deletingCategory.nameKey) : '',
               })
             }}
-          </p>
-        </q-card-section>
+          </p></q-card-section
+        >
         <q-card-actions align="right">
           <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
           <q-btn
@@ -194,7 +196,7 @@
     <q-dialog v-model="ownershipDialog">
       <q-card class="ownership-dialog-card">
         <q-card-section>
-          <h2>{{ t('assets.ownership.label') }}</h2>
+          <h2>{{ t('liabilities.ownership.label') }}</h2>
           <OwnershipEditor
             v-if="editingOwnershipCategoryId"
             v-model="editingOwnership"
@@ -224,14 +226,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import AssetCategorySetup from '@/components/assets/AssetCategorySetup.vue'
 import OwnershipEditor from '@/components/assets/OwnershipEditor.vue'
 import SimpleAssetValueEditor from '@/components/assets/SimpleAssetValueEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
-import { assetCategories } from '@/config/asset-categories'
+import LiabilityCategorySetup from '@/components/liabilities/LiabilityCategorySetup.vue'
+import { liabilityCategories } from '@/config/liability-categories'
 import { authUser } from '@/services/auth'
-import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { cloneOwnership, isValidOwnership } from '@/utils/asset-calculations'
 import { formatCurrency } from '@/utils/formatters'
@@ -241,7 +243,7 @@ const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const assetsStore = useAssetsStore()
+const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
@@ -271,39 +273,40 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const enabledCategories = computed(() =>
-  assetCategories.filter((category) => assetsStore.enabledCategories.includes(category.id)),
+  liabilityCategories.filter((category) =>
+    liabilitiesStore.enabledCategories.includes(category.id),
+  ),
 )
-const total = computed(() => assetsStore.total(selectedMemberId.value))
+const total = computed(() => liabilitiesStore.total(selectedMemberId.value))
 const scopeLabel = computed(() =>
   selectedMemberId.value === 'all'
     ? t('dashboard.allMembers')
     : members.value.find((member) => member.id === selectedMemberId.value)?.name || '',
 )
 
-onMounted(() => loadAssets(workspaceId.value))
-watch(workspaceId, (value) => loadAssets(value))
-
-async function loadAssets(activeWorkspaceId) {
-  await assetsStore.loadSummary(activeWorkspaceId)
-}
+onMounted(() => liabilitiesStore.loadSummary(workspaceId.value))
+watch(workspaceId, (value) => liabilitiesStore.loadSummary(value))
 
 async function completeSetup(selected) {
   await persist(() =>
-    assetsStore.completeSetup(workspaceId.value, selected, authUser.value.uid, memberIds.value),
+    liabilitiesStore.completeSetup(
+      workspaceId.value,
+      selected,
+      authUser.value.uid,
+      memberIds.value,
+    ),
   )
 }
 
 function requestCategorySave(selected) {
-  const removedWithData = assetsStore.enabledCategories.some(
+  const removedWithData = liabilitiesStore.enabledCategories.some(
     (categoryId) => !selected.includes(categoryId) && categoryHasData(categoryId),
   )
-
   if (removedWithData) {
     pendingSelection.value = selected
     confirmDisable.value = true
     return
   }
-
   saveCategorySelection(selected)
 }
 
@@ -315,7 +318,7 @@ async function savePendingCategories() {
 
 async function saveCategorySelection(selected) {
   const saved = await persist(() =>
-    assetsStore.saveCategorySelection(
+    liabilitiesStore.saveCategorySelection(
       workspaceId.value,
       selected,
       authUser.value.uid,
@@ -332,11 +335,13 @@ function requestCategoryDelete(category) {
 
 async function deleteCategory() {
   if (!deletingCategory.value || saving.value) return
-
   const saved = await persist(() =>
-    assetsStore.deleteCategory(workspaceId.value, deletingCategory.value.id, authUser.value.uid),
+    liabilitiesStore.deleteCategory(
+      workspaceId.value,
+      deletingCategory.value.id,
+      authUser.value.uid,
+    ),
   )
-
   if (saved) {
     confirmCategoryDelete.value = false
     deletingCategory.value = null
@@ -344,24 +349,23 @@ async function deleteCategory() {
 }
 
 function categoryHasData(categoryId) {
-  const category = assetsStore.summary?.categories?.[categoryId]
+  const category = liabilitiesStore.summary?.categories?.[categoryId]
   return Number(category?.manualValue || 0) > 0 || Number(category?.itemCount || 0) > 0
 }
 
 function categoryStatus(categoryId) {
-  const category = assetsStore.summary?.categories?.[categoryId]
-  if (Number(category?.itemCount || 0) > 0) {
-    return t('assets.itemCount', { count: category.itemCount })
-  }
-  return t('assets.simpleTotal')
+  const category = liabilitiesStore.summary?.categories?.[categoryId]
+  return Number(category?.itemCount || 0) > 0
+    ? t('liabilities.itemCount', { count: category.itemCount })
+    : t('liabilities.simpleTotal')
 }
 
 function categoryValue(categoryId) {
-  return formatCurrency(assetsStore.totalForCategory(categoryId, selectedMemberId.value))
+  return formatCurrency(liabilitiesStore.totalForCategory(categoryId, selectedMemberId.value))
 }
 
 function categoryMembers(categoryId) {
-  const category = assetsStore.summary?.categories?.[categoryId]
+  const category = liabilitiesStore.summary?.categories?.[categoryId]
   const ownerIds = new Set(
     Number(category?.itemCount || 0) > 0
       ? Object.keys(category.memberValues || {})
@@ -369,7 +373,6 @@ function categoryMembers(categoryId) {
           .filter((share) => Number(share.percentage) > 0)
           .map((share) => share.memberId),
   )
-
   return members.value.filter((member) => ownerIds.has(member.id))
 }
 
@@ -378,7 +381,6 @@ function categoryOwnershipLabel(categoryId) {
     .map((member) => member.name)
     .join(', ')
 }
-
 function initials(name) {
   return name
     .split(/\s+/)
@@ -388,44 +390,39 @@ function initials(name) {
     .join('')
     .toUpperCase()
 }
-
 function isItemizedCategory(categoryId) {
-  return Number(assetsStore.summary?.categories?.[categoryId]?.itemCount || 0) > 0
+  return Number(liabilitiesStore.summary?.categories?.[categoryId]?.itemCount || 0) > 0
 }
-
 function canonicalCategoryValue(categoryId) {
-  return assetsStore.summary?.categories?.[categoryId]?.manualValue ?? 0
+  return liabilitiesStore.summary?.categories?.[categoryId]?.manualValue ?? 0
 }
-
 function isCategorySaving(categoryId) {
   return savingCategoryIds.value.has(categoryId)
 }
 
 async function saveSimpleCategoryValue(categoryId, value) {
   if (isCategorySaving(categoryId)) return
-
   savingCategoryIds.value = new Set(savingCategoryIds.value).add(categoryId)
   try {
-    await assetsStore.updateSimpleCategoryValue(
+    await liabilitiesStore.updateSimpleCategoryValue(
       workspaceId.value,
       categoryId,
       value,
       authUser.value.uid,
     )
   } catch {
-    $q.notify({ type: 'negative', message: t('assets.errors.save'), position: 'top' })
+    $q.notify({ type: 'negative', message: t('liabilities.errors.save'), position: 'top' })
   } finally {
-    const nextSavingIds = new Set(savingCategoryIds.value)
-    nextSavingIds.delete(categoryId)
-    savingCategoryIds.value = nextSavingIds
+    const next = new Set(savingCategoryIds.value)
+    next.delete(categoryId)
+    savingCategoryIds.value = next
   }
 }
 
 function openOwnershipEditor(categoryId) {
   if (isItemizedCategory(categoryId)) return
-  const ownership = assetsStore.summary?.categories?.[categoryId]?.ownership
+  const ownership = liabilitiesStore.summary?.categories?.[categoryId]?.ownership
   if (!ownership) return
-
   editingOwnershipCategoryId.value = categoryId
   editingOwnership.value = cloneOwnership(ownership)
   ownershipValid.value = isValidOwnership(editingOwnership.value, memberIds.value)
@@ -434,16 +431,14 @@ function openOwnershipEditor(categoryId) {
 
 async function saveSimpleOwnership() {
   if (!editingOwnershipCategoryId.value || !ownershipValid.value) return
-
   const saved = await persist(() =>
-    assetsStore.updateSimpleCategoryOwnership(
+    liabilitiesStore.updateSimpleCategoryOwnership(
       workspaceId.value,
       editingOwnershipCategoryId.value,
       cloneOwnership(editingOwnership.value),
       authUser.value.uid,
     ),
   )
-
   if (saved) {
     ownershipDialog.value = false
     editingOwnershipCategoryId.value = null
@@ -452,7 +447,7 @@ async function saveSimpleOwnership() {
 
 function openCategory(categoryId) {
   router.push({
-    name: 'asset-category',
+    name: 'liability-category',
     params: { workspaceId: workspaceId.value, category: categoryId },
   })
 }
@@ -463,7 +458,7 @@ async function persist(action) {
     await action()
     return true
   } catch {
-    $q.notify({ type: 'negative', message: t('assets.errors.save'), position: 'top' })
+    $q.notify({ type: 'negative', message: t('liabilities.errors.save'), position: 'top' })
     return false
   } finally {
     saving.value = false
@@ -473,137 +468,106 @@ async function persist(action) {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
-
-.assets-page {
-  min-height: calc(100vh - 64px);
+.liabilities-page {
   min-height: calc(100dvh - 64px);
   padding: clamp(1.5rem, 4vw, 3rem);
   background: var(--color-page);
 }
-
-.assets-shell {
+.liabilities-shell {
   width: 100%;
   max-width: 64rem;
   margin: 0 auto;
 }
-
+.loading-state,
+.error-state {
+  min-height: 24rem;
+}
 .loading-state {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  min-height: 20rem;
   color: var(--color-copy);
 }
-
 .error-state {
   display: grid;
   justify-items: center;
-  min-height: 24rem;
   place-content: center;
   text-align: center;
 }
-
 .error-state > .q-icon {
   color: var(--color-copy);
   font-size: 3rem;
 }
-
 .error-state h1 {
-  margin-top: 1rem;
-  font-size: 2rem;
+  margin: 1rem 0 0;
 }
-
 .error-state p {
-  max-width: 32rem;
-  margin: 0.75rem 0 1.25rem;
   color: var(--color-copy);
 }
-
-.assets-header {
+.liabilities-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 2rem;
 }
-
 .back-button {
   min-height: 2rem;
   margin: 0 0 1rem -0.5rem;
   padding: 0 0.5rem;
   font-size: 0.78rem;
 }
-
 .eyebrow {
   color: var(--color-primary);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 750;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-
 h1 {
-  margin: 0.35rem 0 0;
+  margin: 0.3rem 0 0;
   color: var(--color-ink);
-  font-size: clamp(2.4rem, 5vw, 4rem);
+  font-size: clamp(2.1rem, 5vw, 3.5rem);
   line-height: 1;
   letter-spacing: -0.05em;
 }
-
-.total-card {
+.total-card,
+.category-list {
   @include dashboard-card;
-  display: grid;
-  margin-top: 2rem;
-  padding: clamp(1.5rem, 4vw, 2.5rem);
+  margin-top: 1.25rem;
 }
-
+.total-card {
+  display: grid;
+  padding: clamp(1.5rem, 4vw, 2.1rem);
+}
 .total-card span,
 .total-card small {
   color: var(--color-copy);
 }
-
 .total-card strong {
-  margin-top: 0.4rem;
-  color: var(--color-ink);
-  font-size: clamp(2.75rem, 7vw, 5rem);
+  margin-top: 0.25rem;
+  font-size: clamp(2.7rem, 7vw, 4.7rem);
   line-height: 1;
   letter-spacing: -0.055em;
 }
-
 .total-card small {
   margin-top: 0.65rem;
 }
-
 .category-list {
-  @include dashboard-card;
   overflow: hidden;
-  margin-top: 1.25rem;
 }
-
 .category-row {
   display: grid;
   grid-template-columns: minmax(14rem, 1fr) auto auto auto auto;
   align-items: center;
   gap: 1rem;
-  width: 100%;
   min-height: 5.6rem;
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
-  color: var(--color-ink);
 }
-
-.category-menu {
-  min-width: 10rem;
-}
-
 .category-row:last-child {
   border-bottom: 0;
 }
-
-.category-row:hover {
-  background: var(--color-surface-soft);
-}
-
 .category-main {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -618,7 +582,24 @@ h1 {
   text-align: left;
   cursor: pointer;
 }
-
+.category-icon {
+  display: grid;
+  place-items: center;
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 50%;
+  background: var(--color-red-soft, #fdebed);
+  color: var(--color-danger);
+  font-size: 1.3rem;
+}
+.category-copy strong,
+.category-copy small {
+  display: block;
+}
+.category-copy small {
+  margin-top: 0.25rem;
+  color: var(--color-copy);
+}
 .category-ownership {
   display: flex;
   padding-left: 0.45rem;
@@ -626,15 +607,9 @@ h1 {
   background: transparent;
   cursor: pointer;
 }
-
 .category-ownership:disabled {
   cursor: default;
 }
-
-.category-ownership:not(:disabled):focus-visible {
-  @include focus-ring;
-}
-
 .ownership-avatar {
   margin-left: -0.45rem;
   border: 2px solid var(--color-surface);
@@ -643,33 +618,6 @@ h1 {
   font-size: 0.75rem;
   font-weight: 750;
 }
-
-.category-main:focus-visible,
-.category-link:focus-visible {
-  @include focus-ring;
-}
-
-.category-icon {
-  display: grid;
-  place-items: center;
-  width: 2.9rem;
-  height: 2.9rem;
-  border-radius: 50%;
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
-  font-size: 1.3rem;
-}
-
-.category-copy strong,
-.category-copy small {
-  display: block;
-}
-
-.category-copy small {
-  margin-top: 0.25rem;
-  color: var(--color-copy);
-}
-
 .category-link {
   display: grid;
   place-items: center;
@@ -681,97 +629,76 @@ h1 {
   color: inherit;
   cursor: pointer;
 }
-
+.category-main:focus-visible,
+.category-link:focus-visible,
+.category-ownership:not(:disabled):focus-visible {
+  @include focus-ring;
+}
 .chevron {
   color: var(--color-copy);
   font-size: 1.25rem;
 }
-
 .edit-categories {
   margin-top: 1rem;
 }
-
 .category-dialog {
   width: min(68rem, calc(100vw - 2rem));
   max-width: none;
   padding: clamp(1.25rem, 4vw, 2.5rem);
   border-radius: var(--radius-card);
 }
-
 .confirm-card {
   width: min(28rem, calc(100vw - 2rem));
   border-radius: var(--radius-md);
 }
-
+.confirm-card h2,
+.ownership-dialog-card h2 {
+  margin: 0 0 1rem;
+}
+.confirm-card p {
+  color: var(--color-copy);
+}
 .ownership-dialog-card {
   width: min(34rem, calc(100vw - 2rem));
   border-radius: var(--radius-md);
 }
-
-.ownership-dialog-card h2 {
-  margin: 0 0 1.25rem;
-}
-
-.confirm-card h2 {
-  margin: 0;
-  color: var(--color-ink);
-}
-
-.confirm-card p {
-  margin: 0.75rem 0 0;
-  color: var(--color-copy);
-}
-
 @media (max-width: 699px) {
-  .assets-page {
+  .liabilities-page {
     padding: 1.2rem;
   }
-
-  .assets-header {
+  .liabilities-header {
     align-items: flex-end;
     gap: 1rem;
   }
-
-  .assets-header :deep(.member-selector) {
+  .liabilities-header :deep(.member-selector) {
     max-width: 52%;
   }
-
   .category-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 0.2rem 0.5rem;
     padding: 0.75rem 0.5rem 0.75rem 1rem;
   }
-
   .category-main {
     grid-column: 1;
     min-height: 3rem;
     padding: 0;
   }
-
   .category-row :deep(.simple-value) {
     grid-column: 2;
     grid-row: 2;
-    justify-self: end;
   }
-
   .category-ownership {
     grid-column: 1;
     grid-row: 2;
   }
-
   .category-link {
     grid-column: 2;
     grid-row: 1;
     min-height: 3rem;
   }
-
   .category-row > .q-btn {
     grid-column: 3;
     grid-row: 1 / span 2;
-  }
-
-  .category-icon {
-    grid-row: 1;
   }
 }
 </style>

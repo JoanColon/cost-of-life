@@ -50,7 +50,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  createSharedOwnership,
+  createEqualOwnership,
   createSingleOwnership,
   isValidOwnership,
 } from '@/utils/asset-calculations'
@@ -88,7 +88,7 @@ function selectSingle(memberId) {
 
 function selectShared() {
   if (selection.value === 'shared') return
-  update(createSharedOwnership(props.members.map((member) => member.id)))
+  update(createEqualOwnership(props.members.map((member) => member.id)))
 }
 
 function updateShare(memberId, percentage) {

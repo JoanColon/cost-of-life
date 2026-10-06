@@ -12,19 +12,35 @@ export function createSingleOwnership(memberId) {
   }
 }
 
-export function createSharedOwnership(memberIds) {
-  if (memberIds.length <= 1) return createSingleOwnership(memberIds[0])
+export function createEqualOwnership(memberIds) {
+  const uniqueMemberIds = [...new Set(memberIds.filter(Boolean))]
+  if (uniqueMemberIds.length <= 1) return createSingleOwnership(uniqueMemberIds[0])
 
-  const basePercentage = Math.floor(10000 / memberIds.length) / 100
+  const basePercentage = Math.floor(100000 / uniqueMemberIds.length) / 1000
   let assigned = 0
 
   return {
     mode: 'shared',
-    shares: memberIds.map((memberId, index) => {
-      const percentage = index === memberIds.length - 1 ? 100 - assigned : basePercentage
+    shares: uniqueMemberIds.map((memberId, index) => {
+      const percentage =
+        index === uniqueMemberIds.length - 1
+          ? Math.round((100 - assigned) * 1000) / 1000
+          : basePercentage
       assigned += percentage
       return { memberId, percentage }
     }),
+  }
+}
+
+export function cloneOwnership(ownership) {
+  const shares = (ownership?.shares || []).map((share) => ({
+    memberId: share.memberId,
+    percentage: Number(share.percentage),
+  }))
+
+  return {
+    mode: ownership?.mode || (shares.length > 1 ? 'shared' : 'single'),
+    shares,
   }
 }
 
@@ -62,64 +78,133 @@ export function applyOwnership(value, ownership, memberId) {
   return Math.round(amount * ownershipPercentage(ownership, memberId)) / 100
 }
 
-export function categoryAssets(assets, categoryId) {
-  return assets.filter((asset) => asset.category === categoryId)
+export function allocateValueByOwnership(value, ownership, memberIds = []) {
+  const amountInCents = Math.round((normalizeMoney(value) || 0) * 100)
+  const shares = (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
+  const values = Object.fromEntries(memberIds.filter(Boolean).map((memberId) => [memberId, 0]))
+  let assignedCents = 0
+
+  shares.forEach((share, index) => {
+    const cents =
+      index === shares.length - 1
+        ? amountInCents - assignedCents
+        : Math.round((amountInCents * Number(share.percentage)) / 100)
+    assignedCents += cents
+    values[share.memberId] = Math.round(((values[share.memberId] || 0) + cents / 100) * 100) / 100
+  })
+
+  return values
 }
 
-export function categoryTotal(categoryId, config, assets, memberId = 'all') {
-  const category = config?.categories?.[categoryId]
+export function addMemberValues(base = {}, delta = {}, multiplier = 1) {
+  const memberIds = new Set([...Object.keys(base || {}), ...Object.keys(delta || {})])
+  return Object.fromEntries(
+    [...memberIds].map((memberId) => [
+      memberId,
+      Math.round(
+        ((Number(base?.[memberId]) || 0) + multiplier * (Number(delta?.[memberId]) || 0)) * 100,
+      ) / 100,
+    ]),
+  )
+}
+
+export function addItemToCategory(category, value, ownership) {
+  const normalizedValue = normalizeMoney(value) || 0
+  const previousCount = Number(category?.itemCount || 0)
+  return {
+    ...category,
+    itemCount: previousCount + 1,
+    itemizedValue:
+      Math.round(
+        ((previousCount > 0 ? Number(category?.itemizedValue) || 0 : 0) + normalizedValue) * 100,
+      ) / 100,
+    memberValues: addMemberValues(
+      previousCount > 0 ? category?.memberValues : {},
+      allocateValueByOwnership(normalizedValue, ownership),
+    ),
+  }
+}
+
+export function updateItemInCategory(
+  category,
+  previousValue,
+  previousOwnership,
+  nextValue,
+  nextOwnership,
+) {
+  const oldValue = normalizeMoney(previousValue) || 0
+  const newValue = normalizeMoney(nextValue) || 0
+  const withoutPrevious = addMemberValues(
+    category?.memberValues,
+    allocateValueByOwnership(oldValue, previousOwnership),
+    -1,
+  )
+
+  return {
+    ...category,
+    itemizedValue:
+      Math.round(((Number(category?.itemizedValue) || 0) - oldValue + newValue) * 100) / 100,
+    memberValues: addMemberValues(
+      withoutPrevious,
+      allocateValueByOwnership(newValue, nextOwnership),
+    ),
+  }
+}
+
+export function removeItemFromCategory(
+  category,
+  value,
+  ownership,
+  defaultOwnership,
+  memberIds = [],
+) {
+  const nextCount = Math.max(0, Number(category?.itemCount || 0) - 1)
+  if (nextCount === 0) {
+    return {
+      ...category,
+      ownership: cloneOwnership(defaultOwnership),
+      itemCount: 0,
+      itemizedValue: 0,
+      memberValues: allocateValueByOwnership(category?.manualValue, defaultOwnership, memberIds),
+    }
+  }
+
+  return {
+    ...category,
+    itemCount: nextCount,
+    itemizedValue: Math.max(
+      0,
+      Math.round(((Number(category?.itemizedValue) || 0) - (normalizeMoney(value) || 0)) * 100) /
+        100,
+    ),
+    memberValues: addMemberValues(
+      category?.memberValues,
+      allocateValueByOwnership(value, ownership),
+      -1,
+    ),
+  }
+}
+
+export function isItemizedCategory(category) {
+  return Number(category?.itemCount || 0) > 0
+}
+
+export function categoryEffectiveValue(category, memberId = 'all') {
   if (!category?.enabled) return 0
 
-  if (category.mode === 'itemized') {
-    return normalizeMoney(
-      categoryAssets(assets, categoryId).reduce(
-        (total, asset) => total + applyOwnership(asset.currentValue, asset.ownership, memberId),
-        0,
-      ),
-    )
+  if (isItemizedCategory(category)) {
+    if (!memberId || memberId === 'all') return normalizeMoney(category.itemizedValue) || 0
+    return normalizeMoney(category.memberValues?.[memberId]) || 0
   }
 
   return applyOwnership(category.manualValue, category.ownership, memberId)
 }
 
-export function totalAssets(config, assets, memberId = 'all') {
+export function totalAssets(summary, memberId = 'all') {
   return normalizeMoney(
-    Object.keys(config?.categories || {}).reduce(
-      (total, categoryId) => total + categoryTotal(categoryId, config, assets, memberId),
+    Object.values(summary?.categories || {}).reduce(
+      (total, category) => total + categoryEffectiveValue(category, memberId),
       0,
     ),
   )
-}
-
-export function ownershipFromAssets(assets, memberIds) {
-  const totals = new Map(memberIds.map((memberId) => [memberId, 0]))
-  let totalValue = 0
-
-  assets.forEach((asset) => {
-    const value = normalizeMoney(asset.currentValue) || 0
-    totalValue += value
-    asset.ownership?.shares?.forEach((share) => {
-      if (!totals.has(share.memberId)) return
-      totals.set(share.memberId, totals.get(share.memberId) + value * (share.percentage / 100))
-    })
-  })
-
-  if (!totalValue) return createSingleOwnership(memberIds[0])
-
-  const shares = memberIds
-    .map((memberId) => ({
-      memberId,
-      percentage: Math.round((totals.get(memberId) / totalValue) * 10000) / 100,
-    }))
-    .filter((share) => share.percentage > 0)
-
-  if (shares.length) {
-    const difference = 100 - shares.reduce((sum, share) => sum + share.percentage, 0)
-    shares[shares.length - 1].percentage += difference
-  }
-
-  return {
-    mode: shares.length === 1 ? 'single' : 'shared',
-    shares,
-  }
 }

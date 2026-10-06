@@ -10,7 +10,10 @@ module.exports = {
   rules: {
     'no-restricted-globals': ['error', 'name', 'length'],
     'prefer-arrow-callback': 'error',
-    quotes: ['error', 'double', { allowTemplateLiterals: true }],
+    quotes: ['error', 'single', { allowTemplateLiterals: true }],
+    semi: ['error', 'never'],
+    'object-curly-spacing': ['error', 'always'],
+    'quote-props': ['error', 'as-needed'],
   },
   overrides: [
     {

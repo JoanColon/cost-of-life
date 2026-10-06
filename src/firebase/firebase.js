@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBo43_5VY5_W76APFbIxopO9iPnDWMnR4Q',
-  authDomain: 'cost-of-life-f23b2.firebaseapp.com',
+  authDomain: 'cost-of-life-f23b2.web.app',
   projectId: 'cost-of-life-f23b2',
   storageBucket: 'cost-of-life-f23b2.firebasestorage.app',
   messagingSenderId: '472858873731',

@@ -1,9 +1,9 @@
 <template>
-  <q-card class="asset-form-card">
+  <q-card class="liability-form-card">
     <q-card-section class="form-header">
       <div>
         <div class="eyebrow">{{ t(category.nameKey) }}</div>
-        <h2>{{ asset ? t('assets.form.editTitle') : t(category.addLabelKey) }}</h2>
+        <h2>{{ liability ? t('liabilities.form.editTitle') : t(category.addLabelKey) }}</h2>
       </div>
       <q-btn
         flat
@@ -16,35 +16,28 @@
     </q-card-section>
 
     <q-card-section>
-      <q-form ref="form" class="asset-form" @submit.prevent="submit">
-        <q-select
-          v-if="category.subtypes.length > 1"
-          v-model="subtype"
-          outlined
-          emit-value
-          map-options
-          :label="t('assets.form.type')"
-          :options="subtypeOptions"
-        />
+      <q-form ref="form" class="liability-form" @submit.prevent="submit">
         <q-input
           v-model.trim="name"
           outlined
           autofocus
-          :label="t('assets.form.name')"
+          :label="t('liabilities.form.name')"
           maxlength="80"
           lazy-rules
-          :rules="[(value) => Boolean(value) || t('assets.form.nameRequired')]"
+          :rules="[(value) => Boolean(value) || t('liabilities.form.nameRequired')]"
         />
         <q-input
-          v-model="currentValue"
+          v-model="balance"
           outlined
           type="number"
           min="0"
           step="0.01"
           prefix="€"
-          :label="t('assets.form.currentValue')"
+          :label="t('liabilities.form.balance')"
           lazy-rules
-          :rules="[(value) => normalizeMoney(value) !== null || t('assets.form.valueInvalid')]"
+          :rules="[
+            (value) => normalizeMoney(value) !== null || t('liabilities.form.balanceInvalid'),
+          ]"
         />
 
         <OwnershipEditor
@@ -55,7 +48,7 @@
 
         <div class="form-actions">
           <q-btn
-            v-if="asset"
+            v-if="liability"
             flat
             no-caps
             color="negative"
@@ -77,7 +70,7 @@
               no-caps
               color="primary"
               type="button"
-              :label="asset ? t('common.save') : t('common.add')"
+              :label="liability ? t('common.save') : t('common.add')"
               :loading="saving || submitting"
               :disable="!ownershipValid || saving || submitting"
               @click="submit"
@@ -90,9 +83,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import OwnershipEditor from './OwnershipEditor.vue'
+import OwnershipEditor from '@/components/assets/OwnershipEditor.vue'
 import {
   cloneOwnership,
   createEqualOwnership,
@@ -102,7 +95,7 @@ import {
 
 const props = defineProps({
   category: { type: Object, required: true },
-  asset: { type: Object, default: null },
+  liability: { type: Object, default: null },
   defaults: { type: Object, default: null },
   members: { type: Array, required: true },
   saving: { type: Boolean, default: false },
@@ -111,21 +104,13 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
 const form = ref(null)
-const subtype = ref('')
 const name = ref('')
-const currentValue = ref('')
+const balance = ref('')
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const submitting = ref(false)
 
-const subtypeOptions = computed(() =>
-  props.category.subtypes.map((value) => ({
-    value,
-    label: t(`assets.subtypes.${value}`),
-  })),
-)
-
-watch(() => [props.asset, props.defaults, props.category.id], reset, { immediate: true })
+watch(() => [props.liability, props.defaults, props.category.id], reset, { immediate: true })
 watch(
   () => props.saving,
   (saving) => {
@@ -134,10 +119,9 @@ watch(
 )
 
 function reset() {
-  const initial = props.asset || props.defaults
-  subtype.value = initial?.subtype || props.category.subtypes[0]
+  const initial = props.liability || props.defaults
   name.value = initial?.name || ''
-  currentValue.value = initial?.currentValue ?? ''
+  balance.value = initial?.balance ?? ''
   ownership.value = initial?.ownership
     ? cloneOwnership(initial.ownership)
     : createEqualOwnership(props.members.map((member) => member.id))
@@ -149,35 +133,31 @@ function reset() {
 
 async function submit() {
   if (props.saving || submitting.value) return
-
   const formIsValid = await form.value?.validate()
-  const value = normalizeMoney(currentValue.value)
-  if (!formIsValid || !name.value || value === null || !ownershipValid.value) return
+  const normalizedBalance = normalizeMoney(balance.value)
+  if (!formIsValid || !name.value || normalizedBalance === null || !ownershipValid.value) return
 
   submitting.value = true
   emit('save', {
     category: props.category.id,
-    subtype: subtype.value || null,
     name: name.value,
-    currentValue: value,
+    balance: normalizedBalance,
     ownership: cloneOwnership(ownership.value),
   })
 }
 </script>
 
 <style scoped lang="scss">
-.asset-form-card {
+.liability-form-card {
   width: min(34rem, calc(100vw - 2rem));
   border-radius: var(--radius-card);
 }
-
 .form-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
-
 .eyebrow {
   color: var(--color-primary);
   font-size: 0.72rem;
@@ -185,26 +165,22 @@ async function submit() {
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
-
 h2 {
   margin: 0.25rem 0 0;
   color: var(--color-ink);
   font-size: 1.65rem;
   letter-spacing: -0.035em;
 }
-
-.asset-form {
+.liability-form {
   display: grid;
   gap: 1rem;
 }
-
 .form-actions {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
-
 .primary-actions {
   display: flex;
   gap: 0.75rem;

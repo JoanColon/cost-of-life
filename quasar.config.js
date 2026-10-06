@@ -91,7 +91,13 @@ export default defineConfig((ctx) => {
     devServer: {
       // vueDevtools: true,
       // https: true,
-      open: true, // opens browser window automatically
+      // Keep Firebase Auth on the authorized local origin and launch a real
+      // browser: Google's OAuth/passkey flow cannot run reliably in VS Code's
+      // embedded webview.
+      host: 'localhost',
+      open: {
+        app: { name: 'google chrome' },
+      },
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
