@@ -235,7 +235,7 @@ import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { cloneOwnership, isValidOwnership } from '@/utils/asset-calculations'
+import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -437,6 +437,7 @@ async function saveSimpleOwnership() {
       editingOwnershipCategoryId.value,
       cloneOwnership(editingOwnership.value),
       authUser.value.uid,
+      memberIds.value,
     ),
   )
   if (saved) {
@@ -469,14 +470,10 @@ async function persist(action) {
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
 .liabilities-page {
-  min-height: calc(100dvh - 64px);
-  padding: clamp(1.5rem, 4vw, 3rem);
-  background: var(--color-page);
+  @include financial-page;
 }
 .liabilities-shell {
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
+  @include financial-shell;
 }
 .loading-state,
 .error-state {
@@ -506,30 +503,16 @@ async function persist(action) {
   color: var(--color-copy);
 }
 .liabilities-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
+  @include financial-header;
 }
 .back-button {
-  min-height: 2rem;
-  margin: 0 0 1rem -0.5rem;
-  padding: 0 0.5rem;
-  font-size: 0.78rem;
+  @include financial-back-button;
 }
 .eyebrow {
-  color: var(--color-primary);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  @include financial-eyebrow;
 }
 h1 {
-  margin: 0.3rem 0 0;
-  color: var(--color-ink);
-  font-size: clamp(2.1rem, 5vw, 3.5rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  @include financial-title;
 }
 .total-card,
 .category-list {
@@ -537,21 +520,17 @@ h1 {
   margin-top: 1.25rem;
 }
 .total-card {
-  display: grid;
-  padding: clamp(1.5rem, 4vw, 2.1rem);
+  @include financial-total-card;
 }
 .total-card span,
 .total-card small {
-  color: var(--color-copy);
+  @include financial-total-secondary;
 }
 .total-card strong {
-  margin-top: 0.25rem;
-  font-size: clamp(2.7rem, 7vw, 4.7rem);
-  line-height: 1;
-  letter-spacing: -0.055em;
+  @include financial-total-value;
 }
 .total-card small {
-  margin-top: 0.65rem;
+  @include financial-total-meta;
 }
 .category-list {
   overflow: hidden;

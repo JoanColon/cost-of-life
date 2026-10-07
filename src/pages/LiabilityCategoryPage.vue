@@ -175,7 +175,7 @@ import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/utils/asset-calculations'
+import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -281,8 +281,19 @@ async function saveLiability(payload) {
   formSaving.value = true
   const saved = await persist(() =>
     liabilityId
-      ? liabilitiesStore.editLiability(workspaceId.value, liabilityId, payload, authUser.value.uid)
-      : liabilitiesStore.addLiability(workspaceId.value, payload, authUser.value.uid),
+      ? liabilitiesStore.editLiability(
+          workspaceId.value,
+          liabilityId,
+          payload,
+          authUser.value.uid,
+          memberIds.value,
+        )
+      : liabilitiesStore.addLiability(
+          workspaceId.value,
+          payload,
+          authUser.value.uid,
+          memberIds.value,
+        ),
   )
   formSaving.value = false
   if (saved) closeLiabilityDialog()
@@ -344,14 +355,10 @@ async function persist(action) {
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
 .category-page {
-  min-height: calc(100dvh - 64px);
-  padding: clamp(1.5rem, 4vw, 3rem);
-  background: var(--color-page);
+  @include financial-page;
 }
 .category-shell {
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
+  @include financial-shell;
 }
 .loading-state,
 .error-state {
@@ -381,59 +388,43 @@ async function persist(action) {
   color: var(--color-copy);
 }
 .category-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
+  @include financial-header;
 }
 .back-button {
-  min-height: 2rem;
-  margin: 0 0 1rem -0.5rem;
-  padding: 0 0.5rem;
-  font-size: 0.78rem;
+  @include financial-back-button;
 }
 .eyebrow {
-  color: var(--color-primary);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  @include financial-eyebrow;
 }
 h1 {
-  margin: 0.3rem 0 0;
-  color: var(--color-ink);
-  font-size: clamp(2.1rem, 5vw, 3.5rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  @include financial-title;
 }
 .summary-card,
 .liability-list,
 .empty-card {
   @include dashboard-card;
-  margin-top: 1.35rem;
+  margin-top: 1.25rem;
 }
 .summary-card {
-  display: flex;
+  @include financial-total-card(flex);
   align-items: center;
   gap: 1.1rem;
-  padding: clamp(1.4rem, 4vw, 2rem);
 }
 .summary-card > div {
   display: grid;
 }
 .summary-card span:not(.summary-icon),
-.summary-card small,
+.summary-card small {
+  @include financial-total-secondary;
+}
 .empty-card p {
   color: var(--color-copy);
 }
 .summary-card strong {
-  margin-top: 0.2rem;
-  font-size: clamp(2.45rem, 7vw, 4.2rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  @include financial-total-value;
 }
 .summary-card small {
-  margin-top: 0.5rem;
+  @include financial-total-meta;
 }
 .summary-icon,
 .liability-icon,
@@ -446,9 +437,7 @@ h1 {
   color: var(--color-danger);
 }
 .summary-icon {
-  width: 4.8rem;
-  height: 4.8rem;
-  font-size: 2rem;
+  @include financial-summary-icon;
 }
 .liability-list {
   overflow: hidden;

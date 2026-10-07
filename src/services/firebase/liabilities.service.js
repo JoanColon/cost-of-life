@@ -12,15 +12,18 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
+import { normalizeMoney } from '@/domain/financial/money'
 import {
-  addItemToCategory,
   allocateValueByOwnership,
   cloneOwnership,
   createEqualOwnership,
-  normalizeMoney,
+  isValidOwnership,
+} from '@/domain/financial/ownership'
+import {
+  addItemToCategory,
   removeItemFromCategory,
   updateItemInCategory,
-} from '@/utils/asset-calculations'
+} from '@/domain/financial/category-summary'
 
 function summaryRef(workspaceId) {
   return doc(db, 'workspaces', workspaceId, 'financialPosition', 'liabilitiesSummary')
@@ -97,7 +100,14 @@ export async function updateSimpleLiabilityValue(workspaceId, categoryId, value,
   })
 }
 
-export async function updateSimpleLiabilityOwnership(workspaceId, categoryId, ownership, userId) {
+export async function updateSimpleLiabilityOwnership(
+  workspaceId,
+  categoryId,
+  ownership,
+  userId,
+  memberIds,
+) {
+  assertValidOwnership(ownership, memberIds)
   const documentRef = summaryRef(workspaceId)
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(documentRef)
@@ -122,7 +132,8 @@ export async function updateSimpleLiabilityOwnership(workspaceId, categoryId, ow
   })
 }
 
-export async function createLiability(workspaceId, liability, userId) {
+export async function createLiability(workspaceId, liability, userId, memberIds) {
+  assertValidOwnership(liability.ownership, memberIds)
   const liabilityRef = doc(liabilitiesRef(workspaceId))
   const documentRef = summaryRef(workspaceId)
   return runTransaction(db, async (transaction) => {
@@ -161,7 +172,7 @@ export async function createLiability(workspaceId, liability, userId) {
   })
 }
 
-export async function updateLiability(workspaceId, liabilityId, changes, userId) {
+export async function updateLiability(workspaceId, liabilityId, changes, userId, memberIds) {
   const liabilityRef = doc(liabilitiesRef(workspaceId), liabilityId)
   const documentRef = summaryRef(workspaceId)
   return runTransaction(db, async (transaction) => {
@@ -190,6 +201,7 @@ export async function updateLiability(workspaceId, liabilityId, changes, userId)
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
+    assertValidOwnership(updatedLiability.ownership, memberIds)
     const updatedCategory = {
       ...updateItemInCategory(
         category,
@@ -279,4 +291,10 @@ function stampCategories(categories, userId) {
       { ...category, updatedAt: serverTimestamp(), updatedBy: userId },
     ]),
   )
+}
+
+function assertValidOwnership(ownership, memberIds) {
+  if (!isValidOwnership(ownership, memberIds)) {
+    throw new Error('Ownership must reference workspace members and add up to 100%')
+  }
 }

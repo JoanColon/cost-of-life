@@ -12,6 +12,11 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
+import { getIncomeCategory } from '@/config/income-categories'
+import {
+  annualIncomeValue,
+  normalizeIncomeCalculation,
+} from '@/domain/financial/income-calculations'
 import { normalizeMoney } from '@/domain/financial/money'
 import {
   allocateValueByOwnership,
@@ -26,28 +31,27 @@ import {
 } from '@/domain/financial/category-summary'
 
 function summaryRef(workspaceId) {
-  return doc(db, 'workspaces', workspaceId, 'financialPosition', 'assetsSummary')
+  return doc(db, 'workspaces', workspaceId, 'cashFlow', 'incomeSummary')
 }
 
-function assetsRef(workspaceId) {
-  return collection(db, 'workspaces', workspaceId, 'assets')
+function incomeRef(workspaceId) {
+  return collection(db, 'workspaces', workspaceId, 'income')
 }
 
-export async function getAssetsSummary(workspaceId) {
+export async function getIncomeSummary(workspaceId) {
   const snapshot = await getDoc(summaryRef(workspaceId))
   return snapshot.exists() ? snapshot.data() : null
 }
 
-export async function getCategoryAssets(workspaceId, categoryId) {
-  const snapshot = await getDocs(query(assetsRef(workspaceId), where('category', '==', categoryId)))
-
-  return snapshot.docs.map((assetDocument) => ({
-    id: assetDocument.id,
-    ...assetDocument.data(),
+export async function getCategoryIncome(workspaceId, categoryId) {
+  const snapshot = await getDocs(query(incomeRef(workspaceId), where('category', '==', categoryId)))
+  return snapshot.docs.map((incomeDocument) => ({
+    id: incomeDocument.id,
+    ...incomeDocument.data(),
   }))
 }
 
-export async function saveAssetsSetup(workspaceId, categories, userId) {
+export async function saveIncomeSetup(workspaceId, categories, userId) {
   await setDoc(summaryRef(workspaceId), {
     setupCompleted: true,
     categories: stampCategories(categories, userId),
@@ -58,7 +62,7 @@ export async function saveAssetsSetup(workspaceId, categories, userId) {
   })
 }
 
-export async function updateAssetsCategories(workspaceId, categories, userId) {
+export async function updateIncomeCategories(workspaceId, categories, userId) {
   await setDoc(
     summaryRef(workspaceId),
     {
@@ -71,19 +75,17 @@ export async function updateAssetsCategories(workspaceId, categories, userId) {
   )
 }
 
-export async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
+export async function updateSimpleIncomeValue(workspaceId, categoryId, value, userId) {
   const documentRef = summaryRef(workspaceId)
-
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(documentRef)
     const category = snapshot.data()?.categories?.[categoryId]
     if (!category || Number(category.itemCount || 0) !== 0) {
-      throw new Error('Only simple asset categories can be edited directly')
+      throw new Error('Only simple income categories can be edited directly')
     }
 
     const manualValue = normalizeMoney(value)
-    if (manualValue === null) throw new Error('A non-negative numeric value is required')
-
+    if (manualValue === null) throw new Error('A non-negative annual income is required')
     const updatedCategory = {
       ...category,
       manualValue,
@@ -91,18 +93,16 @@ export async function updateSimpleCategoryValue(workspaceId, categoryId, value, 
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-
     transaction.update(documentRef, {
       [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-
     return { ...updatedCategory, updatedAt: null }
   })
 }
 
-export async function updateSimpleCategoryOwnership(
+export async function updateSimpleIncomeOwnership(
   workspaceId,
   categoryId,
   ownership,
@@ -111,14 +111,12 @@ export async function updateSimpleCategoryOwnership(
 ) {
   assertValidOwnership(ownership, memberIds)
   const documentRef = summaryRef(workspaceId)
-
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(documentRef)
     const category = snapshot.data()?.categories?.[categoryId]
     if (!category || Number(category.itemCount || 0) !== 0) {
-      throw new Error('Only simple asset category ownership can be edited')
+      throw new Error('Only simple income category ownership can be edited')
     }
-
     const updatedCategory = {
       ...category,
       ownership: cloneOwnership(ownership),
@@ -126,171 +124,150 @@ export async function updateSimpleCategoryOwnership(
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-
     transaction.update(documentRef, {
       [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-
     return { ...updatedCategory, updatedAt: null }
   })
 }
 
-export async function createAsset(workspaceId, asset, userId, memberIds) {
-  assertValidOwnership(asset.ownership, memberIds)
-  const assetRef = doc(assetsRef(workspaceId))
+export async function createIncome(workspaceId, income, userId, memberIds) {
+  assertValidOwnership(income.ownership, memberIds)
+  const normalized = normalizeIncomeItem(income)
+  const itemRef = doc(incomeRef(workspaceId))
   const documentRef = summaryRef(workspaceId)
 
   return runTransaction(db, async (transaction) => {
     const summarySnapshot = await transaction.get(documentRef)
-    const category = summarySnapshot.data()?.categories?.[asset.category]
-    if (!category?.enabled) throw new Error('Asset category is not enabled')
+    const category = summarySnapshot.data()?.categories?.[normalized.category]
+    if (!category?.enabled) throw new Error('Income category is not enabled')
 
-    const currentValue = normalizeMoney(asset.currentValue)
-    if (currentValue === null) throw new Error('A non-negative numeric value is required')
-
-    const assetData = {
-      ...asset,
-      currentValue,
-      ownership: cloneOwnership(asset.ownership),
-      detail: asset.detail || {},
-      valueSource: 'manual',
+    const itemData = {
+      ...income,
+      ...normalized,
+      ownership: cloneOwnership(income.ownership),
       createdAt: serverTimestamp(),
       createdBy: userId,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
+    const annualValue = annualIncomeValue(itemData.calculation)
     const updatedCategory = {
-      ...addItemToCategory(category, currentValue, assetData.ownership),
+      ...addItemToCategory(category, annualValue, itemData.ownership),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-
-    transaction.set(assetRef, assetData)
+    transaction.set(itemRef, itemData)
     transaction.update(documentRef, {
-      [`categories.${asset.category}`]: updatedCategory,
+      [`categories.${normalized.category}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-
     return {
-      asset: { ...assetData, id: assetRef.id, createdAt: null, updatedAt: null },
+      income: { ...itemData, id: itemRef.id, createdAt: null, updatedAt: null },
       category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
-export async function updateAsset(workspaceId, assetId, changes, userId, memberIds) {
-  const assetRef = doc(assetsRef(workspaceId), assetId)
+export async function updateIncome(workspaceId, incomeId, changes, userId, memberIds) {
+  const itemRef = doc(incomeRef(workspaceId), incomeId)
   const documentRef = summaryRef(workspaceId)
-
   return runTransaction(db, async (transaction) => {
-    const [assetSnapshot, summarySnapshot] = await Promise.all([
-      transaction.get(assetRef),
+    const [itemSnapshot, summarySnapshot] = await Promise.all([
+      transaction.get(itemRef),
       transaction.get(documentRef),
     ])
-    if (!assetSnapshot.exists()) throw new Error('Asset not found')
+    if (!itemSnapshot.exists()) throw new Error('Income source not found')
 
-    const previousAsset = assetSnapshot.data()
-    const categoryId = previousAsset.category
+    const previousIncome = itemSnapshot.data()
+    const categoryId = previousIncome.category
     const category = summarySnapshot.data()?.categories?.[categoryId]
     if (!category || Number(category.itemCount || 0) === 0) {
-      throw new Error('Itemized asset category not found')
+      throw new Error('Itemized income category not found')
     }
 
-    const currentValue = normalizeMoney(changes.currentValue)
-    if (currentValue === null) throw new Error('A non-negative numeric value is required')
-
-    const updatedAsset = {
-      ...previousAsset,
+    const normalized = normalizeIncomeItem({ ...previousIncome, ...changes, category: categoryId })
+    const updatedIncome = {
+      ...previousIncome,
       ...changes,
+      ...normalized,
       category: categoryId,
-      currentValue,
-      ownership: cloneOwnership(changes.ownership || previousAsset.ownership),
-      detail: changes.detail || previousAsset.detail || {},
+      ownership: cloneOwnership(changes.ownership || previousIncome.ownership),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-    assertValidOwnership(updatedAsset.ownership, memberIds)
+    assertValidOwnership(updatedIncome.ownership, memberIds)
     const updatedCategory = {
       ...updateItemInCategory(
         category,
-        previousAsset.currentValue,
-        previousAsset.ownership,
-        currentValue,
-        updatedAsset.ownership,
+        annualIncomeValue(previousIncome.calculation),
+        previousIncome.ownership,
+        annualIncomeValue(updatedIncome.calculation),
+        updatedIncome.ownership,
       ),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-
-    transaction.update(assetRef, updatedAsset)
+    transaction.update(itemRef, updatedIncome)
     transaction.update(documentRef, {
       [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-
     return {
-      asset: { id: assetId, ...updatedAsset, updatedAt: null },
+      income: { id: incomeId, ...updatedIncome, updatedAt: null },
       category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
-export async function removeAsset(workspaceId, assetId, userId, memberIds) {
-  const assetRef = doc(assetsRef(workspaceId), assetId)
+export async function removeIncome(workspaceId, incomeId, userId, memberIds) {
+  const itemRef = doc(incomeRef(workspaceId), incomeId)
   const documentRef = summaryRef(workspaceId)
-
   return runTransaction(db, async (transaction) => {
-    const [assetSnapshot, summarySnapshot] = await Promise.all([
-      transaction.get(assetRef),
+    const [itemSnapshot, summarySnapshot] = await Promise.all([
+      transaction.get(itemRef),
       transaction.get(documentRef),
     ])
-    if (!assetSnapshot.exists()) throw new Error('Asset not found')
+    if (!itemSnapshot.exists()) throw new Error('Income source not found')
 
-    const asset = assetSnapshot.data()
-    const category = summarySnapshot.data()?.categories?.[asset.category]
-    if (!category) throw new Error('Asset category not found')
-
+    const income = itemSnapshot.data()
+    const category = summarySnapshot.data()?.categories?.[income.category]
+    if (!category) throw new Error('Income category not found')
     const updatedCategory = {
       ...removeItemFromCategory(
         category,
-        asset.currentValue,
-        asset.ownership,
+        annualIncomeValue(income.calculation),
+        income.ownership,
         createEqualOwnership(memberIds),
         memberIds,
       ),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-
-    transaction.delete(assetRef)
+    transaction.delete(itemRef)
     transaction.update(documentRef, {
-      [`categories.${asset.category}`]: updatedCategory,
+      [`categories.${income.category}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-
     return {
-      categoryId: asset.category,
+      categoryId: income.category,
       category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
-export async function removeAssetCategory(workspaceId, categoryId, userId) {
-  const categoryAssetsSnapshot = await getDocs(
-    query(assetsRef(workspaceId), where('category', '==', categoryId)),
-  )
-
-  if (categoryAssetsSnapshot.size > 498) {
-    throw new Error('Asset categories with more than 498 items cannot be deleted in one operation')
+export async function removeIncomeCategory(workspaceId, categoryId, userId) {
+  const snapshot = await getDocs(query(incomeRef(workspaceId), where('category', '==', categoryId)))
+  if (snapshot.size > 498) {
+    throw new Error('Income categories with more than 498 sources cannot be deleted at once')
   }
-
   const batch = writeBatch(db)
-  categoryAssetsSnapshot.docs.forEach((assetDocument) => batch.delete(assetDocument.ref))
+  snapshot.docs.forEach((incomeDocument) => batch.delete(incomeDocument.ref))
   batch.update(summaryRef(workspaceId), {
     [`categories.${categoryId}`]: deleteField(),
     updatedAt: serverTimestamp(),
@@ -299,15 +276,25 @@ export async function removeAssetCategory(workspaceId, categoryId, userId) {
   await batch.commit()
 }
 
+function normalizeIncomeItem(income) {
+  const category = getIncomeCategory(income.category)
+  if (!category) throw new Error('A valid income category is required')
+  if (!category.subtypes.includes(income.subtype))
+    throw new Error('A valid income type is required')
+  if (!String(income.name || '').trim()) throw new Error('An income source name is required')
+
+  const calculation = normalizeIncomeCalculation(income.calculation)
+  if (!calculation || !category.calculationModes.includes(calculation.mode)) {
+    throw new Error('A valid income calculation is required')
+  }
+  return { category: category.id, subtype: income.subtype, name: income.name.trim(), calculation }
+}
+
 function stampCategories(categories, userId) {
   return Object.fromEntries(
     Object.entries(categories).map(([categoryId, category]) => [
       categoryId,
-      {
-        ...category,
-        updatedAt: serverTimestamp(),
-        updatedBy: userId,
-      },
+      { ...category, updatedAt: serverTimestamp(), updatedBy: userId },
     ]),
   )
 }

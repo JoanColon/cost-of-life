@@ -233,7 +233,7 @@ import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { cloneOwnership, isValidOwnership } from '@/utils/asset-calculations'
+import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -441,6 +441,7 @@ async function saveSimpleOwnership() {
       editingOwnershipCategoryId.value,
       cloneOwnership(editingOwnership.value),
       authUser.value.uid,
+      memberIds.value,
     ),
   )
 
@@ -475,16 +476,11 @@ async function persist(action) {
 @use '@/css/mixins' as *;
 
 .assets-page {
-  min-height: calc(100vh - 64px);
-  min-height: calc(100dvh - 64px);
-  padding: clamp(1.5rem, 4vw, 3rem);
-  background: var(--color-page);
+  @include financial-page;
 }
 
 .assets-shell {
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
+  @include financial-shell;
 }
 
 .loading-state {
@@ -521,57 +517,36 @@ async function persist(action) {
 }
 
 .assets-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
+  @include financial-header;
 }
 
 .back-button {
-  min-height: 2rem;
-  margin: 0 0 1rem -0.5rem;
-  padding: 0 0.5rem;
-  font-size: 0.78rem;
+  @include financial-back-button;
 }
 
 .eyebrow {
-  color: var(--color-primary);
-  font-size: 0.75rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  @include financial-eyebrow;
 }
 
 h1 {
-  margin: 0.35rem 0 0;
-  color: var(--color-ink);
-  font-size: clamp(2.4rem, 5vw, 4rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  @include financial-title;
 }
 
 .total-card {
-  @include dashboard-card;
-  display: grid;
-  margin-top: 2rem;
-  padding: clamp(1.5rem, 4vw, 2.5rem);
+  @include financial-total-card;
 }
 
 .total-card span,
 .total-card small {
-  color: var(--color-copy);
+  @include financial-total-secondary;
 }
 
 .total-card strong {
-  margin-top: 0.4rem;
-  color: var(--color-ink);
-  font-size: clamp(2.75rem, 7vw, 5rem);
-  line-height: 1;
-  letter-spacing: -0.055em;
+  @include financial-total-value;
 }
 
 .total-card small {
-  margin-top: 0.65rem;
+  @include financial-total-meta;
 }
 
 .category-list {

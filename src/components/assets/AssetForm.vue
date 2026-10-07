@@ -97,8 +97,8 @@ import {
   cloneOwnership,
   createEqualOwnership,
   isValidOwnership,
-  normalizeMoney,
-} from '@/utils/asset-calculations'
+} from '@/domain/financial/ownership'
+import { normalizeMoney } from '@/domain/financial/money'
 
 const props = defineProps({
   category: { type: Object, required: true },

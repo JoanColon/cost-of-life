@@ -14,13 +14,11 @@ import {
   updateSimpleCategoryValue as updateSimpleCategoryValueDocument,
 } from '@/services/firebase/assets.service'
 import {
-  allocateValueByOwnership,
+  buildSummaryCategories,
   categoryEffectiveValue,
-  cloneOwnership,
-  createEqualOwnership,
   isItemizedCategory,
-  totalAssets,
-} from '@/utils/asset-calculations'
+  totalCategories,
+} from '@/domain/financial/category-summary'
 
 export const useAssetsStore = defineStore('assets', () => {
   const summary = ref(null)
@@ -93,14 +91,15 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildCategories(selectedCategoryIds, {}, memberIds)
+    const categories = buildSummaryCategories(assetCategoryIds, selectedCategoryIds, {}, memberIds)
     await saveAssetsSetup(workspaceId, categories, userId)
     summary.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
   async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildCategories(
+    const categories = buildSummaryCategories(
+      assetCategoryIds,
       selectedCategoryIds,
       summary.value?.categories || {},
       memberIds,
@@ -114,18 +113,25 @@ export const useAssetsStore = defineStore('assets', () => {
     replaceCategory(categoryId, category)
   }
 
-  async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, userId) {
+  async function updateSimpleCategoryOwnership(
+    workspaceId,
+    categoryId,
+    ownership,
+    userId,
+    memberIds,
+  ) {
     const category = await updateSimpleCategoryOwnershipDocument(
       workspaceId,
       categoryId,
       ownership,
       userId,
+      memberIds,
     )
     replaceCategory(categoryId, category)
   }
 
-  async function addAsset(workspaceId, asset, userId) {
-    const result = await createAssetDocument(workspaceId, asset, userId)
+  async function addAsset(workspaceId, asset, userId, memberIds) {
+    const result = await createAssetDocument(workspaceId, asset, userId, memberIds)
     const categoryAssets = itemsForCategory(asset.category)
     assetsByCategory.value = {
       ...assetsByCategory.value,
@@ -136,11 +142,11 @@ export const useAssetsStore = defineStore('assets', () => {
     return result.asset
   }
 
-  async function editAsset(workspaceId, assetId, changes, userId) {
+  async function editAsset(workspaceId, assetId, changes, userId, memberIds) {
     const asset = findLoadedAsset(assetId)
     if (!asset) throw new Error('Asset not found')
 
-    const result = await updateAssetDocument(workspaceId, assetId, changes, userId)
+    const result = await updateAssetDocument(workspaceId, assetId, changes, userId, memberIds)
     assetsByCategory.value = {
       ...assetsByCategory.value,
       [asset.category]: itemsForCategory(asset.category).map((candidate) =>
@@ -188,7 +194,7 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   function total(memberId = 'all') {
-    return totalAssets(summary.value, memberId)
+    return totalCategories(summary.value, memberId)
   }
 
   function replaceCategory(categoryId, category) {
@@ -244,27 +250,3 @@ export const useAssetsStore = defineStore('assets', () => {
     reset,
   }
 })
-
-function buildCategories(selectedCategoryIds, existingCategories, memberIds) {
-  const selected = new Set(selectedCategoryIds)
-
-  return Object.fromEntries(
-    assetCategoryIds.map((categoryId) => {
-      const previous = existingCategories[categoryId]
-      if (previous) return [categoryId, { ...previous, enabled: selected.has(categoryId) }]
-
-      const ownership = createEqualOwnership(memberIds)
-      return [
-        categoryId,
-        {
-          enabled: selected.has(categoryId),
-          manualValue: 0,
-          ownership: cloneOwnership(ownership),
-          itemCount: 0,
-          itemizedValue: 0,
-          memberValues: allocateValueByOwnership(0, ownership, memberIds),
-        },
-      ]
-    }),
-  )
-}

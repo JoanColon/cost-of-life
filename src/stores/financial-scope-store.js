@@ -7,6 +7,7 @@ export const useFinancialScopeStore = defineStore('financial-scope', () => {
   function get(workspaceId, memberIds, preferredMemberId) {
     const selected = selectedByWorkspace.value[workspaceId]
     if (selected === 'all' || memberIds.includes(selected)) return selected
+    if (memberIds.length > 1) return 'all'
     return memberIds.includes(preferredMemberId) ? preferredMemberId : memberIds[0] || 'all'
   }
 

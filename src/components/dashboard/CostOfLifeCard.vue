@@ -24,7 +24,15 @@
     </div>
 
     <div class="metric-grid">
-      <div v-for="metric in metrics" :key="metric.label" class="metric">
+      <component
+        :is="metric.action ? 'button' : 'div'"
+        v-for="metric in metrics"
+        :key="metric.label"
+        class="metric"
+        :class="{ 'metric-action': metric.action }"
+        :type="metric.action ? 'button' : undefined"
+        @click="metric.action && emit(metric.action)"
+      >
         <div class="metric-icon" :class="metric.tone">
           <q-icon :name="metric.icon" />
         </div>
@@ -32,7 +40,8 @@
           <div class="metric-label">{{ metric.label }}</div>
           <strong>{{ metric.value }}</strong>
         </div>
-      </div>
+        <q-icon v-if="metric.action" name="chevron_right" class="metric-chevron" />
+      </component>
     </div>
   </DashboardCard>
 </template>
@@ -44,7 +53,7 @@ import DashboardCard from './DashboardCard.vue'
 import { formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({ data: { type: Object, required: true } })
-defineEmits(['open'])
+const emit = defineEmits(['open', 'open-income'])
 const { t } = useI18n()
 
 const metrics = computed(() => [
@@ -53,6 +62,7 @@ const metrics = computed(() => [
     value: formatCurrency(props.data.income),
     icon: 'account_balance_wallet',
     tone: 'green',
+    action: 'open-income',
   },
   {
     label: t('dashboard.costOfLife.cashFlow'),
@@ -148,6 +158,29 @@ const metrics = computed(() => [
   min-width: 0;
   padding: 0 1rem;
   border-right: 1px solid var(--color-line);
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.metric-action {
+  cursor: pointer;
+}
+.metric-chevron {
+  margin-left: auto;
+  color: var(--color-copy);
+}
+.metric-action:hover strong,
+.metric-action:focus-visible strong {
+  color: var(--color-primary);
+}
+.metric-action:focus-visible {
+  border-radius: 0.5rem;
+  outline: 3px solid rgb(22 136 248 / 22%);
+  outline-offset: 3px;
 }
 
 .metric:first-child {

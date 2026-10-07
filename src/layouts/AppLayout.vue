@@ -129,6 +129,7 @@ import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
 import { authUser, signOut } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
@@ -138,6 +139,7 @@ const route = useRoute()
 const router = useRouter()
 const assetsStore = useAssetsStore()
 const liabilitiesStore = useLiabilitiesStore()
+const incomeStore = useIncomeStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 
@@ -225,6 +227,7 @@ async function logout() {
   try {
     assetsStore.reset()
     liabilitiesStore.reset()
+    incomeStore.reset()
     scopeStore.reset()
     workspaceStore.reset()
     await signOut()

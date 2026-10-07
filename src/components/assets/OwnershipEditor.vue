@@ -53,7 +53,7 @@ import {
   createEqualOwnership,
   createSingleOwnership,
   isValidOwnership,
-} from '@/utils/asset-calculations'
+} from '@/domain/financial/ownership'
 
 const props = defineProps({
   modelValue: { type: Object, required: true },

@@ -16,6 +16,7 @@
           class="cost-card"
           :data="dashboardData"
           @open="openSection('cost-of-life')"
+          @open-income="openSection('income')"
         />
         <FinancialPositionCard
           class="position-card"
@@ -52,6 +53,7 @@ import { getMockDashboard } from '@/mocks/workspace-dashboard'
 import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -61,6 +63,7 @@ const route = useRoute()
 const router = useRouter()
 const assetsStore = useAssetsStore()
 const liabilitiesStore = useLiabilitiesStore()
+const incomeStore = useIncomeStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 
@@ -79,11 +82,18 @@ const dashboardData = computed(() => {
   const mockDashboard = getMockDashboard(selectedMemberId.value, memberIds.value)
   const assets = assetsStore.total(selectedMemberId.value)
   const liabilities = liabilitiesStore.total(selectedMemberId.value)
+  const income = incomeStore.setupCompleted
+    ? incomeStore.total(selectedMemberId.value)
+    : mockDashboard.income
 
   return {
     ...mockDashboard,
     assets,
     liabilities,
+    income,
+    freeCashFlow: income - mockDashboard.annualCost,
+    savingsRate: income > 0 ? Math.round(((income - mockDashboard.annualCost) / income) * 100) : 0,
+    costRatio: income > 0 ? Math.round((mockDashboard.annualCost / income) * 100) : 0,
     netWorth: assets - liabilities,
   }
 })
@@ -105,6 +115,7 @@ watch(
   (id) => {
     assetsStore.loadSummary(id)
     liabilitiesStore.loadSummary(id)
+    incomeStore.loadSummary(id)
   },
   { immediate: true },
 )

@@ -5,6 +5,87 @@
   box-shadow: var(--shadow-card);
 }
 
+@mixin financial-page {
+  min-height: calc(100dvh - 64px);
+  padding: clamp(1.25rem, 4vw, 3rem);
+  background: var(--color-page);
+}
+
+@mixin financial-shell {
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+@mixin financial-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+@mixin financial-back-button {
+  min-height: 2rem;
+  margin: 0 0 0.75rem -0.5rem;
+  padding: 0 0.5rem;
+  font-size: 0.78rem;
+}
+
+@mixin financial-eyebrow($color: var(--color-primary)) {
+  color: $color;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@mixin financial-title {
+  margin: 0.3rem 0 0;
+  color: var(--color-ink);
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+@mixin financial-total-card($display: grid) {
+  display: $display;
+  min-height: 7.25rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-card);
+  background: var(--color-ink);
+  color: white;
+  box-shadow: var(--shadow-card);
+}
+
+@mixin financial-total-secondary {
+  color: white;
+  opacity: 0.72;
+}
+
+@mixin financial-total-value {
+  margin: 0.15rem 0;
+  color: white;
+  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+@mixin financial-total-meta {
+  margin-top: 0.35rem;
+}
+
+@mixin financial-summary-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 4rem;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  font-size: 1.8rem;
+}
+
 @mixin focus-ring {
   outline: 3px solid rgb(22 136 248 / 22%);
   outline-offset: 3px;

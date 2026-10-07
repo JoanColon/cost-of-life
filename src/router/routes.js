@@ -3,6 +3,8 @@ import AssetCategoryPage from '@/pages/AssetCategoryPage.vue'
 import AssetsPage from '@/pages/AssetsPage.vue'
 import CreateWorkspacePage from '@/pages/CreateWorkspacePage.vue'
 import HomePage from '@/pages/HomePage.vue'
+import IncomeCategoryPage from '@/pages/IncomeCategoryPage.vue'
+import IncomePage from '@/pages/IncomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import LiabilitiesPage from '@/pages/LiabilitiesPage.vue'
 import LiabilityCategoryPage from '@/pages/LiabilityCategoryPage.vue'
@@ -55,6 +57,16 @@ const routes = [
         path: 'workspaces/:workspaceId/liabilities/:category',
         name: 'liability-category',
         component: LiabilityCategoryPage,
+      },
+      {
+        path: 'workspaces/:workspaceId/income',
+        name: 'income',
+        component: IncomePage,
+      },
+      {
+        path: 'workspaces/:workspaceId/income/:category',
+        name: 'income-category',
+        component: IncomeCategoryPage,
       },
       {
         path: 'workspaces/:workspaceId/cost-of-life',
