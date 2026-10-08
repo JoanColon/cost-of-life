@@ -638,6 +638,9 @@ export default {
       necessity: 'Is it essential or lifestyle?',
       necessityHint: 'Leave this unclassified if you are not sure.',
       normalizedCost: 'Normalized Cost of Life',
+      monthlyAmount: 'Monthly expense',
+      editMonth: 'Edit {month}',
+      amountForMonth: 'Amount for {month}',
     },
     empty: {
       title: 'Break this category down',

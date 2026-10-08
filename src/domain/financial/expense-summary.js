@@ -1,5 +1,7 @@
-import { buildSummaryCategories, totalCategories } from './category-summary'
+import { addItemToCategory, buildSummaryCategories, totalCategories } from './category-summary'
+import { annualMonthlyExpenseValue } from './expense-calculations'
 import { normalizeMoney } from './money'
+import { allocateValueByOwnership } from './ownership'
 
 export function buildExpenseSummaryCategories(
   categoryIds,
@@ -32,4 +34,25 @@ export function costOfLifeTotals(summary, memberId = 'all') {
     annualCostOfLife,
     monthlyCostOfLife: normalizeMoney(annualCostOfLife / 12) || 0,
   }
+}
+
+export function rebuildExpenseCategorySummary(category, expenses) {
+  if (!expenses.length) {
+    return {
+      ...category,
+      itemCount: 0,
+      itemizedValue: 0,
+      memberValues: allocateValueByOwnership(category.manualValue, category.ownership),
+    }
+  }
+
+  return expenses.reduce(
+    (current, expense) =>
+      addItemToCategory(
+        current,
+        annualMonthlyExpenseValue(expense.monthlyAmounts, expense.estimate),
+        expense.ownership,
+      ),
+    { ...category, itemCount: 0, itemizedValue: 0, memberValues: {} },
+  )
 }

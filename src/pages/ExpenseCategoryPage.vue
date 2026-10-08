@@ -146,7 +146,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { getExpenseCategory } from '@/config/expense-categories'
-import { annualExpenseValue } from '@/domain/financial/expense-calculations'
+import { annualMonthlyExpenseValue } from '@/domain/financial/expense-calculations'
 import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -193,7 +193,7 @@ const scopedExpenses = computed(() =>
   allExpenses.value.map((item) => ({
     ...item,
     scopedValue: applyOwnership(
-      annualExpenseValue(item.estimate),
+      annualMonthlyExpenseValue(item.monthlyAmounts, item.estimate),
       item.ownership,
       selectedMemberId.value,
     ),

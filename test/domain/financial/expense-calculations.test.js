@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  annualMonthlyExpenseValue,
   annualExpenseValue,
+  generateMonthlyExpenseAmounts,
   monthlyExpenseValue,
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
@@ -21,6 +23,30 @@ describe('expense calculations', () => {
   it('derives the monthly equivalent from the annual total', () => {
     expect(monthlyExpenseValue({ amount: 600, frequency: 'yearly' })).toBe(50)
     expect(monthlyExpenseValue({ amount: 1000, frequency: 'irregular' })).toBe(83.33)
+  })
+
+  it('generates an editable Jan-Dec schedule from the estimate', () => {
+    expect(generateMonthlyExpenseAmounts({ amount: 300, frequency: 'quarterly' })).toEqual({
+      january: 300,
+      february: 0,
+      march: 0,
+      april: 300,
+      may: 0,
+      june: 0,
+      july: 300,
+      august: 0,
+      september: 0,
+      october: 300,
+      november: 0,
+      december: 0,
+    })
+  })
+
+  it('uses the twelve editable month values for the annual total', () => {
+    const months = generateMonthlyExpenseAmounts({ amount: 100, frequency: 'monthly' })
+    months.april = 250
+
+    expect(annualMonthlyExpenseValue(months)).toBe(1350)
   })
 
   it.each([

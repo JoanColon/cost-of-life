@@ -15,8 +15,10 @@ import { db } from '@/firebase/firebase'
 import { getExpenseCategory } from '@/config/expense-categories'
 import {
   annualExpenseValue,
+  generateMonthlyExpenseAmounts,
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
+  normalizeMonthlyExpenseAmounts,
 } from '@/domain/financial/expense-calculations'
 import {
   allocateValueByOwnership,
@@ -24,11 +26,7 @@ import {
   createEqualOwnership,
   isValidOwnership,
 } from '@/domain/financial/ownership'
-import {
-  addItemToCategory,
-  removeItemFromCategory,
-  updateItemInCategory,
-} from '@/domain/financial/category-summary'
+import { rebuildExpenseCategorySummary } from '@/domain/financial/expense-summary'
 
 function summaryRef(workspaceId) {
   return doc(db, 'workspaces', workspaceId, 'cashFlow', 'expensesSummary')
@@ -39,8 +37,23 @@ function expensesRef(workspaceId) {
 }
 
 export async function getExpensesSummary(workspaceId) {
-  const snapshot = await getDoc(summaryRef(workspaceId))
-  return snapshot.exists() ? snapshot.data() : null
+  const documentRef = summaryRef(workspaceId)
+  const [snapshot, expensesSnapshot] = await Promise.all([
+    getDoc(documentRef),
+    getDocs(expensesRef(workspaceId)),
+  ])
+  if (!snapshot.exists()) return null
+
+  const summary = snapshot.data()
+  const expenses = expensesSnapshot.docs.map((expenseDocument) => ({
+    id: expenseDocument.id,
+    ...expenseDocument.data(),
+  }))
+  const categories = rebuildExpenseCategories(summary.categories, expenses)
+  if (expenseCategoryTotalsChanged(summary.categories, categories)) {
+    await setDoc(documentRef, { categories, updatedAt: serverTimestamp() }, { merge: true })
+  }
+  return { ...summary, categories }
 }
 
 export async function getCategoryExpenses(workspaceId, categoryId) {
@@ -143,6 +156,7 @@ export async function createExpense(workspaceId, expense, userId, memberIds) {
   const normalized = normalizeExpenseItem(expense)
   const itemRef = doc(expensesRef(workspaceId))
   const documentRef = summaryRef(workspaceId)
+  const existingExpenses = await getCategoryExpenses(workspaceId, normalized.category)
 
   return runTransaction(db, async (transaction) => {
     const summarySnapshot = await transaction.get(documentRef)
@@ -157,9 +171,8 @@ export async function createExpense(workspaceId, expense, userId, memberIds) {
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-    const annualValue = annualExpenseValue(itemData.estimate)
     const updatedCategory = {
-      ...addItemToCategory(category, annualValue, itemData.ownership),
+      ...rebuildExpenseCategorySummary(category, [...existingExpenses, itemData]),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
@@ -179,6 +192,9 @@ export async function createExpense(workspaceId, expense, userId, memberIds) {
 export async function updateExpense(workspaceId, expenseId, changes, userId, memberIds) {
   const itemRef = doc(expensesRef(workspaceId), expenseId)
   const documentRef = summaryRef(workspaceId)
+  const previousDocument = await getDoc(itemRef)
+  if (!previousDocument.exists()) throw new Error('Expense not found')
+  const categoryExpenses = await getCategoryExpenses(workspaceId, previousDocument.data().category)
 
   return runTransaction(db, async (transaction) => {
     const [itemSnapshot, summarySnapshot] = await Promise.all([
@@ -208,12 +224,11 @@ export async function updateExpense(workspaceId, expenseId, changes, userId, mem
     }
     assertValidOwnership(updatedExpense.ownership, memberIds)
     const updatedCategory = {
-      ...updateItemInCategory(
+      ...rebuildExpenseCategorySummary(
         category,
-        annualExpenseValue(previousExpense.estimate),
-        previousExpense.ownership,
-        annualExpenseValue(updatedExpense.estimate),
-        updatedExpense.ownership,
+        categoryExpenses.map((expense) =>
+          expense.id === expenseId ? { ...updatedExpense, id: expenseId } : expense,
+        ),
       ),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
@@ -234,6 +249,9 @@ export async function updateExpense(workspaceId, expenseId, changes, userId, mem
 export async function removeExpense(workspaceId, expenseId, userId, memberIds) {
   const itemRef = doc(expensesRef(workspaceId), expenseId)
   const documentRef = summaryRef(workspaceId)
+  const previousDocument = await getDoc(itemRef)
+  if (!previousDocument.exists()) throw new Error('Expense not found')
+  const categoryExpenses = await getCategoryExpenses(workspaceId, previousDocument.data().category)
 
   return runTransaction(db, async (transaction) => {
     const [itemSnapshot, summarySnapshot] = await Promise.all([
@@ -246,12 +264,11 @@ export async function removeExpense(workspaceId, expenseId, userId, memberIds) {
     const category = summarySnapshot.data()?.categories?.[expense.category]
     if (!category) throw new Error('Expense category not found')
     const updatedCategory = {
-      ...removeItemFromCategory(
-        category,
-        annualExpenseValue(expense.estimate),
-        expense.ownership,
-        createEqualOwnership(memberIds),
-        memberIds,
+      ...rebuildExpenseCategorySummary(
+        categoryExpenses.length === 1
+          ? { ...category, ownership: createEqualOwnership(memberIds) }
+          : category,
+        categoryExpenses.filter((candidate) => candidate.id !== expenseId),
       ),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
@@ -298,10 +315,42 @@ function normalizeExpenseItem(expense) {
 
   const estimate = normalizeExpenseEstimate(expense.estimate)
   if (!estimate) throw new Error('A valid expense estimate is required')
+  const monthlyAmounts =
+    normalizeMonthlyExpenseAmounts(expense.monthlyAmounts) ||
+    generateMonthlyExpenseAmounts(estimate)
   const attributes = normalizeExpenseAttributes(expense)
   if (!attributes) throw new Error('Valid expense behavior is required')
 
-  return { category: category.id, type, name, estimate, ...attributes }
+  return { category: category.id, type, name, estimate, monthlyAmounts, ...attributes }
+}
+
+function rebuildExpenseCategories(categories = {}, expenses = []) {
+  const expensesByCategory = expenses.reduce((groups, expense) => {
+    const categoryId = expense.category
+    groups[categoryId] = [...(groups[categoryId] || []), expense]
+    return groups
+  }, {})
+  return Object.fromEntries(
+    Object.entries(categories).map(([categoryId, category]) => {
+      const categoryExpenses = expensesByCategory[categoryId] || []
+      if (!categoryExpenses.length && Number(category.itemCount || 0) === 0) {
+        return [categoryId, category]
+      }
+      return [categoryId, rebuildExpenseCategorySummary(category, categoryExpenses)]
+    }),
+  )
+}
+
+function expenseCategoryTotalsChanged(previous = {}, next = {}) {
+  return Object.keys(next).some((categoryId) => {
+    const before = previous[categoryId]
+    const after = next[categoryId]
+    return (
+      Number(before?.itemCount || 0) !== Number(after?.itemCount || 0) ||
+      Number(before?.itemizedValue || 0) !== Number(after?.itemizedValue || 0) ||
+      JSON.stringify(before?.memberValues || {}) !== JSON.stringify(after?.memberValues || {})
+    )
+  })
 }
 
 function stampCategories(categories, userId) {

@@ -84,6 +84,56 @@
           />
         </div>
 
+        <q-markup-table v-if="monthlyAmounts" flat bordered dense class="monthly-schedule">
+          <thead>
+            <tr>
+              <th class="text-left">{{ t('income.form.month') }}</th>
+              <th class="text-right">{{ t('expenses.form.monthlyAmount') }}</th>
+              <th class="month-edit-column" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="month in incomeMonths" :key="month">
+              <td>{{ t(`income.months.${month}`) }}</td>
+              <td class="text-right">{{ formatCurrency(monthAmount(month)) }}</td>
+              <td class="month-edit-column">
+                <q-btn
+                  flat
+                  round
+                  dense
+                  color="primary"
+                  icon="edit"
+                  :aria-label="t('expenses.form.editMonth', { month: t(`income.months.${month}`) })"
+                >
+                  <q-popup-edit
+                    :model-value="monthlyAmounts[month]"
+                    buttons
+                    :label-set="t('common.save')"
+                    :label-cancel="t('common.cancel')"
+                    @save="setMonthAmount(month, $event)"
+                  >
+                    <template #default="scope">
+                      <q-input
+                        v-model="scope.value"
+                        autofocus
+                        dense
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        prefix="€"
+                        :label="
+                          t('expenses.form.amountForMonth', { month: t(`income.months.${month}`) })
+                        "
+                        @keyup.enter="scope.set"
+                      />
+                    </template>
+                  </q-popup-edit>
+                </q-btn>
+              </td>
+            </tr>
+          </tbody>
+        </q-markup-table>
+
         <div v-if="breakdown" class="calculation-preview">
           <span>{{ t('expenses.form.normalizedCost') }}</span>
           <strong>{{ formatCurrency(breakdown.annual) }} / {{ t('dashboard.year') }}</strong>
@@ -132,15 +182,18 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
-  expenseFrequencies,
+  annualMonthlyExpenseValue,
   expenseNecessities,
   expenseRecurrences,
   expenseVariabilities,
-  annualExpenseValue,
-  monthlyExpenseValue,
+  generateMonthlyExpenseAmounts,
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
+  normalizeMonthlyExpenseAmounts,
+  selectableExpenseFrequencies,
 } from '@/domain/financial/expense-calculations'
+import { incomeMonths } from '@/domain/financial/income-calculations'
+import { normalizeMoney } from '@/domain/financial/money'
 import {
   cloneOwnership,
   createEqualOwnership,
@@ -166,9 +219,10 @@ const recurrence = ref('recurring')
 const necessity = ref(null)
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
+const monthlyAmounts = ref(null)
 
 const option = (namespace) => (value) => ({ value, label: t(`expenses.${namespace}.${value}`) })
-const frequencyOptions = computed(() => expenseFrequencies.map(option('frequencies')))
+const frequencyOptions = computed(() => selectableExpenseFrequencies.map(option('frequencies')))
 const variabilityOptions = computed(() => expenseVariabilities.map(option('variabilities')))
 const recurrenceOptions = computed(() => expenseRecurrences.map(option('recurrences')))
 const necessityOptions = computed(() => expenseNecessities.map(option('necessities')))
@@ -187,10 +241,13 @@ const normalizedAttributes = computed(() =>
   }),
 )
 const breakdown = computed(() =>
-  normalizedEstimate.value
+  normalizedEstimate.value && monthlyAmounts.value
     ? {
-        annual: annualExpenseValue(normalizedEstimate.value),
-        monthly: monthlyExpenseValue(normalizedEstimate.value),
+        annual: annualMonthlyExpenseValue(monthlyAmounts.value, normalizedEstimate.value),
+        monthly:
+          normalizeMoney(
+            annualMonthlyExpenseValue(monthlyAmounts.value, normalizedEstimate.value) / 12,
+          ) || 0,
       }
     : null,
 )
@@ -199,10 +256,18 @@ const formValid = computed(
     Boolean(expenseType.value) &&
     Boolean(name.value.trim()) &&
     Boolean(normalizedEstimate.value) &&
+    Boolean(normalizeMonthlyExpenseAmounts(monthlyAmounts.value)) &&
     Boolean(normalizedAttributes.value) &&
     ownershipValid.value,
 )
 
+watch(
+  [amount, frequency],
+  () => {
+    monthlyAmounts.value = generateMonthlyExpenseAmounts(normalizedEstimate.value)
+  },
+  { flush: 'sync' },
+)
 watch(() => [props.expense, props.defaults], seed, { immediate: true, deep: true })
 
 function seed() {
@@ -211,6 +276,9 @@ function seed() {
   name.value = initial.name || ''
   amount.value = initial.estimate?.amount ?? 0
   frequency.value = initial.estimate?.frequency || 'monthly'
+  monthlyAmounts.value =
+    normalizeMonthlyExpenseAmounts(initial.monthlyAmounts) ||
+    generateMonthlyExpenseAmounts(initial.estimate || { amount: 0, frequency: 'monthly' })
   variability.value = initial.variability || 'fixed'
   recurrence.value = initial.recurrence || 'recurring'
   necessity.value = initial.necessity ?? null
@@ -221,6 +289,16 @@ function seed() {
     ownership.value,
     props.members.map((member) => member.id),
   )
+}
+
+function monthAmount(month) {
+  return normalizeMoney(monthlyAmounts.value?.[month]) || 0
+}
+
+function setMonthAmount(month, value) {
+  const normalized = normalizeMoney(value)
+  if (normalized === null) return
+  monthlyAmounts.value = { ...monthlyAmounts.value, [month]: normalized }
 }
 
 function applySuggestion(value) {
@@ -248,6 +326,7 @@ function submit() {
     type: expenseType.value,
     name: name.value.trim(),
     estimate: normalizedEstimate.value,
+    monthlyAmounts: normalizeMonthlyExpenseAmounts(monthlyAmounts.value),
     ...normalizedAttributes.value,
     ownership: cloneOwnership(ownership.value),
   })
@@ -291,6 +370,16 @@ function submit() {
 
 .full-width {
   grid-column: 1 / -1;
+}
+
+.monthly-schedule {
+  margin-top: 1rem;
+  overflow: visible;
+}
+
+.month-edit-column {
+  width: 3.5rem;
+  text-align: right;
 }
 
 .calculation-preview {

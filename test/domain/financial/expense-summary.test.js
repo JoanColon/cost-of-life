@@ -3,6 +3,7 @@ import { addItemToCategory } from '../../../src/domain/financial/category-summar
 import {
   buildExpenseSummaryCategories,
   costOfLifeTotals,
+  rebuildExpenseCategorySummary,
 } from '../../../src/domain/financial/expense-summary'
 import { createEqualOwnership } from '../../../src/domain/financial/ownership'
 
@@ -64,5 +65,34 @@ describe('expense summary', () => {
     )
 
     expect(costOfLifeTotals({ categories: { food: category } }).annualCostOfLife).toBe(6000)
+  })
+
+  it('rebuilds a stale accumulated category total from its expense documents', () => {
+    const category = rebuildExpenseCategorySummary(
+      {
+        enabled: true,
+        manualValue: 0,
+        ownership,
+        itemCount: 5,
+        itemizedValue: 9704,
+        memberValues: { a: 4852, b: 4852 },
+      },
+      [
+        {
+          estimate: { amount: 120, frequency: 'yearly' },
+          ownership,
+        },
+        {
+          estimate: { amount: 386, frequency: 'monthly' },
+          ownership,
+        },
+      ],
+    )
+
+    expect(category).toMatchObject({
+      itemCount: 2,
+      itemizedValue: 4752,
+      memberValues: { a: 2376, b: 2376 },
+    })
   })
 })

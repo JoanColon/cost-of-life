@@ -55,8 +55,8 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  expenseFrequencies,
   normalizeExpenseEstimate,
+  selectableExpenseFrequencies,
 } from '@/domain/financial/expense-calculations'
 import { formatCurrency } from '@/utils/formatters'
 
@@ -79,7 +79,10 @@ const normalized = computed(
 const formattedValue = computed(() => formatCurrency(normalized.value.amount))
 const frequencyLabel = computed(() => t(`expenses.frequencies.${normalized.value.frequency}`))
 const frequencyOptions = computed(() =>
-  expenseFrequencies.map((value) => ({ value, label: t(`expenses.frequencies.${value}`) })),
+  selectableExpenseFrequencies.map((value) => ({
+    value,
+    label: t(`expenses.frequencies.${value}`),
+  })),
 )
 
 function open() {
