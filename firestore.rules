@@ -45,11 +45,17 @@ service cloud.firestore {
       allow update, delete: if isLegacyCreator(resource.data)
         || isWorkspaceOwner(resource.data);
 
+      match /history/{year} {
+        allow read: if isWorkspaceMemberById(workspaceId);
+        allow write: if false;
+      }
+
       // During development, workspace members can collaborate on every
-      // document stored below their workspace. Administrative access to the
-      // workspace document itself remains owner-only above.
-      match /{document=**} {
-        allow read, write: if isWorkspaceMemberById(workspaceId);
+      // non-history document stored below their workspace. Administrative
+      // access to the workspace document itself remains owner-only above.
+      match /{collectionId}/{document=**} {
+        allow read, write: if collectionId != 'history'
+          && isWorkspaceMemberById(workspaceId);
       }
     }
 

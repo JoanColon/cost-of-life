@@ -2,6 +2,8 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import AssetCategoryPage from '@/pages/AssetCategoryPage.vue'
 import AssetsPage from '@/pages/AssetsPage.vue'
 import CreateWorkspacePage from '@/pages/CreateWorkspacePage.vue'
+import ExpenseCategoryPage from '@/pages/ExpenseCategoryPage.vue'
+import ExpensesPage from '@/pages/ExpensesPage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import IncomeCategoryPage from '@/pages/IncomeCategoryPage.vue'
 import IncomePage from '@/pages/IncomePage.vue'
@@ -69,10 +71,18 @@ const routes = [
         component: IncomeCategoryPage,
       },
       {
+        path: 'workspaces/:workspaceId/expenses',
+        name: 'expenses',
+        component: ExpensesPage,
+      },
+      {
+        path: 'workspaces/:workspaceId/expenses/:category',
+        name: 'expense-category',
+        component: ExpenseCategoryPage,
+      },
+      {
         path: 'workspaces/:workspaceId/cost-of-life',
-        name: 'cost-of-life',
-        component: WorkspaceSectionPage,
-        meta: { sectionTitleKey: 'dashboard.costOfLife.title' },
+        redirect: (to) => ({ name: 'expenses', params: { workspaceId: to.params.workspaceId } }),
       },
       {
         path: 'workspaces/:workspaceId/financial-position',

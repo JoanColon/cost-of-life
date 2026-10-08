@@ -1,6 +1,6 @@
 <template>
   <div v-if="members.length > 1" class="ownership-editor">
-    <div class="field-label">{{ t('assets.ownership.label') }}</div>
+    <div class="field-label">{{ t('financial.ownership.label') }}</div>
 
     <div class="ownership-options">
       <button
@@ -19,7 +19,7 @@
         :class="{ selected: selection === 'shared' }"
         @click="selectShared"
       >
-        {{ t('assets.ownership.shared') }}
+        {{ t('financial.ownership.shared') }}
       </button>
     </div>
 
@@ -41,7 +41,7 @@
     </div>
 
     <div v-if="selection === 'shared'" class="share-total" :class="{ invalid: !valid }">
-      {{ t('assets.ownership.total', { total: shareTotal }) }}
+      {{ t('financial.ownership.total', { total: shareTotal }) }}
     </div>
   </div>
 </template>

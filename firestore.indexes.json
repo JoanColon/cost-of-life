@@ -1,4 +1,15 @@
 {
   "indexes": [],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "history",
+      "fieldPath": "months",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "history",
+      "fieldPath": "itemLabels",
+      "indexes": []
+    }
+  ]
 }

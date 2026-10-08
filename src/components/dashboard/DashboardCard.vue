@@ -1,9 +1,14 @@
 <template>
   <q-card flat class="dashboard-card">
     <header class="card-header">
-      <div>
-        <h2>{{ title }}</h2>
-        <p v-if="subtitle">{{ subtitle }}</p>
+      <div class="card-heading">
+        <div v-if="icon" class="card-icon" :class="iconTone">
+          <q-icon :name="icon" />
+        </div>
+        <div>
+          <h2>{{ title }}</h2>
+          <p v-if="subtitle">{{ subtitle }}</p>
+        </div>
       </div>
       <q-btn
         flat
@@ -23,6 +28,8 @@
 defineProps({
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
+  icon: { type: String, default: '' },
+  iconTone: { type: String, default: 'green' },
 })
 
 defineEmits(['open'])
@@ -44,6 +51,38 @@ defineEmits(['open'])
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.card-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.card-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 3.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  font-size: 1.65rem;
+}
+
+.card-icon.green {
+  background: var(--color-green-soft);
+  color: var(--color-success-dark);
+}
+
+.card-icon.blue {
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
+}
+
+.card-icon.purple {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
 }
 
 h2 {
@@ -74,6 +113,13 @@ p {
 
   .card-header {
     margin-bottom: 1rem;
+  }
+
+  .card-icon {
+    flex-basis: 3rem;
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.4rem;
   }
 }
 </style>

@@ -3,55 +3,48 @@
     <main class="dashboard-shell">
       <header class="dashboard-header">
         <div class="dashboard-heading">
-          <div class="workspace-name">{{ workspace?.name }}</div>
-          <h1>{{ t('dashboard.title') }}</h1>
-          <p>{{ greeting }}</p>
+          <h1>{{ greeting }}</h1>
+          <p>{{ t('dashboard.snapshotSubtitle') }}</p>
         </div>
 
         <MemberScopeSelector v-model="selectedMemberId" :members="members" />
       </header>
 
       <section class="dashboard-grid" aria-label="Financial dashboard">
-        <CostOfLifeCard
-          class="cost-card"
-          :data="dashboardData"
-          @open="openSection('cost-of-life')"
-          @open-income="openSection('income')"
-        />
         <FinancialPositionCard
-          class="position-card"
           :data="dashboardData"
+          :history-points="historyPoints"
+          :history-loading="historyLoading"
+          :history-error="Boolean(historyError)"
           @open="openSection('financial-position')"
           @open-assets="openSection('assets')"
           @open-liabilities="openSection('liabilities')"
         />
-        <MilestonesCard
-          class="milestones-card"
-          :milestones="dashboardData.milestones"
-          @open="openSection('milestones')"
+        <CostOfLifeCard
+          :data="dashboardData"
+          @open="openSection('expenses')"
+          @open-income="openSection('income')"
         />
-        <WhatIfCard
-          class="what-if-card"
-          :scenarios="dashboardData.scenarios"
-          @open="openSection('what-if')"
-        />
+        <WhatsNextCard />
       </section>
     </main>
   </q-page>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import CostOfLifeCard from '@/components/dashboard/CostOfLifeCard.vue'
 import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
-import MilestonesCard from '@/components/dashboard/MilestonesCard.vue'
-import WhatIfCard from '@/components/dashboard/WhatIfCard.vue'
+import WhatsNextCard from '@/components/dashboard/WhatsNextCard.vue'
+import { buildNetWorthSeries } from '@/domain/financial/history'
 import { getMockDashboard } from '@/mocks/workspace-dashboard'
 import { authUser } from '@/services/auth'
+import { getFinancialHistory } from '@/services/firebase/history.service'
 import { useAssetsStore } from '@/stores/assets-store'
+import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
@@ -62,10 +55,15 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const assetsStore = useAssetsStore()
+const expensesStore = useExpensesStore()
 const liabilitiesStore = useLiabilitiesStore()
 const incomeStore = useIncomeStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
+const historyDocuments = ref([])
+const historyLoading = ref(false)
+const historyError = ref(null)
+let historyRequestId = 0
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspace = computed(
@@ -77,6 +75,7 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
+const historyPoints = computed(() => buildNetWorthSeries(historyDocuments.value))
 
 const dashboardData = computed(() => {
   const mockDashboard = getMockDashboard(selectedMemberId.value, memberIds.value)
@@ -85,15 +84,20 @@ const dashboardData = computed(() => {
   const income = incomeStore.setupCompleted
     ? incomeStore.total(selectedMemberId.value)
     : mockDashboard.income
+  const expenseTotals = expensesStore.totals(selectedMemberId.value)
+  const savingsCapacity =
+    Math.round((income - expenseTotals.annualCostOfLife + Number.EPSILON) * 100) / 100
 
   return {
     ...mockDashboard,
     assets,
     liabilities,
     income,
-    freeCashFlow: income - mockDashboard.annualCost,
-    savingsRate: income > 0 ? Math.round(((income - mockDashboard.annualCost) / income) * 100) : 0,
-    costRatio: income > 0 ? Math.round((mockDashboard.annualCost / income) * 100) : 0,
+    annualCost: expenseTotals.annualCostOfLife,
+    monthlyCost: expenseTotals.monthlyCostOfLife,
+    savingsCapacity,
+    savingsRate: income > 0 ? Math.round((savingsCapacity / income) * 100) : 0,
+    costRatio: income > 0 ? Math.round((expenseTotals.annualCostOfLife / income) * 100) : 0,
     netWorth: assets - liabilities,
   }
 })
@@ -101,7 +105,7 @@ const dashboardData = computed(() => {
 const greeting = computed(() => {
   const selectedMember = members.value.find((member) => member.id === selectedMemberId.value)
   const fallbackMember = members.value.find((member) => member.id === authUser.value?.uid)
-  const name = selectedMember?.name || fallbackMember?.name
+  const name = firstName(selectedMember?.name || fallbackMember?.name)
 
   if (!name) return t('dashboard.greeting.fallback')
 
@@ -110,15 +114,44 @@ const greeting = computed(() => {
   return t(`dashboard.greeting.${period}`, { name })
 })
 
+function firstName(name = '') {
+  const value = name.trim().split(/\s+/)[0]
+  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : ''
+}
+
 watch(
   workspaceId,
   (id) => {
     assetsStore.loadSummary(id)
     liabilitiesStore.loadSummary(id)
     incomeStore.loadSummary(id)
+    expensesStore.loadSummary(id)
+    loadHistory(id)
   },
   { immediate: true },
 )
+
+onBeforeUnmount(() => {
+  historyRequestId += 1
+})
+
+async function loadHistory(id) {
+  const requestId = ++historyRequestId
+  historyDocuments.value = []
+  historyError.value = null
+  historyLoading.value = true
+
+  try {
+    const documents = await getFinancialHistory(id)
+    if (requestId !== historyRequestId) return
+    historyDocuments.value = documents
+  } catch (error) {
+    if (requestId !== historyRequestId) return
+    historyError.value = error
+  } finally {
+    if (requestId === historyRequestId) historyLoading.value = false
+  }
+}
 
 function openSection(section) {
   router.push({ name: section, params: { workspaceId: route.params.workspaceId } })
@@ -129,8 +162,9 @@ function openSection(section) {
 .workspace-dashboard-page {
   min-height: calc(100vh - 64px);
   min-height: calc(100dvh - 64px);
-  padding: clamp(1.25rem, 3vw, 2.75rem);
-  background: var(--color-page);
+  padding: clamp(1.5rem, 3.5vw, 3rem);
+  background:
+    radial-gradient(circle at 68% 4%, rgb(226 242 255 / 72%), transparent 34rem), var(--color-page);
 }
 
 .dashboard-shell {
@@ -151,19 +185,6 @@ function openSection(section) {
   min-width: 0;
 }
 
-.workspace-name {
-  overflow: hidden;
-  max-width: 28rem;
-  margin-bottom: 0.2rem;
-  color: var(--color-primary);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.09em;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 h1 {
   margin: 0;
   font-size: clamp(2.25rem, 4vw, 3.5rem);
@@ -180,35 +201,7 @@ h1 {
 
 .dashboard-grid {
   display: grid;
-  gap: 1.25rem;
-}
-
-@media (min-width: 1280px) {
-  .dashboard-grid {
-    grid-template-columns: minmax(0, 7fr) minmax(22rem, 5fr);
-    grid-template-areas:
-      'cost position'
-      'milestones what-if';
-    align-items: start;
-  }
-
-  .cost-card {
-    grid-area: cost;
-    align-self: stretch;
-  }
-
-  .position-card {
-    grid-area: position;
-    align-self: stretch;
-  }
-
-  .milestones-card {
-    grid-area: milestones;
-  }
-
-  .what-if-card {
-    grid-area: what-if;
-  }
+  gap: 1.15rem;
 }
 
 @media (max-width: 1023px) {
@@ -232,12 +225,8 @@ h1 {
     gap: 1rem;
   }
 
-  .workspace-name {
-    max-width: 11rem;
-  }
-
   h1 {
-    font-size: 2.35rem;
+    font-size: clamp(2.1rem, 9vw, 3rem);
   }
 
   .dashboard-heading p {

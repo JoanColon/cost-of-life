@@ -8,6 +8,7 @@
  */
 
 const { setGlobalOptions } = require('firebase-functions')
+const { initializeApp } = require('firebase-admin/app')
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -20,6 +21,12 @@ const { setGlobalOptions } = require('firebase-functions')
 // In the v1 API, each function can only serve one request per container, so
 // this will be the maximum concurrent request count.
 setGlobalOptions({ maxInstances: 10 })
+
+initializeApp()
+
+const { scheduledFinancialHistory } = require('./scheduled/financial-history')
+
+exports.scheduledFinancialHistory = scheduledFinancialHistory
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started

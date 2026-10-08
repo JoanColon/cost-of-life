@@ -85,7 +85,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import OwnershipEditor from '@/components/assets/OwnershipEditor.vue'
+import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
   cloneOwnership,
   createEqualOwnership,

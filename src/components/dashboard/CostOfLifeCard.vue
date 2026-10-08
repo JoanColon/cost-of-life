@@ -3,51 +3,62 @@
     class="cost-card"
     :title="t('dashboard.costOfLife.title')"
     :subtitle="t('dashboard.costOfLife.subtitle')"
+    icon="account_balance_wallet"
+    icon-tone="blue"
     @open="$emit('open')"
   >
-    <div class="cost-main">
-      <div class="cost-values">
-        <div class="annual-value">
-          {{ formatCurrency(data.annualCost) }}<span>/ {{ t('dashboard.year') }}</span>
-        </div>
-        <div class="monthly-value">
-          {{ formatCurrency(data.monthlyCost) }} <span>/ {{ t('dashboard.month') }}</span>
-        </div>
+    <template #default>
+      <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
+        <button
+          type="button"
+          :class="{ selected: period === 'annual' }"
+          :aria-pressed="period === 'annual'"
+          @click="period = 'annual'"
+        >
+          {{ t('dashboard.costOfLife.annual') }}
+        </button>
+        <button
+          type="button"
+          :class="{ selected: period === 'monthly' }"
+          :aria-pressed="period === 'monthly'"
+          @click="period = 'monthly'"
+        >
+          {{ t('dashboard.costOfLife.monthly') }}
+        </button>
       </div>
 
-      <div class="cost-ring" :style="{ '--progress': `${Math.min(data.costRatio, 100) * 3.6}deg` }">
-        <div class="ring-center">
-          <strong>{{ data.costRatio }}%</strong>
-          <span>{{ t('dashboard.costOfLife.incomeRatio') }}</span>
+      <div class="cost-equation">
+        <button type="button" class="equation-card income" @click="emit('open-income')">
+          <div class="equation-icon"><q-icon name="payments" /></div>
+          <strong>{{ formatCurrency(values.income) }}</strong>
+          <span>{{ t('dashboard.costOfLife.income') }}</span>
+          <small>{{ periodLabel }}</small>
+        </button>
+
+        <div class="operator" aria-hidden="true">−</div>
+
+        <button type="button" class="equation-card costs" @click="emit('open')">
+          <div class="equation-icon"><q-icon name="credit_card" /></div>
+          <strong>{{ formatCurrency(values.cost) }}</strong>
+          <span>{{ t('dashboard.costOfLife.lifeCosts') }}</span>
+          <small>{{ periodLabel }}</small>
+        </button>
+
+        <div class="operator equals" aria-hidden="true">=</div>
+
+        <div class="equation-card available">
+          <div class="equation-icon"><q-icon name="savings" /></div>
+          <strong>{{ formatCurrency(values.savingsCapacity) }}</strong>
+          <span>{{ t('dashboard.costOfLife.savingsCapacity') }}</span>
+          <small>{{ periodLabel }}</small>
         </div>
       </div>
-    </div>
-
-    <div class="metric-grid">
-      <component
-        :is="metric.action ? 'button' : 'div'"
-        v-for="metric in metrics"
-        :key="metric.label"
-        class="metric"
-        :class="{ 'metric-action': metric.action }"
-        :type="metric.action ? 'button' : undefined"
-        @click="metric.action && emit(metric.action)"
-      >
-        <div class="metric-icon" :class="metric.tone">
-          <q-icon :name="metric.icon" />
-        </div>
-        <div>
-          <div class="metric-label">{{ metric.label }}</div>
-          <strong>{{ metric.value }}</strong>
-        </div>
-        <q-icon v-if="metric.action" name="chevron_right" class="metric-chevron" />
-      </component>
-    </div>
+    </template>
   </DashboardCard>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DashboardCard from './DashboardCard.vue'
 import { formatCurrency } from '@/utils/formatters'
@@ -55,248 +66,200 @@ import { formatCurrency } from '@/utils/formatters'
 const props = defineProps({ data: { type: Object, required: true } })
 const emit = defineEmits(['open', 'open-income'])
 const { t } = useI18n()
+const period = ref('annual')
 
-const metrics = computed(() => [
-  {
-    label: t('dashboard.costOfLife.income'),
-    value: formatCurrency(props.data.income),
-    icon: 'account_balance_wallet',
-    tone: 'green',
-    action: 'open-income',
-  },
-  {
-    label: t('dashboard.costOfLife.cashFlow'),
-    value: formatCurrency(props.data.freeCashFlow),
-    icon: 'bar_chart',
-    tone: 'blue',
-  },
-  {
-    label: t('dashboard.costOfLife.savingsRate'),
-    value: `${props.data.savingsRate}%`,
-    icon: 'savings',
-    tone: 'purple',
-  },
-])
+const values = computed(() => {
+  if (period.value === 'monthly') {
+    return {
+      income: props.data.income / 12,
+      cost: props.data.monthlyCost,
+      savingsCapacity: props.data.savingsCapacity / 12,
+    }
+  }
+
+  return {
+    income: props.data.income,
+    cost: props.data.annualCost,
+    savingsCapacity: props.data.savingsCapacity,
+  }
+})
+
+const periodLabel = computed(() =>
+  period.value === 'annual'
+    ? t('dashboard.costOfLife.perYear')
+    : t('dashboard.costOfLife.perMonth'),
+)
 </script>
 
-<style scoped lang="scss">
-.cost-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 2rem;
-}
+<style lang="scss">
+@use '@/css/mixins' as *;
 
-.annual-value {
-  color: var(--color-ink);
-  font-size: clamp(2.55rem, 5vw, 4.6rem);
-  font-weight: 760;
-  line-height: 1;
-  letter-spacing: -0.055em;
-}
+.cost-card {
+  position: relative;
 
-.annual-value span,
-.monthly-value span {
-  color: var(--color-copy);
-  font-size: 0.48em;
-  font-weight: 450;
-  letter-spacing: -0.02em;
-}
-
-.monthly-value {
-  margin-top: 0.65rem;
-  font-size: clamp(1.4rem, 3vw, 2rem);
-  font-weight: 700;
-}
-
-.cost-ring {
-  display: grid;
-  width: clamp(8.5rem, 14vw, 11.5rem);
-  aspect-ratio: 1;
-  padding: 1rem;
-  border-radius: 50%;
-  background: conic-gradient(
-    var(--color-success) 0deg var(--progress),
-    #e9f1ef var(--progress) 360deg
-  );
-  box-shadow: inset 0 0 0 1px rgb(25 95 75 / 5%);
-}
-
-.ring-center {
-  display: grid;
-  place-content: center;
-  padding: 0.5rem;
-  border-radius: 50%;
-  background: var(--color-surface);
-  text-align: center;
-}
-
-.ring-center strong {
-  font-size: clamp(1.65rem, 3vw, 2.35rem);
-}
-
-.ring-center span {
-  max-width: 7rem;
-  margin-top: 0.25rem;
-  color: var(--color-copy);
-  font-size: 0.78rem;
-  line-height: 1.3;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--color-line);
-}
-
-.metric {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  min-width: 0;
-  padding: 0 1rem;
-  border-right: 1px solid var(--color-line);
-  border-top: 0;
-  border-bottom: 0;
-  border-left: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-}
-
-.metric-action {
-  cursor: pointer;
-}
-.metric-chevron {
-  margin-left: auto;
-  color: var(--color-copy);
-}
-.metric-action:hover strong,
-.metric-action:focus-visible strong {
-  color: var(--color-primary);
-}
-.metric-action:focus-visible {
-  border-radius: 0.5rem;
-  outline: 3px solid rgb(22 136 248 / 22%);
-  outline-offset: 3px;
-}
-
-.metric:first-child {
-  padding-left: 0;
-}
-
-.metric:last-child {
-  padding-right: 0;
-  border-right: 0;
-}
-
-.metric-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 2.8rem;
-  width: 2.8rem;
-  height: 2.8rem;
-  border-radius: 50%;
-  font-size: 1.35rem;
-}
-
-.metric-icon.green {
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
-}
-
-.metric-icon.blue {
-  background: var(--color-blue-soft);
-  color: var(--color-primary);
-}
-
-.metric-icon.purple {
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-
-.metric-label {
-  overflow: hidden;
-  color: var(--color-copy);
-  font-size: 0.78rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.metric strong {
-  display: block;
-  margin-top: 0.12rem;
-  font-size: clamp(1rem, 1.7vw, 1.3rem);
-  white-space: nowrap;
-}
-
-@media (max-width: 699px) {
-  .cost-main {
-    gap: 1rem;
+  .period-switch {
+    position: absolute;
+    top: 1.4rem;
+    right: 4.7rem;
+    display: flex;
+    padding: 0.22rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: #f3f6f9;
   }
 
-  .cost-ring {
-    width: 7.6rem;
-    padding: 0.75rem;
+  .period-switch button {
+    min-width: 5.4rem;
+    padding: 0.45rem 0.8rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-copy);
+    font-size: 0.8rem;
+    font-weight: 650;
+    cursor: pointer;
   }
 
-  .annual-value {
-    font-size: clamp(2.2rem, 11vw, 3.25rem);
+  .period-switch button.selected {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: 0 2px 10px rgb(24 43 68 / 8%);
   }
 
-  .metric-grid {
-    gap: 0;
+  .period-switch button:focus-visible {
+    @include focus-ring;
   }
 
-  .metric {
-    gap: 0.45rem;
-    padding: 0 0.45rem;
+  .cost-equation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(0.8rem, 2.5vw, 2rem);
   }
 
-  .metric-icon {
-    flex-basis: 2.25rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    font-size: 1.05rem;
+  .equation-card {
+    display: grid;
+    justify-items: center;
+    min-width: 0;
+    min-height: 11.5rem;
+    padding: 1.25rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: var(--color-ink);
+    text-align: center;
   }
 
-  .metric-label {
-    font-size: 0.67rem;
+  button.equation-card {
+    cursor: pointer;
   }
 
-  .metric strong {
-    font-size: 0.9rem;
-  }
-}
-
-@media (max-width: 430px) {
-  .cost-ring {
-    width: 6.7rem;
+  button.equation-card:hover {
+    border-color: rgb(82 105 135 / 18%);
   }
 
-  .ring-center span {
-    font-size: 0.66rem;
-  }
-}
-
-@media (max-width: 370px) {
-  .cost-main {
-    gap: 0.4rem;
+  button.equation-card:focus-visible {
+    @include focus-ring;
   }
 
-  .annual-value {
-    font-size: 1.9rem;
+  .equation-card.income {
+    background: linear-gradient(145deg, #eefbf6, #e5f8f0);
   }
 
-  .cost-ring {
-    width: 5.6rem;
-    padding: 0.55rem;
+  .equation-card.costs {
+    background: linear-gradient(145deg, #fff4f4, #ffeded);
   }
 
-  .ring-center span {
-    display: none;
+  .equation-card.available {
+    background: linear-gradient(145deg, #f2f8ff, #eaf4ff);
+  }
+
+  .equation-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.55rem;
+    border-radius: 50%;
+    font-size: 1.45rem;
+  }
+
+  .income .equation-icon {
+    background: #d6f5e8;
+    color: var(--color-success-dark);
+  }
+
+  .costs .equation-icon {
+    background: #ffdfe0;
+    color: #f15e64;
+  }
+
+  .available .equation-icon {
+    background: #dcecff;
+    color: var(--color-primary);
+  }
+
+  .equation-card strong {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: clamp(1.7rem, 3vw, 2.45rem);
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .equation-card span {
+    margin-top: 0.35rem;
+    color: var(--color-copy);
+    font-size: 1rem;
+  }
+
+  .equation-card small {
+    margin-top: 0.15rem;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+  }
+
+  .operator {
+    color: var(--color-copy);
+    font-size: 2rem;
+    font-weight: 550;
+  }
+
+  .operator.equals {
+    color: var(--color-primary);
+  }
+
+  @media (max-width: 850px) {
+    .period-switch {
+      position: static;
+      width: fit-content;
+      margin: -0.25rem 0 1rem auto;
+    }
+
+    .cost-equation {
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+    }
+
+    .operator {
+      height: 1rem;
+      line-height: 0.35;
+    }
+
+    .equation-card {
+      min-height: 10.5rem;
+    }
+  }
+
+  @media (max-width: 599px) {
+    .period-switch {
+      width: 100%;
+    }
+
+    .period-switch button {
+      flex: 1;
+    }
   }
 }
 </style>

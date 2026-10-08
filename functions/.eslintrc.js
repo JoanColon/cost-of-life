@@ -4,7 +4,7 @@ module.exports = {
     node: true,
   },
   parserOptions: {
-    ecmaVersion: 2018,
+    ecmaVersion: 2022,
   },
   extends: ['eslint:recommended', 'google'],
   rules: {
@@ -14,6 +14,9 @@ module.exports = {
     semi: ['error', 'never'],
     'object-curly-spacing': ['error', 'always'],
     'quote-props': ['error', 'as-needed'],
+    'require-jsdoc': 'off',
+    'max-len': 'off',
+    indent: 'off',
   },
   overrides: [
     {
