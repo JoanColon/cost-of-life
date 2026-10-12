@@ -109,6 +109,10 @@
         :expense="editingExpense"
         :defaults="expenseDefaults"
         :members="members"
+        :tracking-year="currentYear"
+        :tracking-months="trackingStore.yearMonths"
+        :tracking-enabled-subcategories="trackingStore.enabledSubcategories"
+        :used-standard-types="usedStandardTypes"
         :saving="formSaving"
         @save="saveExpense"
         @cancel="closeExpenseDialog"
@@ -146,10 +150,11 @@ import { useRoute, useRouter } from 'vue-router'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { getExpenseCategory } from '@/config/expense-categories'
-import { annualMonthlyExpenseValue } from '@/domain/financial/expense-calculations'
-import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
+import { effectiveExpenseValueForYear } from '@/domain/financial/expense-tracking'
+import { cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
+import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -160,6 +165,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const expensesStore = useExpensesStore()
+const trackingStore = useExpenseTrackingStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const preparing = ref(false)
@@ -170,6 +176,7 @@ const deletingExpense = ref(null)
 const deleteDialog = ref(false)
 const formSaving = ref(false)
 let preparationId = 0
+const currentYear = new Date().getFullYear()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const categoryId = computed(() => String(route.params.category))
@@ -189,18 +196,24 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allExpenses = computed(() => expensesStore.itemsForCategory(categoryId.value))
+const usedStandardTypes = computed(() =>
+  allExpenses.value.filter(({ type }) => type !== 'other').map(({ type }) => type),
+)
 const scopedExpenses = computed(() =>
   allExpenses.value.map((item) => ({
     ...item,
-    scopedValue: applyOwnership(
-      annualMonthlyExpenseValue(item.monthlyAmounts, item.estimate),
-      item.ownership,
-      selectedMemberId.value,
-    ),
+    scopedValue: effectiveExpenseValueForYear({
+      expense: item,
+      trackingMonths: trackingStore.yearMonths,
+      year: currentYear,
+      memberId: selectedMemberId.value,
+    }),
   })),
 )
 const categoryTotal = computed(() =>
-  expensesStore.totalForCategory(categoryId.value, selectedMemberId.value),
+  allExpenses.value.length
+    ? scopedExpenses.value.reduce((total, item) => total + item.scopedValue, 0)
+    : expensesStore.totalForCategory(categoryId.value, selectedMemberId.value),
 )
 const expenseDefaults = computed(() => {
   const config = categoryConfig.value
@@ -216,9 +229,7 @@ const expenseDefaults = computed(() => {
     ownership: cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value)),
   }
 })
-const pageLoading = computed(
-  () => preparing.value || expensesStore.loading || expensesStore.categoryLoading,
-)
+const pageLoading = computed(() => preparing.value || expensesStore.loading)
 
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
 
@@ -233,7 +244,7 @@ async function preparePage(force = false) {
       await router.replace(expensesRoute.value)
       return
     }
-    await expensesStore.loadCategory(workspaceId.value, categoryId.value, force)
+    await trackingStore.loadYear(workspaceId.value, currentYear, force)
   } catch (error) {
     pageError.value = error
   } finally {

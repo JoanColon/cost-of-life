@@ -41,9 +41,29 @@
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
         <section class="total-card">
-          <span>{{ t('income.totalIncome') }}</span
-          ><strong>{{ formatCurrency(total) }}</strong
-          ><small>{{ t('income.annualTotal') }} · {{ scopeLabel }}</small>
+          <div class="total-copy">
+            <span>{{ t('income.totalIncome') }}</span>
+            <strong>{{ formatCurrency(displayedTotal) }}</strong>
+            <small>{{ displayedPeriodLabel }} · {{ scopeLabel }}</small>
+          </div>
+          <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
+            <button
+              type="button"
+              :class="{ selected: period === 'annual' }"
+              :aria-pressed="period === 'annual'"
+              @click="period = 'annual'"
+            >
+              {{ t('dashboard.costOfLife.annual') }}
+            </button>
+            <button
+              type="button"
+              :class="{ selected: period === 'monthly' }"
+              :aria-pressed="period === 'monthly'"
+              @click="period = 'monthly'"
+            >
+              {{ t('dashboard.costOfLife.monthly') }}
+            </button>
+          </div>
         </section>
         <section class="category-list" :aria-label="t('income.enabledCategories')">
           <div v-for="category in enabledCategories" :key="category.id" class="category-row">
@@ -73,7 +93,7 @@
             </button>
             <SimpleIncomeValueEditor
               :value="canonicalCategoryValue(category.id)"
-              :formatted-value="`${categoryValue(category.id)} / ${t('dashboard.year')}`"
+              :formatted-value="`${categoryValue(category.id)} / ${categoryPeriodLabel}`"
               :saving="isCategorySaving(category.id)"
               :disabled="isItemizedCategory(category.id)"
               @save="saveSimpleCategoryValue(category.id, $event)"
@@ -214,6 +234,7 @@ const ownershipDialog = ref(false)
 const editingOwnershipCategoryId = ref(null)
 const editingOwnership = ref({ mode: 'single', shares: [] })
 const ownershipValid = ref(false)
+const period = ref('annual')
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspaceHomeRoute = computed(() => ({
   name: 'workspace-dashboard',
@@ -232,6 +253,15 @@ const enabledCategories = computed(() =>
   incomeCategories.filter((category) => incomeStore.enabledCategories.includes(category.id)),
 )
 const total = computed(() => incomeStore.total(selectedMemberId.value))
+const displayedTotal = computed(() => (period.value === 'annual' ? total.value : total.value / 12))
+const displayedPeriodLabel = computed(() =>
+  period.value === 'annual'
+    ? t('dashboard.costOfLife.perYear')
+    : t('dashboard.costOfLife.perMonth'),
+)
+const categoryPeriodLabel = computed(() =>
+  period.value === 'annual' ? t('dashboard.year') : t('dashboard.month'),
+)
 const scopeLabel = computed(() =>
   selectedMemberId.value === 'all'
     ? t('dashboard.allMembers')
@@ -293,7 +323,8 @@ function categoryStatus(id) {
   return count ? t('income.itemCount', { count }) : t('income.simpleTotal')
 }
 function categoryValue(id) {
-  return formatCurrency(incomeStore.totalForCategory(id, selectedMemberId.value))
+  const annualValue = incomeStore.totalForCategory(id, selectedMemberId.value)
+  return formatCurrency(period.value === 'annual' ? annualValue : annualValue / 12)
 }
 function categoryMembers(id) {
   const category = incomeStore.summary?.categories?.[id]
@@ -417,7 +448,13 @@ h1 {
   @include financial-title;
 }
 .total-card {
-  @include financial-total-card;
+  @include financial-total-card(flex);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.total-copy {
+  display: grid;
 }
 .total-card span,
 .total-card small {
@@ -428,6 +465,9 @@ h1 {
 }
 .total-card small {
   @include financial-total-meta;
+}
+.period-switch {
+  @include financial-period-switch;
 }
 .category-list {
   margin-top: 1.25rem;
@@ -525,6 +565,17 @@ h1 {
   }
   .simple-value {
     font-size: 1rem;
+  }
+  .total-card {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .period-switch {
+    width: 100%;
+  }
+  .period-switch button {
+    flex: 1;
   }
 }
 </style>

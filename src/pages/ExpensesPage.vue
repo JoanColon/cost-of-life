@@ -1,12 +1,12 @@
 <template>
   <q-page class="expenses-page">
     <main class="expenses-shell">
-      <div v-if="expensesStore.loading" class="state">
+      <div v-if="pageLoading" class="state">
         <q-spinner color="primary" size="2rem" />
         <span>{{ t('expenses.loading') }}</span>
       </div>
 
-      <section v-else-if="expensesStore.error" class="state">
+      <section v-else-if="expensesStore.error || trackingStore.error" class="state">
         <q-icon name="cloud_off" size="2rem" />
         <h1>{{ t('expenses.errors.loadTitle') }}</h1>
         <p>{{ t('expenses.errors.load') }}</p>
@@ -16,7 +16,7 @@
           color="primary"
           icon="refresh"
           :label="t('common.retry')"
-          @click="expensesStore.loadSummary(workspaceId, true)"
+          @click="loadPage(true)"
         />
       </section>
 
@@ -46,12 +46,29 @@
         </header>
 
         <section class="total-card">
-          <span>{{ t('expenses.totalCostOfLife') }}</span>
-          <strong>{{ formatCurrency(totals.annualCostOfLife) }}</strong>
-          <small>
-            {{ t('expenses.perYear') }} · {{ formatCurrency(totals.monthlyCostOfLife) }}
-            {{ t('expenses.perMonth') }} · {{ scopeLabel }}
-          </small>
+          <div class="total-copy">
+            <span>{{ t('expenses.totalCostOfLife') }}</span>
+            <strong>{{ formatCurrency(displayedTotal) }}</strong>
+            <small>{{ displayedPeriodLabel }} · {{ scopeLabel }}</small>
+          </div>
+          <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
+            <button
+              type="button"
+              :class="{ selected: period === 'annual' }"
+              :aria-pressed="period === 'annual'"
+              @click="period = 'annual'"
+            >
+              {{ t('dashboard.costOfLife.annual') }}
+            </button>
+            <button
+              type="button"
+              :class="{ selected: period === 'monthly' }"
+              :aria-pressed="period === 'monthly'"
+              @click="period = 'monthly'"
+            >
+              {{ t('dashboard.costOfLife.monthly') }}
+            </button>
+          </div>
         </section>
 
         <section class="category-list" :aria-label="t('expenses.enabledCategories')">
@@ -83,13 +100,15 @@
             </button>
 
             <div v-if="isItemized(category.id)" class="category-value">
-              <strong>{{ formatCurrency(categoryMonthlyValue(category.id)) }}</strong>
-              <small>/ {{ t('dashboard.month') }}</small>
+              <strong>{{ formatCurrency(categoryDisplayValue(category.id)) }}</strong>
+              <small>/ {{ categoryPeriodLabel }}</small>
             </div>
 
             <SimpleExpenseEstimateEditor
               v-else
               :estimate="categoryEstimate(category.id)"
+              :display-value="formatCurrency(categoryDisplayValue(category.id))"
+              :display-period="categoryPeriodLabel"
               :saving="savingCategoryIds.has(category.id)"
               @save="saveEstimate(category.id, $event)"
             />
@@ -116,14 +135,24 @@
           </div>
         </section>
 
-        <q-btn
-          flat
-          no-caps
-          icon="tune"
-          color="primary"
-          :label="t('expenses.editCategories')"
-          @click="editingCategories = true"
-        />
+        <div class="expense-actions">
+          <q-btn
+            unelevated
+            no-caps
+            icon="receipt_long"
+            color="primary"
+            :label="t('expenseTracker.open')"
+            :to="{ name: 'expense-tracker', params: { workspaceId } }"
+          />
+          <q-btn
+            flat
+            no-caps
+            icon="tune"
+            color="primary"
+            :label="t('expenses.editCategories')"
+            @click="editingCategories = true"
+          />
+        </div>
       </template>
     </main>
 
@@ -204,9 +233,11 @@ import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { expenseCategories } from '@/config/expense-categories'
 import { isItemizedCategory } from '@/domain/financial/category-summary'
+import { effectiveExpenseValuesForYear } from '@/domain/financial/expense-tracking'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
+import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -217,6 +248,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const expensesStore = useExpensesStore()
+const trackingStore = useExpenseTrackingStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
@@ -228,6 +260,8 @@ const ownershipValid = ref(false)
 const savingCategoryIds = ref(new Set())
 const deleteDialog = ref(false)
 const deletingCategory = ref(null)
+const period = ref('annual')
+const currentYear = new Date().getFullYear()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspaceHomeRoute = computed(() => ({
@@ -246,13 +280,47 @@ const selectedMemberId = computed({
 const enabledCategories = computed(() =>
   expenseCategories.filter((category) => expensesStore.summary?.categories?.[category.id]?.enabled),
 )
-const totals = computed(() => expensesStore.totals(selectedMemberId.value))
+const loadedExpensesByCategory = computed(() =>
+  Object.fromEntries(expenseCategories.map(({ id }) => [id, expensesStore.itemsForCategory(id)])),
+)
+const effectiveValues = computed(() =>
+  effectiveExpenseValuesForYear({
+    summary: expensesStore.summary,
+    expensesByCategory: loadedExpensesByCategory.value,
+    trackingMonths: trackingStore.yearMonths,
+    year: currentYear,
+    memberId: selectedMemberId.value,
+  }),
+)
+const totals = computed(() => ({
+  annualCostOfLife: effectiveValues.value.annualCostOfLife,
+  monthlyCostOfLife: effectiveValues.value.annualCostOfLife / 12,
+}))
+const pageLoading = computed(() => expensesStore.loading || trackingStore.loading)
+const displayedTotal = computed(() =>
+  period.value === 'annual' ? totals.value.annualCostOfLife : totals.value.monthlyCostOfLife,
+)
+const displayedPeriodLabel = computed(() =>
+  period.value === 'annual'
+    ? t('dashboard.costOfLife.perYear')
+    : t('dashboard.costOfLife.perMonth'),
+)
+const categoryPeriodLabel = computed(() =>
+  period.value === 'annual' ? t('dashboard.year') : t('dashboard.month'),
+)
 const scopeLabel = computed(() => {
   if (selectedMemberId.value === 'all') return t('dashboard.allMembers')
   return members.value.find((member) => member.id === selectedMemberId.value)?.name || ''
 })
 
-watch(workspaceId, (id) => expensesStore.loadSummary(id), { immediate: true })
+watch(workspaceId, () => loadPage(), { immediate: true })
+
+async function loadPage(force = false) {
+  await Promise.allSettled([
+    expensesStore.loadSummary(workspaceId.value, force),
+    trackingStore.loadYear(workspaceId.value, currentYear, true),
+  ])
+}
 
 function categoryConfig(categoryId) {
   return expensesStore.summary?.categories?.[categoryId]
@@ -266,8 +334,9 @@ function isItemized(categoryId) {
   return isItemizedCategory(categoryConfig(categoryId))
 }
 
-function categoryMonthlyValue(categoryId) {
-  return expensesStore.totalForCategory(categoryId, selectedMemberId.value) / 12
+function categoryDisplayValue(categoryId) {
+  const annualValue = effectiveValues.value.categories[categoryId] || 0
+  return period.value === 'annual' ? annualValue : annualValue / 12
 }
 
 function categoryStatus(categoryId) {
@@ -395,15 +464,21 @@ async function runSaving(operation) {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .expenses-page {
-  min-height: calc(100vh - 64px);
-  padding: clamp(1.25rem, 3vw, 3rem);
-  background: var(--color-page);
+  @include financial-page;
 }
 
 .expenses-shell {
-  width: min(68rem, 100%);
-  margin: 0 auto;
+  @include financial-shell;
+}
+
+.expense-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .state {
@@ -419,50 +494,54 @@ async function runSaving(operation) {
 }
 
 .expenses-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  @include financial-header;
+}
+
+.back-button {
+  @include financial-back-button;
 }
 
 .expenses-header h1 {
-  margin: 0.2rem 0 0;
-  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  @include financial-title;
 }
 
 .eyebrow {
-  color: var(--color-primary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  @include financial-eyebrow;
 }
 
 .total-card {
+  @include financial-total-card(flex);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+.total-copy {
   display: grid;
-  margin-bottom: 1rem;
-  padding: 1.4rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, #fff7f7, #fff);
+}
+
+.total-card span,
+.total-card small {
+  @include financial-total-secondary;
 }
 
 .total-card strong {
-  margin: 0.25rem 0;
-  font-size: clamp(2.2rem, 5vw, 3.5rem);
-  line-height: 1;
+  @include financial-total-value;
 }
 
 .total-card small {
-  color: var(--color-copy);
+  @include financial-total-meta;
+}
+
+.period-switch {
+  @include financial-period-switch;
 }
 
 .category-list {
+  @include dashboard-card;
   overflow: hidden;
   margin-bottom: 0.75rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
 }
 
 .category-row {
@@ -566,6 +645,20 @@ async function runSaving(operation) {
 
   .category-link {
     display: none;
+  }
+
+  .total-card {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .period-switch {
+    width: 100%;
+  }
+
+  .period-switch button {
+    flex: 1;
   }
 }
 </style>

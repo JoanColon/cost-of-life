@@ -37,12 +37,30 @@
 
         <div class="operator" aria-hidden="true">−</div>
 
-        <button type="button" class="equation-card costs" @click="emit('open')">
+        <div
+          class="equation-card costs"
+          role="button"
+          tabindex="0"
+          @click="emit('open')"
+          @keydown.enter.self="emit('open')"
+          @keydown.space.self.prevent="emit('open')"
+        >
+          <q-btn
+            flat
+            round
+            dense
+            icon="calculate"
+            class="tracker-icon"
+            :aria-label="t('dashboard.costOfLife.openTracker')"
+            @click.stop="emit('open-tracker')"
+          >
+            <q-tooltip>{{ t('dashboard.costOfLife.openTracker') }}</q-tooltip>
+          </q-btn>
           <div class="equation-icon"><q-icon name="credit_card" /></div>
           <strong>{{ formatCurrency(values.cost) }}</strong>
           <span>{{ t('dashboard.costOfLife.lifeCosts') }}</span>
           <small>{{ periodLabel }}</small>
-        </button>
+        </div>
 
         <div class="operator equals" aria-hidden="true">=</div>
 
@@ -64,7 +82,7 @@ import DashboardCard from './DashboardCard.vue'
 import { formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({ data: { type: Object, required: true } })
-const emit = defineEmits(['open', 'open-income'])
+const emit = defineEmits(['open', 'open-income', 'open-tracker'])
 const { t } = useI18n()
 const period = ref('annual')
 
@@ -166,7 +184,17 @@ const periodLabel = computed(() =>
   }
 
   .equation-card.costs {
+    position: relative;
     background: linear-gradient(145deg, #fff4f4, #ffeded);
+    cursor: pointer;
+  }
+
+  .equation-card.costs:hover {
+    border-color: rgb(82 105 135 / 18%);
+  }
+
+  .equation-card.costs:focus-visible {
+    @include focus-ring;
   }
 
   .equation-card.available {
@@ -191,6 +219,17 @@ const periodLabel = computed(() =>
   .costs .equation-icon {
     background: #ffdfe0;
     color: #f15e64;
+  }
+
+  .tracker-icon {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    width: 2rem;
+    height: 2rem;
+    min-height: 2rem;
+    color: #f15e64;
+    background: rgb(255 255 255 / 58%);
   }
 
   .available .equation-icon {

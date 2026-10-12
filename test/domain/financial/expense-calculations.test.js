@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  expenseAmountForMonth,
   annualMonthlyExpenseValue,
   annualExpenseValue,
   generateMonthlyExpenseAmounts,
@@ -47,6 +48,24 @@ describe('expense calculations', () => {
     months.april = 250
 
     expect(annualMonthlyExpenseValue(months)).toBe(1350)
+  })
+
+  it('uses an expense estimate when a stored monthly schedule is missing', () => {
+    const expense = { estimate: { amount: 500, frequency: 'monthly' } }
+
+    expect(expenseAmountForMonth(expense, 'october')).toBe(500)
+  })
+
+  it('prefers the explicit monthly schedule over the fallback estimate', () => {
+    const monthlyAmounts = generateMonthlyExpenseAmounts({ amount: 500, frequency: 'monthly' })
+    monthlyAmounts.october = 425
+
+    expect(
+      expenseAmountForMonth(
+        { estimate: { amount: 500, frequency: 'monthly' }, monthlyAmounts },
+        'october',
+      ),
+    ).toBe(425)
   })
 
   it.each([

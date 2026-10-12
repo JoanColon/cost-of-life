@@ -24,6 +24,7 @@
           :data="dashboardData"
           @open="openSection('expenses')"
           @open-income="openSection('income')"
+          @open-tracker="openSection('expense-tracker')"
         />
         <WhatsNextCard />
       </section>
@@ -40,11 +41,13 @@ import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import WhatsNextCard from '@/components/dashboard/WhatsNextCard.vue'
 import { buildNetWorthSeries } from '@/domain/financial/history'
+import { effectiveExpenseValuesForYear } from '@/domain/financial/expense-tracking'
 import { getMockDashboard } from '@/mocks/workspace-dashboard'
 import { authUser } from '@/services/auth'
 import { getFinancialHistory } from '@/services/firebase/history.service'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useExpensesStore } from '@/stores/expenses-store'
+import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
@@ -56,6 +59,7 @@ const route = useRoute()
 const router = useRouter()
 const assetsStore = useAssetsStore()
 const expensesStore = useExpensesStore()
+const trackingStore = useExpenseTrackingStore()
 const liabilitiesStore = useLiabilitiesStore()
 const incomeStore = useIncomeStore()
 const scopeStore = useFinancialScopeStore()
@@ -64,6 +68,7 @@ const historyDocuments = ref([])
 const historyLoading = ref(false)
 const historyError = ref(null)
 let historyRequestId = 0
+const currentYear = new Date().getFullYear()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspace = computed(
@@ -76,6 +81,14 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const historyPoints = computed(() => buildNetWorthSeries(historyDocuments.value))
+const loadedExpensesByCategory = computed(() =>
+  Object.fromEntries(
+    Object.keys(expensesStore.summary?.categories || {}).map((categoryId) => [
+      categoryId,
+      expensesStore.itemsForCategory(categoryId),
+    ]),
+  ),
+)
 
 const dashboardData = computed(() => {
   const mockDashboard = getMockDashboard(selectedMemberId.value, memberIds.value)
@@ -84,20 +97,27 @@ const dashboardData = computed(() => {
   const income = incomeStore.setupCompleted
     ? incomeStore.total(selectedMemberId.value)
     : mockDashboard.income
-  const expenseTotals = expensesStore.totals(selectedMemberId.value)
-  const savingsCapacity =
-    Math.round((income - expenseTotals.annualCostOfLife + Number.EPSILON) * 100) / 100
+  const effectiveExpenses = effectiveExpenseValuesForYear({
+    summary: expensesStore.summary,
+    expensesByCategory: loadedExpensesByCategory.value,
+    trackingMonths: trackingStore.yearMonths,
+    year: currentYear,
+    memberId: selectedMemberId.value,
+  })
+  const annualCostOfLife = effectiveExpenses.annualCostOfLife
+  const monthlyCostOfLife = annualCostOfLife / 12
+  const savingsCapacity = Math.round((income - annualCostOfLife + Number.EPSILON) * 100) / 100
 
   return {
     ...mockDashboard,
     assets,
     liabilities,
     income,
-    annualCost: expenseTotals.annualCostOfLife,
-    monthlyCost: expenseTotals.monthlyCostOfLife,
+    annualCost: annualCostOfLife,
+    monthlyCost: monthlyCostOfLife,
     savingsCapacity,
     savingsRate: income > 0 ? Math.round((savingsCapacity / income) * 100) : 0,
-    costRatio: income > 0 ? Math.round((expenseTotals.annualCostOfLife / income) * 100) : 0,
+    costRatio: income > 0 ? Math.round((annualCostOfLife / income) * 100) : 0,
     netWorth: assets - liabilities,
   }
 })
@@ -126,6 +146,7 @@ watch(
     liabilitiesStore.loadSummary(id)
     incomeStore.loadSummary(id)
     expensesStore.loadSummary(id)
+    trackingStore.loadYear(id, currentYear).catch(() => {})
     loadHistory(id)
   },
   { immediate: true },

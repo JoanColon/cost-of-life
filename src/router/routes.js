@@ -3,6 +3,7 @@ import AssetCategoryPage from '@/pages/AssetCategoryPage.vue'
 import AssetsPage from '@/pages/AssetsPage.vue'
 import CreateWorkspacePage from '@/pages/CreateWorkspacePage.vue'
 import ExpenseCategoryPage from '@/pages/ExpenseCategoryPage.vue'
+import ExpenseTrackerPage from '@/pages/ExpenseTrackerPage.vue'
 import ExpensesPage from '@/pages/ExpensesPage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import IncomeCategoryPage from '@/pages/IncomeCategoryPage.vue'
@@ -74,6 +75,11 @@ const routes = [
         path: 'workspaces/:workspaceId/expenses',
         name: 'expenses',
         component: ExpensesPage,
+      },
+      {
+        path: 'workspaces/:workspaceId/expenses/tracker',
+        name: 'expense-tracker',
+        component: ExpenseTrackerPage,
       },
       {
         path: 'workspaces/:workspaceId/expenses/:category',

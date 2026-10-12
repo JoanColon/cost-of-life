@@ -104,6 +104,36 @@
           </q-item>
         </q-list>
       </div>
+
+      <template v-if="activeWorkspaceId">
+        <q-separator class="q-my-sm" />
+        <div class="workspace-list-label">{{ t('navigation.financialWorkspace') }}</div>
+        <q-list dense class="q-px-sm">
+          <q-item
+            v-ripple
+            clickable
+            :to="{ name: 'expenses', params: { workspaceId: activeWorkspaceId } }"
+            exact
+            active-class="active-nav-item"
+            @click="closeMobileDrawer"
+          >
+            <q-item-section avatar><q-icon name="credit_card" /></q-item-section>
+            <q-item-section>{{ t('navigation.expenses') }}</q-item-section>
+          </q-item>
+          <q-item
+            v-ripple
+            clickable
+            :to="{ name: 'expense-tracker', params: { workspaceId: activeWorkspaceId } }"
+            exact
+            active-class="active-nav-item"
+            class="tracker-nav-item"
+            @click="closeMobileDrawer"
+          >
+            <q-item-section avatar><q-icon name="receipt_long" /></q-item-section>
+            <q-item-section>{{ t('navigation.expenseTracker') }}</q-item-section>
+          </q-item>
+        </q-list>
+      </template>
     </q-drawer>
 
     <q-page-container>
@@ -129,6 +159,7 @@ import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
 import { authUser, signOut } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useExpensesStore } from '@/stores/expenses-store'
+import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
@@ -140,6 +171,7 @@ const route = useRoute()
 const router = useRouter()
 const assetsStore = useAssetsStore()
 const expensesStore = useExpensesStore()
+const expenseTrackingStore = useExpenseTrackingStore()
 const liabilitiesStore = useLiabilitiesStore()
 const incomeStore = useIncomeStore()
 const scopeStore = useFinancialScopeStore()
@@ -208,7 +240,11 @@ async function openWorkspace(workspaceId) {
   if (!workspaceId) return
 
   closeMobileDrawer()
-  await router.push(workspaceRoute(workspaceId))
+  const destination =
+    route.name === 'expense-tracker'
+      ? { name: 'expense-tracker', params: { workspaceId } }
+      : workspaceRoute(workspaceId)
+  await router.push(destination)
 }
 
 function workspaceRoute(workspaceId) {
@@ -229,6 +265,7 @@ async function logout() {
   try {
     assetsStore.reset()
     expensesStore.reset()
+    expenseTrackingStore.reset()
     liabilitiesStore.reset()
     incomeStore.reset()
     scopeStore.reset()

@@ -24,6 +24,7 @@
           map-options
           :label="t('expenses.form.suggestion')"
           :options="suggestionOptions"
+          :disable="Boolean(expense)"
           :rules="[(value) => Boolean(value) || t('expenses.validation.typeRequired')]"
           class="form-field"
           @update:model-value="applySuggestion"
@@ -88,15 +89,17 @@
           <thead>
             <tr>
               <th class="text-left">{{ t('income.form.month') }}</th>
-              <th class="text-right">{{ t('expenses.form.monthlyAmount') }}</th>
-              <th class="month-edit-column" />
+              <th class="text-right">{{ t('expenses.form.modelAmount') }}</th>
+              <th v-if="trackingEnabled" class="text-right">
+                {{ t('expenses.form.actualAmount') }}
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="month in incomeMonths" :key="month">
               <td>{{ t(`income.months.${month}`) }}</td>
-              <td class="text-right">{{ formatCurrency(monthAmount(month)) }}</td>
-              <td class="month-edit-column">
+              <td class="model-amount">
+                <span>{{ formatCurrency(monthAmount(month)) }}</span>
                 <q-btn
                   flat
                   round
@@ -129,6 +132,9 @@
                     </template>
                   </q-popup-edit>
                 </q-btn>
+              </td>
+              <td v-if="trackingEnabled" class="text-right actual-amount">
+                {{ actualAmount(month) == null ? '—' : formatCurrency(actualAmount(month)) }}
               </td>
             </tr>
           </tbody>
@@ -206,6 +212,10 @@ const props = defineProps({
   expense: { type: Object, default: null },
   defaults: { type: Object, default: null },
   members: { type: Array, required: true },
+  trackingYear: { type: Number, default: () => new Date().getFullYear() },
+  trackingMonths: { type: Object, default: () => ({}) },
+  trackingEnabledSubcategories: { type: Array, default: () => [] },
+  usedStandardTypes: { type: Array, default: () => [] },
   saving: Boolean,
 })
 const emit = defineEmits(['save', 'cancel', 'delete'])
@@ -227,9 +237,15 @@ const variabilityOptions = computed(() => expenseVariabilities.map(option('varia
 const recurrenceOptions = computed(() => expenseRecurrences.map(option('recurrences')))
 const necessityOptions = computed(() => expenseNecessities.map(option('necessities')))
 const suggestionOptions = computed(() => [
-  ...props.category.suggestions.map((item) => ({ value: item.id, label: t(item.nameKey) })),
+  ...props.category.suggestions
+    .filter(({ id }) => id === props.expense?.type || !props.usedStandardTypes.includes(id))
+    .map((item) => ({ value: item.id, label: t(item.nameKey) })),
   { value: 'other', label: t('expenses.suggestions.other') },
 ])
+const trackingEnabled = computed(
+  () =>
+    expenseType.value !== 'other' && props.trackingEnabledSubcategories.includes(expenseType.value),
+)
 const normalizedEstimate = computed(() =>
   normalizeExpenseEstimate({ amount: amount.value, frequency: frequency.value }),
 )
@@ -293,6 +309,14 @@ function seed() {
 
 function monthAmount(month) {
   return normalizeMoney(monthlyAmounts.value?.[month]) || 0
+}
+
+function actualAmount(month) {
+  const monthNumber = incomeMonths.indexOf(month) + 1
+  if (!trackingEnabled.value || monthNumber < 1) return null
+  const period = `${props.trackingYear}-${String(monthNumber).padStart(2, '0')}`
+  const category = props.trackingMonths[period]?.categories?.[expenseType.value]
+  return category?.items?.length ? category.total : null
 }
 
 function setMonthAmount(month, value) {
@@ -377,9 +401,16 @@ function submit() {
   overflow: visible;
 }
 
-.month-edit-column {
-  width: 3.5rem;
-  text-align: right;
+.model-amount {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.actual-amount {
+  color: var(--color-primary);
+  font-weight: 700;
 }
 
 .calculation-preview {

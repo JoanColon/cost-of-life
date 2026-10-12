@@ -32,7 +32,12 @@ const items = [
 ]
 const activeItem = computed(() => {
   if (route.name === 'workspace-dashboard') return 'home'
-  if (route.name === 'expenses' || route.name === 'expense-category') return 'expenses'
+  if (
+    route.name === 'expenses' ||
+    route.name === 'expense-category' ||
+    route.name === 'expense-tracker'
+  )
+    return 'expenses'
   return null
 })
 

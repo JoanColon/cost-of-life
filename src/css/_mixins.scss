@@ -76,6 +76,37 @@
   margin-top: 0.35rem;
 }
 
+@mixin financial-period-switch {
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0.22rem;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+
+  button {
+    min-width: 5.4rem;
+    padding: 0.45rem 0.8rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: rgb(255 255 255 / 72%);
+    font-size: 0.8rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  button.selected {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 16%);
+  }
+
+  button:focus-visible {
+    @include focus-ring;
+  }
+}
+
 @mixin financial-summary-icon {
   display: grid;
   place-items: center;

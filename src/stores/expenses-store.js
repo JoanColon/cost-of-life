@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import { expenseCategoryIds } from '@/config/expense-categories'
 import {
   createExpense as createExpenseDocument,
-  getCategoryExpenses,
   getExpensesSummary,
   removeExpense as removeExpenseDocument,
   removeExpenseCategory as removeExpenseCategoryDocuments,
@@ -13,19 +12,16 @@ import {
   updateSimpleExpenseEstimate as updateSimpleExpenseEstimateDocument,
   updateSimpleExpenseOwnership as updateSimpleExpenseOwnershipDocument,
 } from '@/services/firebase/expenses.service'
-import { categoryEffectiveValue, isItemizedCategory } from '@/domain/financial/category-summary'
-import { buildExpenseSummaryCategories, costOfLifeTotals } from '@/domain/financial/expense-summary'
+import { categoryEffectiveValue } from '@/domain/financial/category-summary'
+import { buildExpenseSummaryCategories } from '@/domain/financial/expense-summary'
 
 export const useExpensesStore = defineStore('expenses', () => {
   const summary = ref(null)
   const expensesByCategory = ref({})
   const loading = ref(false)
-  const categoryLoading = ref(false)
   const error = ref(null)
   const loadedWorkspaceId = ref(null)
-  const loadedCategoryIds = ref(new Set())
   let summaryRequestId = 0
-  let categoryRequestId = 0
 
   const setupCompleted = computed(() => Boolean(summary.value?.setupCompleted))
   const enabledCategories = computed(() =>
@@ -40,12 +36,12 @@ export const useExpensesStore = defineStore('expenses', () => {
     error.value = null
     summary.value = null
     expensesByCategory.value = {}
-    loadedCategoryIds.value = new Set()
     const requestId = ++summaryRequestId
     try {
       const state = await getExpensesSummary(workspaceId)
       if (requestId !== summaryRequestId) return
-      summary.value = state
+      summary.value = state.summary
+      expensesByCategory.value = groupExpensesByCategory(state.expenses)
       loadedWorkspaceId.value = workspaceId
     } catch (loadError) {
       if (requestId !== summaryRequestId) return
@@ -53,32 +49,6 @@ export const useExpensesStore = defineStore('expenses', () => {
       loadedWorkspaceId.value = workspaceId
     } finally {
       if (requestId === summaryRequestId) loading.value = false
-    }
-  }
-
-  async function loadCategory(workspaceId, categoryId, force = false) {
-    await loadSummary(workspaceId, force)
-    if (error.value || !summary.value?.categories?.[categoryId]) return
-    if (!force && loadedCategoryIds.value.has(categoryId)) return
-    const category = summary.value.categories[categoryId]
-    if (!isItemizedCategory(category)) {
-      expensesByCategory.value = { ...expensesByCategory.value, [categoryId]: [] }
-      loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
-      return
-    }
-
-    categoryLoading.value = true
-    const requestId = ++categoryRequestId
-    try {
-      const items = await getCategoryExpenses(workspaceId, categoryId)
-      if (requestId !== categoryRequestId) return
-      expensesByCategory.value = { ...expensesByCategory.value, [categoryId]: items }
-      loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
-    } catch (loadError) {
-      if (requestId !== categoryRequestId) return
-      error.value = loadError
-    } finally {
-      if (requestId === categoryRequestId) categoryLoading.value = false
     }
   }
 
@@ -137,7 +107,6 @@ export const useExpensesStore = defineStore('expenses', () => {
       ...expensesByCategory.value,
       [expense.category]: [...itemsForCategory(expense.category), result.expense],
     }
-    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(expense.category)
     replaceCategory(expense.category, result.category)
     return result.expense
   }
@@ -175,9 +144,6 @@ export const useExpensesStore = defineStore('expenses', () => {
     const nextItems = { ...expensesByCategory.value }
     delete nextItems[categoryId]
     expensesByCategory.value = nextItems
-    const nextLoadedIds = new Set(loadedCategoryIds.value)
-    nextLoadedIds.delete(categoryId)
-    loadedCategoryIds.value = nextLoadedIds
   }
 
   function itemsForCategory(categoryId) {
@@ -188,15 +154,18 @@ export const useExpensesStore = defineStore('expenses', () => {
     return categoryEffectiveValue(summary.value?.categories?.[categoryId], memberId)
   }
 
-  function totals(memberId = 'all') {
-    return costOfLifeTotals(summary.value, memberId)
-  }
-
   function replaceCategory(categoryId, category) {
     summary.value = {
       ...(summary.value || {}),
       categories: { ...(summary.value?.categories || {}), [categoryId]: category },
     }
+  }
+
+  function groupExpensesByCategory(expenses) {
+    return expenses.reduce((groups, expense) => {
+      groups[expense.category] = [...(groups[expense.category] || []), expense]
+      return groups
+    }, {})
   }
 
   function findLoadedExpense(expenseId) {
@@ -207,25 +176,20 @@ export const useExpensesStore = defineStore('expenses', () => {
 
   function reset() {
     summaryRequestId += 1
-    categoryRequestId += 1
     summary.value = null
     expensesByCategory.value = {}
     loading.value = false
-    categoryLoading.value = false
     error.value = null
     loadedWorkspaceId.value = null
-    loadedCategoryIds.value = new Set()
   }
 
   return {
     summary,
     loading,
-    categoryLoading,
     error,
     setupCompleted,
     enabledCategories,
     loadSummary,
-    loadCategory,
     completeSetup,
     saveCategorySelection,
     updateSimpleCategoryEstimate,
@@ -236,7 +200,6 @@ export const useExpensesStore = defineStore('expenses', () => {
     deleteCategory,
     itemsForCategory,
     totalForCategory,
-    totals,
     reset,
   }
 })

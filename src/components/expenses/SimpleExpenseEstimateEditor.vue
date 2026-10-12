@@ -3,11 +3,11 @@
     type="button"
     class="estimate-button"
     :disabled="disabled"
-    :aria-label="t('expenses.quickEdit.label', { value: formattedValue })"
+    :aria-label="t('expenses.quickEdit.label', { value: shownValue })"
     @click="open"
   >
-    <strong>{{ formattedValue }}</strong>
-    <small>/ {{ frequencyLabel }}</small>
+    <strong>{{ shownValue }}</strong>
+    <small>/ {{ shownPeriod }}</small>
   </button>
 
   <q-dialog v-model="dialog">
@@ -62,6 +62,8 @@ import { formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
   estimate: { type: Object, required: true },
+  displayValue: { type: String, default: null },
+  displayPeriod: { type: String, default: null },
   saving: Boolean,
   disabled: Boolean,
 })
@@ -78,6 +80,8 @@ const normalized = computed(
 )
 const formattedValue = computed(() => formatCurrency(normalized.value.amount))
 const frequencyLabel = computed(() => t(`expenses.frequencies.${normalized.value.frequency}`))
+const shownValue = computed(() => props.displayValue || formattedValue.value)
+const shownPeriod = computed(() => props.displayPeriod || frequencyLabel.value)
 const frequencyOptions = computed(() =>
   selectableExpenseFrequencies.map((value) => ({
     value,

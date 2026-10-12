@@ -42,21 +42,21 @@ export async function getExpensesSummary(workspaceId) {
     getDoc(documentRef),
     getDocs(expensesRef(workspaceId)),
   ])
-  if (!snapshot.exists()) return null
-
-  const summary = snapshot.data()
   const expenses = expensesSnapshot.docs.map((expenseDocument) => ({
     id: expenseDocument.id,
     ...expenseDocument.data(),
   }))
+  if (!snapshot.exists()) return { summary: null, expenses }
+
+  const summary = snapshot.data()
   const categories = rebuildExpenseCategories(summary.categories, expenses)
   if (expenseCategoryTotalsChanged(summary.categories, categories)) {
     await setDoc(documentRef, { categories, updatedAt: serverTimestamp() }, { merge: true })
   }
-  return { ...summary, categories }
+  return { summary: { ...summary, categories }, expenses }
 }
 
-export async function getCategoryExpenses(workspaceId, categoryId) {
+async function getCategoryExpenses(workspaceId, categoryId) {
   const snapshot = await getDocs(
     query(expensesRef(workspaceId), where('category', '==', categoryId)),
   )
@@ -67,14 +67,18 @@ export async function getCategoryExpenses(workspaceId, categoryId) {
 }
 
 export async function saveExpensesSetup(workspaceId, categories, userId) {
-  await setDoc(summaryRef(workspaceId), {
-    setupCompleted: true,
-    categories: stampCategories(categories, userId),
-    createdAt: serverTimestamp(),
-    createdBy: userId,
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
+  await setDoc(
+    summaryRef(workspaceId),
+    {
+      setupCompleted: true,
+      categories: stampCategories(categories, userId),
+      createdAt: serverTimestamp(),
+      createdBy: userId,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId,
+    },
+    { merge: true },
+  )
 }
 
 export async function updateExpensesCategories(workspaceId, categories, userId) {
@@ -154,14 +158,26 @@ export async function updateSimpleExpenseOwnership(
 export async function createExpense(workspaceId, expense, userId, memberIds) {
   assertValidOwnership(expense.ownership, memberIds)
   const normalized = normalizeExpenseItem(expense)
-  const itemRef = doc(expensesRef(workspaceId))
+  const itemRef =
+    normalized.type === 'other'
+      ? doc(expensesRef(workspaceId))
+      : doc(expensesRef(workspaceId), standardExpenseDocumentId(normalized))
   const documentRef = summaryRef(workspaceId)
   const existingExpenses = await getCategoryExpenses(workspaceId, normalized.category)
 
   return runTransaction(db, async (transaction) => {
-    const summarySnapshot = await transaction.get(documentRef)
+    const [summarySnapshot, existingItemSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      normalized.type === 'other' ? Promise.resolve(null) : transaction.get(itemRef),
+    ])
     const category = summarySnapshot.data()?.categories?.[normalized.category]
     if (!category?.enabled) throw new Error('Expense category is not enabled')
+    if (
+      existingItemSnapshot?.exists() ||
+      (normalized.type !== 'other' && existingExpenses.some(({ type }) => type === normalized.type))
+    ) {
+      throw new Error('Only one expense is allowed for each standard subcategory')
+    }
 
     const itemData = {
       ...normalized,
@@ -204,6 +220,9 @@ export async function updateExpense(workspaceId, expenseId, changes, userId, mem
     if (!itemSnapshot.exists()) throw new Error('Expense not found')
 
     const previousExpense = itemSnapshot.data()
+    if (changes.type && changes.type !== previousExpense.type) {
+      throw new Error('An expense subcategory cannot be changed after creation')
+    }
     const categoryId = previousExpense.category
     const category = summarySnapshot.data()?.categories?.[categoryId]
     if (!category || Number(category.itemCount || 0) === 0) {
@@ -341,6 +360,10 @@ function rebuildExpenseCategories(categories = {}, expenses = []) {
   )
 }
 
+function standardExpenseDocumentId(expense) {
+  return `${expense.category}--${expense.type}`
+}
+
 function expenseCategoryTotalsChanged(previous = {}, next = {}) {
   return Object.keys(next).some((categoryId) => {
     const before = previous[categoryId]
@@ -367,8 +390,3 @@ function assertValidOwnership(ownership, memberIds) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
 }
-
-// Layers 1 and 2 model the expected cash required to sustain the user's life.
-// Layer 3 may adjust the true economic Cost of Life when a payment partly
-// represents a wealth transfer, such as principal reducing a liability.
-export const EXPENSE_COST_MODEL = 'expected_cash_requirement'
