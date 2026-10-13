@@ -16,7 +16,7 @@
           color="primary"
           icon="refresh"
           :label="t('common.retry')"
-          @click="liabilitiesStore.loadSummary(workspaceId, true)"
+          @click="liabilitiesStore.loadConfig(workspaceId, true)"
         />
       </section>
 
@@ -231,8 +231,17 @@ import SimpleAssetValueEditor from '@/components/assets/SimpleAssetValueEditor.v
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import LiabilityCategorySetup from '@/components/liabilities/LiabilityCategorySetup.vue'
 import { liabilityCategories } from '@/config/liability-categories'
+import {
+  currentFinancialMonth,
+  currentFinancialYear,
+  financialYearCategoryItemCount,
+  financialYearCategoryMemberIds,
+  financialYearMonthCategoryValue,
+  financialYearMonthValue,
+} from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
@@ -244,6 +253,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const liabilitiesStore = useLiabilitiesStore()
+const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
@@ -257,6 +267,8 @@ const ownershipDialog = ref(false)
 const editingOwnershipCategoryId = ref(null)
 const editingOwnership = ref({ mode: 'single', shares: [] })
 const ownershipValid = ref(false)
+const currentYear = currentFinancialYear()
+const currentMonth = currentFinancialMonth()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspaceHomeRoute = computed(() => ({
@@ -277,15 +289,25 @@ const enabledCategories = computed(() =>
     liabilitiesStore.enabledCategories.includes(category.id),
   ),
 )
-const total = computed(() => liabilitiesStore.total(selectedMemberId.value))
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const total = computed(() =>
+  financialYearMonthValue(financialYear.value, currentMonth, 'liabilities', selectedMemberId.value),
+)
 const scopeLabel = computed(() =>
   selectedMemberId.value === 'all'
     ? t('dashboard.allMembers')
     : members.value.find((member) => member.id === selectedMemberId.value)?.name || '',
 )
 
-onMounted(() => liabilitiesStore.loadSummary(workspaceId.value))
-watch(workspaceId, (value) => liabilitiesStore.loadSummary(value))
+onMounted(() => loadLiabilities(workspaceId.value))
+watch(workspaceId, (value) => loadLiabilities(value))
+
+async function loadLiabilities(activeWorkspaceId) {
+  await Promise.allSettled([
+    liabilitiesStore.loadConfig(activeWorkspaceId),
+    financialYearsStore.load(activeWorkspaceId, currentYear),
+  ])
+}
 
 async function completeSetup(selected) {
   await persist(() =>
@@ -349,26 +371,34 @@ async function deleteCategory() {
 }
 
 function categoryHasData(categoryId) {
-  const category = liabilitiesStore.summary?.categories?.[categoryId]
-  return Number(category?.manualValue || 0) > 0 || Number(category?.itemCount || 0) > 0
+  return (
+    financialYearMonthCategoryValue(financialYear.value, currentMonth, 'liabilities', categoryId) >
+      0 || isItemizedCategory(categoryId)
+  )
 }
 
 function categoryStatus(categoryId) {
-  const category = liabilitiesStore.summary?.categories?.[categoryId]
-  return Number(category?.itemCount || 0) > 0
-    ? t('liabilities.itemCount', { count: category.itemCount })
-    : t('liabilities.simpleTotal')
+  const count = categoryItemCount(categoryId)
+  return count > 0 ? t('liabilities.itemCount', { count }) : t('liabilities.simpleTotal')
 }
 
 function categoryValue(categoryId) {
-  return formatCurrency(liabilitiesStore.totalForCategory(categoryId, selectedMemberId.value))
+  return formatCurrency(
+    financialYearMonthCategoryValue(
+      financialYear.value,
+      currentMonth,
+      'liabilities',
+      categoryId,
+      selectedMemberId.value,
+    ),
+  )
 }
 
 function categoryMembers(categoryId) {
-  const category = liabilitiesStore.summary?.categories?.[categoryId]
+  const category = liabilitiesStore.config?.categories?.[categoryId]
   const ownerIds = new Set(
-    Number(category?.itemCount || 0) > 0
-      ? Object.keys(category.memberValues || {})
+    isItemizedCategory(categoryId)
+      ? financialYearCategoryMemberIds(financialYear.value, 'liabilities', categoryId, currentMonth)
       : (category?.ownership?.shares || [])
           .filter((share) => Number(share.percentage) > 0)
           .map((share) => share.memberId),
@@ -391,10 +421,18 @@ function initials(name) {
     .toUpperCase()
 }
 function isItemizedCategory(categoryId) {
-  return Number(liabilitiesStore.summary?.categories?.[categoryId]?.itemCount || 0) > 0
+  return categoryItemCount(categoryId) > 0
+}
+function categoryItemCount(categoryId) {
+  return financialYearCategoryItemCount(
+    financialYear.value,
+    'liabilities',
+    categoryId,
+    currentMonth,
+  )
 }
 function canonicalCategoryValue(categoryId) {
-  return liabilitiesStore.summary?.categories?.[categoryId]?.manualValue ?? 0
+  return liabilitiesStore.config?.categories?.[categoryId]?.manualValue ?? 0
 }
 function isCategorySaving(categoryId) {
   return savingCategoryIds.value.has(categoryId)
@@ -421,7 +459,7 @@ async function saveSimpleCategoryValue(categoryId, value) {
 
 function openOwnershipEditor(categoryId) {
   if (isItemizedCategory(categoryId)) return
-  const ownership = liabilitiesStore.summary?.categories?.[categoryId]?.ownership
+  const ownership = liabilitiesStore.config?.categories?.[categoryId]?.ownership
   if (!ownership) return
   editingOwnershipCategoryId.value = categoryId
   editingOwnership.value = cloneOwnership(ownership)

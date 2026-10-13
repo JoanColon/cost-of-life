@@ -50,7 +50,10 @@ export function normalizeIncomeCalculation(calculation) {
   const amount = normalizeMoney(calculation.amount)
   if (amount === null) return null
 
-  if (calculation.mode === 'one_time') return { mode: 'one_time', amount }
+  if (calculation.mode === 'one_time') {
+    const month = incomeMonths.includes(calculation.month) ? calculation.month : 'january'
+    return { mode: 'one_time', amount, month }
+  }
   if (!recurringIncomeFrequencies.includes(calculation.frequency)) return null
   return { mode: 'recurring', amount, frequency: calculation.frequency }
 }

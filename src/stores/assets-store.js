@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { assetCategoryIds } from '@/config/asset-categories'
 import {
   createAsset as createAssetDocument,
-  getAssetsSummary,
+  getAssetsConfig,
   getCategoryAssets,
   removeAsset as removeAssetDocument,
   removeAssetCategory as removeAssetCategoryDocuments,
@@ -13,66 +13,54 @@ import {
   updateSimpleCategoryOwnership as updateSimpleCategoryOwnershipDocument,
   updateSimpleCategoryValue as updateSimpleCategoryValueDocument,
 } from '@/services/firebase/assets.service'
-import {
-  buildSummaryCategories,
-  categoryEffectiveValue,
-  isItemizedCategory,
-  totalCategories,
-} from '@/domain/financial/category-summary'
+import { buildModelCategories } from '@/domain/financial/model-categories'
 
 export const useAssetsStore = defineStore('assets', () => {
-  const summary = ref(null)
+  const config = ref(null)
   const assetsByCategory = ref({})
   const loading = ref(false)
   const categoryLoading = ref(false)
   const error = ref(null)
   const loadedWorkspaceId = ref(null)
   const loadedCategoryIds = ref(new Set())
-  let summaryRequestId = 0
+  let configRequestId = 0
   let categoryRequestId = 0
 
-  const setupCompleted = computed(() => Boolean(summary.value?.setupCompleted))
+  const setupCompleted = computed(() => Boolean(config.value?.setupCompleted))
   const enabledCategories = computed(() =>
-    Object.entries(summary.value?.categories || {})
+    Object.entries(config.value?.categories || {})
       .filter(([, category]) => category.enabled)
       .map(([categoryId]) => categoryId),
   )
 
-  async function loadSummary(workspaceId, force = false) {
+  async function loadConfig(workspaceId, force = false) {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
 
     loading.value = true
     error.value = null
-    summary.value = null
+    config.value = null
     assetsByCategory.value = {}
     loadedCategoryIds.value = new Set()
-    const requestId = ++summaryRequestId
+    const requestId = ++configRequestId
 
     try {
-      const state = await getAssetsSummary(workspaceId)
-      if (requestId !== summaryRequestId) return
-      summary.value = state
+      const state = await getAssetsConfig(workspaceId)
+      if (requestId !== configRequestId) return
+      config.value = state
       loadedWorkspaceId.value = workspaceId
     } catch (loadError) {
-      if (requestId !== summaryRequestId) return
+      if (requestId !== configRequestId) return
       error.value = loadError
       loadedWorkspaceId.value = workspaceId
     } finally {
-      if (requestId === summaryRequestId) loading.value = false
+      if (requestId === configRequestId) loading.value = false
     }
   }
 
   async function loadCategory(workspaceId, categoryId, force = false) {
-    await loadSummary(workspaceId, force)
-    if (error.value || !summary.value?.categories?.[categoryId]) return
+    await loadConfig(workspaceId, force)
+    if (error.value || !config.value?.categories?.[categoryId]) return
     if (!force && loadedCategoryIds.value.has(categoryId)) return
-
-    const category = summary.value.categories[categoryId]
-    if (!isItemizedCategory(category)) {
-      assetsByCategory.value = { ...assetsByCategory.value, [categoryId]: [] }
-      loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
-      return
-    }
 
     categoryLoading.value = true
     const requestId = ++categoryRequestId
@@ -91,21 +79,21 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildSummaryCategories(assetCategoryIds, selectedCategoryIds, {}, memberIds)
+    const categories = buildModelCategories(assetCategoryIds, selectedCategoryIds, {}, memberIds)
     await saveAssetsSetup(workspaceId, categories, userId)
-    summary.value = { setupCompleted: true, categories }
+    config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
   async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildSummaryCategories(
+    const categories = buildModelCategories(
       assetCategoryIds,
       selectedCategoryIds,
-      summary.value?.categories || {},
+      config.value?.categories || {},
       memberIds,
     )
     await updateAssetsCategories(workspaceId, categories, userId)
-    summary.value = { ...(summary.value || {}), setupCompleted: true, categories }
+    config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
   async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
@@ -138,7 +126,6 @@ export const useAssetsStore = defineStore('assets', () => {
       [asset.category]: [...categoryAssets, result.asset],
     }
     loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(asset.category)
-    replaceCategory(asset.category, result.category)
     return result.asset
   }
 
@@ -153,7 +140,6 @@ export const useAssetsStore = defineStore('assets', () => {
         candidate.id === assetId ? result.asset : candidate,
       ),
     }
-    replaceCategory(asset.category, result.category)
   }
 
   async function deleteAsset(workspaceId, assetId, userId, memberIds) {
@@ -167,15 +153,14 @@ export const useAssetsStore = defineStore('assets', () => {
         (candidate) => candidate.id !== assetId,
       ),
     }
-    replaceCategory(result.categoryId, result.category)
   }
 
   async function deleteCategory(workspaceId, categoryId, userId) {
     await removeAssetCategoryDocuments(workspaceId, categoryId, userId)
 
-    const categories = { ...(summary.value?.categories || {}) }
+    const categories = { ...(config.value?.categories || {}) }
     delete categories[categoryId]
-    summary.value = { ...summary.value, categories }
+    config.value = { ...config.value, categories }
 
     const nextAssetsByCategory = { ...assetsByCategory.value }
     delete nextAssetsByCategory[categoryId]
@@ -189,20 +174,12 @@ export const useAssetsStore = defineStore('assets', () => {
     return assetsByCategory.value[categoryId] || []
   }
 
-  function totalForCategory(categoryId, memberId = 'all') {
-    return categoryEffectiveValue(summary.value?.categories?.[categoryId], memberId)
-  }
-
-  function total(memberId = 'all') {
-    return totalCategories(summary.value, memberId)
-  }
-
   function replaceCategory(categoryId, category) {
-    summary.value = {
-      ...(summary.value || {}),
+    config.value = {
+      ...(config.value || {}),
       categories: {
-        ...(summary.value?.categories || {}),
-        [categoryId]: category,
+        ...(config.value?.categories || {}),
+        [categoryId]: { ...(config.value?.categories?.[categoryId] || {}), ...category },
       },
     }
   }
@@ -214,9 +191,9 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   function reset() {
-    summaryRequestId += 1
+    configRequestId += 1
     categoryRequestId += 1
-    summary.value = null
+    config.value = null
     assetsByCategory.value = {}
     loading.value = false
     categoryLoading.value = false
@@ -226,7 +203,7 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   return {
-    summary,
+    config,
     assetsByCategory,
     loading,
     categoryLoading,
@@ -234,7 +211,7 @@ export const useAssetsStore = defineStore('assets', () => {
     loadedWorkspaceId,
     setupCompleted,
     enabledCategories,
-    loadSummary,
+    loadConfig,
     loadCategory,
     completeSetup,
     saveCategorySelection,
@@ -245,8 +222,6 @@ export const useAssetsStore = defineStore('assets', () => {
     deleteAsset,
     deleteCategory,
     itemsForCategory,
-    totalForCategory,
-    total,
     reset,
   }
 })

@@ -33,6 +33,18 @@ export const defaultExpenseTrackingCategoryIds = [
   'home_repairs',
 ]
 
+export function trackingSubcategoryIdsForModelExpenses(expenses = []) {
+  const available = new Set(
+    expenses
+      .filter((expense) => {
+        const category = expenseTrackingCategories.find(({ id }) => id === expense.type)
+        return expense.trackingEligible === true && category?.categoryId === expense.category
+      })
+      .map((expense) => expense.type),
+  )
+  return expenseTrackingCategoryIds.filter((id) => available.has(id))
+}
+
 export function groupedExpenseTrackingCategories(subcategories = expenseTrackingCategories) {
   return subcategories.reduce((groups, subcategory) => {
     const category = getExpenseCategory(subcategory.categoryId)

@@ -10,8 +10,6 @@ import {
 import { db } from '@/firebase/firebase'
 
 export async function getUserWorkspaces(user) {
-  await migrateOwnedLegacyWorkspaces(user)
-
   const workspacesQuery = query(
     collection(db, 'workspaces'),
     where('memberIds', 'array-contains', user.uid),
@@ -74,37 +72,4 @@ export async function createFinancialWorkspace({ name, inviteEmail, user }) {
       },
     },
   }
-}
-
-async function migrateOwnedLegacyWorkspaces(user) {
-  const ownedWorkspacesQuery = query(
-    collection(db, 'workspaces'),
-    where('createdBy', '==', user.uid),
-  )
-  const ownedWorkspaceSnapshot = await getDocs(ownedWorkspacesQuery)
-  const legacyWorkspaces = ownedWorkspaceSnapshot.docs.filter(
-    (workspaceDocument) => !Array.isArray(workspaceDocument.data().memberIds),
-  )
-
-  if (!legacyWorkspaces.length) return
-
-  const batch = writeBatch(db)
-  const displayName = user.displayName || user.email || ''
-
-  legacyWorkspaces.forEach((workspaceDocument) => {
-    batch.update(workspaceDocument.ref, {
-      memberIds: [user.uid],
-      members: {
-        [user.uid]: {
-          displayName,
-          role: 'owner',
-          joinedAt: workspaceDocument.data().createdAt || serverTimestamp(),
-        },
-      },
-      updatedAt: serverTimestamp(),
-    })
-    batch.delete(doc(workspaceDocument.ref, 'members', user.uid))
-  })
-
-  await batch.commit()
 }

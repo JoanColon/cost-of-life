@@ -171,8 +171,14 @@ import { useRoute, useRouter } from 'vue-router'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import LiabilityForm from '@/components/liabilities/LiabilityForm.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
+import {
+  currentFinancialMonth,
+  currentFinancialYear,
+  financialYearMonthCategoryValue,
+} from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
@@ -184,6 +190,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const liabilitiesStore = useLiabilitiesStore()
+const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const preparing = ref(false)
@@ -194,6 +201,8 @@ const deletingLiability = ref(null)
 const confirmDelete = ref(false)
 const formSaving = ref(false)
 let preparationId = 0
+const currentYear = currentFinancialYear()
+const currentMonth = currentFinancialMonth()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const categoryId = computed(() => String(route.params.category))
@@ -202,7 +211,7 @@ const liabilitiesRoute = computed(() => ({
   params: { workspaceId: workspaceId.value },
 }))
 const category = computed(() => getLiabilityCategory(categoryId.value))
-const categoryConfig = computed(() => liabilitiesStore.summary?.categories?.[categoryId.value])
+const categoryConfig = computed(() => liabilitiesStore.config?.categories?.[categoryId.value])
 const workspace = computed(
   () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
 )
@@ -213,10 +222,11 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allCategoryLiabilities = computed(() => liabilitiesStore.itemsForCategory(categoryId.value))
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const liabilityDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config) return null
-  const firstItem = Number(config.itemCount || 0) === 0
+  const firstItem = allCategoryLiabilities.value.length === 0
   return {
     name: '',
     balance: firstItem ? (config.manualValue ?? 0) : 0,
@@ -230,10 +240,16 @@ const scopedLiabilities = computed(() =>
   })),
 )
 const categoryTotal = computed(() =>
-  liabilitiesStore.totalForCategory(categoryId.value, selectedMemberId.value),
+  financialYearMonthCategoryValue(
+    financialYear.value,
+    currentMonth,
+    'liabilities',
+    categoryId.value,
+    selectedMemberId.value,
+  ),
 )
 const itemSummary = computed(() => {
-  const count = Number(categoryConfig.value?.itemCount || 0)
+  const count = allCategoryLiabilities.value.length
   const key = count === 1 ? category.value.itemNameKey : category.value.itemNamePluralKey
   return t('liabilities.itemSummary', { count, items: t(key) })
 })
@@ -248,7 +264,10 @@ async function preparePage(force = false) {
   preparing.value = true
   pageError.value = null
   try {
-    await liabilitiesStore.loadSummary(workspaceId.value, force)
+    await Promise.all([
+      liabilitiesStore.loadConfig(workspaceId.value, force),
+      financialYearsStore.load(workspaceId.value, currentYear, force),
+    ])
     if (currentPreparation !== preparationId) return
     if (!liabilitiesStore.setupCompleted || !category.value || !categoryConfig.value?.enabled) {
       await router.replace(liabilitiesRoute.value)

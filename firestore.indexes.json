@@ -2,13 +2,13 @@
   "indexes": [],
   "fieldOverrides": [
     {
-      "collectionGroup": "history",
+      "collectionGroup": "financialYears",
       "fieldPath": "months",
       "indexes": []
     },
     {
-      "collectionGroup": "history",
-      "fieldPath": "itemLabels",
+      "collectionGroup": "financialYears",
+      "fieldPath": "totals",
       "indexes": []
     }
   ]

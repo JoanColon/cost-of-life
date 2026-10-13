@@ -3,11 +3,11 @@ import { expenseCategories } from '../../../src/config/expense-categories'
 import {
   defaultExpenseTrackingCategoryIds,
   expenseTrackingCategoryIds,
+  trackingSubcategoryIdsForModelExpenses,
 } from '../../../src/config/expense-tracking-categories'
 import {
   addTrackedItem,
   deleteTrackedItem,
-  effectiveExpenseValuesForYear,
   emptyExpenseTrackingMonth,
   normalizeTrackingMonth,
   resolveExpenseTrackingValue,
@@ -38,6 +38,17 @@ describe('expense tracking month', () => {
       'home_repairs',
     ])
     expect(defaultExpenseTrackingCategoryIds).not.toContain('gym_fitness')
+  })
+
+  it('offers only tracking-eligible subcategories backed by matching model expenses', () => {
+    expect(
+      trackingSubcategoryIdsForModelExpenses([
+        { category: 'food', type: 'groceries', trackingEligible: true },
+        { category: 'food', type: 'restaurants_takeaway', trackingEligible: false },
+        { category: 'housing', type: 'fuel_charging', trackingEligible: true },
+        { category: 'other', type: 'other', trackingEligible: true },
+      ]),
+    ).toEqual(['groceries'])
   })
 
   it('adds items and keeps category and month totals synchronized', () => {
@@ -91,7 +102,7 @@ describe('expense tracking month', () => {
     expect(normalized.total).toBe(5.5)
   })
 
-  it('normalizes tracked decisions without legacy model snapshots', () => {
+  it('normalizes tracked decisions without model snapshots', () => {
     const month = normalizeTrackingMonth(
       {
         categories: { groceries: { items: [item('a', 450)] } },
@@ -121,6 +132,19 @@ describe('expense tracking month', () => {
     expect(tracked.total).toBe(450)
     expect(restored.reconciliation).toEqual({})
     expect(restored.total).toBe(450)
+  })
+
+  it('allows an explicit tracked actual of zero', () => {
+    const tracked = setTrackingDecision(
+      emptyExpenseTrackingMonth('2026-10'),
+      'groceries',
+      'tracked',
+    )
+
+    expect(tracked.reconciliation.groceries).toEqual({ decision: 'tracked' })
+    expect(normalizeTrackingMonth(tracked, '2026-10').reconciliation.groceries).toEqual({
+      decision: 'tracked',
+    })
   })
 
   it('updates multiple decisions together in the monthly document', () => {
@@ -169,60 +193,5 @@ describe('expense tracking month', () => {
       effective: 600,
       source: 'model',
     })
-  })
-
-  it('builds the annual effective total from tracked decisions and model fallbacks', () => {
-    const monthlyAmounts = Object.fromEntries(
-      [
-        'january',
-        'february',
-        'march',
-        'april',
-        'may',
-        'june',
-        'july',
-        'august',
-        'september',
-        'october',
-        'november',
-        'december',
-      ].map((month) => [month, 500]),
-    )
-    const ownership = { mode: 'single', shares: [{ memberId: 'member-a', percentage: 100 }] }
-    const input = {
-      summary: {
-        categories: {
-          // Expense documents are authoritative even if this derived counter is stale.
-          food: { enabled: true, itemCount: 0, itemizedValue: 0, manualValue: 0 },
-        },
-      },
-      expensesByCategory: {
-        food: [{ type: 'groceries', monthlyAmounts, ownership }],
-      },
-      trackingMonths: {
-        '2026-10': {
-          categories: { groceries: { total: 450, items: [{ amount: 450, ownership }] } },
-          reconciliation: { groceries: { decision: 'tracked' } },
-        },
-      },
-      year: 2026,
-    }
-
-    expect(effectiveExpenseValuesForYear(input)).toEqual({
-      categories: { food: 5950 },
-      annualCostOfLife: 5950,
-    })
-    expect(
-      effectiveExpenseValuesForYear({
-        ...input,
-        trackingMonths: {
-          '2026-10': {
-            ...input.trackingMonths['2026-10'],
-            reconciliation: {},
-          },
-        },
-      }).annualCostOfLife,
-    ).toBe(6000)
-    expect(effectiveExpenseValuesForYear({ ...input, year: 2027 }).annualCostOfLife).toBe(6000)
   })
 })

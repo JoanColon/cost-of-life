@@ -89,9 +89,9 @@ const period = ref('annual')
 const values = computed(() => {
   if (period.value === 'monthly') {
     return {
-      income: props.data.income / 12,
+      income: props.data.monthlyIncome,
       cost: props.data.monthlyCost,
-      savingsCapacity: props.data.savingsCapacity / 12,
+      savingsCapacity: props.data.monthlySavingsCapacity,
     }
   }
 

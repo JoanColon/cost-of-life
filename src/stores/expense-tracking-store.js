@@ -4,7 +4,6 @@ import {
   createTrackedExpense,
   getExpenseTrackingMonth,
   getExpenseTrackingPreferences,
-  getExpenseTrackingYear,
   removeTrackedExpense,
   saveExpenseTrackingPreferences,
   saveTrackingReconciliation,
@@ -15,14 +14,12 @@ import {
 export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
   const month = ref(null)
   const enabledSubcategories = ref([])
-  const yearMonths = ref({})
+  const availableSubcategories = ref([])
   const loading = ref(false)
   const saving = ref(false)
   const error = ref(null)
   const loadedKey = ref(null)
-  const loadedYearKey = ref(null)
   let requestId = 0
-  let yearRequestId = 0
 
   async function load(workspaceId, period, force = false) {
     const key = `${workspaceId}:${period}`
@@ -37,7 +34,8 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
       ])
       if (currentRequest !== requestId) return
       month.value = trackingMonth
-      enabledSubcategories.value = preferences
+      enabledSubcategories.value = preferences.enabledSubcategories
+      availableSubcategories.value = preferences.availableSubcategories
       loadedKey.value = key
     } catch (loadError) {
       if (currentRequest !== requestId) return
@@ -57,30 +55,6 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
       )
     } finally {
       saving.value = false
-    }
-  }
-
-  async function loadYear(workspaceId, year, force = false) {
-    const key = `${workspaceId}:${year}`
-    if (!force && loadedYearKey.value === key) return
-    const currentRequest = ++yearRequestId
-    loading.value = true
-    error.value = null
-    try {
-      const [months, preferences] = await Promise.all([
-        getExpenseTrackingYear(workspaceId, year),
-        getExpenseTrackingPreferences(workspaceId),
-      ])
-      if (currentRequest !== yearRequestId) return
-      yearMonths.value = months
-      enabledSubcategories.value = preferences
-      loadedYearKey.value = key
-    } catch (loadError) {
-      if (currentRequest !== yearRequestId) return
-      error.value = loadError
-      throw loadError
-    } finally {
-      if (currentRequest === yearRequestId) loading.value = false
     }
   }
 
@@ -125,10 +99,6 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
     try {
       const updatedMonth = await operation()
       month.value = updatedMonth
-      const period = `${updatedMonth.year}-${String(updatedMonth.month).padStart(2, '0')}`
-      if (loadedYearKey.value?.endsWith(`:${updatedMonth.year}`)) {
-        yearMonths.value = { ...yearMonths.value, [period]: updatedMonth }
-      }
     } finally {
       saving.value = false
     }
@@ -136,26 +106,23 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
 
   function reset() {
     requestId += 1
-    yearRequestId += 1
     month.value = null
-    yearMonths.value = {}
     enabledSubcategories.value = []
+    availableSubcategories.value = []
     loading.value = false
     saving.value = false
     error.value = null
     loadedKey.value = null
-    loadedYearKey.value = null
   }
 
   return {
     month,
-    yearMonths,
     enabledSubcategories,
+    availableSubcategories,
     loading,
     saving,
     error,
     load,
-    loadYear,
     savePreferences,
     add,
     edit,

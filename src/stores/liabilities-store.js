@@ -4,7 +4,7 @@ import { liabilityCategoryIds } from '@/config/liability-categories'
 import {
   createLiability as createLiabilityDocument,
   getCategoryLiabilities,
-  getLiabilitiesSummary,
+  getLiabilitiesConfig,
   removeLiability as removeLiabilityDocument,
   removeLiabilityCategory as removeLiabilityCategoryDocuments,
   saveLiabilitiesSetup,
@@ -13,64 +13,52 @@ import {
   updateSimpleLiabilityOwnership as updateSimpleLiabilityOwnershipDocument,
   updateSimpleLiabilityValue as updateSimpleLiabilityValueDocument,
 } from '@/services/firebase/liabilities.service'
-import {
-  buildSummaryCategories,
-  categoryEffectiveValue,
-  isItemizedCategory,
-  totalCategories,
-} from '@/domain/financial/category-summary'
+import { buildModelCategories } from '@/domain/financial/model-categories'
 
 export const useLiabilitiesStore = defineStore('liabilities', () => {
-  const summary = ref(null)
+  const config = ref(null)
   const liabilitiesByCategory = ref({})
   const loading = ref(false)
   const categoryLoading = ref(false)
   const error = ref(null)
   const loadedWorkspaceId = ref(null)
   const loadedCategoryIds = ref(new Set())
-  let summaryRequestId = 0
+  let configRequestId = 0
   let categoryRequestId = 0
 
-  const setupCompleted = computed(() => Boolean(summary.value?.setupCompleted))
+  const setupCompleted = computed(() => Boolean(config.value?.setupCompleted))
   const enabledCategories = computed(() =>
-    Object.entries(summary.value?.categories || {})
+    Object.entries(config.value?.categories || {})
       .filter(([, category]) => category.enabled)
       .map(([categoryId]) => categoryId),
   )
 
-  async function loadSummary(workspaceId, force = false) {
+  async function loadConfig(workspaceId, force = false) {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
     loading.value = true
     error.value = null
-    summary.value = null
+    config.value = null
     liabilitiesByCategory.value = {}
     loadedCategoryIds.value = new Set()
-    const requestId = ++summaryRequestId
+    const requestId = ++configRequestId
     try {
-      const state = await getLiabilitiesSummary(workspaceId)
-      if (requestId !== summaryRequestId) return
-      summary.value = state
+      const state = await getLiabilitiesConfig(workspaceId)
+      if (requestId !== configRequestId) return
+      config.value = state
       loadedWorkspaceId.value = workspaceId
     } catch (loadError) {
-      if (requestId !== summaryRequestId) return
+      if (requestId !== configRequestId) return
       error.value = loadError
       loadedWorkspaceId.value = workspaceId
     } finally {
-      if (requestId === summaryRequestId) loading.value = false
+      if (requestId === configRequestId) loading.value = false
     }
   }
 
   async function loadCategory(workspaceId, categoryId, force = false) {
-    await loadSummary(workspaceId, force)
-    if (error.value || !summary.value?.categories?.[categoryId]) return
+    await loadConfig(workspaceId, force)
+    if (error.value || !config.value?.categories?.[categoryId]) return
     if (!force && loadedCategoryIds.value.has(categoryId)) return
-
-    const category = summary.value.categories[categoryId]
-    if (!isItemizedCategory(category)) {
-      liabilitiesByCategory.value = { ...liabilitiesByCategory.value, [categoryId]: [] }
-      loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
-      return
-    }
 
     categoryLoading.value = true
     const requestId = ++categoryRequestId
@@ -91,26 +79,26 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
   }
 
   async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildSummaryCategories(
+    const categories = buildModelCategories(
       liabilityCategoryIds,
       selectedCategoryIds,
       {},
       memberIds,
     )
     await saveLiabilitiesSetup(workspaceId, categories, userId)
-    summary.value = { setupCompleted: true, categories }
+    config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
   async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildSummaryCategories(
+    const categories = buildModelCategories(
       liabilityCategoryIds,
       selectedCategoryIds,
-      summary.value?.categories || {},
+      config.value?.categories || {},
       memberIds,
     )
     await updateLiabilityCategories(workspaceId, categories, userId)
-    summary.value = { ...(summary.value || {}), setupCompleted: true, categories }
+    config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
   async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
@@ -146,7 +134,6 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
       [liability.category]: [...itemsForCategory(liability.category), result.liability],
     }
     loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(liability.category)
-    replaceCategory(liability.category, result.category)
     return result.liability
   }
 
@@ -166,7 +153,6 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
         candidate.id === liabilityId ? result.liability : candidate,
       ),
     }
-    replaceCategory(liability.category, result.category)
   }
 
   async function deleteLiability(workspaceId, liabilityId, userId, memberIds) {
@@ -178,14 +164,13 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
         (candidate) => candidate.id !== liabilityId,
       ),
     }
-    replaceCategory(result.categoryId, result.category)
   }
 
   async function deleteCategory(workspaceId, categoryId, userId) {
     await removeLiabilityCategoryDocuments(workspaceId, categoryId, userId)
-    const categories = { ...(summary.value?.categories || {}) }
+    const categories = { ...(config.value?.categories || {}) }
     delete categories[categoryId]
-    summary.value = { ...summary.value, categories }
+    config.value = { ...config.value, categories }
     const nextItems = { ...liabilitiesByCategory.value }
     delete nextItems[categoryId]
     liabilitiesByCategory.value = nextItems
@@ -198,18 +183,13 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     return liabilitiesByCategory.value[categoryId] || []
   }
 
-  function totalForCategory(categoryId, memberId = 'all') {
-    return categoryEffectiveValue(summary.value?.categories?.[categoryId], memberId)
-  }
-
-  function total(memberId = 'all') {
-    return totalCategories(summary.value, memberId)
-  }
-
   function replaceCategory(categoryId, category) {
-    summary.value = {
-      ...(summary.value || {}),
-      categories: { ...(summary.value?.categories || {}), [categoryId]: category },
+    config.value = {
+      ...(config.value || {}),
+      categories: {
+        ...(config.value?.categories || {}),
+        [categoryId]: { ...(config.value?.categories?.[categoryId] || {}), ...category },
+      },
     }
   }
 
@@ -220,9 +200,9 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
   }
 
   function reset() {
-    summaryRequestId += 1
+    configRequestId += 1
     categoryRequestId += 1
-    summary.value = null
+    config.value = null
     liabilitiesByCategory.value = {}
     loading.value = false
     categoryLoading.value = false
@@ -232,13 +212,13 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
   }
 
   return {
-    summary,
+    config,
     loading,
     categoryLoading,
     error,
     setupCompleted,
     enabledCategories,
-    loadSummary,
+    loadConfig,
     loadCategory,
     completeSetup,
     saveCategorySelection,
@@ -249,8 +229,6 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     deleteLiability,
     deleteCategory,
     itemsForCategory,
-    totalForCategory,
-    total,
     reset,
   }
 })

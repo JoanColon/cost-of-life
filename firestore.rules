@@ -16,11 +16,6 @@ service cloud.firestore {
         && workspace.members[request.auth.uid].role == 'owner';
     }
 
-    function isLegacyCreator(workspace) {
-      return isSignedIn()
-        && workspace.createdBy == request.auth.uid;
-    }
-
     function isWorkspaceMemberById(workspaceId) {
       return isWorkspaceMember(
         get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
@@ -40,21 +35,26 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
         && isWorkspaceOwner(request.resource.data);
-      allow read: if isLegacyCreator(resource.data)
-        || isWorkspaceMember(resource.data);
-      allow update, delete: if isLegacyCreator(resource.data)
-        || isWorkspaceOwner(resource.data);
+      allow read: if isWorkspaceMember(resource.data);
+      allow update, delete: if isWorkspaceOwner(resource.data);
 
-      match /history/{year} {
+      match /financialYears/{year} {
         allow read: if isWorkspaceMemberById(workspaceId);
         allow write: if false;
       }
 
-      // During development, workspace members can collaborate on every
-      // non-history document stored below their workspace. Administrative
-      // access to the workspace document itself remains owner-only above.
+      // During development, workspace members can collaborate on the model
+      // and operational data below their workspace. Administrative access to
+      // the workspace document itself remains owner-only above.
       match /{collectionId}/{document=**} {
-        allow read, write: if collectionId != 'history'
+        allow read, write: if (
+          collectionId == 'modelAssets'
+          || collectionId == 'modelLiabilities'
+          || collectionId == 'modelIncome'
+          || collectionId == 'modelExpenses'
+          || collectionId == 'modelConfig'
+          || collectionId == 'expenseTracking'
+        )
           && isWorkspaceMemberById(workspaceId);
       }
     }

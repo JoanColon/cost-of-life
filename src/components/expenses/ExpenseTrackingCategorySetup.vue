@@ -57,20 +57,18 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  expenseTrackingCategories,
-  groupedExpenseTrackingCategories,
-} from '@/config/expense-tracking-categories'
+import { groupedExpenseTrackingCategories } from '@/config/expense-tracking-categories'
 
 const props = defineProps({
   initialSelected: { type: Array, default: () => [] },
+  subcategories: { type: Array, default: () => [] },
   saving: Boolean,
 })
 defineEmits(['save', 'cancel'])
 const { t } = useI18n()
-const groups = groupedExpenseTrackingCategories(expenseTrackingCategories)
+const groups = computed(() => groupedExpenseTrackingCategories(props.subcategories))
 const selected = ref([])
 
 watch(

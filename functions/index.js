@@ -24,9 +24,9 @@ setGlobalOptions({ maxInstances: 10 })
 
 initializeApp()
 
-const { scheduledFinancialHistory } = require('./scheduled/financial-history')
+const financialYears = require('./financial-years')
 
-exports.scheduledFinancialHistory = scheduledFinancialHistory
+Object.assign(exports, financialYears)
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started

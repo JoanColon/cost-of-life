@@ -7,96 +7,108 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
+import { modelConfigRef } from '@/services/firebase/model-config.service'
 import { normalizeMoney } from '@/domain/financial/money'
+import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import {
-  allocateValueByOwnership,
-  cloneOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  canonicalCategories,
+  hydrateModelConfigWithBaselines,
+} from '@/domain/financial/model-categories'
 import {
-  addItemToCategory,
-  removeItemFromCategory,
-  updateItemInCategory,
-} from '@/domain/financial/category-summary'
+  MODEL_BASELINE_KIND,
+  isModelBaseline,
+  modelBaselineId,
+} from '@/domain/financial/model-baseline'
 
-function summaryRef(workspaceId) {
-  return doc(db, 'workspaces', workspaceId, 'financialPosition', 'liabilitiesSummary')
+function configRef(workspaceId) {
+  return modelConfigRef(workspaceId, 'liabilities')
 }
 
-function liabilitiesRef(workspaceId) {
-  return collection(db, 'workspaces', workspaceId, 'liabilities')
+function modelLiabilitiesRef(workspaceId) {
+  return collection(db, 'workspaces', workspaceId, 'modelLiabilities')
 }
 
-export async function getLiabilitiesSummary(workspaceId) {
-  const snapshot = await getDoc(summaryRef(workspaceId))
-  return snapshot.exists() ? snapshot.data() : null
+export async function getLiabilitiesConfig(workspaceId) {
+  const [configSnapshot, baselineSnapshot] = await Promise.all([
+    getDoc(configRef(workspaceId)),
+    getDocs(query(modelLiabilitiesRef(workspaceId), where('kind', '==', MODEL_BASELINE_KIND))),
+  ])
+  if (!configSnapshot.exists()) return null
+  const baselines = baselineSnapshot.docs.map((document) => ({
+    id: document.id,
+    ...document.data(),
+  }))
+  return hydrateModelConfigWithBaselines(configSnapshot.data(), baselines, (baseline) => ({
+    manualValue: baseline.balance,
+    ownership: baseline.ownership,
+  }))
 }
 
 export async function getCategoryLiabilities(workspaceId, categoryId) {
   const snapshot = await getDocs(
-    query(liabilitiesRef(workspaceId), where('category', '==', categoryId)),
+    query(modelLiabilitiesRef(workspaceId), where('category', '==', categoryId)),
   )
-  return snapshot.docs.map((liabilityDocument) => ({
-    id: liabilityDocument.id,
-    ...liabilityDocument.data(),
-  }))
+  return snapshot.docs
+    .map((liabilityDocument) => ({ id: liabilityDocument.id, ...liabilityDocument.data() }))
+    .filter((liability) => !isModelBaseline(liability))
 }
 
 export async function saveLiabilitiesSetup(workspaceId, categories, userId) {
-  await setDoc(summaryRef(workspaceId), {
+  const batch = writeBatch(db)
+  batch.set(configRef(workspaceId), {
+    schemaVersion: 1,
     setupCompleted: true,
-    categories: stampCategories(categories, userId),
+    categories: stampCategories(canonicalCategories(categories), userId),
     createdAt: serverTimestamp(),
     createdBy: userId,
     updatedAt: serverTimestamp(),
     updatedBy: userId,
   })
+  setLiabilityBaselines(batch, workspaceId, categories, userId)
+  await batch.commit()
 }
 
 export async function updateLiabilityCategories(workspaceId, categories, userId) {
-  await setDoc(
-    summaryRef(workspaceId),
+  const batch = writeBatch(db)
+  batch.set(
+    configRef(workspaceId),
     {
       setupCompleted: true,
-      categories: stampCategories(categories, userId),
+      categories: stampCategories(canonicalCategories(categories), userId),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     },
     { merge: true },
   )
+  await batch.commit()
 }
 
 export async function updateSimpleLiabilityValue(workspaceId, categoryId, value, userId) {
-  const documentRef = summaryRef(workspaceId)
+  const documentRef = configRef(workspaceId)
+  const baselineRef = doc(modelLiabilitiesRef(workspaceId), modelBaselineId(categoryId))
   return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
+    const [snapshot, baselineSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      transaction.get(baselineRef),
+    ])
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) !== 0) {
+    if (!category?.enabled || !baselineSnapshot.exists()) {
       throw new Error('Only simple liability categories can be edited directly')
     }
 
     const manualValue = normalizeMoney(value)
     if (manualValue === null) throw new Error('A non-negative numeric value is required')
 
-    const updatedCategory = {
-      ...category,
-      manualValue,
-      memberValues: allocateValueByOwnership(manualValue, category.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
+    transaction.update(baselineRef, {
+      balance: manualValue,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-    return { ...updatedCategory, updatedAt: null }
+    return { manualValue, ownership: baselineSnapshot.data().ownership }
   })
 }
 
@@ -108,37 +120,36 @@ export async function updateSimpleLiabilityOwnership(
   memberIds,
 ) {
   assertValidOwnership(ownership, memberIds)
-  const documentRef = summaryRef(workspaceId)
+  const documentRef = configRef(workspaceId)
+  const baselineRef = doc(modelLiabilitiesRef(workspaceId), modelBaselineId(categoryId))
   return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
+    const [snapshot, baselineSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      transaction.get(baselineRef),
+    ])
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) !== 0) {
+    if (!category?.enabled || !baselineSnapshot.exists()) {
       throw new Error('Only simple liability category ownership can be edited')
     }
-
-    const updatedCategory = {
-      ...category,
+    transaction.update(baselineRef, {
       ownership: cloneOwnership(ownership),
-      memberValues: allocateValueByOwnership(category.manualValue, ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-    return { ...updatedCategory, updatedAt: null }
+    return {
+      manualValue: baselineSnapshot.data().balance || 0,
+      ownership: cloneOwnership(ownership),
+    }
   })
 }
 
 export async function createLiability(workspaceId, liability, userId, memberIds) {
   assertValidOwnership(liability.ownership, memberIds)
-  const liabilityRef = doc(liabilitiesRef(workspaceId))
-  const documentRef = summaryRef(workspaceId)
+  const liabilityRef = doc(modelLiabilitiesRef(workspaceId))
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const summarySnapshot = await transaction.get(documentRef)
-    const category = summarySnapshot.data()?.categories?.[liability.category]
+    const configSnapshot = await transaction.get(documentRef)
+    const category = configSnapshot.data()?.categories?.[liability.category]
     if (!category?.enabled) throw new Error('Liability category is not enabled')
 
     const balance = normalizeMoney(liability.balance)
@@ -153,30 +164,18 @@ export async function createLiability(workspaceId, liability, userId, memberIds)
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-    const updatedCategory = {
-      ...addItemToCategory(category, balance, liabilityData.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
     transaction.set(liabilityRef, liabilityData)
-    transaction.update(documentRef, {
-      [`categories.${liability.category}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
     return {
       liability: { ...liabilityData, id: liabilityRef.id, createdAt: null, updatedAt: null },
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
 export async function updateLiability(workspaceId, liabilityId, changes, userId, memberIds) {
-  const liabilityRef = doc(liabilitiesRef(workspaceId), liabilityId)
-  const documentRef = summaryRef(workspaceId)
+  const liabilityRef = doc(modelLiabilitiesRef(workspaceId), liabilityId)
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const [liabilitySnapshot, summarySnapshot] = await Promise.all([
+    const [liabilitySnapshot, configSnapshot] = await Promise.all([
       transaction.get(liabilityRef),
       transaction.get(documentRef),
     ])
@@ -184,8 +183,8 @@ export async function updateLiability(workspaceId, liabilityId, changes, userId,
 
     const previousLiability = liabilitySnapshot.data()
     const categoryId = previousLiability.category
-    const category = summarySnapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) === 0) {
+    const category = configSnapshot.data()?.categories?.[categoryId]
+    if (!category) {
       throw new Error('Itemized liability category not found')
     }
 
@@ -202,81 +201,53 @@ export async function updateLiability(workspaceId, liabilityId, changes, userId,
       updatedBy: userId,
     }
     assertValidOwnership(updatedLiability.ownership, memberIds)
-    const updatedCategory = {
-      ...updateItemInCategory(
-        category,
-        previousLiability.balance,
-        previousLiability.ownership,
-        balance,
-        updatedLiability.ownership,
-      ),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
     transaction.update(liabilityRef, updatedLiability)
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
     return {
       liability: { id: liabilityId, ...updatedLiability, updatedAt: null },
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
-export async function removeLiability(workspaceId, liabilityId, userId, memberIds) {
-  const liabilityRef = doc(liabilitiesRef(workspaceId), liabilityId)
-  const documentRef = summaryRef(workspaceId)
+export async function removeLiability(workspaceId, liabilityId) {
+  const liabilityRef = doc(modelLiabilitiesRef(workspaceId), liabilityId)
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const [liabilitySnapshot, summarySnapshot] = await Promise.all([
+    const [liabilitySnapshot, configSnapshot] = await Promise.all([
       transaction.get(liabilityRef),
       transaction.get(documentRef),
     ])
     if (!liabilitySnapshot.exists()) throw new Error('Liability not found')
 
     const liability = liabilitySnapshot.data()
-    const category = summarySnapshot.data()?.categories?.[liability.category]
+    const category = configSnapshot.data()?.categories?.[liability.category]
     if (!category) throw new Error('Liability category not found')
 
-    const updatedCategory = {
-      ...removeItemFromCategory(
-        category,
-        liability.balance,
-        liability.ownership,
-        createEqualOwnership(memberIds),
-        memberIds,
-      ),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
     transaction.delete(liabilityRef)
-    transaction.update(documentRef, {
-      [`categories.${liability.category}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
     return {
       categoryId: liability.category,
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
 export async function removeLiabilityCategory(workspaceId, categoryId, userId) {
   const categorySnapshot = await getDocs(
-    query(liabilitiesRef(workspaceId), where('category', '==', categoryId)),
+    query(modelLiabilitiesRef(workspaceId), where('category', '==', categoryId)),
   )
   if (categorySnapshot.size > 498) {
     throw new Error('Liability categories with more than 498 items cannot be deleted at once')
   }
 
   const batch = writeBatch(db)
-  categorySnapshot.docs.forEach((liabilityDocument) => batch.delete(liabilityDocument.ref))
-  batch.update(summaryRef(workspaceId), {
+  categorySnapshot.docs.forEach((liabilityDocument) => {
+    if (isModelBaseline(liabilityDocument.data())) {
+      batch.update(liabilityDocument.ref, {
+        balance: 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      })
+    } else batch.delete(liabilityDocument.ref)
+  })
+  batch.update(configRef(workspaceId), {
     [`categories.${categoryId}`]: deleteField(),
     updatedAt: serverTimestamp(),
     updatedBy: userId,
@@ -291,6 +262,23 @@ function stampCategories(categories, userId) {
       { ...category, updatedAt: serverTimestamp(), updatedBy: userId },
     ]),
   )
+}
+
+function setLiabilityBaselines(batch, workspaceId, categories, userId) {
+  for (const [categoryId, category] of Object.entries(categories)) {
+    batch.set(
+      doc(modelLiabilitiesRef(workspaceId), modelBaselineId(categoryId)),
+      {
+        kind: MODEL_BASELINE_KIND,
+        category: categoryId,
+        balance: normalizeMoney(category.manualValue) || 0,
+        ownership: cloneOwnership(category.ownership),
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      },
+      { merge: true },
+    )
+  }
 }
 
 function assertValidOwnership(ownership, memberIds) {

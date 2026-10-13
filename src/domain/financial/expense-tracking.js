@@ -1,8 +1,4 @@
 import { normalizeMoney } from './money'
-import { categoryEffectiveValue } from './category-summary'
-import { expenseAmountForMonth } from './expense-calculations'
-import { incomeMonths } from './income-calculations'
-import { applyOwnership } from './ownership'
 
 export function emptyExpenseTrackingMonth(period) {
   return {
@@ -52,7 +48,7 @@ export function normalizeTrackingMonth(month, period) {
     year: base.year,
     month: base.month,
     categories,
-    reconciliation: normalizeReconciliation(month?.reconciliation, categories),
+    reconciliation: normalizeReconciliation(month?.reconciliation),
     total: money(Object.values(categories).reduce((sum, category) => sum + category.total, 0)),
   }
 }
@@ -60,9 +56,6 @@ export function normalizeTrackingMonth(month, period) {
 export function setTrackingDecision(month, subcategoryId, decision) {
   const reconciliation = { ...(month?.reconciliation || {}) }
   if (decision === 'tracked') {
-    if (!categoryItems(month, subcategoryId).length) {
-      throw new Error('Tracked decisions require at least one tracked expense')
-    }
     reconciliation[subcategoryId] = { decision: 'tracked' }
   } else if (decision === 'model') {
     delete reconciliation[subcategoryId]
@@ -91,74 +84,6 @@ export function resolveExpenseTrackingValue(modelValue, actualValue, decision) {
   }
 }
 
-export function effectiveExpenseValuesForYear({
-  summary,
-  expensesByCategory = {},
-  trackingMonths = {},
-  year,
-  memberId = 'all',
-}) {
-  const categories = Object.fromEntries(
-    Object.entries(summary?.categories || {}).map(([categoryId, category]) => {
-      if (!category?.enabled) return [categoryId, 0]
-
-      const expenses = expensesByCategory[categoryId] || []
-      if (!expenses.length) {
-        return [categoryId, categoryEffectiveValue(category, memberId)]
-      }
-
-      const value = expenses.reduce(
-        (categoryTotal, expense) =>
-          categoryTotal + effectiveExpenseValueForYear({ expense, trackingMonths, year, memberId }),
-        0,
-      )
-
-      return [categoryId, money(value)]
-    }),
-  )
-
-  return {
-    categories,
-    annualCostOfLife: money(Object.values(categories).reduce((total, value) => total + value, 0)),
-  }
-}
-
-export function effectiveExpenseValueForYear({
-  expense,
-  trackingMonths = {},
-  year,
-  memberId = 'all',
-}) {
-  return money(
-    incomeMonths.reduce((annualTotal, monthName, monthIndex) => {
-      const model = applyOwnership(
-        expenseAmountForMonth(expense, monthName),
-        expense.ownership,
-        memberId,
-      )
-      if (expense.type === 'other') return annualTotal + model
-
-      const period = `${year}-${String(monthIndex + 1).padStart(2, '0')}`
-      const trackingMonth = trackingMonths[period]
-      const trackedCategory = trackingMonth?.categories?.[expense.type]
-      const actual = trackedCategory?.items?.length
-        ? trackedCategory.items.reduce(
-            (total, item) => total + applyOwnership(item.amount, item.ownership, memberId),
-            0,
-          )
-        : null
-      return (
-        annualTotal +
-        resolveExpenseTrackingValue(
-          model,
-          actual,
-          trackingMonth?.reconciliation?.[expense.type]?.decision,
-        ).effective
-      )
-    }, 0),
-  )
-}
-
 function categoryItems(month, subcategoryId) {
   return month?.categories?.[subcategoryId]?.items || []
 }
@@ -184,12 +109,10 @@ function buildCategory(items) {
   }
 }
 
-function normalizeReconciliation(value, categories) {
+function normalizeReconciliation(value) {
   return Object.fromEntries(
     Object.entries(value || {}).flatMap(([subcategoryId, state]) => {
-      return state?.decision === 'tracked' && categories[subcategoryId]?.items?.length
-        ? [[subcategoryId, { decision: 'tracked' }]]
-        : []
+      return state?.decision === 'tracked' ? [[subcategoryId, { decision: 'tracked' }]] : []
     }),
   )
 }

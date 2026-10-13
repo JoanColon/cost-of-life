@@ -5,7 +5,13 @@ describe('financial history series', () => {
   it('flattens and sorts annual documents into monthly net worth points', () => {
     expect(
       buildNetWorthSeries([
-        { id: '2026', months: { '02': { netWorth: 120 }, '01': { netWorth: 100 } } },
+        {
+          id: '2026',
+          months: {
+            '02': { netWorth: 120 },
+            '01': { netWorth: 100 },
+          },
+        },
         { year: 2025, months: { 12: { netWorth: 90 } } },
       ]),
     ).toEqual([

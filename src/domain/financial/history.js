@@ -4,9 +4,9 @@ export function buildNetWorthSeries(historyDocuments = []) {
       const year = Number(history.year || history.id)
       if (!Number.isInteger(year)) return []
 
-      return Object.entries(history.months || {}).map(([month, snapshot]) => ({
+      return Object.entries(history.months || {}).map(([month, projection]) => ({
         period: `${year}-${month}`,
-        value: snapshot?.netWorth == null ? Number.NaN : Number(snapshot.netWorth),
+        value: projection?.netWorth == null ? Number.NaN : Number(projection.netWorth),
       }))
     })
     .filter(({ period, value }) => /^\d{4}-(0[1-9]|1[0-2])$/.test(period) && Number.isFinite(value))

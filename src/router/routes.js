@@ -6,6 +6,7 @@ import ExpenseCategoryPage from '@/pages/ExpenseCategoryPage.vue'
 import ExpenseTrackerPage from '@/pages/ExpenseTrackerPage.vue'
 import ExpensesPage from '@/pages/ExpensesPage.vue'
 import HomePage from '@/pages/HomePage.vue'
+import HistoricPage from '@/pages/HistoricPage.vue'
 import IncomeCategoryPage from '@/pages/IncomeCategoryPage.vue'
 import IncomePage from '@/pages/IncomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
@@ -60,6 +61,11 @@ const routes = [
         path: 'workspaces/:workspaceId/liabilities/:category',
         name: 'liability-category',
         component: LiabilityCategoryPage,
+      },
+      {
+        path: 'workspaces/:workspaceId/historic',
+        name: 'historic',
+        component: HistoricPage,
       },
       {
         path: 'workspaces/:workspaceId/income',

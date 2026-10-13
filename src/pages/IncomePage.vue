@@ -1,10 +1,10 @@
 <template>
   <q-page class="income-page">
     <main class="income-shell">
-      <div v-if="incomeStore.loading" class="state">
+      <div v-if="incomeStore.loading || financialYearsStore.loading" class="state">
         <q-spinner color="primary" size="2rem" /><span>{{ t('income.loading') }}</span>
       </div>
-      <section v-else-if="incomeStore.error" class="state">
+      <section v-else-if="incomeStore.error || financialYearsStore.error" class="state">
         <q-icon name="cloud_off" size="2rem" />
         <h1>{{ t('income.errors.loadTitle') }}</h1>
         <p>{{ t('income.errors.load') }}</p>
@@ -14,7 +14,7 @@
           color="primary"
           icon="refresh"
           :label="t('common.retry')"
-          @click="incomeStore.loadSummary(workspaceId, true)"
+          @click="loadPage(true)"
         />
       </section>
       <IncomeCategorySetup
@@ -208,10 +208,18 @@ import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import IncomeCategorySetup from '@/components/income/IncomeCategorySetup.vue'
 import SimpleIncomeValueEditor from '@/components/income/SimpleIncomeValueEditor.vue'
 import { incomeCategories } from '@/config/income-categories'
+import {
+  currentFinancialYear,
+  financialYearCategoryItemCount,
+  financialYearCategoryMemberIds,
+  financialYearCategoryValue,
+  financialYearValue,
+} from '@/domain/financial/financial-year'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -221,6 +229,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const incomeStore = useIncomeStore()
+const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
@@ -235,6 +244,7 @@ const editingOwnershipCategoryId = ref(null)
 const editingOwnership = ref({ mode: 'single', shares: [] })
 const ownershipValid = ref(false)
 const period = ref('annual')
+const currentYear = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspaceHomeRoute = computed(() => ({
   name: 'workspace-dashboard',
@@ -252,7 +262,10 @@ const selectedMemberId = computed({
 const enabledCategories = computed(() =>
   incomeCategories.filter((category) => incomeStore.enabledCategories.includes(category.id)),
 )
-const total = computed(() => incomeStore.total(selectedMemberId.value))
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const total = computed(() =>
+  financialYearValue(financialYear.value, 'income', selectedMemberId.value),
+)
 const displayedTotal = computed(() => (period.value === 'annual' ? total.value : total.value / 12))
 const displayedPeriodLabel = computed(() =>
   period.value === 'annual'
@@ -267,8 +280,15 @@ const scopeLabel = computed(() =>
     ? t('dashboard.allMembers')
     : members.value.find((member) => member.id === selectedMemberId.value)?.name || '',
 )
-onMounted(() => incomeStore.loadSummary(workspaceId.value))
-watch(workspaceId, (value) => incomeStore.loadSummary(value))
+onMounted(() => loadPage())
+watch(workspaceId, () => loadPage())
+
+async function loadPage(force = false) {
+  await Promise.allSettled([
+    incomeStore.loadConfig(workspaceId.value, force),
+    financialYearsStore.load(workspaceId.value, currentYear, force),
+  ])
+}
 
 async function completeSetup(selected) {
   await persist(() =>
@@ -315,22 +335,27 @@ async function deleteCategory() {
   }
 }
 function categoryHasData(id) {
-  const category = incomeStore.summary?.categories?.[id]
-  return Number(category?.manualValue || 0) > 0 || Number(category?.itemCount || 0) > 0
+  const category = incomeStore.config?.categories?.[id]
+  return Number(category?.manualValue || 0) > 0 || isItemizedCategory(id)
 }
 function categoryStatus(id) {
-  const count = Number(incomeStore.summary?.categories?.[id]?.itemCount || 0)
+  const count = categoryItemCount(id)
   return count ? t('income.itemCount', { count }) : t('income.simpleTotal')
 }
 function categoryValue(id) {
-  const annualValue = incomeStore.totalForCategory(id, selectedMemberId.value)
+  const annualValue = financialYearCategoryValue(
+    financialYear.value,
+    'income',
+    id,
+    selectedMemberId.value,
+  )
   return formatCurrency(period.value === 'annual' ? annualValue : annualValue / 12)
 }
 function categoryMembers(id) {
-  const category = incomeStore.summary?.categories?.[id]
+  const category = incomeStore.config?.categories?.[id]
   const ownerIds = new Set(
-    Number(category?.itemCount || 0) > 0
-      ? Object.keys(category.memberValues || {})
+    isItemizedCategory(id)
+      ? financialYearCategoryMemberIds(financialYear.value, 'income', id)
       : (category?.ownership?.shares || [])
           .filter((share) => Number(share.percentage) > 0)
           .map((share) => share.memberId),
@@ -352,10 +377,13 @@ function initials(name) {
     .toUpperCase()
 }
 function isItemizedCategory(id) {
-  return Number(incomeStore.summary?.categories?.[id]?.itemCount || 0) > 0
+  return categoryItemCount(id) > 0
+}
+function categoryItemCount(id) {
+  return financialYearCategoryItemCount(financialYear.value, 'income', id)
 }
 function canonicalCategoryValue(id) {
-  return incomeStore.summary?.categories?.[id]?.manualValue ?? 0
+  return incomeStore.config?.categories?.[id]?.manualValue ?? 0
 }
 function isCategorySaving(id) {
   return savingCategoryIds.value.has(id)
@@ -375,7 +403,7 @@ async function saveSimpleCategoryValue(id, value) {
 }
 function openOwnershipEditor(id) {
   if (isItemizedCategory(id)) return
-  const ownership = incomeStore.summary?.categories?.[id]?.ownership
+  const ownership = incomeStore.config?.categories?.[id]?.ownership
   if (!ownership) return
   editingOwnershipCategoryId.value = id
   editingOwnership.value = cloneOwnership(ownership)

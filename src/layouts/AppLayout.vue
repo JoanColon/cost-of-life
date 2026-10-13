@@ -132,6 +132,17 @@
             <q-item-section avatar><q-icon name="receipt_long" /></q-item-section>
             <q-item-section>{{ t('navigation.expenseTracker') }}</q-item-section>
           </q-item>
+          <q-item
+            v-ripple
+            clickable
+            :to="{ name: 'historic', params: { workspaceId: activeWorkspaceId } }"
+            exact
+            active-class="active-nav-item"
+            @click="closeMobileDrawer"
+          >
+            <q-item-section avatar><q-icon name="history" /></q-item-section>
+            <q-item-section>{{ t('navigation.historic') }}</q-item-section>
+          </q-item>
         </q-list>
       </template>
     </q-drawer>
@@ -161,6 +172,7 @@ import { useAssetsStore } from '@/stores/assets-store'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -175,6 +187,7 @@ const expenseTrackingStore = useExpenseTrackingStore()
 const liabilitiesStore = useLiabilitiesStore()
 const incomeStore = useIncomeStore()
 const scopeStore = useFinancialScopeStore()
+const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
 
 const drawerOpen = ref($q.screen.gt.sm)
@@ -269,6 +282,7 @@ async function logout() {
     liabilitiesStore.reset()
     incomeStore.reset()
     scopeStore.reset()
+    financialYearsStore.reset()
     workspaceStore.reset()
     await signOut()
     await router.replace({ name: 'login' })

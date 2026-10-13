@@ -3,7 +3,7 @@ import { db } from '@/firebase/firebase'
 
 export async function getFinancialHistory(workspaceId) {
   const historyQuery = query(
-    collection(db, 'workspaces', workspaceId, 'history'),
+    collection(db, 'workspaces', workspaceId, 'financialYears'),
     orderBy('year', 'asc'),
   )
   const snapshot = await getDocs(historyQuery)

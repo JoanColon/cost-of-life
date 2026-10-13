@@ -41,34 +41,31 @@ import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import WhatsNextCard from '@/components/dashboard/WhatsNextCard.vue'
 import { buildNetWorthSeries } from '@/domain/financial/history'
-import { effectiveExpenseValuesForYear } from '@/domain/financial/expense-tracking'
-import { getMockDashboard } from '@/mocks/workspace-dashboard'
+import {
+  currentFinancialMonth,
+  currentFinancialYear,
+  financialYearMonthValue,
+  financialYearValue,
+} from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
 import { getFinancialHistory } from '@/services/firebase/history.service'
-import { useAssetsStore } from '@/stores/assets-store'
-import { useExpensesStore } from '@/stores/expenses-store'
-import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
-import { useIncomeStore } from '@/stores/income-store'
-import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const assetsStore = useAssetsStore()
-const expensesStore = useExpensesStore()
-const trackingStore = useExpenseTrackingStore()
-const liabilitiesStore = useLiabilitiesStore()
-const incomeStore = useIncomeStore()
+const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const historyDocuments = ref([])
 const historyLoading = ref(false)
 const historyError = ref(null)
 let historyRequestId = 0
-const currentYear = new Date().getFullYear()
+const currentYear = currentFinancialYear()
+const currentMonth = currentFinancialMonth()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspace = computed(
@@ -80,45 +77,68 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
-const historyPoints = computed(() => buildNetWorthSeries(historyDocuments.value))
-const loadedExpensesByCategory = computed(() =>
-  Object.fromEntries(
-    Object.keys(expensesStore.summary?.categories || {}).map((categoryId) => [
-      categoryId,
-      expensesStore.itemsForCategory(categoryId),
-    ]),
-  ),
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const historyPoints = computed(() =>
+  buildNetWorthSeries([
+    ...historyDocuments.value.filter(
+      (document) => Number(document.year || document.id) !== currentYear,
+    ),
+    ...(financialYear.value ? [financialYear.value] : []),
+  ]),
 )
 
 const dashboardData = computed(() => {
-  const mockDashboard = getMockDashboard(selectedMemberId.value, memberIds.value)
-  const assets = assetsStore.total(selectedMemberId.value)
-  const liabilities = liabilitiesStore.total(selectedMemberId.value)
-  const income = incomeStore.setupCompleted
-    ? incomeStore.total(selectedMemberId.value)
-    : mockDashboard.income
-  const effectiveExpenses = effectiveExpenseValuesForYear({
-    summary: expensesStore.summary,
-    expensesByCategory: loadedExpensesByCategory.value,
-    trackingMonths: trackingStore.yearMonths,
-    year: currentYear,
-    memberId: selectedMemberId.value,
-  })
-  const annualCostOfLife = effectiveExpenses.annualCostOfLife
-  const monthlyCostOfLife = annualCostOfLife / 12
+  const assets = financialYearMonthValue(
+    financialYear.value,
+    currentMonth,
+    'assets',
+    selectedMemberId.value,
+  )
+  const liabilities = financialYearMonthValue(
+    financialYear.value,
+    currentMonth,
+    'liabilities',
+    selectedMemberId.value,
+  )
+  const income = financialYear.value
+    ? financialYearValue(financialYear.value, 'income', selectedMemberId.value)
+    : 0
+  const monthlyIncome = financialYearMonthValue(
+    financialYear.value,
+    currentMonth,
+    'income',
+    selectedMemberId.value,
+  )
+  const annualCostOfLife = financialYear.value
+    ? financialYearValue(financialYear.value, 'expenses', selectedMemberId.value)
+    : 0
+  const monthlyCostOfLife = financialYearMonthValue(
+    financialYear.value,
+    currentMonth,
+    'expenses',
+    selectedMemberId.value,
+  )
   const savingsCapacity = Math.round((income - annualCostOfLife + Number.EPSILON) * 100) / 100
+  const monthlySavingsCapacity =
+    Math.round((monthlyIncome - monthlyCostOfLife + Number.EPSILON) * 100) / 100
 
   return {
-    ...mockDashboard,
     assets,
     liabilities,
     income,
+    monthlyIncome,
     annualCost: annualCostOfLife,
     monthlyCost: monthlyCostOfLife,
     savingsCapacity,
+    monthlySavingsCapacity,
     savingsRate: income > 0 ? Math.round((savingsCapacity / income) * 100) : 0,
     costRatio: income > 0 ? Math.round((annualCostOfLife / income) * 100) : 0,
-    netWorth: assets - liabilities,
+    netWorth: financialYearMonthValue(
+      financialYear.value,
+      currentMonth,
+      'netWorth',
+      selectedMemberId.value,
+    ),
   }
 })
 
@@ -142,11 +162,7 @@ function firstName(name = '') {
 watch(
   workspaceId,
   (id) => {
-    assetsStore.loadSummary(id)
-    liabilitiesStore.loadSummary(id)
-    incomeStore.loadSummary(id)
-    expensesStore.loadSummary(id)
-    trackingStore.loadYear(id, currentYear).catch(() => {})
+    financialYearsStore.load(id, currentYear).catch(() => {})
     loadHistory(id)
   },
   { immediate: true },

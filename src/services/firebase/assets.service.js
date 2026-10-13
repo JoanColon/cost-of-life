@@ -7,98 +7,111 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
+import { modelConfigRef } from '@/services/firebase/model-config.service'
 import { normalizeMoney } from '@/domain/financial/money'
+import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import {
-  allocateValueByOwnership,
-  cloneOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  canonicalCategories,
+  hydrateModelConfigWithBaselines,
+} from '@/domain/financial/model-categories'
 import {
-  addItemToCategory,
-  removeItemFromCategory,
-  updateItemInCategory,
-} from '@/domain/financial/category-summary'
+  MODEL_BASELINE_KIND,
+  isModelBaseline,
+  modelBaselineId,
+} from '@/domain/financial/model-baseline'
 
-function summaryRef(workspaceId) {
-  return doc(db, 'workspaces', workspaceId, 'financialPosition', 'assetsSummary')
+function configRef(workspaceId) {
+  return modelConfigRef(workspaceId, 'assets')
 }
 
-function assetsRef(workspaceId) {
-  return collection(db, 'workspaces', workspaceId, 'assets')
+function modelAssetsRef(workspaceId) {
+  return collection(db, 'workspaces', workspaceId, 'modelAssets')
 }
 
-export async function getAssetsSummary(workspaceId) {
-  const snapshot = await getDoc(summaryRef(workspaceId))
-  return snapshot.exists() ? snapshot.data() : null
-}
-
-export async function getCategoryAssets(workspaceId, categoryId) {
-  const snapshot = await getDocs(query(assetsRef(workspaceId), where('category', '==', categoryId)))
-
-  return snapshot.docs.map((assetDocument) => ({
-    id: assetDocument.id,
-    ...assetDocument.data(),
+export async function getAssetsConfig(workspaceId) {
+  const [configSnapshot, baselineSnapshot] = await Promise.all([
+    getDoc(configRef(workspaceId)),
+    getDocs(query(modelAssetsRef(workspaceId), where('kind', '==', MODEL_BASELINE_KIND))),
+  ])
+  if (!configSnapshot.exists()) return null
+  const baselines = baselineSnapshot.docs.map((document) => ({
+    id: document.id,
+    ...document.data(),
+  }))
+  return hydrateModelConfigWithBaselines(configSnapshot.data(), baselines, (baseline) => ({
+    manualValue: baseline.currentValue,
+    ownership: baseline.ownership,
   }))
 }
 
+export async function getCategoryAssets(workspaceId, categoryId) {
+  const snapshot = await getDocs(
+    query(modelAssetsRef(workspaceId), where('category', '==', categoryId)),
+  )
+
+  return snapshot.docs
+    .map((assetDocument) => ({ id: assetDocument.id, ...assetDocument.data() }))
+    .filter((asset) => !isModelBaseline(asset))
+}
+
 export async function saveAssetsSetup(workspaceId, categories, userId) {
-  await setDoc(summaryRef(workspaceId), {
+  const batch = writeBatch(db)
+  batch.set(configRef(workspaceId), {
+    schemaVersion: 1,
     setupCompleted: true,
-    categories: stampCategories(categories, userId),
+    categories: stampCategories(canonicalCategories(categories), userId),
     createdAt: serverTimestamp(),
     createdBy: userId,
     updatedAt: serverTimestamp(),
     updatedBy: userId,
   })
+  setAssetBaselines(batch, workspaceId, categories, userId)
+  await batch.commit()
 }
 
 export async function updateAssetsCategories(workspaceId, categories, userId) {
-  await setDoc(
-    summaryRef(workspaceId),
+  const batch = writeBatch(db)
+  batch.set(
+    configRef(workspaceId),
     {
       setupCompleted: true,
-      categories: stampCategories(categories, userId),
+      categories: stampCategories(canonicalCategories(categories), userId),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     },
     { merge: true },
   )
+  await batch.commit()
 }
 
 export async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
-  const documentRef = summaryRef(workspaceId)
+  const documentRef = configRef(workspaceId)
+  const baselineRef = doc(modelAssetsRef(workspaceId), modelBaselineId(categoryId))
 
   return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
+    const [snapshot, baselineSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      transaction.get(baselineRef),
+    ])
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) !== 0) {
+    if (!category?.enabled || !baselineSnapshot.exists()) {
       throw new Error('Only simple asset categories can be edited directly')
     }
 
     const manualValue = normalizeMoney(value)
     if (manualValue === null) throw new Error('A non-negative numeric value is required')
 
-    const updatedCategory = {
-      ...category,
-      manualValue,
-      memberValues: allocateValueByOwnership(manualValue, category.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
+    transaction.update(baselineRef, {
+      currentValue: manualValue,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
 
-    return { ...updatedCategory, updatedAt: null }
+    return { manualValue, ownership: baselineSnapshot.data().ownership }
   })
 }
 
@@ -110,41 +123,39 @@ export async function updateSimpleCategoryOwnership(
   memberIds,
 ) {
   assertValidOwnership(ownership, memberIds)
-  const documentRef = summaryRef(workspaceId)
+  const documentRef = configRef(workspaceId)
+  const baselineRef = doc(modelAssetsRef(workspaceId), modelBaselineId(categoryId))
 
   return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
+    const [snapshot, baselineSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      transaction.get(baselineRef),
+    ])
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) !== 0) {
+    if (!category?.enabled || !baselineSnapshot.exists()) {
       throw new Error('Only simple asset category ownership can be edited')
     }
-
-    const updatedCategory = {
-      ...category,
+    transaction.update(baselineRef, {
       ownership: cloneOwnership(ownership),
-      memberValues: allocateValueByOwnership(category.manualValue, ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
 
-    return { ...updatedCategory, updatedAt: null }
+    return {
+      manualValue: baselineSnapshot.data().currentValue || 0,
+      ownership: cloneOwnership(ownership),
+    }
   })
 }
 
 export async function createAsset(workspaceId, asset, userId, memberIds) {
   assertValidOwnership(asset.ownership, memberIds)
-  const assetRef = doc(assetsRef(workspaceId))
-  const documentRef = summaryRef(workspaceId)
+  const assetRef = doc(modelAssetsRef(workspaceId))
+  const documentRef = configRef(workspaceId)
 
   return runTransaction(db, async (transaction) => {
-    const summarySnapshot = await transaction.get(documentRef)
-    const category = summarySnapshot.data()?.categories?.[asset.category]
+    const configSnapshot = await transaction.get(documentRef)
+    const category = configSnapshot.data()?.categories?.[asset.category]
     if (!category?.enabled) throw new Error('Asset category is not enabled')
 
     const currentValue = normalizeMoney(asset.currentValue)
@@ -161,32 +172,19 @@ export async function createAsset(workspaceId, asset, userId, memberIds) {
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-    const updatedCategory = {
-      ...addItemToCategory(category, currentValue, assetData.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
     transaction.set(assetRef, assetData)
-    transaction.update(documentRef, {
-      [`categories.${asset.category}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
 
     return {
       asset: { ...assetData, id: assetRef.id, createdAt: null, updatedAt: null },
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
 export async function updateAsset(workspaceId, assetId, changes, userId, memberIds) {
-  const assetRef = doc(assetsRef(workspaceId), assetId)
-  const documentRef = summaryRef(workspaceId)
-
+  const assetRef = doc(modelAssetsRef(workspaceId), assetId)
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const [assetSnapshot, summarySnapshot] = await Promise.all([
+    const [assetSnapshot, configSnapshot] = await Promise.all([
       transaction.get(assetRef),
       transaction.get(documentRef),
     ])
@@ -194,8 +192,8 @@ export async function updateAsset(workspaceId, assetId, changes, userId, memberI
 
     const previousAsset = assetSnapshot.data()
     const categoryId = previousAsset.category
-    const category = summarySnapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) === 0) {
+    const category = configSnapshot.data()?.categories?.[categoryId]
+    if (!category) {
       throw new Error('Itemized asset category not found')
     }
 
@@ -213,76 +211,39 @@ export async function updateAsset(workspaceId, assetId, changes, userId, memberI
       updatedBy: userId,
     }
     assertValidOwnership(updatedAsset.ownership, memberIds)
-    const updatedCategory = {
-      ...updateItemInCategory(
-        category,
-        previousAsset.currentValue,
-        previousAsset.ownership,
-        currentValue,
-        updatedAsset.ownership,
-      ),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
     transaction.update(assetRef, updatedAsset)
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
 
     return {
       asset: { id: assetId, ...updatedAsset, updatedAt: null },
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
-export async function removeAsset(workspaceId, assetId, userId, memberIds) {
-  const assetRef = doc(assetsRef(workspaceId), assetId)
-  const documentRef = summaryRef(workspaceId)
-
+export async function removeAsset(workspaceId, assetId) {
+  const assetRef = doc(modelAssetsRef(workspaceId), assetId)
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const [assetSnapshot, summarySnapshot] = await Promise.all([
+    const [assetSnapshot, configSnapshot] = await Promise.all([
       transaction.get(assetRef),
       transaction.get(documentRef),
     ])
     if (!assetSnapshot.exists()) throw new Error('Asset not found')
 
     const asset = assetSnapshot.data()
-    const category = summarySnapshot.data()?.categories?.[asset.category]
+    const category = configSnapshot.data()?.categories?.[asset.category]
     if (!category) throw new Error('Asset category not found')
 
-    const updatedCategory = {
-      ...removeItemFromCategory(
-        category,
-        asset.currentValue,
-        asset.ownership,
-        createEqualOwnership(memberIds),
-        memberIds,
-      ),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
     transaction.delete(assetRef)
-    transaction.update(documentRef, {
-      [`categories.${asset.category}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
 
     return {
       categoryId: asset.category,
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
 export async function removeAssetCategory(workspaceId, categoryId, userId) {
   const categoryAssetsSnapshot = await getDocs(
-    query(assetsRef(workspaceId), where('category', '==', categoryId)),
+    query(modelAssetsRef(workspaceId), where('category', '==', categoryId)),
   )
 
   if (categoryAssetsSnapshot.size > 498) {
@@ -290,8 +251,16 @@ export async function removeAssetCategory(workspaceId, categoryId, userId) {
   }
 
   const batch = writeBatch(db)
-  categoryAssetsSnapshot.docs.forEach((assetDocument) => batch.delete(assetDocument.ref))
-  batch.update(summaryRef(workspaceId), {
+  categoryAssetsSnapshot.docs.forEach((assetDocument) => {
+    if (isModelBaseline(assetDocument.data())) {
+      batch.update(assetDocument.ref, {
+        currentValue: 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      })
+    } else batch.delete(assetDocument.ref)
+  })
+  batch.update(configRef(workspaceId), {
     [`categories.${categoryId}`]: deleteField(),
     updatedAt: serverTimestamp(),
     updatedBy: userId,
@@ -310,6 +279,23 @@ function stampCategories(categories, userId) {
       },
     ]),
   )
+}
+
+function setAssetBaselines(batch, workspaceId, categories, userId) {
+  for (const [categoryId, category] of Object.entries(categories)) {
+    batch.set(
+      doc(modelAssetsRef(workspaceId), modelBaselineId(categoryId)),
+      {
+        kind: MODEL_BASELINE_KIND,
+        category: categoryId,
+        currentValue: normalizeMoney(category.manualValue) || 0,
+        ownership: cloneOwnership(category.ownership),
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      },
+      { merge: true },
+    )
+  }
 }
 
 function assertValidOwnership(ownership, memberIds) {

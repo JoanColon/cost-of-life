@@ -174,11 +174,7 @@
                     toggle-color="primary"
                     color="white"
                     text-color="grey-8"
-                    :disable="
-                      decisionSaving ||
-                      decisionSavingIds.has(subcategory.id) ||
-                      !trackingStore.itemsFor(subcategory.id).length
-                    "
+                    :disable="decisionSaving || decisionSavingIds.has(subcategory.id)"
                     :options="decisionOptions"
                     @update:model-value="setDecision(subcategory, $event)"
                   />
@@ -193,6 +189,7 @@
     <q-dialog v-model="manageDialog" :maximized="$q.screen.lt.sm">
       <ExpenseTrackingCategorySetup
         :initial-selected="trackingStore.enabledSubcategories"
+        :subcategories="availableCategories"
         :saving="trackingStore.saving"
         @save="savePreferences"
         @cancel="manageDialog = false"
@@ -304,13 +301,12 @@ import {
   expenseTrackingCategories,
   groupedExpenseTrackingCategories,
 } from '@/config/expense-tracking-categories'
-import { expenseAmountForMonth } from '@/domain/financial/expense-calculations'
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
-import { incomeMonths } from '@/domain/financial/income-calculations'
+import { currentFinancialYear, FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
 import { normalizeMoney } from '@/domain/financial/money'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
-import { useExpensesStore } from '@/stores/expenses-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -319,7 +315,7 @@ const $q = useQuasar()
 const { t, locale } = useI18n()
 const route = useRoute()
 const trackingStore = useExpenseTrackingStore()
-const expensesStore = useExpensesStore()
+const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
 const tab = ref('track')
 const period = ref(currentPeriod())
@@ -346,7 +342,11 @@ const members = computed(() => getWorkspaceMembers(workspace.value, authUser.val
 const memberIds = computed(() => members.value.map(({ id }) => id))
 const enabledCategories = computed(() => {
   const enabled = new Set(trackingStore.enabledSubcategories)
-  return expenseTrackingCategories.filter(({ id }) => enabled.has(id))
+  return availableCategories.value.filter(({ id }) => enabled.has(id))
+})
+const availableCategories = computed(() => {
+  const available = new Set(trackingStore.availableSubcategories)
+  return expenseTrackingCategories.filter(({ id }) => available.has(id))
 })
 const trackGroups = computed(() => groupedExpenseTrackingCategories(enabledCategories.value))
 const categoriesWithTrackedItems = computed(() =>
@@ -357,6 +357,10 @@ const expensesRoute = computed(() => ({
   name: 'expenses',
   params: { workspaceId: activeWorkspaceId.value },
 }))
+const selectedYear = computed(() => Number(period.value.slice(0, 4)))
+const financialYear = computed(() =>
+  financialYearsStore.get(activeWorkspaceId.value, selectedYear.value),
+)
 const decisionOptions = computed(() => [
   { label: t('expenseTracker.review.useTracked'), value: 'tracked' },
   { label: t('expenseTracker.review.keepModel'), value: 'model' },
@@ -393,7 +397,7 @@ async function loadPage(force = false) {
     await Promise.all([
       // Always refresh the selected month so entries and decisions stay current.
       trackingStore.load(activeWorkspaceId.value, period.value, true),
-      expensesStore.loadSummary(activeWorkspaceId.value, force),
+      financialYearsStore.load(activeWorkspaceId.value, selectedYear.value, force),
     ])
     if (requestId !== loadRequestId) return
   } catch (error) {
@@ -473,8 +477,9 @@ async function deleteEntry() {
 }
 
 async function savePreferences(selected) {
-  const saved = await persist(() =>
-    trackingStore.savePreferences(activeWorkspaceId.value, selected, authUser.value.uid),
+  const saved = await persist(
+    () => trackingStore.savePreferences(activeWorkspaceId.value, selected, authUser.value.uid),
+    false,
   )
   if (saved) manageDialog.value = false
 }
@@ -484,13 +489,11 @@ function modelValue(subcategory) {
 }
 
 function currentModelValue(subcategory) {
-  const monthName = selectedMonthName()
   return (
     normalizeMoney(
-      modelExpenses(subcategory).reduce(
-        (sum, expense) => sum + expenseAmountForMonth(expense, monthName),
-        0,
-      ),
+      financialYear.value?.months?.[period.value.slice(5, 7)]?.expenses?.categories?.[
+        subcategory.categoryId
+      ]?.subcategories?.[subcategory.id]?.estimated,
     ) || 0
   )
 }
@@ -523,6 +526,7 @@ async function setDecision(subcategory, decision) {
       decision,
       authUser.value.uid,
     )
+    await syncHistoricalProjection()
     $q.notify({ type: 'positive', message: t('expenseTracker.sourceUpdated'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.sourceSave'), position: 'top' })
@@ -549,6 +553,7 @@ async function setGlobalDecision(decision) {
       decision,
       authUser.value.uid,
     )
+    await syncHistoricalProjection()
     $q.notify({ type: 'positive', message: t('expenseTracker.sourcesUpdated'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.sourceSave'), position: 'top' })
@@ -557,25 +562,18 @@ async function setGlobalDecision(decision) {
   }
 }
 
-function modelExpenses(subcategory) {
-  return expensesStore
-    .itemsForCategory(subcategory.categoryId)
-    .filter(({ type }) => type === subcategory.id)
-}
-
-function selectedMonthName() {
-  return incomeMonths[Number(period.value.slice(5, 7)) - 1]
-}
-
 function formatItemDate(value) {
   const date = value?.toDate ? value.toDate() : new Date(value)
   return new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(date)
 }
 
-async function persist(operation) {
+async function persist(operation, syncProjection = true, notify = true) {
   try {
     await operation()
-    $q.notify({ type: 'positive', message: t('expenseTracker.saved'), position: 'top' })
+    if (syncProjection) await syncHistoricalProjection()
+    if (notify) {
+      $q.notify({ type: 'positive', message: t('expenseTracker.saved'), position: 'top' })
+    }
     return true
   } catch {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.save'), position: 'top' })
@@ -583,9 +581,19 @@ async function persist(operation) {
   }
 }
 
+async function syncHistoricalProjection() {
+  if (selectedYear.value === currentFinancialYear()) return
+  await financialYearsStore.refreshTracking(activeWorkspaceId.value, period.value)
+}
+
 function currentPeriod() {
-  const today = new Date()
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    timeZone: FINANCIAL_YEAR_TIME_ZONE,
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}`
 }
 </script>
 

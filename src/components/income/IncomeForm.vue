@@ -165,17 +165,26 @@
           </div>
         </template>
 
-        <q-input
-          v-else
-          v-model="oneTimeAmount"
-          outlined
-          type="number"
-          min="0"
-          step="0.01"
-          :prefix="currencySymbol"
-          :label="t('income.form.oneTimeAmount')"
-          :rules="[moneyRule]"
-        />
+        <div v-else class="amount-frequency">
+          <q-input
+            v-model="oneTimeAmount"
+            outlined
+            type="number"
+            min="0"
+            step="0.01"
+            :prefix="currencySymbol"
+            :label="t('income.form.oneTimeAmount')"
+            :rules="[moneyRule]"
+          />
+          <q-select
+            v-model="oneTimeMonth"
+            outlined
+            emit-value
+            map-options
+            :label="t('income.form.recognitionMonth')"
+            :options="monthOptions"
+          />
+        </div>
 
         <div v-if="breakdown" class="calculation-preview">
           <div>
@@ -271,6 +280,7 @@ const extrasByMonth = ref(createEmptyExtras())
 const recurringAmount = ref('')
 const frequency = ref('monthly')
 const oneTimeAmount = ref('')
+const oneTimeMonth = ref('january')
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const submitting = ref(false)
@@ -288,6 +298,9 @@ const calculationModeOptions = computed(() =>
 const frequencyOptions = computed(() =>
   recurringIncomeFrequencies.map((value) => ({ value, label: t(`income.frequencies.${value}`) })),
 )
+const monthOptions = computed(() =>
+  incomeMonths.map((value) => ({ value, label: t(`income.months.${value}`) })),
+)
 const calculation = computed(() => {
   if (calculationMode.value === 'annual_salary')
     return {
@@ -301,7 +314,9 @@ const calculation = computed(() => {
       monthlyAmount: monthlyAmount.value,
       extrasByMonth: extrasByMonth.value,
     }
-  if (calculationMode.value === 'one_time') return { mode: 'one_time', amount: oneTimeAmount.value }
+  if (calculationMode.value === 'one_time') {
+    return { mode: 'one_time', amount: oneTimeAmount.value, month: oneTimeMonth.value }
+  }
   return { mode: 'recurring', amount: recurringAmount.value, frequency: frequency.value }
 })
 const normalizedCalculation = computed(() => normalizeIncomeCalculation(calculation.value))
@@ -342,8 +357,10 @@ function setCalculation(value) {
   } else if (value.mode === 'monthly_schedule') {
     monthlyAmount.value = value.monthlyAmount
     extrasByMonth.value = { ...createEmptyExtras(), ...value.extrasByMonth }
-  } else if (value.mode === 'one_time') oneTimeAmount.value = value.amount
-  else {
+  } else if (value.mode === 'one_time') {
+    oneTimeAmount.value = value.amount
+    oneTimeMonth.value = value.month || 'january'
+  } else {
     recurringAmount.value = value.amount
     frequency.value = value.frequency
   }
@@ -361,7 +378,7 @@ function defaultCalculation(mode, annualSeed) {
       monthlyAmount: normalizeMoney(annualSeed / 12) || 0,
       extrasByMonth: {},
     }
-  if (mode === 'one_time') return { mode, amount: annualSeed }
+  if (mode === 'one_time') return { mode, amount: annualSeed, month: 'january' }
   return { mode: 'recurring', amount: annualSeed, frequency: 'yearly' }
 }
 

@@ -6,7 +6,7 @@
         <span>{{ t('expenses.loading') }}</span>
       </div>
 
-      <section v-else-if="expensesStore.error || trackingStore.error" class="state">
+      <section v-else-if="expensesStore.error || financialYearsStore.error" class="state">
         <q-icon name="cloud_off" size="2rem" />
         <h1>{{ t('expenses.errors.loadTitle') }}</h1>
         <p>{{ t('expenses.errors.load') }}</p>
@@ -232,12 +232,16 @@ import SimpleExpenseEstimateEditor from '@/components/expenses/SimpleExpenseEsti
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { expenseCategories } from '@/config/expense-categories'
-import { isItemizedCategory } from '@/domain/financial/category-summary'
-import { effectiveExpenseValuesForYear } from '@/domain/financial/expense-tracking'
+import {
+  currentFinancialYear,
+  financialYearCategoryItemCount,
+  financialYearCategoryValue,
+  financialYearValue,
+} from '@/domain/financial/financial-year'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
-import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -248,7 +252,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const expensesStore = useExpensesStore()
-const trackingStore = useExpenseTrackingStore()
+const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
@@ -261,7 +265,7 @@ const savingCategoryIds = ref(new Set())
 const deleteDialog = ref(false)
 const deletingCategory = ref(null)
 const period = ref('annual')
-const currentYear = new Date().getFullYear()
+const currentYear = currentFinancialYear()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspaceHomeRoute = computed(() => ({
@@ -278,25 +282,15 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const enabledCategories = computed(() =>
-  expenseCategories.filter((category) => expensesStore.summary?.categories?.[category.id]?.enabled),
+  expenseCategories.filter((category) => expensesStore.config?.categories?.[category.id]?.enabled),
 )
-const loadedExpensesByCategory = computed(() =>
-  Object.fromEntries(expenseCategories.map(({ id }) => [id, expensesStore.itemsForCategory(id)])),
-)
-const effectiveValues = computed(() =>
-  effectiveExpenseValuesForYear({
-    summary: expensesStore.summary,
-    expensesByCategory: loadedExpensesByCategory.value,
-    trackingMonths: trackingStore.yearMonths,
-    year: currentYear,
-    memberId: selectedMemberId.value,
-  }),
-)
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const totals = computed(() => ({
-  annualCostOfLife: effectiveValues.value.annualCostOfLife,
-  monthlyCostOfLife: effectiveValues.value.annualCostOfLife / 12,
+  annualCostOfLife: financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+  monthlyCostOfLife:
+    financialYearValue(financialYear.value, 'expenses', selectedMemberId.value) / 12,
 }))
-const pageLoading = computed(() => expensesStore.loading || trackingStore.loading)
+const pageLoading = computed(() => expensesStore.loading || financialYearsStore.loading)
 const displayedTotal = computed(() =>
   period.value === 'annual' ? totals.value.annualCostOfLife : totals.value.monthlyCostOfLife,
 )
@@ -317,13 +311,13 @@ watch(workspaceId, () => loadPage(), { immediate: true })
 
 async function loadPage(force = false) {
   await Promise.allSettled([
-    expensesStore.loadSummary(workspaceId.value, force),
-    trackingStore.loadYear(workspaceId.value, currentYear, true),
+    expensesStore.loadConfig(workspaceId.value, force),
+    financialYearsStore.load(workspaceId.value, currentYear, force),
   ])
 }
 
 function categoryConfig(categoryId) {
-  return expensesStore.summary?.categories?.[categoryId]
+  return expensesStore.config?.categories?.[categoryId]
 }
 
 function categoryEstimate(categoryId) {
@@ -331,18 +325,27 @@ function categoryEstimate(categoryId) {
 }
 
 function isItemized(categoryId) {
-  return isItemizedCategory(categoryConfig(categoryId))
+  return categoryItemCount(categoryId) > 0
 }
 
 function categoryDisplayValue(categoryId) {
-  const annualValue = effectiveValues.value.categories[categoryId] || 0
+  const annualValue = financialYearCategoryValue(
+    financialYear.value,
+    'expenses',
+    categoryId,
+    selectedMemberId.value,
+  )
   return period.value === 'annual' ? annualValue : annualValue / 12
 }
 
 function categoryStatus(categoryId) {
-  const config = categoryConfig(categoryId)
-  if (isItemizedCategory(config)) return t('expenses.itemCount', { count: config.itemCount })
+  const count = categoryItemCount(categoryId)
+  if (count > 0) return t('expenses.itemCount', { count })
   return t('expenses.simpleEstimate')
+}
+
+function categoryItemCount(categoryId) {
+  return financialYearCategoryItemCount(financialYear.value, 'expenses', categoryId)
 }
 
 function categoryMembers(categoryId) {

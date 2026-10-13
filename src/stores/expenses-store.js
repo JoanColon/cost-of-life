@@ -3,7 +3,8 @@ import { defineStore } from 'pinia'
 import { expenseCategoryIds } from '@/config/expense-categories'
 import {
   createExpense as createExpenseDocument,
-  getExpensesSummary,
+  getCategoryExpenses,
+  getExpensesConfig,
   removeExpense as removeExpenseDocument,
   removeExpenseCategory as removeExpenseCategoryDocuments,
   saveExpensesSetup,
@@ -12,67 +13,85 @@ import {
   updateSimpleExpenseEstimate as updateSimpleExpenseEstimateDocument,
   updateSimpleExpenseOwnership as updateSimpleExpenseOwnershipDocument,
 } from '@/services/firebase/expenses.service'
-import { categoryEffectiveValue } from '@/domain/financial/category-summary'
-import { buildExpenseSummaryCategories } from '@/domain/financial/expense-summary'
+import { buildExpenseModelCategories } from '@/domain/financial/expense-model-categories'
 
 export const useExpensesStore = defineStore('expenses', () => {
-  const summary = ref(null)
+  const config = ref(null)
   const expensesByCategory = ref({})
   const loading = ref(false)
+  const categoryLoading = ref(false)
   const error = ref(null)
   const loadedWorkspaceId = ref(null)
-  let summaryRequestId = 0
+  const loadedCategoryIds = ref(new Set())
+  let configRequestId = 0
 
-  const setupCompleted = computed(() => Boolean(summary.value?.setupCompleted))
+  const setupCompleted = computed(() => Boolean(config.value?.setupCompleted))
   const enabledCategories = computed(() =>
-    Object.entries(summary.value?.categories || {})
+    Object.entries(config.value?.categories || {})
       .filter(([, category]) => category.enabled)
       .map(([categoryId]) => categoryId),
   )
 
-  async function loadSummary(workspaceId, force = false) {
+  async function loadConfig(workspaceId, force = false) {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
     loading.value = true
     error.value = null
-    summary.value = null
+    config.value = null
     expensesByCategory.value = {}
-    const requestId = ++summaryRequestId
+    loadedCategoryIds.value = new Set()
+    const requestId = ++configRequestId
     try {
-      const state = await getExpensesSummary(workspaceId)
-      if (requestId !== summaryRequestId) return
-      summary.value = state.summary
-      expensesByCategory.value = groupExpensesByCategory(state.expenses)
+      const state = await getExpensesConfig(workspaceId)
+      if (requestId !== configRequestId) return
+      config.value = state.config
       loadedWorkspaceId.value = workspaceId
     } catch (loadError) {
-      if (requestId !== summaryRequestId) return
+      if (requestId !== configRequestId) return
       error.value = loadError
       loadedWorkspaceId.value = workspaceId
     } finally {
-      if (requestId === summaryRequestId) loading.value = false
+      if (requestId === configRequestId) loading.value = false
+    }
+  }
+
+  async function loadCategory(workspaceId, categoryId, force = false) {
+    await loadConfig(workspaceId, force)
+    if (error.value || !config.value?.categories?.[categoryId]) return
+    if (!force && loadedCategoryIds.value.has(categoryId)) return
+    categoryLoading.value = true
+    try {
+      const items = await getCategoryExpenses(workspaceId, categoryId)
+      expensesByCategory.value = { ...expensesByCategory.value, [categoryId]: items }
+      loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
+    } catch (loadError) {
+      error.value = loadError
+      throw loadError
+    } finally {
+      categoryLoading.value = false
     }
   }
 
   async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildExpenseSummaryCategories(
+    const categories = buildExpenseModelCategories(
       expenseCategoryIds,
       selectedCategoryIds,
       {},
       memberIds,
     )
     await saveExpensesSetup(workspaceId, categories, userId)
-    summary.value = { setupCompleted: true, categories }
+    config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
   async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
-    const categories = buildExpenseSummaryCategories(
+    const categories = buildExpenseModelCategories(
       expenseCategoryIds,
       selectedCategoryIds,
-      summary.value?.categories || {},
+      config.value?.categories || {},
       memberIds,
     )
     await updateExpensesCategories(workspaceId, categories, userId)
-    summary.value = { ...(summary.value || {}), setupCompleted: true, categories }
+    config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
   async function updateSimpleCategoryEstimate(workspaceId, categoryId, estimate, userId) {
@@ -107,7 +126,7 @@ export const useExpensesStore = defineStore('expenses', () => {
       ...expensesByCategory.value,
       [expense.category]: [...itemsForCategory(expense.category), result.expense],
     }
-    replaceCategory(expense.category, result.category)
+    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(expense.category)
     return result.expense
   }
 
@@ -121,7 +140,6 @@ export const useExpensesStore = defineStore('expenses', () => {
         candidate.id === expenseId ? result.expense : candidate,
       ),
     }
-    replaceCategory(expense.category, result.category)
   }
 
   async function deleteExpense(workspaceId, expenseId, userId, memberIds) {
@@ -133,39 +151,33 @@ export const useExpensesStore = defineStore('expenses', () => {
         (candidate) => candidate.id !== expenseId,
       ),
     }
-    replaceCategory(result.categoryId, result.category)
   }
 
   async function deleteCategory(workspaceId, categoryId, userId) {
     await removeExpenseCategoryDocuments(workspaceId, categoryId, userId)
-    const categories = { ...(summary.value?.categories || {}) }
+    const categories = { ...(config.value?.categories || {}) }
     delete categories[categoryId]
-    summary.value = { ...summary.value, categories }
+    config.value = { ...config.value, categories }
     const nextItems = { ...expensesByCategory.value }
     delete nextItems[categoryId]
     expensesByCategory.value = nextItems
+    const nextLoadedIds = new Set(loadedCategoryIds.value)
+    nextLoadedIds.delete(categoryId)
+    loadedCategoryIds.value = nextLoadedIds
   }
 
   function itemsForCategory(categoryId) {
     return expensesByCategory.value[categoryId] || []
   }
 
-  function totalForCategory(categoryId, memberId = 'all') {
-    return categoryEffectiveValue(summary.value?.categories?.[categoryId], memberId)
-  }
-
   function replaceCategory(categoryId, category) {
-    summary.value = {
-      ...(summary.value || {}),
-      categories: { ...(summary.value?.categories || {}), [categoryId]: category },
+    config.value = {
+      ...(config.value || {}),
+      categories: {
+        ...(config.value?.categories || {}),
+        [categoryId]: { ...(config.value?.categories?.[categoryId] || {}), ...category },
+      },
     }
-  }
-
-  function groupExpensesByCategory(expenses) {
-    return expenses.reduce((groups, expense) => {
-      groups[expense.category] = [...(groups[expense.category] || []), expense]
-      return groups
-    }, {})
   }
 
   function findLoadedExpense(expenseId) {
@@ -175,21 +187,24 @@ export const useExpensesStore = defineStore('expenses', () => {
   }
 
   function reset() {
-    summaryRequestId += 1
-    summary.value = null
+    configRequestId += 1
+    config.value = null
     expensesByCategory.value = {}
+    loadedCategoryIds.value = new Set()
     loading.value = false
     error.value = null
     loadedWorkspaceId.value = null
   }
 
   return {
-    summary,
+    config,
     loading,
+    categoryLoading,
     error,
     setupCompleted,
     enabledCategories,
-    loadSummary,
+    loadConfig,
+    loadCategory,
     completeSetup,
     saveCategorySelection,
     updateSimpleCategoryEstimate,
@@ -199,7 +214,6 @@ export const useExpensesStore = defineStore('expenses', () => {
     deleteExpense,
     deleteCategory,
     itemsForCategory,
-    totalForCategory,
     reset,
   }
 })

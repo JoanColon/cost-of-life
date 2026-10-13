@@ -56,89 +56,109 @@
             :label="t('expenses.form.frequency')"
             :options="frequencyOptions"
           />
-          <q-select
-            v-model="variability"
-            outlined
-            emit-value
-            map-options
-            :label="t('expenses.form.variability')"
-            :options="variabilityOptions"
-          />
-          <q-select
-            v-model="recurrence"
-            outlined
-            emit-value
-            map-options
-            :label="t('expenses.form.recurrence')"
-            :options="recurrenceOptions"
-          />
-          <q-select
-            v-model="necessity"
-            outlined
-            clearable
-            emit-value
-            map-options
-            :label="t('expenses.form.necessity')"
-            :hint="t('expenses.form.necessityHint')"
-            :options="necessityOptions"
-            class="full-width"
-          />
         </div>
 
-        <q-markup-table v-if="monthlyAmounts" flat bordered dense class="monthly-schedule">
-          <thead>
-            <tr>
-              <th class="text-left">{{ t('income.form.month') }}</th>
-              <th class="text-right">{{ t('expenses.form.modelAmount') }}</th>
-              <th v-if="trackingEnabled" class="text-right">
-                {{ t('expenses.form.actualAmount') }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="month in incomeMonths" :key="month">
-              <td>{{ t(`income.months.${month}`) }}</td>
-              <td class="model-amount">
-                <span>{{ formatCurrency(monthAmount(month)) }}</span>
-                <q-btn
-                  flat
-                  round
-                  dense
-                  color="primary"
-                  icon="edit"
-                  :aria-label="t('expenses.form.editMonth', { month: t(`income.months.${month}`) })"
-                >
-                  <q-popup-edit
-                    :model-value="monthlyAmounts[month]"
-                    buttons
-                    :label-set="t('common.save')"
-                    :label-cancel="t('common.cancel')"
-                    @save="setMonthAmount(month, $event)"
+        <q-expansion-item
+          icon="tune"
+          :label="t('expenses.form.advancedOptions')"
+          class="advanced-options"
+        >
+          <div class="form-grid q-pt-sm">
+            <q-select
+              v-model="variability"
+              outlined
+              emit-value
+              map-options
+              :label="t('expenses.form.variability')"
+              :options="variabilityOptions"
+            />
+            <q-select
+              v-model="recurrence"
+              outlined
+              emit-value
+              map-options
+              :label="t('expenses.form.recurrence')"
+              :options="recurrenceOptions"
+            />
+            <q-select
+              v-model="necessity"
+              outlined
+              clearable
+              emit-value
+              map-options
+              :label="t('expenses.form.necessity')"
+              :hint="t('expenses.form.necessityHint')"
+              :options="necessityOptions"
+              class="full-width"
+            />
+          </div>
+        </q-expansion-item>
+
+        <q-expansion-item
+          v-if="monthlyAmounts"
+          icon="calendar_month"
+          :label="t('expenses.form.yearBreakdown')"
+          class="year-breakdown"
+        >
+          <q-markup-table flat bordered dense class="monthly-schedule">
+            <thead>
+              <tr>
+                <th class="text-left">{{ t('income.form.month') }}</th>
+                <th class="text-right">{{ t('expenses.form.modelAmount') }}</th>
+                <th class="text-right">
+                  {{ t('expenses.form.actualAmount') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="month in incomeMonths" :key="month">
+                <td>{{ t(`income.months.${month}`) }}</td>
+                <td class="model-amount">
+                  <span>{{ formatCurrency(monthAmount(month)) }}</span>
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    color="primary"
+                    icon="edit"
+                    :aria-label="
+                      t('expenses.form.editMonth', { month: t(`income.months.${month}`) })
+                    "
                   >
-                    <template #default="scope">
-                      <q-input
-                        v-model="scope.value"
-                        autofocus
-                        dense
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        prefix="€"
-                        :label="
-                          t('expenses.form.amountForMonth', { month: t(`income.months.${month}`) })
-                        "
-                        @keyup.enter="scope.set"
-                      />
-                    </template>
-                  </q-popup-edit>
-                </q-btn>
-              </td>
-              <td v-if="trackingEnabled" class="text-right actual-amount">
-                {{ actualAmount(month) == null ? '—' : formatCurrency(actualAmount(month)) }}
-              </td>
-            </tr>
-          </tbody>
-        </q-markup-table>
+                    <q-popup-edit
+                      :model-value="monthlyAmounts[month]"
+                      buttons
+                      :label-set="t('common.save')"
+                      :label-cancel="t('common.cancel')"
+                      @save="setMonthAmount(month, $event)"
+                    >
+                      <template #default="scope">
+                        <q-input
+                          v-model="scope.value"
+                          autofocus
+                          dense
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          prefix="€"
+                          :label="
+                            t('expenses.form.amountForMonth', {
+                              month: t(`income.months.${month}`),
+                            })
+                          "
+                          @keyup.enter="scope.set"
+                        />
+                      </template>
+                    </q-popup-edit>
+                  </q-btn>
+                </td>
+                <td class="text-right actual-amount">
+                  {{ actualAmount(month) == null ? '—' : formatCurrency(actualAmount(month)) }}
+                </td>
+              </tr>
+            </tbody>
+          </q-markup-table>
+        </q-expansion-item>
 
         <div v-if="breakdown" class="calculation-preview">
           <span>{{ t('expenses.form.normalizedCost') }}</span>
@@ -212,9 +232,7 @@ const props = defineProps({
   expense: { type: Object, default: null },
   defaults: { type: Object, default: null },
   members: { type: Array, required: true },
-  trackingYear: { type: Number, default: () => new Date().getFullYear() },
-  trackingMonths: { type: Object, default: () => ({}) },
-  trackingEnabledSubcategories: { type: Array, default: () => [] },
+  financialYear: { type: Object, default: null },
   usedStandardTypes: { type: Array, default: () => [] },
   saving: Boolean,
 })
@@ -242,10 +260,6 @@ const suggestionOptions = computed(() => [
     .map((item) => ({ value: item.id, label: t(item.nameKey) })),
   { value: 'other', label: t('expenses.suggestions.other') },
 ])
-const trackingEnabled = computed(
-  () =>
-    expenseType.value !== 'other' && props.trackingEnabledSubcategories.includes(expenseType.value),
-)
 const normalizedEstimate = computed(() =>
   normalizeExpenseEstimate({ amount: amount.value, frequency: frequency.value }),
 )
@@ -313,10 +327,12 @@ function monthAmount(month) {
 
 function actualAmount(month) {
   const monthNumber = incomeMonths.indexOf(month) + 1
-  if (!trackingEnabled.value || monthNumber < 1) return null
-  const period = `${props.trackingYear}-${String(monthNumber).padStart(2, '0')}`
-  const category = props.trackingMonths[period]?.categories?.[expenseType.value]
-  return category?.items?.length ? category.total : null
+  if (monthNumber < 1 || expenseType.value === 'other') return null
+  const monthKey = String(monthNumber).padStart(2, '0')
+  return (
+    props.financialYear?.months?.[monthKey]?.expenses?.categories?.[props.category.id]
+      ?.subcategories?.[expenseType.value]?.actual ?? null
+  )
 }
 
 function setMonthAmount(month, value) {
@@ -397,8 +413,18 @@ function submit() {
 }
 
 .monthly-schedule {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   overflow: visible;
+}
+
+.year-breakdown {
+  margin-top: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.advanced-options {
+  margin-top: 0.25rem;
 }
 
 .model-amount {

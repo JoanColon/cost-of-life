@@ -2,103 +2,117 @@ import {
   collection,
   deleteField,
   doc,
-  getDoc,
   getDocs,
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 import { getIncomeCategory } from '@/config/income-categories'
-import {
-  annualIncomeValue,
-  normalizeIncomeCalculation,
-} from '@/domain/financial/income-calculations'
+import { normalizeIncomeCalculation } from '@/domain/financial/income-calculations'
 import { normalizeMoney } from '@/domain/financial/money'
+import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import {
-  allocateValueByOwnership,
-  cloneOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  canonicalCategories,
+  hydrateModelConfigWithBaselines,
+} from '@/domain/financial/model-categories'
 import {
-  addItemToCategory,
-  removeItemFromCategory,
-  updateItemInCategory,
-} from '@/domain/financial/category-summary'
+  MODEL_BASELINE_KIND,
+  isModelBaseline,
+  modelBaselineId,
+} from '@/domain/financial/model-baseline'
+import { ensureModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
-function summaryRef(workspaceId) {
-  return doc(db, 'workspaces', workspaceId, 'cashFlow', 'incomeSummary')
+function configRef(workspaceId) {
+  return modelConfigRef(workspaceId, 'income')
 }
 
-function incomeRef(workspaceId) {
-  return collection(db, 'workspaces', workspaceId, 'income')
+function modelIncomeRef(workspaceId) {
+  return collection(db, 'workspaces', workspaceId, 'modelIncome')
 }
 
-export async function getIncomeSummary(workspaceId) {
-  const snapshot = await getDoc(summaryRef(workspaceId))
-  return snapshot.exists() ? snapshot.data() : null
-}
-
-export async function getCategoryIncome(workspaceId, categoryId) {
-  const snapshot = await getDocs(query(incomeRef(workspaceId), where('category', '==', categoryId)))
-  return snapshot.docs.map((incomeDocument) => ({
-    id: incomeDocument.id,
-    ...incomeDocument.data(),
+export async function getIncomeConfig(workspaceId) {
+  const [config, baselineSnapshot] = await Promise.all([
+    ensureModelConfig(workspaceId, 'income'),
+    getDocs(query(modelIncomeRef(workspaceId), where('kind', '==', MODEL_BASELINE_KIND))),
+  ])
+  const baselines = baselineSnapshot.docs.map((document) => ({
+    id: document.id,
+    ...document.data(),
+  }))
+  return hydrateModelConfigWithBaselines(config, baselines, (baseline) => ({
+    manualValue: baseline.annualValue,
+    ownership: baseline.ownership,
   }))
 }
 
-export async function saveIncomeSetup(workspaceId, categories, userId) {
-  await setDoc(summaryRef(workspaceId), {
-    setupCompleted: true,
-    categories: stampCategories(categories, userId),
-    createdAt: serverTimestamp(),
-    createdBy: userId,
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
+export async function getCategoryIncome(workspaceId, categoryId) {
+  const snapshot = await getDocs(
+    query(modelIncomeRef(workspaceId), where('category', '==', categoryId)),
+  )
+  return snapshot.docs
+    .map((incomeDocument) => ({ id: incomeDocument.id, ...incomeDocument.data() }))
+    .filter((income) => !isModelBaseline(income))
 }
 
-export async function updateIncomeCategories(workspaceId, categories, userId) {
-  await setDoc(
-    summaryRef(workspaceId),
+export async function saveIncomeSetup(workspaceId, categories, userId) {
+  const batch = writeBatch(db)
+  batch.set(
+    configRef(workspaceId),
     {
+      schemaVersion: 1,
       setupCompleted: true,
-      categories: stampCategories(categories, userId),
+      categories: stampCategories(canonicalCategories(categories), userId),
+      createdAt: serverTimestamp(),
+      createdBy: userId,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     },
     { merge: true },
   )
+  setIncomeBaselines(batch, workspaceId, categories, userId)
+  await batch.commit()
+}
+
+export async function updateIncomeCategories(workspaceId, categories, userId) {
+  const batch = writeBatch(db)
+  batch.set(
+    configRef(workspaceId),
+    {
+      setupCompleted: true,
+      categories: stampCategories(canonicalCategories(categories), userId),
+      updatedAt: serverTimestamp(),
+      updatedBy: userId,
+    },
+    { merge: true },
+  )
+  await batch.commit()
 }
 
 export async function updateSimpleIncomeValue(workspaceId, categoryId, value, userId) {
-  const documentRef = summaryRef(workspaceId)
+  await ensureModelConfig(workspaceId, 'income')
+  const documentRef = configRef(workspaceId)
+  const baselineRef = doc(modelIncomeRef(workspaceId), modelBaselineId(categoryId))
   return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
+    const [snapshot, baselineSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      transaction.get(baselineRef),
+    ])
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) !== 0) {
+    if (!category?.enabled || !baselineSnapshot.exists()) {
       throw new Error('Only simple income categories can be edited directly')
     }
 
     const manualValue = normalizeMoney(value)
     if (manualValue === null) throw new Error('A non-negative annual income is required')
-    const updatedCategory = {
-      ...category,
-      manualValue,
-      memberValues: allocateValueByOwnership(manualValue, category.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
+    transaction.update(baselineRef, {
+      annualValue: manualValue,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-    return { ...updatedCategory, updatedAt: null }
+    return { manualValue, ownership: baselineSnapshot.data().ownership }
   })
 }
 
@@ -109,39 +123,41 @@ export async function updateSimpleIncomeOwnership(
   userId,
   memberIds,
 ) {
+  await ensureModelConfig(workspaceId, 'income')
   assertValidOwnership(ownership, memberIds)
-  const documentRef = summaryRef(workspaceId)
+  const documentRef = configRef(workspaceId)
+  const baselineRef = doc(modelIncomeRef(workspaceId), modelBaselineId(categoryId))
   return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
+    const [snapshot, baselineSnapshot] = await Promise.all([
+      transaction.get(documentRef),
+      transaction.get(baselineRef),
+    ])
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) !== 0) {
+    if (!category?.enabled || !baselineSnapshot.exists()) {
       throw new Error('Only simple income category ownership can be edited')
     }
-    const updatedCategory = {
-      ...category,
+    transaction.update(baselineRef, {
       ownership: cloneOwnership(ownership),
-      memberValues: allocateValueByOwnership(category.manualValue, ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-    return { ...updatedCategory, updatedAt: null }
+    return {
+      manualValue: baselineSnapshot.data().annualValue || 0,
+      ownership: cloneOwnership(ownership),
+    }
   })
 }
 
 export async function createIncome(workspaceId, income, userId, memberIds) {
+  await ensureModelConfig(workspaceId, 'income')
   assertValidOwnership(income.ownership, memberIds)
   const normalized = normalizeIncomeItem(income)
-  const itemRef = doc(incomeRef(workspaceId))
-  const documentRef = summaryRef(workspaceId)
+  const itemRef = doc(modelIncomeRef(workspaceId))
+  const documentRef = configRef(workspaceId)
 
   return runTransaction(db, async (transaction) => {
-    const summarySnapshot = await transaction.get(documentRef)
-    const category = summarySnapshot.data()?.categories?.[normalized.category]
+    const configSnapshot = await transaction.get(documentRef)
+    const category = configSnapshot.data()?.categories?.[normalized.category]
     if (!category?.enabled) throw new Error('Income category is not enabled')
 
     const itemData = {
@@ -153,30 +169,19 @@ export async function createIncome(workspaceId, income, userId, memberIds) {
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     }
-    const annualValue = annualIncomeValue(itemData.calculation)
-    const updatedCategory = {
-      ...addItemToCategory(category, annualValue, itemData.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
     transaction.set(itemRef, itemData)
-    transaction.update(documentRef, {
-      [`categories.${normalized.category}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
     return {
       income: { ...itemData, id: itemRef.id, createdAt: null, updatedAt: null },
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
 export async function updateIncome(workspaceId, incomeId, changes, userId, memberIds) {
-  const itemRef = doc(incomeRef(workspaceId), incomeId)
-  const documentRef = summaryRef(workspaceId)
+  await ensureModelConfig(workspaceId, 'income')
+  const itemRef = doc(modelIncomeRef(workspaceId), incomeId)
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const [itemSnapshot, summarySnapshot] = await Promise.all([
+    const [itemSnapshot, configSnapshot] = await Promise.all([
       transaction.get(itemRef),
       transaction.get(documentRef),
     ])
@@ -184,8 +189,8 @@ export async function updateIncome(workspaceId, incomeId, changes, userId, membe
 
     const previousIncome = itemSnapshot.data()
     const categoryId = previousIncome.category
-    const category = summarySnapshot.data()?.categories?.[categoryId]
-    if (!category || Number(category.itemCount || 0) === 0) {
+    const category = configSnapshot.data()?.categories?.[categoryId]
+    if (!category) {
       throw new Error('Itemized income category not found')
     }
 
@@ -200,75 +205,52 @@ export async function updateIncome(workspaceId, incomeId, changes, userId, membe
       updatedBy: userId,
     }
     assertValidOwnership(updatedIncome.ownership, memberIds)
-    const updatedCategory = {
-      ...updateItemInCategory(
-        category,
-        annualIncomeValue(previousIncome.calculation),
-        previousIncome.ownership,
-        annualIncomeValue(updatedIncome.calculation),
-        updatedIncome.ownership,
-      ),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
     transaction.update(itemRef, updatedIncome)
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
     return {
       income: { id: incomeId, ...updatedIncome, updatedAt: null },
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
-export async function removeIncome(workspaceId, incomeId, userId, memberIds) {
-  const itemRef = doc(incomeRef(workspaceId), incomeId)
-  const documentRef = summaryRef(workspaceId)
+export async function removeIncome(workspaceId, incomeId) {
+  await ensureModelConfig(workspaceId, 'income')
+  const itemRef = doc(modelIncomeRef(workspaceId), incomeId)
+  const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
-    const [itemSnapshot, summarySnapshot] = await Promise.all([
+    const [itemSnapshot, configSnapshot] = await Promise.all([
       transaction.get(itemRef),
       transaction.get(documentRef),
     ])
     if (!itemSnapshot.exists()) throw new Error('Income source not found')
 
     const income = itemSnapshot.data()
-    const category = summarySnapshot.data()?.categories?.[income.category]
+    const category = configSnapshot.data()?.categories?.[income.category]
     if (!category) throw new Error('Income category not found')
-    const updatedCategory = {
-      ...removeItemFromCategory(
-        category,
-        annualIncomeValue(income.calculation),
-        income.ownership,
-        createEqualOwnership(memberIds),
-        memberIds,
-      ),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
     transaction.delete(itemRef)
-    transaction.update(documentRef, {
-      [`categories.${income.category}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
     return {
       categoryId: income.category,
-      category: { ...updatedCategory, updatedAt: null },
     }
   })
 }
 
 export async function removeIncomeCategory(workspaceId, categoryId, userId) {
-  const snapshot = await getDocs(query(incomeRef(workspaceId), where('category', '==', categoryId)))
+  const snapshot = await getDocs(
+    query(modelIncomeRef(workspaceId), where('category', '==', categoryId)),
+  )
   if (snapshot.size > 498) {
     throw new Error('Income categories with more than 498 sources cannot be deleted at once')
   }
   const batch = writeBatch(db)
-  snapshot.docs.forEach((incomeDocument) => batch.delete(incomeDocument.ref))
-  batch.update(summaryRef(workspaceId), {
+  snapshot.docs.forEach((incomeDocument) => {
+    if (isModelBaseline(incomeDocument.data())) {
+      batch.update(incomeDocument.ref, {
+        annualValue: 0,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      })
+    } else batch.delete(incomeDocument.ref)
+  })
+  batch.update(configRef(workspaceId), {
     [`categories.${categoryId}`]: deleteField(),
     updatedAt: serverTimestamp(),
     updatedBy: userId,
@@ -297,6 +279,23 @@ function stampCategories(categories, userId) {
       { ...category, updatedAt: serverTimestamp(), updatedBy: userId },
     ]),
   )
+}
+
+function setIncomeBaselines(batch, workspaceId, categories, userId) {
+  for (const [categoryId, category] of Object.entries(categories)) {
+    batch.set(
+      doc(modelIncomeRef(workspaceId), modelBaselineId(categoryId)),
+      {
+        kind: MODEL_BASELINE_KIND,
+        category: categoryId,
+        annualValue: normalizeMoney(category.manualValue) || 0,
+        ownership: cloneOwnership(category.ownership),
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      },
+      { merge: true },
+    )
+  }
 }
 
 function assertValidOwnership(ownership, memberIds) {

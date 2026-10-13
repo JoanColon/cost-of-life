@@ -151,14 +151,17 @@ import { useRoute, useRouter } from 'vue-router'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import IncomeForm from '@/components/income/IncomeForm.vue'
 import { getIncomeCategory } from '@/config/income-categories'
+import { incomeCalculationBreakdown } from '@/domain/financial/income-calculations'
 import {
-  annualIncomeValue,
-  incomeCalculationBreakdown,
-} from '@/domain/financial/income-calculations'
-import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
+  currentFinancialYear,
+  financialYearCategoryValue,
+  financialYearSubcategoryValue,
+} from '@/domain/financial/financial-year'
+import { cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -168,6 +171,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const incomeStore = useIncomeStore()
+const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const preparing = ref(false)
@@ -178,11 +182,12 @@ const deletingIncome = ref(null)
 const confirmDelete = ref(false)
 const formSaving = ref(false)
 let preparationId = 0
+const currentYear = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
 const categoryId = computed(() => String(route.params.category))
 const incomeRoute = computed(() => ({ name: 'income', params: { workspaceId: workspaceId.value } }))
 const category = computed(() => getIncomeCategory(categoryId.value))
-const categoryConfig = computed(() => incomeStore.summary?.categories?.[categoryId.value])
+const categoryConfig = computed(() => incomeStore.config?.categories?.[categoryId.value])
 const workspace = computed(
   () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
 )
@@ -193,10 +198,11 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allCategoryIncome = computed(() => incomeStore.itemsForCategory(categoryId.value))
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const incomeDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config || !category.value) return null
-  const firstItem = Number(config.itemCount || 0) === 0
+  const firstItem = allCategoryIncome.value.length === 0
   return {
     subtype: category.value.subtypes[0],
     name: '',
@@ -209,23 +215,34 @@ const incomeDefaults = computed(() => {
 const scopedIncome = computed(() =>
   allCategoryIncome.value.map((item) => ({
     ...item,
-    scopedValue: applyOwnership(
-      annualIncomeValue(item.calculation),
-      item.ownership,
+    scopedValue: financialYearSubcategoryValue(
+      financialYear.value,
+      'income',
+      categoryId.value,
+      item.id,
       selectedMemberId.value,
     ),
   })),
 )
 const categoryTotal = computed(() =>
-  incomeStore.totalForCategory(categoryId.value, selectedMemberId.value),
+  financialYearCategoryValue(
+    financialYear.value,
+    'income',
+    categoryId.value,
+    selectedMemberId.value,
+  ),
 )
 const itemSummary = computed(() => {
-  const count = Number(categoryConfig.value?.itemCount || 0)
+  const count = allCategoryIncome.value.length
   const key = count === 1 ? category.value.itemNameKey : category.value.itemNamePluralKey
   return t('income.itemSummary', { count, items: t(key) })
 })
 const pageLoading = computed(
-  () => preparing.value || incomeStore.loading || incomeStore.categoryLoading,
+  () =>
+    preparing.value ||
+    incomeStore.loading ||
+    incomeStore.categoryLoading ||
+    financialYearsStore.loading,
 )
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
 
@@ -245,7 +262,10 @@ async function preparePage(force = false) {
   preparing.value = true
   pageError.value = null
   try {
-    await incomeStore.loadSummary(workspaceId.value, force)
+    await Promise.all([
+      incomeStore.loadConfig(workspaceId.value, force),
+      financialYearsStore.load(workspaceId.value, currentYear, force),
+    ])
     if (current !== preparationId) return
     if (!incomeStore.setupCompleted || !category.value || !categoryConfig.value?.enabled) {
       await router.replace(incomeRoute.value)
