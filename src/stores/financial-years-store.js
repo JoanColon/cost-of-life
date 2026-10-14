@@ -3,36 +3,40 @@ import { defineStore } from 'pinia'
 import { currentFinancialYear } from '@/domain/financial/financial-year'
 import {
   getFinancialYear,
-  rebuildFinancialYearTracking,
   subscribeFinancialYear,
 } from '@/services/firebase/financial-years.service'
 
 export const useFinancialYearsStore = defineStore('financial-years', () => {
   const documents = ref({})
   const loading = ref(false)
-  const error = ref(null)
+  const errors = ref({})
   const requestIds = new Map()
   const loadingKeys = new Set()
   let activeSubscription = null
+  let latestLoadId = 0
 
   async function load(workspaceId, year = currentFinancialYear(), force = false) {
     const key = `${workspaceId}:${year}`
-    if (!force && Object.hasOwn(documents.value, key)) return documents.value[key]
+    const loadId = ++latestLoadId
+    if (!force && Object.hasOwn(documents.value, key)) {
+      if (loadId === latestLoadId) watchFinancialYear(workspaceId, year)
+      return documents.value[key]
+    }
     const currentRequest = (requestIds.get(key) || 0) + 1
     requestIds.set(key, currentRequest)
     loadingKeys.add(key)
     loading.value = true
-    error.value = null
+    setError(key, null)
     try {
       const value = await getFinancialYear(workspaceId, year, {
         ensure: year === currentFinancialYear(),
       })
       if (currentRequest !== requestIds.get(key)) return null
       documents.value = { ...documents.value, [key]: value }
-      if (year === currentFinancialYear()) watchCurrentYear(workspaceId, year)
+      if (loadId === latestLoadId) watchFinancialYear(workspaceId, year)
       return value
     } catch (loadError) {
-      if (currentRequest === requestIds.get(key)) error.value = loadError
+      if (currentRequest === requestIds.get(key)) setError(key, loadError)
       throw loadError
     } finally {
       if (currentRequest === requestIds.get(key)) {
@@ -46,25 +50,21 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     return documents.value[`${workspaceId}:${year}`] || null
   }
 
-  async function refreshTracking(workspaceId, period) {
-    const value = await rebuildFinancialYearTracking(workspaceId, period)
-    documents.value = {
-      ...documents.value,
-      [`${workspaceId}:${Number(period.slice(0, 4))}`]: value,
-    }
-    return value
+  function errorFor(workspaceId, year = currentFinancialYear()) {
+    return errors.value[`${workspaceId}:${year}`] || null
   }
 
   function reset() {
     stopWatching()
+    latestLoadId += 1
     requestIds.clear()
     loadingKeys.clear()
     documents.value = {}
     loading.value = false
-    error.value = null
+    errors.value = {}
   }
 
-  function watchCurrentYear(workspaceId, year) {
+  function watchFinancialYear(workspaceId, year) {
     const key = `${workspaceId}:${year}`
     if (activeSubscription?.key === key) return
     stopWatching()
@@ -75,9 +75,10 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
         year,
         (value) => {
           documents.value = { ...documents.value, [key]: value }
+          setError(key, null)
         },
         (subscriptionError) => {
-          error.value = subscriptionError
+          setError(key, subscriptionError)
         },
       ),
     }
@@ -88,6 +89,9 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     if (activeSubscription?.key.startsWith(prefix)) stopWatching()
     documents.value = Object.fromEntries(
       Object.entries(documents.value).filter(([key]) => !key.startsWith(prefix)),
+    )
+    errors.value = Object.fromEntries(
+      Object.entries(errors.value).filter(([key]) => !key.startsWith(prefix)),
     )
     for (const key of requestIds.keys()) {
       if (key.startsWith(prefix)) requestIds.delete(key)
@@ -103,12 +107,19 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     activeSubscription = null
   }
 
+  function setError(key, value) {
+    const next = { ...errors.value }
+    if (value) next[key] = value
+    else delete next[key]
+    errors.value = next
+  }
+
   return {
     documents,
     loading,
-    error,
+    errors,
     load,
-    refreshTracking,
+    errorFor,
     get,
     clearWorkspace,
     stopWatching,

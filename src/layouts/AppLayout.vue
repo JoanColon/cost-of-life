@@ -152,7 +152,22 @@
         <q-spinner color="primary" size="2rem" />
         <span>{{ t('home.loadingWorkspace') }}</span>
       </div>
-      <router-view v-else :key="route.fullPath" />
+      <div v-else-if="workspaceStore.error" class="loading-state">
+        <q-icon name="cloud_off" size="2rem" />
+        <span>{{ t('workspace.errors.load') }}</span>
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          icon="refresh"
+          :label="t('common.retry')"
+          @click="loadWorkspaces(true)"
+        />
+      </div>
+      <router-view
+        v-else-if="workspaceStore.ready"
+        :key="`${route.fullPath}:${financialPeriodKey}`"
+      />
     </q-page-container>
 
     <q-footer v-if="showMobileNavigation" class="mobile-footer">
@@ -162,11 +177,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
+import { currentFinancialMonth, currentFinancialYear } from '@/domain/financial/financial-year'
 import { authUser, signOut } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -192,7 +208,8 @@ const workspaceStore = useWorkspaceStore()
 
 const drawerOpen = ref($q.screen.gt.sm)
 const loggingOut = ref(false)
-const workspacesReady = ref(false)
+const financialPeriodKey = ref(currentPeriodKey())
+let periodTimer = null
 const workspaceOptions = computed(() =>
   workspaceStore.workspaces.map((workspace) => ({
     label: workspace.name,
@@ -216,21 +233,32 @@ const showAppHeader = computed(() => $q.screen.gt.sm || !isWorkspaceDashboard.va
 const showMobileNavigation = computed(() => $q.screen.lt.md && Boolean(activeWorkspaceId.value))
 
 onMounted(async () => {
+  periodTimer = setInterval(refreshFinancialPeriod, 60_000)
   if (!authUser.value) return
 
-  try {
-    await workspaceStore.load(authUser.value)
-    workspacesReady.value = true
-    syncWorkspaceFromRoute()
-  } catch {
-    $q.notify({ type: 'negative', message: t('workspace.errors.load'), position: 'top' })
-  }
+  await loadWorkspaces()
 })
 
+onBeforeUnmount(() => clearInterval(periodTimer))
+
 watch(() => route.fullPath, syncWorkspaceFromRoute)
+watch(authUser, handleAuthChange)
+
+async function handleAuthChange(user, previousUser) {
+  if (!user) {
+    resetApplicationState()
+    if (!loggingOut.value && route.meta.requiresAuth) await router.replace({ name: 'login' })
+    return
+  }
+
+  if (previousUser?.uid !== user.uid) {
+    if (previousUser?.uid) resetApplicationState()
+    await loadWorkspaces()
+  }
+}
 
 function syncWorkspaceFromRoute() {
-  if (!workspacesReady.value) return
+  if (!workspaceStore.ready) return
 
   const workspaceId = route.params.workspaceId
   if (typeof workspaceId !== 'string') {
@@ -244,6 +272,16 @@ function syncWorkspaceFromRoute() {
   if (!workspaceExists) {
     financialYearsStore.stopWatching()
     router.replace({ name: 'home' })
+  }
+}
+
+async function loadWorkspaces(force = false) {
+  if (!authUser.value) return
+  try {
+    await workspaceStore.load(authUser.value, force)
+    syncWorkspaceFromRoute()
+  } catch {
+    return
   }
 }
 
@@ -274,19 +312,31 @@ async function logout() {
   loggingOut.value = true
 
   try {
-    assetsStore.reset()
-    expensesStore.reset()
-    expenseTrackingStore.reset()
-    liabilitiesStore.reset()
-    incomeStore.reset()
-    scopeStore.reset()
-    financialYearsStore.reset()
-    workspaceStore.reset()
     await signOut()
+    resetApplicationState()
     await router.replace({ name: 'login' })
   } finally {
     loggingOut.value = false
   }
+}
+
+function resetApplicationState() {
+  assetsStore.reset()
+  expensesStore.reset()
+  expenseTrackingStore.reset()
+  liabilitiesStore.reset()
+  incomeStore.reset()
+  scopeStore.reset()
+  financialYearsStore.reset()
+  workspaceStore.reset()
+}
+
+function refreshFinancialPeriod() {
+  financialPeriodKey.value = currentPeriodKey()
+}
+
+function currentPeriodKey() {
+  return `${currentFinancialYear()}-${currentFinancialMonth()}`
 }
 </script>
 

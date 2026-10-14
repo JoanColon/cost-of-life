@@ -4,7 +4,7 @@
       <div v-if="incomeStore.loading || financialYearsStore.loading" class="state">
         <q-spinner color="primary" size="2rem" /><span>{{ t('income.loading') }}</span>
       </div>
-      <section v-else-if="incomeStore.error || financialYearsStore.error" class="state">
+      <section v-else-if="incomeStore.error || financialYearError" class="state">
         <q-icon name="cloud_off" size="2rem" />
         <h1>{{ t('income.errors.loadTitle') }}</h1>
         <p>{{ t('income.errors.load') }}</p>
@@ -263,6 +263,9 @@ const enabledCategories = computed(() =>
   incomeCategories.filter((category) => incomeStore.enabledCategories.includes(category.id)),
 )
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const financialYearError = computed(() =>
+  financialYearsStore.errorFor(workspaceId.value, currentYear),
+)
 const total = computed(() =>
   financialYearValue(financialYear.value, 'income', selectedMemberId.value),
 )

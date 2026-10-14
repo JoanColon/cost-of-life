@@ -154,4 +154,39 @@ describe('financial year persistence', () => {
     expect(nextValue.writes[0].data.months['11'].assets.total).toBe(1700)
     expect(nextValue.writes[0].data.months['12'].assets.total).toBe(1800)
   })
+
+  it('treats a zero-valued item as an observed position', async () => {
+    const ownership = { mode: 'single', shares: [{ memberId: 'member-a', percentage: 100 }] }
+    const initial = createFirestore()
+    await rebuildFinancialYear(initial.firestore, 'workspace-a', 2026)
+
+    const zeroValue = createFirestore({
+      financialYear: initial.writes[0].data,
+      configs: { assets: { categories: { cash: { enabled: true } } } },
+      models: {
+        assets: [{ id: 'account', category: 'cash', currentValue: 0, ownership }],
+      },
+    })
+    await rebuildFinancialYear(zeroValue.firestore, 'workspace-a', 2026, {
+      sections: ['assets'],
+      positionMonth: '10',
+    })
+
+    expect(zeroValue.writes[0].data.projectionState.assetsInitializedMonth).toBe('10')
+
+    const laterValue = createFirestore({
+      financialYear: zeroValue.writes[0].data,
+      configs: { assets: { categories: { cash: { enabled: true } } } },
+      models: {
+        assets: [{ id: 'account', category: 'cash', currentValue: 1000, ownership }],
+      },
+    })
+    await rebuildFinancialYear(laterValue.firestore, 'workspace-a', 2026, {
+      sections: ['assets'],
+      positionMonth: '12',
+    })
+
+    expect(laterValue.writes[0].data.months['11'].assets.total).toBe(0)
+    expect(laterValue.writes[0].data.months['12'].assets.total).toBe(1000)
+  })
 })

@@ -3,6 +3,7 @@ import { expenseCategories } from '../../../src/config/expense-categories'
 import {
   defaultExpenseTrackingCategoryIds,
   expenseTrackingCategoryIds,
+  reviewExpenseTrackingCategories,
   trackingSubcategoryIdsForModelExpenses,
 } from '../../../src/config/expense-tracking-categories'
 import {
@@ -49,6 +50,26 @@ describe('expense tracking month', () => {
         { category: 'other', type: 'other', trackingEligible: true },
       ]),
     ).toEqual(['groceries'])
+  })
+
+  it('keeps stored historical categories visible after they leave the current model', () => {
+    const categories = reviewExpenseTrackingCategories(['groceries'], {
+      categories: {
+        health_insurance: { items: [item('historical', 80)] },
+      },
+    })
+
+    expect(categories.map(({ id }) => id)).toEqual(['groceries', 'health_insurance'])
+  })
+
+  it('keeps an archived explicit tracked zero visible without entries', () => {
+    const categories = reviewExpenseTrackingCategories([], {
+      reconciliation: {
+        health_insurance: { decision: 'tracked' },
+      },
+    })
+
+    expect(categories.map(({ id }) => id)).toEqual(['health_insurance'])
   })
 
   it('adds items and keeps category and month totals synchronized', () => {

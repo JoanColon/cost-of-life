@@ -37,20 +37,31 @@
               <strong>{{ workspace.name }}</strong>
               <small>{{ workspaceDescription(workspace) }}</small>
             </span>
-            <q-icon name="arrow_forward" class="workspace-arrow" />
           </button>
 
           <q-btn
             v-if="isWorkspaceOwner(workspace)"
             flat
             round
-            color="negative"
-            icon="delete_outline"
-            class="workspace-delete"
-            :aria-label="t('workspace.deleteAction', { name: workspace.name })"
-            @click="requestDelete(workspace)"
+            dense
+            color="grey-7"
+            icon="more_vert"
+            class="workspace-actions"
+            :aria-label="t('workspace.moreActions', { name: workspace.name })"
           >
-            <q-tooltip>{{ t('workspace.deleteAction', { name: workspace.name }) }}</q-tooltip>
+            <q-menu anchor="bottom right" self="top right">
+              <q-list dense class="workspace-menu">
+                <q-item
+                  clickable
+                  v-close-popup
+                  class="text-negative"
+                  @click="requestDelete(workspace)"
+                >
+                  <q-item-section avatar><q-icon name="delete_outline" /></q-item-section>
+                  <q-item-section>{{ t('common.delete') }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
           </q-btn>
         </article>
       </section>
@@ -237,7 +248,7 @@ h1 {
 
 .workspace-open {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
   min-width: 0;
@@ -250,8 +261,12 @@ h1 {
   cursor: pointer;
 }
 
-.workspace-delete {
+.workspace-actions {
   margin-right: 0.75rem;
+}
+
+.workspace-menu {
+  min-width: 10rem;
 }
 
 .workspace-icon {
@@ -277,11 +292,6 @@ h1 {
 .workspace-copy small {
   margin-top: 0.25rem;
   color: var(--color-copy);
-}
-
-.workspace-arrow {
-  color: var(--color-copy);
-  font-size: 1.25rem;
 }
 
 .confirm-card {

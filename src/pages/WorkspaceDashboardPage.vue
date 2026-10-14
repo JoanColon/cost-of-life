@@ -77,12 +77,15 @@ const selectedMemberId = computed({
 })
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const historyPoints = computed(() =>
-  buildNetWorthSeries([
-    ...historyDocuments.value.filter(
-      (document) => Number(document.year || document.id) !== currentYear,
-    ),
-    ...(financialYear.value ? [financialYear.value] : []),
-  ]),
+  buildNetWorthSeries(
+    [
+      ...historyDocuments.value.filter(
+        (document) => Number(document.year || document.id) !== currentYear,
+      ),
+      ...(financialYear.value ? [financialYear.value] : []),
+    ],
+    { throughPeriod: `${currentYear}-${currentMonth}` },
+  ),
 )
 
 const dashboardData = computed(() => {

@@ -7,9 +7,15 @@ import {
   monthlyExpenseValue,
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
+  selectableExpenseFrequencies,
+  updateMonthlyExpenseAmounts,
 } from '../../../src/domain/financial/expense-calculations'
 
 describe('expense calculations', () => {
+  it('allows irregular annual estimates in the expense form', () => {
+    expect(selectableExpenseFrequencies).toContain('irregular')
+  })
+
   it.each([
     ['weekly', 100, 5200],
     ['monthly', 100, 1200],
@@ -66,6 +72,36 @@ describe('expense calculations', () => {
         'october',
       ),
     ).toBe(425)
+  })
+
+  it('updates baseline months without losing manual monthly exceptions', () => {
+    const monthlyAmounts = generateMonthlyExpenseAmounts({ amount: 500, frequency: 'monthly' })
+    monthlyAmounts.august = 800
+
+    const updated = updateMonthlyExpenseAmounts(
+      monthlyAmounts,
+      { amount: 500, frequency: 'monthly' },
+      { amount: 550, frequency: 'monthly' },
+    )
+
+    expect(updated.july).toBe(550)
+    expect(updated.august).toBe(800)
+    expect(updated.september).toBe(550)
+  })
+
+  it('preserves exceptions when the baseline frequency changes', () => {
+    const monthlyAmounts = generateMonthlyExpenseAmounts({ amount: 300, frequency: 'quarterly' })
+    monthlyAmounts.february = 75
+
+    const updated = updateMonthlyExpenseAmounts(
+      monthlyAmounts,
+      { amount: 300, frequency: 'quarterly' },
+      { amount: 100, frequency: 'monthly' },
+    )
+
+    expect(updated.january).toBe(100)
+    expect(updated.february).toBe(75)
+    expect(updated.march).toBe(100)
   })
 
   it.each([

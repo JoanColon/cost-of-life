@@ -45,4 +45,25 @@ describe('financial history series', () => {
   it('returns an empty series without history', () => {
     expect(buildNetWorthSeries()).toEqual([])
   })
+
+  it('excludes projected months after the requested history period', () => {
+    expect(
+      buildNetWorthSeries(
+        [
+          {
+            year: 2026,
+            months: {
+              '09': { netWorth: 90 },
+              10: { netWorth: 100 },
+              11: { netWorth: 110 },
+            },
+          },
+        ],
+        { throughPeriod: '2026-10' },
+      ),
+    ).toEqual([
+      { period: '2026-09', value: 90 },
+      { period: '2026-10', value: 100 },
+    ])
+  })
 })

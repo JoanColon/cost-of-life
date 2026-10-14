@@ -10,7 +10,13 @@ const expenseFrequencies = [
   'irregular',
 ]
 
-export const selectableExpenseFrequencies = ['monthly', 'every_two_months', 'quarterly', 'yearly']
+export const selectableExpenseFrequencies = [
+  'monthly',
+  'every_two_months',
+  'quarterly',
+  'yearly',
+  'irregular',
+]
 
 export const expenseVariabilities = ['fixed', 'variable']
 export const expenseRecurrences = ['recurring', 'occasional']
@@ -56,6 +62,21 @@ export function generateMonthlyExpenseAmounts(estimate) {
 
   return Object.fromEntries(
     incomeMonths.map((month, index) => [month, index % interval === 0 ? normalized.amount : 0]),
+  )
+}
+
+export function updateMonthlyExpenseAmounts(amounts, previousEstimate, nextEstimate) {
+  const current = normalizeMonthlyExpenseAmounts(amounts)
+  const previousBaseline = generateMonthlyExpenseAmounts(previousEstimate)
+  const nextBaseline = generateMonthlyExpenseAmounts(nextEstimate)
+  if (!nextBaseline) return null
+  if (!current || !previousBaseline) return nextBaseline
+
+  return Object.fromEntries(
+    incomeMonths.map((month) => [
+      month,
+      current[month] === previousBaseline[month] ? nextBaseline[month] : current[month],
+    ]),
   )
 }
 

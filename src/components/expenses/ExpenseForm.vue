@@ -217,6 +217,7 @@ import {
   normalizeExpenseEstimate,
   normalizeMonthlyExpenseAmounts,
   selectableExpenseFrequencies,
+  updateMonthlyExpenseAmounts,
 } from '@/domain/financial/expense-calculations'
 import { incomeMonths } from '@/domain/financial/income-calculations'
 import { normalizeMoney } from '@/domain/financial/money'
@@ -248,6 +249,7 @@ const necessity = ref(null)
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const monthlyAmounts = ref(null)
+let seeding = false
 
 const option = (namespace) => (value) => ({ value, label: t(`expenses.${namespace}.${value}`) })
 const frequencyOptions = computed(() => selectableExpenseFrequencies.map(option('frequencies')))
@@ -293,14 +295,20 @@ const formValid = computed(
 
 watch(
   [amount, frequency],
-  () => {
-    monthlyAmounts.value = generateMonthlyExpenseAmounts(normalizedEstimate.value)
+  ([nextAmount, nextFrequency], [previousAmount, previousFrequency]) => {
+    if (seeding) return
+    monthlyAmounts.value = updateMonthlyExpenseAmounts(
+      monthlyAmounts.value,
+      { amount: previousAmount, frequency: previousFrequency },
+      { amount: nextAmount, frequency: nextFrequency },
+    )
   },
   { flush: 'sync' },
 )
 watch(() => [props.expense, props.defaults], seed, { immediate: true, deep: true })
 
 function seed() {
+  seeding = true
   const initial = props.expense || props.defaults || {}
   expenseType.value = initial.type || (props.expense ? 'other' : null)
   name.value = initial.name || ''
@@ -319,6 +327,7 @@ function seed() {
     ownership.value,
     props.members.map((member) => member.id),
   )
+  seeding = false
 }
 
 function monthAmount(month) {

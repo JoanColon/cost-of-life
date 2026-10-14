@@ -218,10 +218,20 @@ function dateTimestamp(value, period) {
 }
 
 async function getTrackingEligibleSubcategories(workspaceId) {
-  const snapshot = await getDocs(
-    query(modelExpensesRef(workspaceId), where('trackingEligible', '==', true)),
+  const [snapshot, expenseConfig] = await Promise.all([
+    getDocs(query(modelExpensesRef(workspaceId), where('trackingEligible', '==', true))),
+    getModelConfig(workspaceId, 'expenses'),
+  ])
+  const enabledCategories = new Set(
+    Object.entries(expenseConfig.categories || {})
+      .filter(([, category]) => category.enabled)
+      .map(([categoryId]) => categoryId),
   )
-  return trackingSubcategoryIdsForModelExpenses(snapshot.docs.map((document) => document.data()))
+  return trackingSubcategoryIdsForModelExpenses(
+    snapshot.docs
+      .map((document) => document.data())
+      .filter((expense) => enabledCategories.has(expense.category)),
+  )
 }
 
 function normalizeEnabledCategories(

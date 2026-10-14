@@ -143,6 +143,13 @@ Derived values must not be persisted as a second source of truth. Historical
 snapshots are an intentional exception because they preserve past calculated
 state.
 
+For the current implementation, `financialYears` has two deliberate roles.
+Previous years are closed history. The current year is the active annual model:
+changing a base income or expense updates all twelve months, while the monthly
+table stores explicit month-specific exceptions. Expense Tracker entries and
+reconciliations remain separate period data and must stay consultable even when
+the active model changes.
+
 ### 3.4 Prevent financial double counting
 
 The domain model must distinguish:

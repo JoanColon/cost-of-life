@@ -1,4 +1,4 @@
-export function buildNetWorthSeries(historyDocuments = []) {
+export function buildNetWorthSeries(historyDocuments = [], { throughPeriod = null } = {}) {
   return historyDocuments
     .flatMap((history) => {
       const year = Number(history.year || history.id)
@@ -9,6 +9,11 @@ export function buildNetWorthSeries(historyDocuments = []) {
         value: projection?.netWorth == null ? Number.NaN : Number(projection.netWorth),
       }))
     })
-    .filter(({ period, value }) => /^\d{4}-(0[1-9]|1[0-2])$/.test(period) && Number.isFinite(value))
+    .filter(
+      ({ period, value }) =>
+        /^\d{4}-(0[1-9]|1[0-2])$/.test(period) &&
+        Number.isFinite(value) &&
+        (!throughPeriod || period <= throughPeriod),
+    )
     .sort((first, second) => first.period.localeCompare(second.period))
 }

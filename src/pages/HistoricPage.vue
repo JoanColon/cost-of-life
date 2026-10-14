@@ -100,7 +100,7 @@ const latestNetWorth = computed(() => {
   return month ? Number(month[1].netWorth) : null
 })
 const loading = computed(() => financialYearsStore.loading)
-const error = computed(() => financialYearsStore.error)
+const error = computed(() => financialYearsStore.errorFor(workspaceId.value, selectedYear.value))
 
 watch([workspaceId, selectedYear], load, { immediate: true })
 

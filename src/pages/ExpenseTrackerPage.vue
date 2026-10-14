@@ -133,7 +133,7 @@
           </div>
 
           <div class="review-groups">
-            <section v-for="group in trackGroups" :key="group.id" class="review-group">
+            <section v-for="group in reviewGroups" :key="group.id" class="review-group">
               <h2><q-icon :name="group.icon" /> {{ t(group.nameKey) }}</h2>
               <article
                 v-for="subcategory in group.subcategories"
@@ -174,7 +174,11 @@
                     toggle-color="primary"
                     color="white"
                     text-color="grey-8"
-                    :disable="decisionSaving || decisionSavingIds.has(subcategory.id)"
+                    :disable="
+                      !isCurrentlyAvailable(subcategory.id) ||
+                      decisionSaving ||
+                      decisionSavingIds.has(subcategory.id)
+                    "
                     :options="decisionOptions"
                     @update:model-value="setDecision(subcategory, $event)"
                   />
@@ -230,7 +234,7 @@
                 }}<template v-if="item.notes"> · {{ item.notes }}</template></small
               >
             </div>
-            <div class="item-actions">
+            <div v-if="canMutateActiveSubcategory" class="item-actions">
               <q-btn
                 flat
                 round
@@ -255,7 +259,7 @@
             {{ t('expenseTracker.review.noItems') }}
           </div>
         </q-card-section>
-        <q-card-actions align="right">
+        <q-card-actions v-if="canMutateActiveSubcategory" align="right">
           <q-btn
             unelevated
             no-caps
@@ -300,9 +304,10 @@ import ExpenseTrackingEntryDialog from '@/components/expenses/ExpenseTrackingEnt
 import {
   expenseTrackingCategories,
   groupedExpenseTrackingCategories,
+  reviewExpenseTrackingCategories,
 } from '@/config/expense-tracking-categories'
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
-import { currentFinancialYear, FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
+import { FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
 import { normalizeMoney } from '@/domain/financial/money'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
@@ -347,6 +352,15 @@ const availableCategories = computed(() => {
   return expenseTrackingCategories.filter(({ id }) => available.has(id))
 })
 const trackGroups = computed(() => groupedExpenseTrackingCategories(enabledCategories.value))
+const reviewGroups = computed(() =>
+  groupedExpenseTrackingCategories(
+    reviewExpenseTrackingCategories(
+      enabledCategories.value.map(({ id }) => id),
+      trackingStore.month,
+    ),
+  ),
+)
+const canMutateActiveSubcategory = computed(() => isCurrentlyAvailable(activeSubcategory.value?.id))
 const categoriesWithTrackedItems = computed(() =>
   enabledCategories.value.filter(({ id }) => trackingStore.itemsFor(id).length),
 )
@@ -406,7 +420,7 @@ async function loadPage(force = false) {
 }
 
 function openAdd(subcategory, fromItems = false) {
-  if (!subcategory) return
+  if (!subcategory || !isCurrentlyAvailable(subcategory.id)) return
   activeSubcategory.value = subcategory
   editingItem.value = null
   if (fromItems) itemsDialog.value = false
@@ -414,9 +428,14 @@ function openAdd(subcategory, fromItems = false) {
 }
 
 function openEdit(item) {
+  if (!canMutateActiveSubcategory.value) return
   editingItem.value = item
   itemsDialog.value = false
   entryDialog.value = true
+}
+
+function isCurrentlyAvailable(subcategoryId) {
+  return trackingStore.availableSubcategories.includes(subcategoryId)
 }
 
 function openItems(subcategory) {
@@ -472,9 +491,8 @@ async function deleteEntry() {
 }
 
 async function savePreferences(selected) {
-  const saved = await persist(
-    () => trackingStore.savePreferences(activeWorkspaceId.value, selected),
-    false,
+  const saved = await persist(() =>
+    trackingStore.savePreferences(activeWorkspaceId.value, selected),
   )
   if (saved) manageDialog.value = false
 }
@@ -503,11 +521,12 @@ function reconciliationFor(subcategoryId) {
 }
 
 function resolvedValue(subcategory) {
-  const hasActual = trackingStore.itemsFor(subcategory.id).length > 0
+  const decision = reconciliationFor(subcategory.id)?.decision
+  const hasActual = trackingStore.itemsFor(subcategory.id).length > 0 || decision === 'tracked'
   return resolveExpenseTrackingValue(
     currentModelValue(subcategory),
     hasActual ? trackingStore.totalFor(subcategory.id) : null,
-    reconciliationFor(subcategory.id)?.decision,
+    decision,
   )
 }
 
@@ -520,7 +539,6 @@ async function setDecision(subcategory, decision) {
       subcategory.id,
       decision,
     )
-    await syncHistoricalProjection()
     $q.notify({ type: 'positive', message: t('expenseTracker.sourceUpdated'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.sourceSave'), position: 'top' })
@@ -546,7 +564,6 @@ async function setGlobalDecision(decision) {
       subcategoryIds,
       decision,
     )
-    await syncHistoricalProjection()
     $q.notify({ type: 'positive', message: t('expenseTracker.sourcesUpdated'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.sourceSave'), position: 'top' })
@@ -560,10 +577,9 @@ function formatItemDate(value) {
   return new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(date)
 }
 
-async function persist(operation, syncProjection = true, notify = true) {
+async function persist(operation, notify = true) {
   try {
     await operation()
-    if (syncProjection) await syncHistoricalProjection()
     if (notify) {
       $q.notify({ type: 'positive', message: t('expenseTracker.saved'), position: 'top' })
     }
@@ -572,11 +588,6 @@ async function persist(operation, syncProjection = true, notify = true) {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.save'), position: 'top' })
     return false
   }
-}
-
-async function syncHistoricalProjection() {
-  if (selectedYear.value === currentFinancialYear()) return
-  await financialYearsStore.refreshTracking(activeWorkspaceId.value, period.value)
 }
 
 function currentPeriod() {

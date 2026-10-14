@@ -6,7 +6,7 @@
         <span>{{ t('expenses.loading') }}</span>
       </div>
 
-      <section v-else-if="expensesStore.error || financialYearsStore.error" class="state">
+      <section v-else-if="expensesStore.error || financialYearError" class="state">
         <q-icon name="cloud_off" size="2rem" />
         <h1>{{ t('expenses.errors.loadTitle') }}</h1>
         <p>{{ t('expenses.errors.load') }}</p>
@@ -162,9 +162,29 @@
           edit-mode
           :initial-selected="expensesStore.enabledCategories"
           :saving="saving"
-          @save="saveCategorySelection"
+          @save="requestCategorySave"
           @cancel="editingCategories = false"
         />
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="confirmDisable">
+      <q-card class="confirm-card">
+        <q-card-section>
+          <h2>{{ t('expenses.setup.disableTitle') }}</h2>
+          <p>{{ t('expenses.setup.disableDescription') }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            :label="t('expenses.setup.disableAction')"
+            :loading="saving"
+            @click="savePendingCategories"
+          />
+        </q-card-actions>
       </q-card>
     </q-dialog>
 
@@ -232,6 +252,7 @@ import SimpleExpenseEstimateEditor from '@/components/expenses/SimpleExpenseEsti
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { expenseCategories } from '@/config/expense-categories'
+import { annualMonthlyExpenseValue } from '@/domain/financial/expense-calculations'
 import {
   currentFinancialYear,
   financialYearCategoryItemCount,
@@ -257,6 +278,8 @@ const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
 const editingCategories = ref(false)
+const confirmDisable = ref(false)
+const pendingSelection = ref(null)
 const ownershipDialog = ref(false)
 const editingOwnershipCategoryId = ref(null)
 const editingOwnership = ref({ mode: 'single', shares: [] })
@@ -285,6 +308,9 @@ const enabledCategories = computed(() =>
   expenseCategories.filter((category) => expensesStore.config?.categories?.[category.id]?.enabled),
 )
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const financialYearError = computed(() =>
+  financialYearsStore.errorFor(workspaceId.value, currentYear),
+)
 const totals = computed(() => ({
   annualCostOfLife: financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
   monthlyCostOfLife:
@@ -377,11 +403,37 @@ async function completeSetup(selected) {
   await runSaving(() => expensesStore.completeSetup(workspaceId.value, selected, memberIds.value))
 }
 
+function requestCategorySave(selected) {
+  const removedWithData = expensesStore.enabledCategories.some(
+    (categoryId) => !selected.includes(categoryId) && categoryHasData(categoryId),
+  )
+  if (removedWithData) {
+    pendingSelection.value = selected
+    confirmDisable.value = true
+    return
+  }
+  saveCategorySelection(selected)
+}
+
+async function savePendingCategories() {
+  confirmDisable.value = false
+  await saveCategorySelection(pendingSelection.value)
+  pendingSelection.value = null
+}
+
 async function saveCategorySelection(selected) {
   const saved = await runSaving(() =>
     expensesStore.saveCategorySelection(workspaceId.value, selected, memberIds.value),
   )
   if (saved) editingCategories.value = false
+}
+
+function categoryHasData(categoryId) {
+  const category = categoryConfig(categoryId)
+  return (
+    categoryItemCount(categoryId) > 0 ||
+    Number(annualMonthlyExpenseValue(category?.monthlyAmounts, category?.manualEstimate)) > 0
+  )
 }
 
 async function saveEstimate(categoryId, estimate) {

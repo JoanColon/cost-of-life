@@ -9,18 +9,24 @@ import {
 export const useWorkspaceStore = defineStore('workspace', () => {
   const workspaces = ref([])
   const loading = ref(false)
+  const error = ref(null)
   const initializedForUserId = ref(null)
 
   const hasWorkspaces = computed(() => workspaces.value.length > 0)
+  const ready = computed(() => initializedForUserId.value !== null)
 
-  async function load(user) {
-    if (!user?.uid || initializedForUserId.value === user.uid) return
+  async function load(user, force = false) {
+    if (!user?.uid || (!force && initializedForUserId.value === user.uid)) return
 
     loading.value = true
+    error.value = null
 
     try {
       workspaces.value = await getUserWorkspaces()
       initializedForUserId.value = user.uid
+    } catch (loadError) {
+      error.value = loadError
+      throw loadError
     } finally {
       loading.value = false
     }
@@ -40,13 +46,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   function reset() {
     workspaces.value = []
+    error.value = null
     initializedForUserId.value = null
   }
 
   return {
     workspaces,
     hasWorkspaces,
+    ready,
     loading,
+    error,
     load,
     create,
     deleteWorkspace,

@@ -89,6 +89,7 @@ export default {
     create: 'Create workspace',
     created: 'Financial workspace created.',
     deleted: 'Financial workspace deleted.',
+    moreActions: 'More actions for {name}',
     deleteAction: 'Delete {name}',
     pendingInvite: 'The email has been saved as a pending invitation.',
     delete: {
@@ -605,6 +606,10 @@ export default {
       editTitle: 'Choose expense categories',
       description:
         'Select the areas you want to estimate. You can start with one total per category and add detail later.',
+      disableTitle: 'Hide categories with existing expenses?',
+      disableDescription:
+        'Their estimates and expenses will be preserved, but they will no longer contribute to your Cost of Life while hidden.',
+      disableAction: 'Hide categories',
     },
     quickEdit: {
       title: 'Category estimate',

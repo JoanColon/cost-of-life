@@ -13,22 +13,6 @@ const ensureFinancialYear = onCall({ region: 'europe-west1' }, async (request) =
   return handleFinancialYearRequest(request)
 })
 
-const refreshFinancialYearTracking = onCall({ region: 'europe-west1' }, async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
-  const workspaceId = String(request.data?.workspaceId || '')
-  const period = String(request.data?.period || '')
-  const firestore = getFirestore()
-  const workspace = await firestore.collection('workspaces').doc(workspaceId).get()
-  if (
-    !workspace.exists ||
-    workspace.data()?.deletionPendingAt ||
-    !workspace.data()?.memberIds?.includes(request.auth.uid)
-  ) {
-    throw new HttpsError('permission-denied', 'Workspace membership is required')
-  }
-  return refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
-})
-
 async function handleFinancialYearRequest(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
   const workspaceId = String(request.data?.workspaceId || '')
@@ -85,10 +69,8 @@ const onLiabilityModelWritten = onDocumentWritten(
 const onExpenseTrackingWritten = onDocumentWritten(
   { ...options, document: 'workspaces/{workspaceId}/expenseTracking/{period}' },
   async (event) => {
-    const year = Number(String(event.params.period).slice(0, 4))
-    if (!Number.isInteger(year) || year !== currentYear()) return
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(event.params.period))) return
     const firestore = getFirestore()
-    if (!(await workspaceIsActive(firestore, event.params.workspaceId))) return
     await refreshFinancialYearTrackingMonth(
       firestore,
       event.params.workspaceId,
@@ -98,14 +80,7 @@ const onExpenseTrackingWritten = onDocumentWritten(
 )
 
 async function rebuildCurrent(workspaceId, sections) {
-  const firestore = getFirestore()
-  if (!(await workspaceIsActive(firestore, workspaceId))) return
-  await rebuildFinancialYear(firestore, workspaceId, currentYear(), { sections })
-}
-
-async function workspaceIsActive(firestore, workspaceId) {
-  const workspace = await firestore.collection('workspaces').doc(workspaceId).get()
-  return workspace.exists && !workspace.data()?.deletionPendingAt
+  await rebuildFinancialYear(getFirestore(), workspaceId, currentYear(), { sections })
 }
 
 module.exports = {
@@ -116,5 +91,4 @@ module.exports = {
   onIncomeModelWritten,
   onLiabilityModelWritten,
   onModelConfigWritten,
-  refreshFinancialYearTracking,
 }

@@ -56,6 +56,19 @@ export function groupedExpenseTrackingCategories(subcategories = expenseTracking
   }, [])
 }
 
+export function reviewExpenseTrackingCategories(currentSubcategoryIds = [], trackingMonth = null) {
+  const visible = new Set(currentSubcategoryIds)
+  for (const [subcategoryId, category] of Object.entries(trackingMonth?.categories || {})) {
+    if (category?.items?.length) visible.add(subcategoryId)
+  }
+  for (const [subcategoryId, reconciliation] of Object.entries(
+    trackingMonth?.reconciliation || {},
+  )) {
+    if (reconciliation?.decision === 'tracked') visible.add(subcategoryId)
+  }
+  return expenseTrackingCategories.filter(({ id }) => visible.has(id))
+}
+
 function quickAmountsFor(id) {
   return (
     {

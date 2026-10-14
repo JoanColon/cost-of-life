@@ -105,14 +105,14 @@ function updateFinancialYearProjection(
   if (
     affected.has('assets') &&
     !projectionState.assetsInitializedMonth &&
-    hasPositionValue(config.assets, assets, 'currentValue')
+    hasPositionValue(config.assets, assets)
   ) {
     projectionState.assetsInitializedMonth = positionObservedMonth
   }
   if (
     affected.has('liabilities') &&
     !projectionState.liabilitiesInitializedMonth &&
-    hasPositionValue(config.liabilities, liabilities, 'balance')
+    hasPositionValue(config.liabilities, liabilities)
   ) {
     projectionState.liabilitiesInitializedMonth = positionObservedMonth
   }
@@ -127,8 +127,8 @@ function updateFinancialYearProjection(
   }
 }
 
-function hasPositionValue(config, items, valueField) {
-  if (items.some((item) => Number(item[valueField]) > 0)) return true
+function hasPositionValue(config, items) {
+  if (items.some((item) => config?.categories?.[item.category]?.enabled)) return true
   return Object.values(config?.categories || {}).some(
     (category) => category?.enabled && Number(category.manualValue) > 0,
   )
