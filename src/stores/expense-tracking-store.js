@@ -45,45 +45,35 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
     }
   }
 
-  async function savePreferences(workspaceId, categoryIds, userId) {
+  async function savePreferences(workspaceId, categoryIds) {
     saving.value = true
     try {
-      enabledSubcategories.value = await saveExpenseTrackingPreferences(
-        workspaceId,
-        categoryIds,
-        userId,
-      )
+      enabledSubcategories.value = await saveExpenseTrackingPreferences(workspaceId, categoryIds)
     } finally {
       saving.value = false
     }
   }
 
-  async function add(workspaceId, period, subcategoryId, input, userId, memberIds) {
+  async function add(workspaceId, period, subcategoryId, input, memberIds) {
+    await mutate(() => createTrackedExpense(workspaceId, period, subcategoryId, input, memberIds))
+  }
+
+  async function edit(workspaceId, period, subcategoryId, itemId, input, memberIds) {
     await mutate(() =>
-      createTrackedExpense(workspaceId, period, subcategoryId, input, userId, memberIds),
+      updateTrackedExpense(workspaceId, period, subcategoryId, itemId, input, memberIds),
     )
   }
 
-  async function edit(workspaceId, period, subcategoryId, itemId, input, userId, memberIds) {
-    await mutate(() =>
-      updateTrackedExpense(workspaceId, period, subcategoryId, itemId, input, userId, memberIds),
-    )
+  async function remove(workspaceId, period, subcategoryId, itemId) {
+    await mutate(() => removeTrackedExpense(workspaceId, period, subcategoryId, itemId))
   }
 
-  async function remove(workspaceId, period, subcategoryId, itemId, userId) {
-    await mutate(() => removeTrackedExpense(workspaceId, period, subcategoryId, itemId, userId))
+  async function saveReconciliation(workspaceId, period, subcategoryId, decision) {
+    await mutate(() => saveTrackingReconciliation(workspaceId, period, subcategoryId, decision))
   }
 
-  async function saveReconciliation(workspaceId, period, subcategoryId, decision, userId) {
-    await mutate(() =>
-      saveTrackingReconciliation(workspaceId, period, subcategoryId, decision, userId),
-    )
-  }
-
-  async function saveReconciliations(workspaceId, period, subcategoryIds, decision, userId) {
-    await mutate(() =>
-      saveTrackingReconciliations(workspaceId, period, subcategoryIds, decision, userId),
-    )
+  async function saveReconciliations(workspaceId, period, subcategoryIds, decision) {
+    await mutate(() => saveTrackingReconciliations(workspaceId, period, subcategoryIds, decision))
   }
 
   function itemsFor(subcategoryId) {

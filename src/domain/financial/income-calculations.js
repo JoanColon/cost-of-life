@@ -15,7 +15,7 @@ export const incomeMonths = [
   'november',
   'december',
 ]
-export const incomeCalculationModes = ['annual_salary', 'monthly_schedule', 'recurring', 'one_time']
+const incomeCalculationModes = ['annual_salary', 'monthly_schedule', 'recurring', 'one_time']
 
 const frequencyMultipliers = {
   weekly: 52,

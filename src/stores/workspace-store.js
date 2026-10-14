@@ -1,16 +1,16 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { createFinancialWorkspace, getUserWorkspaces } from '@/services/firebase/workspace.service'
+import {
+  createWorkspace,
+  deleteWorkspace as deleteWorkspaceDocument,
+  getUserWorkspaces,
+} from '@/services/firebase/workspace.service'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const workspaces = ref([])
-  const currentWorkspaceId = ref(null)
   const loading = ref(false)
   const initializedForUserId = ref(null)
 
-  const currentWorkspace = computed(
-    () => workspaces.value.find((workspace) => workspace.id === currentWorkspaceId.value) || null,
-  )
   const hasWorkspaces = computed(() => workspaces.value.length > 0)
 
   async function load(user) {
@@ -19,59 +19,37 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     loading.value = true
 
     try {
-      workspaces.value = await getUserWorkspaces(user)
+      workspaces.value = await getUserWorkspaces()
       initializedForUserId.value = user.uid
-
-      const storedWorkspaceId = localStorage.getItem(storageKey(user.uid))
-      const storedWorkspaceExists = workspaces.value.some(
-        (workspace) => workspace.id === storedWorkspaceId,
-      )
-
-      select(storedWorkspaceExists ? storedWorkspaceId : workspaces.value[0]?.id || null, user.uid)
     } finally {
       loading.value = false
     }
   }
 
   async function create(payload) {
-    const workspace = await createFinancialWorkspace(payload)
+    const workspace = await createWorkspace(payload)
     workspaces.value.push(workspace)
-    initializedForUserId.value = payload.user.uid
-    select(workspace.id, payload.user.uid)
+    initializedForUserId.value = workspace.createdBy
     return workspace
   }
 
-  function select(workspaceId, userId = initializedForUserId.value) {
-    currentWorkspaceId.value = workspaceId
-
-    if (!userId) return
-
-    if (workspaceId) {
-      localStorage.setItem(storageKey(userId), workspaceId)
-    } else {
-      localStorage.removeItem(storageKey(userId))
-    }
+  async function deleteWorkspace(workspaceId) {
+    await deleteWorkspaceDocument(workspaceId)
+    workspaces.value = workspaces.value.filter((workspace) => workspace.id !== workspaceId)
   }
 
   function reset() {
     workspaces.value = []
-    currentWorkspaceId.value = null
     initializedForUserId.value = null
-  }
-
-  function storageKey(userId) {
-    return `cost-of-life:workspace:${userId}`
   }
 
   return {
     workspaces,
-    currentWorkspaceId,
-    currentWorkspace,
     hasWorkspaces,
     loading,
     load,
     create,
-    select,
+    deleteWorkspace,
     reset,
   }
 })

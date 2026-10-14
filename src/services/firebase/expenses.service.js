@@ -12,7 +12,6 @@ import {
 import { db } from '@/firebase/firebase'
 import { getExpenseCategory } from '@/config/expense-categories'
 import {
-  annualMonthlyExpenseValue,
   annualExpenseValue,
   generateMonthlyExpenseAmounts,
   normalizeExpenseAttributes,
@@ -20,16 +19,9 @@ import {
   normalizeMonthlyExpenseAmounts,
 } from '@/domain/financial/expense-calculations'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
-import {
-  canonicalCategories,
-  hydrateModelConfigWithBaselines,
-} from '@/domain/financial/model-categories'
-import {
-  MODEL_BASELINE_KIND,
-  isModelBaseline,
-  modelBaselineId,
-} from '@/domain/financial/model-baseline'
-import { ensureModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
+import { canonicalCategories } from '@/domain/financial/model-categories'
+import { currentUserId } from '@/services/firebase/current-user'
+import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
 function configRef(workspaceId) {
   return modelConfigRef(workspaceId, 'expenses')
@@ -40,41 +32,28 @@ function modelExpensesRef(workspaceId) {
 }
 
 export async function getExpensesConfig(workspaceId) {
-  const [config, baselineSnapshot] = await Promise.all([
-    ensureModelConfig(workspaceId, 'expenses'),
-    getDocs(query(modelExpensesRef(workspaceId), where('kind', '==', MODEL_BASELINE_KIND))),
-  ])
-  const baselines = baselineSnapshot.docs.map((document) => ({
-    id: document.id,
-    ...document.data(),
-  }))
-  const hydratedConfig = hydrateModelConfigWithBaselines(config, baselines, (baseline) => ({
-    manualEstimate: baseline.estimate,
-    monthlyAmounts: baseline.monthlyAmounts,
-    manualValue: expenseAnnualValue(baseline),
-    ownership: baseline.ownership,
-    necessity: baseline.necessity ?? null,
-  }))
-  return { config: hydratedConfig, expenses: [] }
+  return getModelConfig(workspaceId, 'expenses')
 }
 
 export async function getCategoryExpenses(workspaceId, categoryId) {
   const snapshot = await getDocs(
     query(modelExpensesRef(workspaceId), where('category', '==', categoryId)),
   )
-  return snapshot.docs
-    .map((expenseDocument) => ({ id: expenseDocument.id, ...expenseDocument.data() }))
-    .filter((expense) => !isModelBaseline(expense))
+  return snapshot.docs.map((expenseDocument) => ({
+    id: expenseDocument.id,
+    ...expenseDocument.data(),
+  }))
 }
 
-export async function saveExpensesSetup(workspaceId, categories, userId) {
+export async function saveExpensesSetup(workspaceId, categories) {
+  const userId = currentUserId()
   const batch = writeBatch(db)
   batch.set(
     configRef(workspaceId),
     {
       schemaVersion: 1,
       setupCompleted: true,
-      categories: stampCategories(canonicalExpenseCategories(categories), userId),
+      categories: canonicalExpenseCategories(categories),
       createdAt: serverTimestamp(),
       createdBy: userId,
       updatedAt: serverTimestamp(),
@@ -82,17 +61,17 @@ export async function saveExpensesSetup(workspaceId, categories, userId) {
     },
     { merge: true },
   )
-  setExpenseBaselines(batch, workspaceId, categories, userId)
   await batch.commit()
 }
 
-export async function updateExpensesCategories(workspaceId, categories, userId) {
+export async function updateExpensesCategories(workspaceId, categories) {
+  const userId = currentUserId()
   const batch = writeBatch(db)
   batch.set(
     configRef(workspaceId),
     {
       setupCompleted: true,
-      categories: stampCategories(canonicalExpenseCategories(categories), userId),
+      categories: canonicalExpenseCategories(categories),
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     },
@@ -101,74 +80,56 @@ export async function updateExpensesCategories(workspaceId, categories, userId) 
   await batch.commit()
 }
 
-export async function updateSimpleExpenseEstimate(workspaceId, categoryId, estimate, userId) {
-  await ensureModelConfig(workspaceId, 'expenses')
+export async function updateSimpleExpenseEstimate(workspaceId, categoryId, estimate) {
+  const userId = currentUserId()
   const normalizedEstimate = normalizeExpenseEstimate(estimate)
   if (!normalizedEstimate) throw new Error('A valid non-negative expense estimate is required')
   const manualValue = annualExpenseValue(normalizedEstimate)
   const documentRef = configRef(workspaceId)
-  const baselineRef = doc(modelExpensesRef(workspaceId), modelBaselineId(categoryId))
 
   return runTransaction(db, async (transaction) => {
-    const [snapshot, baselineSnapshot] = await Promise.all([
-      transaction.get(documentRef),
-      transaction.get(baselineRef),
-    ])
+    const snapshot = await transaction.get(documentRef)
     const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled || !baselineSnapshot.exists()) {
+    if (!category?.enabled) {
       throw new Error('Only simple expense categories can be edited directly')
     }
-    transaction.update(baselineRef, {
-      estimate: normalizedEstimate,
-      monthlyAmounts: generateMonthlyExpenseAmounts(normalizedEstimate),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-    return {
+    const updatedCategory = {
+      ...category,
       manualEstimate: normalizedEstimate,
       manualValue,
-      ownership: baselineSnapshot.data().ownership,
-      necessity: baselineSnapshot.data().necessity ?? null,
+      monthlyAmounts: generateMonthlyExpenseAmounts(normalizedEstimate),
     }
-  })
-}
-
-export async function updateSimpleExpenseOwnership(
-  workspaceId,
-  categoryId,
-  ownership,
-  userId,
-  memberIds,
-) {
-  await ensureModelConfig(workspaceId, 'expenses')
-  assertValidOwnership(ownership, memberIds)
-  const documentRef = configRef(workspaceId)
-  const baselineRef = doc(modelExpensesRef(workspaceId), modelBaselineId(categoryId))
-  return runTransaction(db, async (transaction) => {
-    const [snapshot, baselineSnapshot] = await Promise.all([
-      transaction.get(documentRef),
-      transaction.get(baselineRef),
-    ])
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled || !baselineSnapshot.exists()) {
-      throw new Error('Only simple expense category ownership can be edited')
-    }
-    transaction.update(baselineRef, {
-      ownership: cloneOwnership(ownership),
+    transaction.update(documentRef, {
+      [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
       updatedBy: userId,
     })
-    return {
-      manualEstimate: baselineSnapshot.data().estimate,
-      manualValue: expenseAnnualValue(baselineSnapshot.data()),
-      ownership: cloneOwnership(ownership),
-      necessity: baselineSnapshot.data().necessity ?? null,
-    }
+    return updatedCategory
   })
 }
 
-export async function createExpense(workspaceId, expense, userId, memberIds) {
-  await ensureModelConfig(workspaceId, 'expenses')
+export async function updateSimpleExpenseOwnership(workspaceId, categoryId, ownership, memberIds) {
+  const userId = currentUserId()
+  assertValidOwnership(ownership, memberIds)
+  const documentRef = configRef(workspaceId)
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(documentRef)
+    const category = snapshot.data()?.categories?.[categoryId]
+    if (!category?.enabled) {
+      throw new Error('Only simple expense category ownership can be edited')
+    }
+    const updatedCategory = { ...category, ownership: cloneOwnership(ownership) }
+    transaction.update(documentRef, {
+      [`categories.${categoryId}`]: updatedCategory,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId,
+    })
+    return updatedCategory
+  })
+}
+
+export async function createExpense(workspaceId, expense, memberIds) {
+  const userId = currentUserId()
   assertValidOwnership(expense.ownership, memberIds)
   const normalized = normalizeExpenseItem(expense)
   const itemRef =
@@ -203,8 +164,8 @@ export async function createExpense(workspaceId, expense, userId, memberIds) {
   })
 }
 
-export async function updateExpense(workspaceId, expenseId, changes, userId, memberIds) {
-  await ensureModelConfig(workspaceId, 'expenses')
+export async function updateExpense(workspaceId, expenseId, changes, memberIds) {
+  const userId = currentUserId()
   const itemRef = doc(modelExpensesRef(workspaceId), expenseId)
   const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
@@ -244,8 +205,7 @@ export async function updateExpense(workspaceId, expenseId, changes, userId, mem
   })
 }
 
-export async function removeExpense(workspaceId, expenseId) {
-  await ensureModelConfig(workspaceId, 'expenses')
+export async function deleteExpense(workspaceId, expenseId) {
   const itemRef = doc(modelExpensesRef(workspaceId), expenseId)
   const documentRef = configRef(workspaceId)
   return runTransaction(db, async (transaction) => {
@@ -265,7 +225,8 @@ export async function removeExpense(workspaceId, expenseId) {
   })
 }
 
-export async function removeExpenseCategory(workspaceId, categoryId, userId) {
+export async function deleteExpenseCategory(workspaceId, categoryId) {
+  const userId = currentUserId()
   const snapshot = await getDocs(
     query(modelExpensesRef(workspaceId), where('category', '==', categoryId)),
   )
@@ -273,17 +234,7 @@ export async function removeExpenseCategory(workspaceId, categoryId, userId) {
     throw new Error('Expense categories with more than 498 items cannot be deleted at once')
   }
   const batch = writeBatch(db)
-  snapshot.docs.forEach((expenseDocument) => {
-    if (isModelBaseline(expenseDocument.data())) {
-      const estimate = { amount: 0, frequency: 'monthly' }
-      batch.update(expenseDocument.ref, {
-        estimate,
-        monthlyAmounts: generateMonthlyExpenseAmounts(estimate),
-        updatedAt: serverTimestamp(),
-        updatedBy: userId,
-      })
-    } else batch.delete(expenseDocument.ref)
-  })
+  snapshot.docs.forEach((expenseDocument) => batch.delete(expenseDocument.ref))
   batch.update(configRef(workspaceId), {
     [`categories.${categoryId}`]: deleteField(),
     updatedAt: serverTimestamp(),
@@ -325,10 +276,6 @@ function standardExpenseDocumentId(expense) {
   return `${expense.category}--${expense.type}`
 }
 
-function expenseAnnualValue(expense) {
-  return annualMonthlyExpenseValue(expense.monthlyAmounts, expense.estimate)
-}
-
 function canonicalExpenseCategories(categories) {
   return Object.fromEntries(
     Object.entries(canonicalCategories(categories)).map(([categoryId, category]) => {
@@ -337,38 +284,6 @@ function canonicalExpenseCategories(categories) {
       return [categoryId, canonical]
     }),
   )
-}
-
-function stampCategories(categories, userId) {
-  return Object.fromEntries(
-    Object.entries(categories).map(([categoryId, category]) => [
-      categoryId,
-      { ...category, updatedAt: serverTimestamp(), updatedBy: userId },
-    ]),
-  )
-}
-
-function setExpenseBaselines(batch, workspaceId, categories, userId) {
-  for (const [categoryId, category] of Object.entries(categories)) {
-    const estimate = normalizeExpenseEstimate(category.manualEstimate) || {
-      amount: 0,
-      frequency: 'monthly',
-    }
-    batch.set(
-      doc(modelExpensesRef(workspaceId), modelBaselineId(categoryId)),
-      {
-        kind: MODEL_BASELINE_KIND,
-        category: categoryId,
-        estimate,
-        monthlyAmounts: generateMonthlyExpenseAmounts(estimate),
-        ownership: cloneOwnership(category.ownership),
-        necessity: category.necessity ?? null,
-        updatedAt: serverTimestamp(),
-        updatedBy: userId,
-      },
-      { merge: true },
-    )
-  }
 }
 
 function assertValidOwnership(ownership, memberIds) {

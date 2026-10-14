@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildExpenseModelCategories } from '../../../src/domain/financial/expense-model-categories'
 
 describe('expense model categories', () => {
-  it('creates zero-valued editable expense baselines', () => {
+  it('creates zero-valued editable expense categories', () => {
     const categories = buildExpenseModelCategories(['food'], ['food'], {}, ['a', 'b'])
 
     expect(categories.food).toMatchObject({

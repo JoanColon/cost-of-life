@@ -1,8 +1,6 @@
 const { getFirestore } = require('firebase-admin/firestore')
-const { logger } = require('firebase-functions')
 const { onDocumentWritten } = require('firebase-functions/firestore')
 const { HttpsError, onCall } = require('firebase-functions/https')
-const { onSchedule } = require('firebase-functions/scheduler')
 const {
   currentYear,
   rebuildFinancialYear,
@@ -12,11 +10,7 @@ const {
 const options = { region: 'europe-west1', retry: true }
 
 const ensureFinancialYear = onCall({ region: 'europe-west1' }, async (request) => {
-  return handleFinancialYearRequest(request, true)
-})
-
-const refreshFinancialYear = onCall({ region: 'europe-west1' }, async (request) => {
-  return handleFinancialYearRequest(request, false)
+  return handleFinancialYearRequest(request)
 })
 
 const refreshFinancialYearTracking = onCall({ region: 'europe-west1' }, async (request) => {
@@ -25,13 +19,17 @@ const refreshFinancialYearTracking = onCall({ region: 'europe-west1' }, async (r
   const period = String(request.data?.period || '')
   const firestore = getFirestore()
   const workspace = await firestore.collection('workspaces').doc(workspaceId).get()
-  if (!workspace.exists || !workspace.data()?.memberIds?.includes(request.auth.uid)) {
+  if (
+    !workspace.exists ||
+    workspace.data()?.deletionPendingAt ||
+    !workspace.data()?.memberIds?.includes(request.auth.uid)
+  ) {
     throw new HttpsError('permission-denied', 'Workspace membership is required')
   }
   return refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
 })
 
-async function handleFinancialYearRequest(request, createOnly) {
+async function handleFinancialYearRequest(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
   const workspaceId = String(request.data?.workspaceId || '')
   const year = Number(request.data?.year)
@@ -43,50 +41,45 @@ async function handleFinancialYearRequest(request, createOnly) {
   }
   const firestore = getFirestore()
   const workspace = await firestore.collection('workspaces').doc(workspaceId).get()
-  if (!workspace.exists || !workspace.data()?.memberIds?.includes(request.auth.uid)) {
+  if (
+    !workspace.exists ||
+    workspace.data()?.deletionPendingAt ||
+    !workspace.data()?.memberIds?.includes(request.auth.uid)
+  ) {
     throw new HttpsError('permission-denied', 'Workspace membership is required')
   }
-  return rebuildFinancialYear(firestore, workspaceId, year, { createOnly })
+  return rebuildFinancialYear(firestore, workspaceId, year, { createOnly: true })
 }
 
-const onExpenseModelConfigWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelConfig/expenses' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['expenses']),
-)
+const modelSections = new Set(['assets', 'liabilities', 'income', 'expenses'])
 
-const onIncomeModelConfigWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelConfig/income' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['income']),
-)
-
-const onAssetModelConfigWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelConfig/assets' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['assets']),
-)
-
-const onLiabilityModelConfigWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelConfig/liabilities' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['liabilities']),
+const onModelConfigWritten = onDocumentWritten(
+  { ...options, document: 'workspaces/{workspaceId}/modelConfig/{section}' },
+  (event) => {
+    const { section, workspaceId } = event.params
+    if (!modelSections.has(section)) return
+    return rebuildCurrent(workspaceId, [section])
+  },
 )
 
 const onExpenseModelWritten = onDocumentWritten(
   { ...options, document: 'workspaces/{workspaceId}/modelExpenses/{expenseId}' },
-  (event) => rebuildModelChange(event, ['expenses']),
+  (event) => rebuildCurrent(event.params.workspaceId, ['expenses']),
 )
 
 const onIncomeModelWritten = onDocumentWritten(
   { ...options, document: 'workspaces/{workspaceId}/modelIncome/{incomeId}' },
-  (event) => rebuildModelChange(event, ['income']),
+  (event) => rebuildCurrent(event.params.workspaceId, ['income']),
 )
 
 const onAssetModelWritten = onDocumentWritten(
   { ...options, document: 'workspaces/{workspaceId}/modelAssets/{assetId}' },
-  (event) => rebuildModelChange(event, ['assets']),
+  (event) => rebuildCurrent(event.params.workspaceId, ['assets']),
 )
 
 const onLiabilityModelWritten = onDocumentWritten(
   { ...options, document: 'workspaces/{workspaceId}/modelLiabilities/{liabilityId}' },
-  (event) => rebuildModelChange(event, ['liabilities']),
+  (event) => rebuildCurrent(event.params.workspaceId, ['liabilities']),
 )
 
 const onExpenseTrackingWritten = onDocumentWritten(
@@ -94,61 +87,34 @@ const onExpenseTrackingWritten = onDocumentWritten(
   async (event) => {
     const year = Number(String(event.params.period).slice(0, 4))
     if (!Number.isInteger(year) || year !== currentYear()) return
+    const firestore = getFirestore()
+    if (!(await workspaceIsActive(firestore, event.params.workspaceId))) return
     await refreshFinancialYearTrackingMonth(
-      getFirestore(),
+      firestore,
       event.params.workspaceId,
       event.params.period,
     )
   },
 )
 
-const scheduledFinancialYear = onSchedule(
-  {
-    schedule: '5 0 1 1 *',
-    timeZone: 'Europe/Madrid',
-    region: 'europe-west1',
-    retryCount: 3,
-  },
-  async () => {
-    const firestore = getFirestore()
-    const workspaces = await firestore.collection('workspaces').get()
-    const year = currentYear()
-    const results = await Promise.allSettled(
-      workspaces.docs.map((workspace) =>
-        rebuildFinancialYear(firestore, workspace.id, year, { createOnly: true }),
-      ),
-    )
-    const failed = results.filter((result) => result.status === 'rejected')
-    if (failed.length) {
-      logger.error('Financial year creation failed', { year, failed: failed.length })
-      throw new Error(`Financial year creation failed for ${failed.length} workspaces`)
-    }
-  },
-)
-
 async function rebuildCurrent(workspaceId, sections) {
-  await rebuildFinancialYear(getFirestore(), workspaceId, currentYear(), { sections })
+  const firestore = getFirestore()
+  if (!(await workspaceIsActive(firestore, workspaceId))) return
+  await rebuildFinancialYear(firestore, workspaceId, currentYear(), { sections })
 }
 
-async function rebuildModelChange(event, sections) {
-  const beforeExists = event.data?.before?.exists === true
-  const after = event.data?.after?.data()
-  if (!beforeExists && after?.kind === 'categoryBaseline') return
-  await rebuildCurrent(event.params.workspaceId, sections)
+async function workspaceIsActive(firestore, workspaceId) {
+  const workspace = await firestore.collection('workspaces').doc(workspaceId).get()
+  return workspace.exists && !workspace.data()?.deletionPendingAt
 }
 
 module.exports = {
   ensureFinancialYear,
-  onAssetModelConfigWritten,
   onAssetModelWritten,
-  onExpenseModelConfigWritten,
   onExpenseModelWritten,
   onExpenseTrackingWritten,
-  onIncomeModelConfigWritten,
   onIncomeModelWritten,
-  onLiabilityModelConfigWritten,
   onLiabilityModelWritten,
-  refreshFinancialYear,
+  onModelConfigWritten,
   refreshFinancialYearTracking,
-  scheduledFinancialYear,
 }

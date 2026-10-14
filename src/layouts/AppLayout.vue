@@ -234,17 +234,15 @@ function syncWorkspaceFromRoute() {
 
   const workspaceId = route.params.workspaceId
   if (typeof workspaceId !== 'string') {
-    workspaceStore.select(null)
+    financialYearsStore.stopWatching()
     return
   }
 
   const workspaceExists = workspaceStore.workspaces.some(
     (workspace) => workspace.id === workspaceId,
   )
-  if (workspaceExists) {
-    workspaceStore.select(workspaceId)
-  } else {
-    workspaceStore.select(null)
+  if (!workspaceExists) {
+    financialYearsStore.stopWatching()
     router.replace({ name: 'home' })
   }
 }

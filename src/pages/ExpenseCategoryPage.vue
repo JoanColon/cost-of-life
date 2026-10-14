@@ -293,14 +293,8 @@ async function saveExpense(payload) {
   const id = editingExpense.value?.id
   const saved = await persist(() =>
     id
-      ? expensesStore.editExpense(
-          workspaceId.value,
-          id,
-          payload,
-          authUser.value.uid,
-          memberIds.value,
-        )
-      : expensesStore.addExpense(workspaceId.value, payload, authUser.value.uid, memberIds.value),
+      ? expensesStore.editExpense(workspaceId.value, id, payload, memberIds.value)
+      : expensesStore.addExpense(workspaceId.value, payload, memberIds.value),
   )
   formSaving.value = false
   if (saved) closeExpenseDialog()
@@ -317,12 +311,7 @@ async function deleteExpense() {
   if (!deletingExpense.value || formSaving.value) return
   formSaving.value = true
   const saved = await persist(() =>
-    expensesStore.deleteExpense(
-      workspaceId.value,
-      deletingExpense.value.id,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    expensesStore.deleteExpense(workspaceId.value, deletingExpense.value.id),
   )
   formSaving.value = false
   if (saved) {

@@ -1,125 +1,85 @@
-import AppLayout from '@/layouts/AppLayout.vue'
-import AssetCategoryPage from '@/pages/AssetCategoryPage.vue'
-import AssetsPage from '@/pages/AssetsPage.vue'
-import CreateWorkspacePage from '@/pages/CreateWorkspacePage.vue'
-import ExpenseCategoryPage from '@/pages/ExpenseCategoryPage.vue'
-import ExpenseTrackerPage from '@/pages/ExpenseTrackerPage.vue'
-import ExpensesPage from '@/pages/ExpensesPage.vue'
-import HomePage from '@/pages/HomePage.vue'
-import HistoricPage from '@/pages/HistoricPage.vue'
-import IncomeCategoryPage from '@/pages/IncomeCategoryPage.vue'
-import IncomePage from '@/pages/IncomePage.vue'
-import LoginPage from '@/pages/LoginPage.vue'
-import LiabilitiesPage from '@/pages/LiabilitiesPage.vue'
-import LiabilityCategoryPage from '@/pages/LiabilityCategoryPage.vue'
-import NotFoundPage from '@/pages/NotFoundPage.vue'
-import WorkspaceDashboardPage from '@/pages/WorkspaceDashboardPage.vue'
-import WorkspaceSectionPage from '@/pages/WorkspaceSectionPage.vue'
-
 const routes = [
   {
     path: '/',
     name: 'login',
-    component: LoginPage,
+    component: () => import('@/pages/LoginPage.vue'),
   },
   {
     path: '/home',
-    component: AppLayout,
+    component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },
     children: [
       {
         path: '',
         name: 'home',
-        component: HomePage,
+        component: () => import('@/pages/HomePage.vue'),
       },
       {
         path: 'workspaces/new',
         name: 'create-workspace',
-        component: CreateWorkspacePage,
+        component: () => import('@/pages/CreateWorkspacePage.vue'),
       },
       {
         path: 'workspaces/:workspaceId',
         name: 'workspace-dashboard',
-        component: WorkspaceDashboardPage,
+        component: () => import('@/pages/WorkspaceDashboardPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/assets',
         name: 'assets',
-        component: AssetsPage,
+        component: () => import('@/pages/AssetsPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/assets/:category',
         name: 'asset-category',
-        component: AssetCategoryPage,
+        component: () => import('@/pages/AssetCategoryPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/liabilities',
         name: 'liabilities',
-        component: LiabilitiesPage,
+        component: () => import('@/pages/LiabilitiesPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/liabilities/:category',
         name: 'liability-category',
-        component: LiabilityCategoryPage,
+        component: () => import('@/pages/LiabilityCategoryPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/historic',
         name: 'historic',
-        component: HistoricPage,
+        component: () => import('@/pages/HistoricPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/income',
         name: 'income',
-        component: IncomePage,
+        component: () => import('@/pages/IncomePage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/income/:category',
         name: 'income-category',
-        component: IncomeCategoryPage,
+        component: () => import('@/pages/IncomeCategoryPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/expenses',
         name: 'expenses',
-        component: ExpensesPage,
+        component: () => import('@/pages/ExpensesPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/expenses/tracker',
         name: 'expense-tracker',
-        component: ExpenseTrackerPage,
+        component: () => import('@/pages/ExpenseTrackerPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/expenses/:category',
         name: 'expense-category',
-        component: ExpenseCategoryPage,
-      },
-      {
-        path: 'workspaces/:workspaceId/cost-of-life',
-        redirect: (to) => ({ name: 'expenses', params: { workspaceId: to.params.workspaceId } }),
-      },
-      {
-        path: 'workspaces/:workspaceId/financial-position',
-        name: 'financial-position',
-        component: WorkspaceSectionPage,
-        meta: { sectionTitleKey: 'dashboard.financialPosition.title' },
-      },
-      {
-        path: 'workspaces/:workspaceId/milestones',
-        name: 'milestones',
-        component: WorkspaceSectionPage,
-        meta: { sectionTitleKey: 'dashboard.milestones.title' },
-      },
-      {
-        path: 'workspaces/:workspaceId/what-if',
-        name: 'what-if',
-        component: WorkspaceSectionPage,
-        meta: { sectionTitleKey: 'dashboard.whatIf.title' },
+        component: () => import('@/pages/ExpenseCategoryPage.vue'),
       },
     ],
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
-    component: NotFoundPage,
+    component: () => import('@/pages/NotFoundPage.vue'),
   },
 ]
 

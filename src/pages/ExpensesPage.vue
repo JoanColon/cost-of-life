@@ -374,19 +374,12 @@ function openCategory(categoryId) {
 }
 
 async function completeSetup(selected) {
-  await runSaving(() =>
-    expensesStore.completeSetup(workspaceId.value, selected, authUser.value.uid, memberIds.value),
-  )
+  await runSaving(() => expensesStore.completeSetup(workspaceId.value, selected, memberIds.value))
 }
 
 async function saveCategorySelection(selected) {
   const saved = await runSaving(() =>
-    expensesStore.saveCategorySelection(
-      workspaceId.value,
-      selected,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    expensesStore.saveCategorySelection(workspaceId.value, selected, memberIds.value),
   )
   if (saved) editingCategories.value = false
 }
@@ -394,12 +387,7 @@ async function saveCategorySelection(selected) {
 async function saveEstimate(categoryId, estimate) {
   savingCategoryIds.value = new Set(savingCategoryIds.value).add(categoryId)
   try {
-    await expensesStore.updateSimpleCategoryEstimate(
-      workspaceId.value,
-      categoryId,
-      estimate,
-      authUser.value.uid,
-    )
+    await expensesStore.updateSimpleCategoryEstimate(workspaceId.value, categoryId, estimate)
     $q.notify({ type: 'positive', message: t('expenses.saved'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('expenses.errors.save'), position: 'top' })
@@ -427,7 +415,6 @@ async function saveOwnership() {
       workspaceId.value,
       categoryId,
       editingOwnership.value,
-      authUser.value.uid,
       memberIds.value,
     ),
   )
@@ -442,7 +429,7 @@ function requestDelete(category) {
 async function deleteCategory() {
   if (!deletingCategory.value) return
   const saved = await runSaving(() =>
-    expensesStore.deleteCategory(workspaceId.value, deletingCategory.value.id, authUser.value.uid),
+    expensesStore.deleteCategory(workspaceId.value, deletingCategory.value.id),
   )
   if (saved) {
     deleteDialog.value = false

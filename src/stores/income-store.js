@@ -5,8 +5,8 @@ import {
   createIncome as createIncomeDocument,
   getCategoryIncome,
   getIncomeConfig,
-  removeIncome as removeIncomeDocument,
-  removeIncomeCategory as removeIncomeCategoryDocuments,
+  deleteIncome as deleteIncomeDocument,
+  deleteIncomeCategory as deleteIncomeCategoryDocuments,
   saveIncomeSetup,
   updateIncome as updateIncomeDocument,
   updateIncomeCategories,
@@ -40,6 +40,7 @@ export const useIncomeStore = defineStore('income', () => {
     config.value = null
     incomeByCategory.value = {}
     loadedCategoryIds.value = new Set()
+    categoryRequestId += 1
     const requestId = ++configRequestId
     try {
       const state = await getIncomeConfig(workspaceId)
@@ -74,52 +75,40 @@ export const useIncomeStore = defineStore('income', () => {
     }
   }
 
-  async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
+  async function completeSetup(workspaceId, selectedCategoryIds, memberIds) {
     const categories = buildModelCategories(incomeCategoryIds, selectedCategoryIds, {}, memberIds)
-    await saveIncomeSetup(workspaceId, categories, userId)
+    await saveIncomeSetup(workspaceId, categories)
     config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
-  async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
+  async function saveCategorySelection(workspaceId, selectedCategoryIds, memberIds) {
     const categories = buildModelCategories(
       incomeCategoryIds,
       selectedCategoryIds,
       config.value?.categories || {},
       memberIds,
     )
-    await updateIncomeCategories(workspaceId, categories, userId)
+    await updateIncomeCategories(workspaceId, categories)
     config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
-  async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
+  async function updateSimpleCategoryValue(workspaceId, categoryId, value) {
     replaceCategory(
       categoryId,
-      await updateSimpleIncomeValueDocument(workspaceId, categoryId, value, userId),
+      await updateSimpleIncomeValueDocument(workspaceId, categoryId, value),
     )
   }
 
-  async function updateSimpleCategoryOwnership(
-    workspaceId,
-    categoryId,
-    ownership,
-    userId,
-    memberIds,
-  ) {
+  async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, memberIds) {
     replaceCategory(
       categoryId,
-      await updateSimpleIncomeOwnershipDocument(
-        workspaceId,
-        categoryId,
-        ownership,
-        userId,
-        memberIds,
-      ),
+      await updateSimpleIncomeOwnershipDocument(workspaceId, categoryId, ownership, memberIds),
     )
   }
 
-  async function addIncome(workspaceId, income, userId, memberIds) {
-    const result = await createIncomeDocument(workspaceId, income, userId, memberIds)
+  async function addIncome(workspaceId, income, memberIds) {
+    const result = await createIncomeDocument(workspaceId, income, memberIds)
     incomeByCategory.value = {
       ...incomeByCategory.value,
       [income.category]: [...itemsForCategory(income.category), result.income],
@@ -128,10 +117,10 @@ export const useIncomeStore = defineStore('income', () => {
     return result.income
   }
 
-  async function editIncome(workspaceId, incomeId, changes, userId, memberIds) {
+  async function editIncome(workspaceId, incomeId, changes, memberIds) {
     const income = findLoadedIncome(incomeId)
     if (!income) throw new Error('Income source not found')
-    const result = await updateIncomeDocument(workspaceId, incomeId, changes, userId, memberIds)
+    const result = await updateIncomeDocument(workspaceId, incomeId, changes, memberIds)
     incomeByCategory.value = {
       ...incomeByCategory.value,
       [income.category]: itemsForCategory(income.category).map((candidate) =>
@@ -140,9 +129,9 @@ export const useIncomeStore = defineStore('income', () => {
     }
   }
 
-  async function deleteIncome(workspaceId, incomeId, userId, memberIds) {
+  async function deleteIncome(workspaceId, incomeId) {
     if (!findLoadedIncome(incomeId)) throw new Error('Income source not found')
-    const result = await removeIncomeDocument(workspaceId, incomeId, userId, memberIds)
+    const result = await deleteIncomeDocument(workspaceId, incomeId)
     incomeByCategory.value = {
       ...incomeByCategory.value,
       [result.categoryId]: itemsForCategory(result.categoryId).filter(
@@ -151,8 +140,8 @@ export const useIncomeStore = defineStore('income', () => {
     }
   }
 
-  async function deleteCategory(workspaceId, categoryId, userId) {
-    await removeIncomeCategoryDocuments(workspaceId, categoryId, userId)
+  async function deleteCategory(workspaceId, categoryId) {
+    await deleteIncomeCategoryDocuments(workspaceId, categoryId)
     const categories = { ...(config.value?.categories || {}) }
     delete categories[categoryId]
     config.value = { ...config.value, categories }

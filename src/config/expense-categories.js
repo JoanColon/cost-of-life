@@ -120,11 +120,3 @@ export const expenseCategoryIds = expenseCategories.map((category) => category.i
 export function getExpenseCategory(categoryId) {
   return expenseCategories.find((category) => category.id === categoryId) || null
 }
-
-export function getExpenseSuggestion(categoryId, suggestionId) {
-  return (
-    getExpenseCategory(categoryId)?.suggestions.find(
-      (candidate) => candidate.id === suggestionId,
-    ) || null
-  )
-}

@@ -28,7 +28,8 @@ import {
 } from '@/domain/financial/expense-tracking'
 import { normalizeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
-import { ensureModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
+import { currentUserId } from '@/services/firebase/current-user'
+import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
 const DEFAULT_TRACKING_CATEGORIES = [...defaultExpenseTrackingCategoryIds]
 
@@ -54,7 +55,7 @@ export async function getExpenseTrackingMonth(workspaceId, period) {
 
 export async function getExpenseTrackingPreferences(workspaceId) {
   const [config, availableSubcategories] = await Promise.all([
-    ensureModelConfig(workspaceId, 'expenseTracking'),
+    getModelConfig(workspaceId, 'expenseTracking'),
     getTrackingEligibleSubcategories(workspaceId),
   ])
   const saved = config?.enabledSubcategories
@@ -67,7 +68,8 @@ export async function getExpenseTrackingPreferences(workspaceId) {
   }
 }
 
-export async function saveExpenseTrackingPreferences(workspaceId, categoryIds, userId) {
+export async function saveExpenseTrackingPreferences(workspaceId, categoryIds) {
+  const userId = currentUserId()
   const availableSubcategories = await getTrackingEligibleSubcategories(workspaceId)
   const trackingEnabledSubcategories = normalizeEnabledCategories(
     categoryIds,
@@ -86,14 +88,8 @@ export async function saveExpenseTrackingPreferences(workspaceId, categoryIds, u
   return trackingEnabledSubcategories
 }
 
-export async function createTrackedExpense(
-  workspaceId,
-  period,
-  subcategoryId,
-  input,
-  userId,
-  memberIds,
-) {
+export async function createTrackedExpense(workspaceId, period, subcategoryId, input, memberIds) {
+  const userId = currentUserId()
   assertSubcategory(subcategoryId)
   const item = normalizeItem(
     { ...input, id: doc(collection(db, 'workspaces', workspaceId, 'expenseTracking')).id },
@@ -115,9 +111,9 @@ export async function updateTrackedExpense(
   subcategoryId,
   itemId,
   input,
-  userId,
   memberIds,
 ) {
+  const userId = currentUserId()
   assertSubcategory(subcategoryId)
   const changes = normalizeItem({ ...input, id: itemId }, memberIds, period)
   return mutateMonth(
@@ -129,20 +125,16 @@ export async function updateTrackedExpense(
   )
 }
 
-export async function removeTrackedExpense(workspaceId, period, subcategoryId, itemId, userId) {
+export async function removeTrackedExpense(workspaceId, period, subcategoryId, itemId) {
+  const userId = currentUserId()
   assertSubcategory(subcategoryId)
   return mutateMonth(workspaceId, period, userId, (month) =>
     deleteTrackedItem(month, subcategoryId, itemId),
   )
 }
 
-export async function saveTrackingReconciliation(
-  workspaceId,
-  period,
-  subcategoryId,
-  decision,
-  userId,
-) {
+export async function saveTrackingReconciliation(workspaceId, period, subcategoryId, decision) {
+  const userId = currentUserId()
   assertSubcategory(subcategoryId)
   return mutateMonth(
     workspaceId,
@@ -153,13 +145,8 @@ export async function saveTrackingReconciliation(
   )
 }
 
-export async function saveTrackingReconciliations(
-  workspaceId,
-  period,
-  subcategoryIds,
-  decision,
-  userId,
-) {
+export async function saveTrackingReconciliations(workspaceId, period, subcategoryIds, decision) {
+  const userId = currentUserId()
   subcategoryIds.forEach(assertSubcategory)
   return mutateMonth(
     workspaceId,

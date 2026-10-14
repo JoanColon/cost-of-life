@@ -14,7 +14,6 @@ const MONTHS = [
 ]
 
 const SCHEMA_VERSION = 1
-const MODEL_BASELINE_KIND = 'categoryBaseline'
 
 function buildFinancialYear({
   year,
@@ -129,9 +128,7 @@ function updateFinancialYearProjection(
 }
 
 function hasPositionValue(config, items, valueField) {
-  const itemizedItems = items.filter((item) => !isModelBaseline(item))
-  if (itemizedItems.length) return true
-  if (items.some((item) => isModelBaseline(item) && Number(item[valueField]) > 0)) return true
+  if (items.some((item) => Number(item[valueField]) > 0)) return true
   return Object.values(config?.categories || {}).some(
     (category) => category?.enabled && Number(category.manualValue) > 0,
   )
@@ -143,11 +140,9 @@ function buildPositionMonth(categoryConfig, items, valueField) {
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
     if (!category?.enabled) continue
     const categoryItems = grouped[categoryId] || []
-    const baseline = categoryItems.find(isModelBaseline)
-    const itemizedItems = categoryItems.filter((item) => !isModelBaseline(item))
     const subcategories = {}
-    if (itemizedItems.length) {
-      for (const item of itemizedItems) {
+    if (categoryItems.length) {
+      for (const item of categoryItems) {
         const total = money(item[valueField])
         subcategories[item.id] = {
           name: item.name || '',
@@ -157,12 +152,12 @@ function buildPositionMonth(categoryConfig, items, valueField) {
         }
       }
     } else {
-      const total = money(baseline?.[valueField])
+      const total = money(category.manualValue)
       subcategories[categoryId] = {
         name: '',
         type: categoryId,
         total,
-        memberValues: allocate(total, baseline?.ownership),
+        memberValues: allocate(total, category.ownership),
       }
     }
     categories[categoryId] = aggregateCategory(subcategories, 'total')
@@ -176,11 +171,9 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
     if (!category?.enabled) continue
     const categoryItems = grouped[categoryId] || []
-    const baseline = categoryItems.find(isModelBaseline)
-    const items = categoryItems.filter((item) => !isModelBaseline(item))
     const subcategories = {}
-    if (items.length) {
-      for (const expense of items) {
+    if (categoryItems.length) {
+      for (const expense of categoryItems) {
         const id = expense.type === 'other' ? expense.id : expense.type
         const estimated = expenseMonth(expense, monthName)
         const tracked = expense.type === 'other' ? null : trackedValue(trackingMonth, expense.type)
@@ -198,7 +191,7 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
         }
       }
     } else {
-      const estimated = simpleExpenseMonth(baseline, monthName)
+      const estimated = simpleExpenseMonth(category, monthName)
       subcategories[categoryId] = {
         name: '',
         type: categoryId,
@@ -206,8 +199,8 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
         actual: null,
         effective: estimated,
         source: 'model',
-        memberValues: allocate(estimated, baseline?.ownership),
-        estimatedMemberValues: allocate(estimated, baseline?.ownership),
+        memberValues: allocate(estimated, category.ownership),
+        estimatedMemberValues: allocate(estimated, category.ownership),
         actualMemberValues: {},
       }
     }
@@ -222,11 +215,9 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
     if (!category?.enabled) continue
     const categoryItems = grouped[categoryId] || []
-    const baseline = categoryItems.find(isModelBaseline)
-    const items = categoryItems.filter((item) => !isModelBaseline(item))
     const subcategories = {}
-    if (items.length) {
-      for (const item of items) {
+    if (categoryItems.length) {
+      for (const item of categoryItems) {
         const total = incomeMonth(item.calculation, monthIndex)
         subcategories[item.id] = {
           name: item.name || '',
@@ -236,12 +227,12 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
         }
       }
     } else {
-      const total = money((Number(baseline?.annualValue) || 0) / 12)
+      const total = money((Number(category.manualValue) || 0) / 12)
       subcategories[categoryId] = {
         name: '',
         type: categoryId,
         total,
-        memberValues: allocate(total, baseline?.ownership),
+        memberValues: allocate(total, category.ownership),
       }
     }
     categories[categoryId] = aggregateCategory(subcategories, 'total')
@@ -316,7 +307,7 @@ function simpleExpenseMonth(category = {}, monthName) {
   if (category.monthlyAmounts && Object.hasOwn(category.monthlyAmounts, monthName)) {
     return money(category.monthlyAmounts[monthName])
   }
-  return estimateMonth(category.estimate, monthName, 0)
+  return estimateMonth(category.manualEstimate, monthName, 0)
 }
 
 function estimateMonth(estimate, monthName, annualFallback) {
@@ -449,10 +440,6 @@ function groupBy(items, field) {
     groups[item[field]] = [...(groups[item[field]] || []), item]
     return groups
   }, {})
-}
-
-function isModelBaseline(item) {
-  return item?.kind === MODEL_BASELINE_KIND
 }
 
 function addMaps(first = {}, second = {}) {

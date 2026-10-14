@@ -79,7 +79,7 @@
               </q-avatar>
             </button>
 
-            <SimpleAssetValueEditor
+            <SimpleValueEditor
               :value="canonicalCategoryValue(category.id)"
               :formatted-value="categoryValue(category.id)"
               :saving="isCategorySaving(category.id)"
@@ -226,7 +226,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AssetCategorySetup from '@/components/assets/AssetCategorySetup.vue'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
-import SimpleAssetValueEditor from '@/components/assets/SimpleAssetValueEditor.vue'
+import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { assetCategories } from '@/config/asset-categories'
 import {
@@ -306,9 +306,7 @@ async function loadAssets(activeWorkspaceId) {
 }
 
 async function completeSetup(selected) {
-  await persist(() =>
-    assetsStore.completeSetup(workspaceId.value, selected, authUser.value.uid, memberIds.value),
-  )
+  await persist(() => assetsStore.completeSetup(workspaceId.value, selected, memberIds.value))
 }
 
 function requestCategorySave(selected) {
@@ -333,12 +331,7 @@ async function savePendingCategories() {
 
 async function saveCategorySelection(selected) {
   const saved = await persist(() =>
-    assetsStore.saveCategorySelection(
-      workspaceId.value,
-      selected,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    assetsStore.saveCategorySelection(workspaceId.value, selected, memberIds.value),
   )
   if (saved) editingCategories.value = false
 }
@@ -352,7 +345,7 @@ async function deleteCategory() {
   if (!deletingCategory.value || saving.value) return
 
   const saved = await persist(() =>
-    assetsStore.deleteCategory(workspaceId.value, deletingCategory.value.id, authUser.value.uid),
+    assetsStore.deleteCategory(workspaceId.value, deletingCategory.value.id),
   )
 
   if (saved) {
@@ -438,12 +431,7 @@ async function saveSimpleCategoryValue(categoryId, value) {
 
   savingCategoryIds.value = new Set(savingCategoryIds.value).add(categoryId)
   try {
-    await assetsStore.updateSimpleCategoryValue(
-      workspaceId.value,
-      categoryId,
-      value,
-      authUser.value.uid,
-    )
+    await assetsStore.updateSimpleCategoryValue(workspaceId.value, categoryId, value)
   } catch {
     $q.notify({ type: 'negative', message: t('assets.errors.save'), position: 'top' })
   } finally {
@@ -472,7 +460,6 @@ async function saveSimpleOwnership() {
       workspaceId.value,
       editingOwnershipCategoryId.value,
       cloneOwnership(editingOwnership.value),
-      authUser.value.uid,
       memberIds.value,
     ),
   )

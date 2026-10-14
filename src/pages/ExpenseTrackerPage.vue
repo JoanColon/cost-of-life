@@ -334,9 +334,7 @@ let loadRequestId = 0
 
 const activeWorkspaceId = computed(() => String(route.params.workspaceId))
 const workspace = computed(
-  () =>
-    workspaceStore.workspaces.find(({ id }) => id === activeWorkspaceId.value) ||
-    workspaceStore.currentWorkspace,
+  () => workspaceStore.workspaces.find(({ id }) => id === activeWorkspaceId.value) || null,
 )
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map(({ id }) => id))
@@ -437,7 +435,6 @@ async function saveEntry(payload) {
           activeSubcategory.value.id,
           itemId,
           payload,
-          authUser.value.uid,
           memberIds.value,
         )
       : trackingStore.add(
@@ -445,7 +442,6 @@ async function saveEntry(payload) {
           period.value,
           activeSubcategory.value.id,
           payload,
-          authUser.value.uid,
           memberIds.value,
         ),
   )
@@ -467,7 +463,6 @@ async function deleteEntry() {
       period.value,
       activeSubcategory.value.id,
       deletingItem.value.id,
-      authUser.value.uid,
     ),
   )
   if (saved) {
@@ -478,7 +473,7 @@ async function deleteEntry() {
 
 async function savePreferences(selected) {
   const saved = await persist(
-    () => trackingStore.savePreferences(activeWorkspaceId.value, selected, authUser.value.uid),
+    () => trackingStore.savePreferences(activeWorkspaceId.value, selected),
     false,
   )
   if (saved) manageDialog.value = false
@@ -524,7 +519,6 @@ async function setDecision(subcategory, decision) {
       period.value,
       subcategory.id,
       decision,
-      authUser.value.uid,
     )
     await syncHistoricalProjection()
     $q.notify({ type: 'positive', message: t('expenseTracker.sourceUpdated'), position: 'top' })
@@ -551,7 +545,6 @@ async function setGlobalDecision(decision) {
       period.value,
       subcategoryIds,
       decision,
-      authUser.value.uid,
     )
     await syncHistoricalProjection()
     $q.notify({ type: 'positive', message: t('expenseTracker.sourcesUpdated'), position: 'top' })

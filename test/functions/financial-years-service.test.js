@@ -7,7 +7,7 @@ function documentSnapshot(data) {
   return { exists: data != null, data: () => data ?? undefined }
 }
 
-function createFirestore({ financialYear = null, configs = {}, models = {} } = {}) {
+function createFirestore({ workspace = {}, financialYear = null, configs = {}, models = {} } = {}) {
   const writes = []
 
   function reference(path, type = 'document') {
@@ -24,6 +24,7 @@ function createFirestore({ financialYear = null, configs = {}, models = {} } = {
         return value
       },
       async get() {
+        if (path === 'workspaces/workspace-a') return documentSnapshot(workspace)
         if (path.endsWith('/financialYears/2026')) return documentSnapshot(financialYear)
         if (path.includes('/modelConfig/')) {
           return documentSnapshot(configs[path.split('/').at(-1)] || { categories: {} })
@@ -63,6 +64,17 @@ function querySnapshot(documents = []) {
 }
 
 describe('financial year persistence', () => {
+  it('does not rebuild data for a workspace being deleted', async () => {
+    const { firestore, writes } = createFirestore({
+      workspace: { deletionPendingAt: { seconds: 1 } },
+    })
+
+    const result = await rebuildFinancialYear(firestore, 'workspace-a', 2026)
+
+    expect(result.status).toBe('skipped')
+    expect(writes).toEqual([])
+  })
+
   it('persists all four model sections inside each projected month', async () => {
     const { firestore, writes } = createFirestore()
 

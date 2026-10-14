@@ -124,7 +124,6 @@ async function submit() {
     const workspace = await workspaceStore.create({
       name: name.value,
       inviteEmail: wantsToShare.value ? inviteEmail.value : null,
-      user: authUser.value,
     })
 
     emit('created', {

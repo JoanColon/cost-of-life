@@ -17,12 +17,6 @@ export async function getFinancialYear(workspaceId, year, { ensure = false } = {
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
 }
 
-export async function rebuildFinancialYear(workspaceId, year) {
-  assertYear(year)
-  await httpsCallable(functions, 'refreshFinancialYear')({ workspaceId, year })
-  return getFinancialYear(workspaceId, year)
-}
-
 export async function rebuildFinancialYearTracking(workspaceId, period) {
   await httpsCallable(functions, 'refreshFinancialYearTracking')({ workspaceId, period })
   return getFinancialYear(workspaceId, Number(period.slice(0, 4)))

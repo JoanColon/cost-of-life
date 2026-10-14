@@ -24,41 +24,82 @@
       </header>
 
       <section class="workspace-grid" :aria-label="t('navigation.workspaces')">
-        <button
+        <article
           v-for="workspace in workspaceStore.workspaces"
           :key="workspace.id"
-          type="button"
           class="workspace-tile"
-          @click="openWorkspace(workspace.id)"
         >
-          <span class="workspace-icon">
-            <q-icon :name="isSharedWorkspace(workspace) ? 'group' : 'person_outline'" />
-          </span>
-          <span class="workspace-copy">
-            <strong>{{ workspace.name }}</strong>
-            <small>{{ workspaceDescription(workspace) }}</small>
-          </span>
-          <q-icon name="arrow_forward" class="workspace-arrow" />
-        </button>
+          <button type="button" class="workspace-open" @click="openWorkspace(workspace.id)">
+            <span class="workspace-icon">
+              <q-icon :name="isSharedWorkspace(workspace) ? 'group' : 'person_outline'" />
+            </span>
+            <span class="workspace-copy">
+              <strong>{{ workspace.name }}</strong>
+              <small>{{ workspaceDescription(workspace) }}</small>
+            </span>
+            <q-icon name="arrow_forward" class="workspace-arrow" />
+          </button>
+
+          <q-btn
+            v-if="isWorkspaceOwner(workspace)"
+            flat
+            round
+            color="negative"
+            icon="delete_outline"
+            class="workspace-delete"
+            :aria-label="t('workspace.deleteAction', { name: workspace.name })"
+            @click="requestDelete(workspace)"
+          >
+            <q-tooltip>{{ t('workspace.deleteAction', { name: workspace.name }) }}</q-tooltip>
+          </q-btn>
+        </article>
       </section>
     </main>
+
+    <q-dialog v-model="deleteDialog" persistent @hide="clearDeleteRequest">
+      <q-card class="confirm-card">
+        <q-card-section>
+          <h2>{{ t('workspace.delete.title') }}</h2>
+          <p>
+            {{ t('workspace.delete.description', { name: workspaceToDelete?.name || '' }) }}
+          </p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps :label="t('common.cancel')" :disable="deleting" v-close-popup />
+          <q-btn
+            unelevated
+            no-caps
+            color="negative"
+            :label="t('common.delete')"
+            :loading="deleting"
+            @click="deleteWorkspace"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import WorkspaceForm from '@/components/workspace/WorkspaceForm.vue'
+import { authUser } from '@/services/auth'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const $q = useQuasar()
 const { t } = useI18n()
 const router = useRouter()
+const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
+const deleteDialog = ref(false)
+const deleting = ref(false)
+const workspaceToDelete = ref(null)
 
 function openWorkspace(workspaceId) {
-  workspaceStore.select(workspaceId)
   router.push({ name: 'workspace-dashboard', params: { workspaceId } })
 }
 
@@ -71,6 +112,37 @@ function workspaceDescription(workspace) {
 
 function isSharedWorkspace(workspace) {
   return Object.keys(workspace.members || {}).length > 1
+}
+
+function isWorkspaceOwner(workspace) {
+  return workspace.members?.[authUser.value?.uid]?.role === 'owner'
+}
+
+function requestDelete(workspace) {
+  workspaceToDelete.value = workspace
+  deleteDialog.value = true
+}
+
+function clearDeleteRequest() {
+  if (!deleting.value) workspaceToDelete.value = null
+}
+
+async function deleteWorkspace() {
+  if (!workspaceToDelete.value || deleting.value) return
+
+  deleting.value = true
+  try {
+    const workspaceId = workspaceToDelete.value.id
+    await workspaceStore.deleteWorkspace(workspaceId)
+    financialYearsStore.clearWorkspace(workspaceId)
+    deleteDialog.value = false
+    workspaceToDelete.value = null
+    $q.notify({ type: 'positive', message: t('workspace.deleted'), position: 'top' })
+  } catch {
+    $q.notify({ type: 'negative', message: t('workspace.errors.delete'), position: 'top' })
+  } finally {
+    deleting.value = false
+  }
 }
 
 async function workspaceCreated({ workspace, hasPendingInvite }) {
@@ -139,18 +211,15 @@ h1 {
 
 .workspace-tile {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 1rem;
   min-height: 7rem;
-  padding: 1.25rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-ink);
-  text-align: left;
   box-shadow: var(--shadow-card);
-  cursor: pointer;
+  overflow: hidden;
   transition:
     border-color 160ms ease,
     transform 160ms ease;
@@ -161,9 +230,28 @@ h1 {
   transform: translateY(-2px);
 }
 
-.workspace-tile:focus-visible {
+.workspace-open:focus-visible {
   outline: 3px solid rgb(22 136 248 / 22%);
-  outline-offset: 3px;
+  outline-offset: -3px;
+}
+
+.workspace-open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  min-height: 7rem;
+  padding: 1.25rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-delete {
+  margin-right: 0.75rem;
 }
 
 .workspace-icon {
@@ -194,6 +282,22 @@ h1 {
 .workspace-arrow {
   color: var(--color-copy);
   font-size: 1.25rem;
+}
+
+.confirm-card {
+  width: min(32rem, calc(100vw - 2rem));
+  border-radius: var(--radius-card);
+}
+
+.confirm-card h2 {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.confirm-card p {
+  margin: 0.75rem 0 0;
+  color: var(--color-copy);
+  line-height: 1.6;
 }
 
 @media (max-width: 699px) {

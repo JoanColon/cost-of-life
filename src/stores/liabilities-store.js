@@ -5,8 +5,8 @@ import {
   createLiability as createLiabilityDocument,
   getCategoryLiabilities,
   getLiabilitiesConfig,
-  removeLiability as removeLiabilityDocument,
-  removeLiabilityCategory as removeLiabilityCategoryDocuments,
+  deleteLiability as deleteLiabilityDocument,
+  deleteLiabilityCategory as deleteLiabilityCategoryDocuments,
   saveLiabilitiesSetup,
   updateLiability as updateLiabilityDocument,
   updateLiabilityCategories,
@@ -40,6 +40,7 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     config.value = null
     liabilitiesByCategory.value = {}
     loadedCategoryIds.value = new Set()
+    categoryRequestId += 1
     const requestId = ++configRequestId
     try {
       const state = await getLiabilitiesConfig(workspaceId)
@@ -78,57 +79,45 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     }
   }
 
-  async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
+  async function completeSetup(workspaceId, selectedCategoryIds, memberIds) {
     const categories = buildModelCategories(
       liabilityCategoryIds,
       selectedCategoryIds,
       {},
       memberIds,
     )
-    await saveLiabilitiesSetup(workspaceId, categories, userId)
+    await saveLiabilitiesSetup(workspaceId, categories)
     config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
-  async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
+  async function saveCategorySelection(workspaceId, selectedCategoryIds, memberIds) {
     const categories = buildModelCategories(
       liabilityCategoryIds,
       selectedCategoryIds,
       config.value?.categories || {},
       memberIds,
     )
-    await updateLiabilityCategories(workspaceId, categories, userId)
+    await updateLiabilityCategories(workspaceId, categories)
     config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
-  async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
+  async function updateSimpleCategoryValue(workspaceId, categoryId, value) {
     replaceCategory(
       categoryId,
-      await updateSimpleLiabilityValueDocument(workspaceId, categoryId, value, userId),
+      await updateSimpleLiabilityValueDocument(workspaceId, categoryId, value),
     )
   }
 
-  async function updateSimpleCategoryOwnership(
-    workspaceId,
-    categoryId,
-    ownership,
-    userId,
-    memberIds,
-  ) {
+  async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, memberIds) {
     replaceCategory(
       categoryId,
-      await updateSimpleLiabilityOwnershipDocument(
-        workspaceId,
-        categoryId,
-        ownership,
-        userId,
-        memberIds,
-      ),
+      await updateSimpleLiabilityOwnershipDocument(workspaceId, categoryId, ownership, memberIds),
     )
   }
 
-  async function addLiability(workspaceId, liability, userId, memberIds) {
-    const result = await createLiabilityDocument(workspaceId, liability, userId, memberIds)
+  async function addLiability(workspaceId, liability, memberIds) {
+    const result = await createLiabilityDocument(workspaceId, liability, memberIds)
     liabilitiesByCategory.value = {
       ...liabilitiesByCategory.value,
       [liability.category]: [...itemsForCategory(liability.category), result.liability],
@@ -137,16 +126,10 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     return result.liability
   }
 
-  async function editLiability(workspaceId, liabilityId, changes, userId, memberIds) {
+  async function editLiability(workspaceId, liabilityId, changes, memberIds) {
     const liability = findLoadedLiability(liabilityId)
     if (!liability) throw new Error('Liability not found')
-    const result = await updateLiabilityDocument(
-      workspaceId,
-      liabilityId,
-      changes,
-      userId,
-      memberIds,
-    )
+    const result = await updateLiabilityDocument(workspaceId, liabilityId, changes, memberIds)
     liabilitiesByCategory.value = {
       ...liabilitiesByCategory.value,
       [liability.category]: itemsForCategory(liability.category).map((candidate) =>
@@ -155,9 +138,9 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     }
   }
 
-  async function deleteLiability(workspaceId, liabilityId, userId, memberIds) {
+  async function deleteLiability(workspaceId, liabilityId) {
     if (!findLoadedLiability(liabilityId)) throw new Error('Liability not found')
-    const result = await removeLiabilityDocument(workspaceId, liabilityId, userId, memberIds)
+    const result = await deleteLiabilityDocument(workspaceId, liabilityId)
     liabilitiesByCategory.value = {
       ...liabilitiesByCategory.value,
       [result.categoryId]: itemsForCategory(result.categoryId).filter(
@@ -166,8 +149,8 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     }
   }
 
-  async function deleteCategory(workspaceId, categoryId, userId) {
-    await removeLiabilityCategoryDocuments(workspaceId, categoryId, userId)
+  async function deleteCategory(workspaceId, categoryId) {
+    await deleteLiabilityCategoryDocuments(workspaceId, categoryId)
     const categories = { ...(config.value?.categories || {}) }
     delete categories[categoryId]
     config.value = { ...config.value, categories }

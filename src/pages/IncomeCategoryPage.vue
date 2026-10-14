@@ -314,8 +314,8 @@ async function saveIncome(payload) {
   formSaving.value = true
   const saved = await persist(() =>
     id
-      ? incomeStore.editIncome(workspaceId.value, id, payload, authUser.value.uid, memberIds.value)
-      : incomeStore.addIncome(workspaceId.value, payload, authUser.value.uid, memberIds.value),
+      ? incomeStore.editIncome(workspaceId.value, id, payload, memberIds.value)
+      : incomeStore.addIncome(workspaceId.value, payload, memberIds.value),
   )
   formSaving.value = false
   if (saved) closeIncomeDialog()
@@ -329,12 +329,7 @@ async function deleteIncome() {
   if (!deletingIncome.value) return
   formSaving.value = true
   const saved = await persist(() =>
-    incomeStore.deleteIncome(
-      workspaceId.value,
-      deletingIncome.value.id,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    incomeStore.deleteIncome(workspaceId.value, deletingIncome.value.id),
   )
   formSaving.value = false
   if (saved) {

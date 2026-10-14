@@ -15,7 +15,14 @@ async function rebuildFinancialYear(
   const target = workspace.collection('financialYears').doc(String(year))
   let status = 'rebuilt'
   await firestore.runTransaction(async (transaction) => {
-    const latestSnapshot = await transaction.get(target)
+    const [workspaceSnapshot, latestSnapshot] = await Promise.all([
+      transaction.get(workspace),
+      transaction.get(target),
+    ])
+    if (!workspaceSnapshot.exists || workspaceSnapshot.data()?.deletionPendingAt) {
+      status = 'skipped'
+      return
+    }
     const latest = latestSnapshot.data() || {}
     if (createOnly && latestSnapshot.exists && latest.totals) {
       status = 'existing'
@@ -81,10 +88,15 @@ async function refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
   const tracking = workspace.collection('expenseTracking').doc(period)
   let status = 'updated'
   await firestore.runTransaction(async (transaction) => {
-    const [financialYearSnapshot, trackingSnapshot] = await Promise.all([
+    const [workspaceSnapshot, financialYearSnapshot, trackingSnapshot] = await Promise.all([
+      transaction.get(workspace),
       transaction.get(target),
       transaction.get(tracking),
     ])
+    if (!workspaceSnapshot.exists || workspaceSnapshot.data()?.deletionPendingAt) {
+      status = 'skipped'
+      return
+    }
     if (!financialYearSnapshot.exists) {
       status = 'missing'
       return
@@ -96,6 +108,7 @@ async function refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
     )
     transaction.set(target, { ...next, updatedAt: FieldValue.serverTimestamp() })
   })
+  if (status === 'skipped') return { status, workspaceId, year }
   if (status === 'missing' && year === currentYear()) {
     return rebuildFinancialYear(firestore, workspaceId, year)
   }

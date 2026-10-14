@@ -45,42 +45,23 @@ describe('server financial year projection', () => {
     )
   })
 
-  it('keeps simple category values in model baseline documents', () => {
+  it('uses simple values directly from model configuration', () => {
     const result = buildFinancialYear({
       year: 2026,
       config: {
-        assets: { categories: { cash: { enabled: true } } },
+        assets: { categories: { cash: { enabled: true, manualValue: 2500, ownership } } },
         liabilities: { categories: {} },
-        expenses: { categories: { housing: { enabled: true } } },
-        income: { categories: { other: { enabled: true } } },
+        expenses: {
+          categories: {
+            housing: {
+              enabled: true,
+              manualEstimate: { amount: 600, frequency: 'monthly' },
+              ownership,
+            },
+          },
+        },
+        income: { categories: { other: { enabled: true, manualValue: 12000, ownership } } },
       },
-      assets: [
-        {
-          id: 'baseline--cash',
-          kind: 'categoryBaseline',
-          category: 'cash',
-          currentValue: 2500,
-          ownership,
-        },
-      ],
-      expenses: [
-        {
-          id: 'baseline--housing',
-          kind: 'categoryBaseline',
-          category: 'housing',
-          estimate: { amount: 600, frequency: 'monthly' },
-          ownership,
-        },
-      ],
-      income: [
-        {
-          id: 'baseline--other',
-          kind: 'categoryBaseline',
-          category: 'other',
-          annualValue: 12000,
-          ownership,
-        },
-      ],
     })
 
     expect(result.months['01'].assets.total).toBe(2500)

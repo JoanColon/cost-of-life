@@ -7,9 +7,12 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
-import { db } from '@/firebase/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { auth, db, functions } from '@/firebase/firebase'
 
-export async function getUserWorkspaces(user) {
+export async function getUserWorkspaces() {
+  const user = auth.currentUser
+  if (!user) throw new Error('Authentication is required')
   const workspacesQuery = query(
     collection(db, 'workspaces'),
     where('memberIds', 'array-contains', user.uid),
@@ -22,7 +25,9 @@ export async function getUserWorkspaces(user) {
   }))
 }
 
-export async function createFinancialWorkspace({ name, inviteEmail, user }) {
+export async function createWorkspace({ name, inviteEmail }) {
+  const user = auth.currentUser
+  if (!user) throw new Error('Authentication is required')
   const workspaceRef = doc(collection(db, 'workspaces'))
   const normalizedInviteEmail = inviteEmail?.trim().toLowerCase() || null
   const batch = writeBatch(db)
@@ -72,4 +77,8 @@ export async function createFinancialWorkspace({ name, inviteEmail, user }) {
       },
     },
   }
+}
+
+export async function deleteWorkspace(workspaceId) {
+  await httpsCallable(functions, 'deleteWorkspace')({ workspaceId })
 }

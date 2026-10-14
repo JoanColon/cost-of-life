@@ -1,7 +1,7 @@
 import { normalizeMoney } from './money'
 import { incomeMonths } from './income-calculations'
 
-export const expenseFrequencies = [
+const expenseFrequencies = [
   'weekly',
   'monthly',
   'every_two_months',

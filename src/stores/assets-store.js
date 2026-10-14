@@ -5,8 +5,8 @@ import {
   createAsset as createAssetDocument,
   getAssetsConfig,
   getCategoryAssets,
-  removeAsset as removeAssetDocument,
-  removeAssetCategory as removeAssetCategoryDocuments,
+  deleteAsset as deleteAssetDocument,
+  deleteAssetCategory as deleteAssetCategoryDocuments,
   saveAssetsSetup,
   updateAsset as updateAssetDocument,
   updateAssetsCategories,
@@ -41,6 +41,7 @@ export const useAssetsStore = defineStore('assets', () => {
     config.value = null
     assetsByCategory.value = {}
     loadedCategoryIds.value = new Set()
+    categoryRequestId += 1
     const requestId = ++configRequestId
 
     try {
@@ -78,48 +79,41 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
-  async function completeSetup(workspaceId, selectedCategoryIds, userId, memberIds) {
+  async function completeSetup(workspaceId, selectedCategoryIds, memberIds) {
     const categories = buildModelCategories(assetCategoryIds, selectedCategoryIds, {}, memberIds)
-    await saveAssetsSetup(workspaceId, categories, userId)
+    await saveAssetsSetup(workspaceId, categories)
     config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
-  async function saveCategorySelection(workspaceId, selectedCategoryIds, userId, memberIds) {
+  async function saveCategorySelection(workspaceId, selectedCategoryIds, memberIds) {
     const categories = buildModelCategories(
       assetCategoryIds,
       selectedCategoryIds,
       config.value?.categories || {},
       memberIds,
     )
-    await updateAssetsCategories(workspaceId, categories, userId)
+    await updateAssetsCategories(workspaceId, categories)
     config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
-  async function updateSimpleCategoryValue(workspaceId, categoryId, value, userId) {
-    const category = await updateSimpleCategoryValueDocument(workspaceId, categoryId, value, userId)
+  async function updateSimpleCategoryValue(workspaceId, categoryId, value) {
+    const category = await updateSimpleCategoryValueDocument(workspaceId, categoryId, value)
     replaceCategory(categoryId, category)
   }
 
-  async function updateSimpleCategoryOwnership(
-    workspaceId,
-    categoryId,
-    ownership,
-    userId,
-    memberIds,
-  ) {
+  async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, memberIds) {
     const category = await updateSimpleCategoryOwnershipDocument(
       workspaceId,
       categoryId,
       ownership,
-      userId,
       memberIds,
     )
     replaceCategory(categoryId, category)
   }
 
-  async function addAsset(workspaceId, asset, userId, memberIds) {
-    const result = await createAssetDocument(workspaceId, asset, userId, memberIds)
+  async function addAsset(workspaceId, asset, memberIds) {
+    const result = await createAssetDocument(workspaceId, asset, memberIds)
     const categoryAssets = itemsForCategory(asset.category)
     assetsByCategory.value = {
       ...assetsByCategory.value,
@@ -129,11 +123,11 @@ export const useAssetsStore = defineStore('assets', () => {
     return result.asset
   }
 
-  async function editAsset(workspaceId, assetId, changes, userId, memberIds) {
+  async function editAsset(workspaceId, assetId, changes, memberIds) {
     const asset = findLoadedAsset(assetId)
     if (!asset) throw new Error('Asset not found')
 
-    const result = await updateAssetDocument(workspaceId, assetId, changes, userId, memberIds)
+    const result = await updateAssetDocument(workspaceId, assetId, changes, memberIds)
     assetsByCategory.value = {
       ...assetsByCategory.value,
       [asset.category]: itemsForCategory(asset.category).map((candidate) =>
@@ -142,11 +136,11 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
-  async function deleteAsset(workspaceId, assetId, userId, memberIds) {
+  async function deleteAsset(workspaceId, assetId) {
     const asset = findLoadedAsset(assetId)
     if (!asset) throw new Error('Asset not found')
 
-    const result = await removeAssetDocument(workspaceId, assetId, userId, memberIds)
+    const result = await deleteAssetDocument(workspaceId, assetId)
     assetsByCategory.value = {
       ...assetsByCategory.value,
       [result.categoryId]: itemsForCategory(result.categoryId).filter(
@@ -155,8 +149,8 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
-  async function deleteCategory(workspaceId, categoryId, userId) {
-    await removeAssetCategoryDocuments(workspaceId, categoryId, userId)
+  async function deleteCategory(workspaceId, categoryId) {
+    await deleteAssetCategoryDocuments(workspaceId, categoryId)
 
     const categories = { ...(config.value?.categories || {}) }
     delete categories[categoryId]

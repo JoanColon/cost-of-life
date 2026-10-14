@@ -79,7 +79,7 @@
               </q-avatar>
             </button>
 
-            <SimpleAssetValueEditor
+            <SimpleValueEditor
               :value="canonicalCategoryValue(category.id)"
               :formatted-value="categoryValue(category.id)"
               :saving="isCategorySaving(category.id)"
@@ -227,7 +227,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
-import SimpleAssetValueEditor from '@/components/assets/SimpleAssetValueEditor.vue'
+import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import LiabilityCategorySetup from '@/components/liabilities/LiabilityCategorySetup.vue'
 import { liabilityCategories } from '@/config/liability-categories'
@@ -310,14 +310,7 @@ async function loadLiabilities(activeWorkspaceId) {
 }
 
 async function completeSetup(selected) {
-  await persist(() =>
-    liabilitiesStore.completeSetup(
-      workspaceId.value,
-      selected,
-      authUser.value.uid,
-      memberIds.value,
-    ),
-  )
+  await persist(() => liabilitiesStore.completeSetup(workspaceId.value, selected, memberIds.value))
 }
 
 function requestCategorySave(selected) {
@@ -340,12 +333,7 @@ async function savePendingCategories() {
 
 async function saveCategorySelection(selected) {
   const saved = await persist(() =>
-    liabilitiesStore.saveCategorySelection(
-      workspaceId.value,
-      selected,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    liabilitiesStore.saveCategorySelection(workspaceId.value, selected, memberIds.value),
   )
   if (saved) editingCategories.value = false
 }
@@ -358,11 +346,7 @@ function requestCategoryDelete(category) {
 async function deleteCategory() {
   if (!deletingCategory.value || saving.value) return
   const saved = await persist(() =>
-    liabilitiesStore.deleteCategory(
-      workspaceId.value,
-      deletingCategory.value.id,
-      authUser.value.uid,
-    ),
+    liabilitiesStore.deleteCategory(workspaceId.value, deletingCategory.value.id),
   )
   if (saved) {
     confirmCategoryDelete.value = false
@@ -442,12 +426,7 @@ async function saveSimpleCategoryValue(categoryId, value) {
   if (isCategorySaving(categoryId)) return
   savingCategoryIds.value = new Set(savingCategoryIds.value).add(categoryId)
   try {
-    await liabilitiesStore.updateSimpleCategoryValue(
-      workspaceId.value,
-      categoryId,
-      value,
-      authUser.value.uid,
-    )
+    await liabilitiesStore.updateSimpleCategoryValue(workspaceId.value, categoryId, value)
   } catch {
     $q.notify({ type: 'negative', message: t('liabilities.errors.save'), position: 'top' })
   } finally {
@@ -474,7 +453,6 @@ async function saveSimpleOwnership() {
       workspaceId.value,
       editingOwnershipCategoryId.value,
       cloneOwnership(editingOwnership.value),
-      authUser.value.uid,
       memberIds.value,
     ),
   )

@@ -16,6 +16,10 @@ service cloud.firestore {
         && workspace.members[request.auth.uid].role == 'owner';
     }
 
+    function isWorkspaceActive(workspace) {
+      return !('deletionPendingAt' in workspace);
+    }
+
     function isWorkspaceMemberById(workspaceId) {
       return isWorkspaceMember(
         get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
@@ -26,17 +30,16 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data;
     }
 
-    match /users/{userId} {
-      allow read, create, update, delete: if isSignedIn()
-        && request.auth.uid == userId;
-    }
-
     match /workspaces/{workspaceId} {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
-        && isWorkspaceOwner(request.resource.data);
+        && isWorkspaceOwner(request.resource.data)
+        && isWorkspaceActive(request.resource.data);
       allow read: if isWorkspaceMember(resource.data);
-      allow update, delete: if isWorkspaceOwner(resource.data);
+      allow update: if isWorkspaceOwner(resource.data)
+        && isWorkspaceActive(resource.data)
+        && isWorkspaceActive(request.resource.data);
+      allow delete: if false;
 
       match /financialYears/{year} {
         allow read: if isWorkspaceMemberById(workspaceId);
@@ -47,7 +50,7 @@ service cloud.firestore {
       // and operational data below their workspace. Administrative access to
       // the workspace document itself remains owner-only above.
       match /{collectionId}/{document=**} {
-        allow read, write: if (
+        allow read: if (
           collectionId == 'modelAssets'
           || collectionId == 'modelLiabilities'
           || collectionId == 'modelIncome'
@@ -56,14 +59,33 @@ service cloud.firestore {
           || collectionId == 'expenseTracking'
         )
           && isWorkspaceMemberById(workspaceId);
+        allow write: if (
+          collectionId == 'modelAssets'
+          || collectionId == 'modelLiabilities'
+          || collectionId == 'modelIncome'
+          || collectionId == 'modelExpenses'
+          || collectionId == 'modelConfig'
+          || collectionId == 'expenseTracking'
+        )
+          && isWorkspaceMemberById(workspaceId)
+          && isWorkspaceActive(
+            get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
+          );
       }
     }
 
     match /workspaceInvites/{inviteId} {
       allow create: if isWorkspaceOwner(
         workspaceAfterWrite(request.resource.data.workspaceId)
+      ) && isWorkspaceActive(
+        workspaceAfterWrite(request.resource.data.workspaceId)
       );
-      allow read, update, delete: if isWorkspaceOwner(
+      allow read: if isWorkspaceOwner(
+        get(/databases/$(database)/documents/workspaces/$(resource.data.workspaceId)).data
+      );
+      allow update, delete: if isWorkspaceOwner(
+        get(/databases/$(database)/documents/workspaces/$(resource.data.workspaceId)).data
+      ) && isWorkspaceActive(
         get(/databases/$(database)/documents/workspaces/$(resource.data.workspaceId)).data
       );
     }

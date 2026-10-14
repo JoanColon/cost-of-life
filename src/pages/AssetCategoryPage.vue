@@ -315,15 +315,9 @@ async function saveAsset(payload) {
   formSaving.value = true
   const saved = await persist(() => {
     if (assetId) {
-      return assetsStore.editAsset(
-        workspaceId.value,
-        assetId,
-        payload,
-        authUser.value.uid,
-        memberIds.value,
-      )
+      return assetsStore.editAsset(workspaceId.value, assetId, payload, memberIds.value)
     }
-    return assetsStore.addAsset(workspaceId.value, payload, authUser.value.uid, memberIds.value)
+    return assetsStore.addAsset(workspaceId.value, payload, memberIds.value)
   })
   formSaving.value = false
   if (saved) closeAssetDialog()
@@ -339,12 +333,7 @@ async function deleteAsset() {
   if (!deletingAsset.value) return
   formSaving.value = true
   const saved = await persist(() =>
-    assetsStore.deleteAsset(
-      workspaceId.value,
-      deletingAsset.value.id,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    assetsStore.deleteAsset(workspaceId.value, deletingAsset.value.id),
   )
   formSaving.value = false
   if (saved) {

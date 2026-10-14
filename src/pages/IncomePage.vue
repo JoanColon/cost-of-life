@@ -291,9 +291,7 @@ async function loadPage(force = false) {
 }
 
 async function completeSetup(selected) {
-  await persist(() =>
-    incomeStore.completeSetup(workspaceId.value, selected, authUser.value.uid, memberIds.value),
-  )
+  await persist(() => incomeStore.completeSetup(workspaceId.value, selected, memberIds.value))
 }
 function requestCategorySave(selected) {
   const removedWithData = incomeStore.enabledCategories.some(
@@ -311,12 +309,7 @@ async function savePendingCategories() {
 }
 async function saveCategorySelection(selected) {
   const saved = await persist(() =>
-    incomeStore.saveCategorySelection(
-      workspaceId.value,
-      selected,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    incomeStore.saveCategorySelection(workspaceId.value, selected, memberIds.value),
   )
   if (saved) editingCategories.value = false
 }
@@ -327,7 +320,7 @@ function requestCategoryDelete(category) {
 async function deleteCategory() {
   if (!deletingCategory.value || saving.value) return
   const saved = await persist(() =>
-    incomeStore.deleteCategory(workspaceId.value, deletingCategory.value.id, authUser.value.uid),
+    incomeStore.deleteCategory(workspaceId.value, deletingCategory.value.id),
   )
   if (saved) {
     confirmCategoryDelete.value = false
@@ -392,7 +385,7 @@ async function saveSimpleCategoryValue(id, value) {
   if (isCategorySaving(id)) return
   savingCategoryIds.value = new Set(savingCategoryIds.value).add(id)
   try {
-    await incomeStore.updateSimpleCategoryValue(workspaceId.value, id, value, authUser.value.uid)
+    await incomeStore.updateSimpleCategoryValue(workspaceId.value, id, value)
   } catch {
     $q.notify({ type: 'negative', message: t('income.errors.save'), position: 'top' })
   } finally {
@@ -417,7 +410,6 @@ async function saveSimpleOwnership() {
       workspaceId.value,
       editingOwnershipCategoryId.value,
       cloneOwnership(editingOwnership.value),
-      authUser.value.uid,
       memberIds.value,
     ),
   )

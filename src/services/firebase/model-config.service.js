@@ -1,4 +1,4 @@
-import { doc, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 
 const defaults = {
@@ -14,20 +14,8 @@ export function modelConfigRef(workspaceId, model) {
   return doc(db, 'workspaces', workspaceId, 'modelConfig', model)
 }
 
-export async function ensureModelConfig(workspaceId, model) {
-  const configRef = modelConfigRef(workspaceId, model)
-
-  return runTransaction(db, async (transaction) => {
-    const existing = await transaction.get(configRef)
-    if (existing.exists()) return existing.data()
-
-    const config = {
-      schemaVersion: 1,
-      ...defaults[model],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }
-    transaction.set(configRef, config)
-    return { ...config, createdAt: null, updatedAt: null }
-  })
+export async function getModelConfig(workspaceId, model) {
+  const reference = modelConfigRef(workspaceId, model)
+  const snapshot = await getDoc(reference)
+  return snapshot.exists() ? snapshot.data() : { ...defaults[model] }
 }

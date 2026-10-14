@@ -88,7 +88,14 @@ export default {
     inviteHint: 'We will add invitation delivery and acceptance in a later step.',
     create: 'Create workspace',
     created: 'Financial workspace created.',
+    deleted: 'Financial workspace deleted.',
+    deleteAction: 'Delete {name}',
     pendingInvite: 'The email has been saved as a pending invitation.',
+    delete: {
+      title: 'Delete workspace?',
+      description:
+        'This will permanently delete “{name}”, including all assets, liabilities, income, expenses, tracking history, financial years, and pending invitations. This action cannot be undone.',
+    },
     validation: {
       nameRequired: 'Enter a workspace name',
       nameLength: 'Use 60 characters or fewer',
@@ -98,6 +105,7 @@ export default {
     errors: {
       load: 'We could not load your financial workspaces.',
       create: 'We could not create the financial workspace. Try again.',
+      delete: 'We could not delete the financial workspace. Try again.',
     },
   },
   home: {
@@ -155,29 +163,6 @@ export default {
       historyEmptyDescription:
         'The first point will be added automatically when a monthly snapshot is captured.',
       chartAria: 'Monthly net worth history',
-    },
-    whatsNext: {
-      title: "What's next?",
-      subtitle: 'Explore, plan and track what matters to you.',
-      controls: 'Carousel controls',
-      previous: 'Previous',
-      next: 'Next',
-    },
-    milestones: {
-      title: 'Milestones',
-      subtitle: 'Your progress towards what matters',
-      home: 'Buy a home',
-      sabbatical: 'Sabbatical',
-    },
-    whatIf: {
-      title: 'What if?',
-      subtitle: 'See how life changes affect your finances',
-    },
-    scenarios: {
-      salary: '+10% salary',
-      home: 'Buy a home',
-      baby: 'New baby',
-      run: 'Run a scenario',
     },
   },
   assets: {

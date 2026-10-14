@@ -300,19 +300,8 @@ async function saveLiability(payload) {
   formSaving.value = true
   const saved = await persist(() =>
     liabilityId
-      ? liabilitiesStore.editLiability(
-          workspaceId.value,
-          liabilityId,
-          payload,
-          authUser.value.uid,
-          memberIds.value,
-        )
-      : liabilitiesStore.addLiability(
-          workspaceId.value,
-          payload,
-          authUser.value.uid,
-          memberIds.value,
-        ),
+      ? liabilitiesStore.editLiability(workspaceId.value, liabilityId, payload, memberIds.value)
+      : liabilitiesStore.addLiability(workspaceId.value, payload, memberIds.value),
   )
   formSaving.value = false
   if (saved) closeLiabilityDialog()
@@ -328,12 +317,7 @@ async function deleteLiability() {
   if (!deletingLiability.value) return
   formSaving.value = true
   const saved = await persist(() =>
-    liabilitiesStore.deleteLiability(
-      workspaceId.value,
-      deletingLiability.value.id,
-      authUser.value.uid,
-      memberIds.value,
-    ),
+    liabilitiesStore.deleteLiability(workspaceId.value, deletingLiability.value.id),
   )
   formSaving.value = false
   if (saved) {

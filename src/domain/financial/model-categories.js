@@ -28,14 +28,11 @@ export function buildModelCategories(
 
 export function canonicalCategory(category = {}) {
   const value = { ...category }
-  delete value.manualValue
-  delete value.manualEstimate
-  delete value.monthlyAmounts
-  delete value.ownership
-  delete value.necessity
   delete value.itemCount
   delete value.itemizedValue
   delete value.memberValues
+  delete value.updatedAt
+  delete value.updatedBy
   return value
 }
 
@@ -46,20 +43,4 @@ export function canonicalCategories(categories = {}) {
       canonicalCategory(category),
     ]),
   )
-}
-
-export function hydrateModelConfigWithBaselines(config, baselines, fieldsForBaseline) {
-  const byCategory = Object.fromEntries(baselines.map((baseline) => [baseline.category, baseline]))
-  return {
-    ...config,
-    categories: Object.fromEntries(
-      Object.entries(config?.categories || {}).map(([categoryId, category]) => [
-        categoryId,
-        {
-          ...category,
-          ...(byCategory[categoryId] ? fieldsForBaseline(byCategory[categoryId]) : {}),
-        },
-      ]),
-    ),
-  }
 }

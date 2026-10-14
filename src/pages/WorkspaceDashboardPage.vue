@@ -16,7 +16,7 @@
           :history-points="historyPoints"
           :history-loading="historyLoading"
           :history-error="Boolean(historyError)"
-          @open="openSection('financial-position')"
+          @open="openSection('assets')"
           @open-assets="openSection('assets')"
           @open-liabilities="openSection('liabilities')"
         />
@@ -26,7 +26,6 @@
           @open-income="openSection('income')"
           @open-tracker="openSection('expense-tracker')"
         />
-        <WhatsNextCard />
       </section>
     </main>
   </q-page>
@@ -39,7 +38,6 @@ import { useRoute, useRouter } from 'vue-router'
 import CostOfLifeCard from '@/components/dashboard/CostOfLifeCard.vue'
 import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
-import WhatsNextCard from '@/components/dashboard/WhatsNextCard.vue'
 import { buildNetWorthSeries } from '@/domain/financial/history'
 import {
   currentFinancialMonth,

@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import { currentFinancialYear } from '@/domain/financial/financial-year'
 import {
   getFinancialYear,
-  rebuildFinancialYear,
   rebuildFinancialYearTracking,
   subscribeFinancialYear,
 } from '@/services/firebase/financial-years.service'
@@ -12,48 +11,39 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
   const documents = ref({})
   const loading = ref(false)
   const error = ref(null)
-  const subscriptions = new Map()
-  let requestId = 0
+  const requestIds = new Map()
+  const loadingKeys = new Set()
+  let activeSubscription = null
 
   async function load(workspaceId, year = currentFinancialYear(), force = false) {
     const key = `${workspaceId}:${year}`
-    if (!force && documents.value[key]) return documents.value[key]
-    const currentRequest = ++requestId
+    if (!force && Object.hasOwn(documents.value, key)) return documents.value[key]
+    const currentRequest = (requestIds.get(key) || 0) + 1
+    requestIds.set(key, currentRequest)
+    loadingKeys.add(key)
     loading.value = true
     error.value = null
     try {
       const value = await getFinancialYear(workspaceId, year, {
         ensure: year === currentFinancialYear(),
       })
-      if (currentRequest !== requestId) return null
+      if (currentRequest !== requestIds.get(key)) return null
       documents.value = { ...documents.value, [key]: value }
       if (year === currentFinancialYear()) watchCurrentYear(workspaceId, year)
       return value
     } catch (loadError) {
-      if (currentRequest === requestId) error.value = loadError
+      if (currentRequest === requestIds.get(key)) error.value = loadError
       throw loadError
     } finally {
-      if (currentRequest === requestId) loading.value = false
+      if (currentRequest === requestIds.get(key)) {
+        loadingKeys.delete(key)
+        loading.value = loadingKeys.size > 0
+      }
     }
   }
 
   function get(workspaceId, year = currentFinancialYear()) {
     return documents.value[`${workspaceId}:${year}`] || null
-  }
-
-  async function refresh(workspaceId, year = currentFinancialYear()) {
-    loading.value = true
-    error.value = null
-    try {
-      const value = await rebuildFinancialYear(workspaceId, year)
-      documents.value = { ...documents.value, [`${workspaceId}:${year}`]: value }
-      return value
-    } catch (refreshError) {
-      error.value = refreshError
-      throw refreshError
-    } finally {
-      loading.value = false
-    }
   }
 
   async function refreshTracking(workspaceId, period) {
@@ -66,9 +56,9 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
   }
 
   function reset() {
-    subscriptions.forEach((unsubscribe) => unsubscribe())
-    subscriptions.clear()
-    requestId += 1
+    stopWatching()
+    requestIds.clear()
+    loadingKeys.clear()
     documents.value = {}
     loading.value = false
     error.value = null
@@ -76,10 +66,11 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
 
   function watchCurrentYear(workspaceId, year) {
     const key = `${workspaceId}:${year}`
-    if (subscriptions.has(key)) return
-    subscriptions.set(
+    if (activeSubscription?.key === key) return
+    stopWatching()
+    activeSubscription = {
       key,
-      subscribeFinancialYear(
+      unsubscribe: subscribeFinancialYear(
         workspaceId,
         year,
         (value) => {
@@ -89,8 +80,38 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
           error.value = subscriptionError
         },
       ),
-    )
+    }
   }
 
-  return { documents, loading, error, load, refresh, refreshTracking, get, reset }
+  function clearWorkspace(workspaceId) {
+    const prefix = `${workspaceId}:`
+    if (activeSubscription?.key.startsWith(prefix)) stopWatching()
+    documents.value = Object.fromEntries(
+      Object.entries(documents.value).filter(([key]) => !key.startsWith(prefix)),
+    )
+    for (const key of requestIds.keys()) {
+      if (key.startsWith(prefix)) requestIds.delete(key)
+    }
+    for (const key of loadingKeys) {
+      if (key.startsWith(prefix)) loadingKeys.delete(key)
+    }
+    loading.value = loadingKeys.size > 0
+  }
+
+  function stopWatching() {
+    activeSubscription?.unsubscribe()
+    activeSubscription = null
+  }
+
+  return {
+    documents,
+    loading,
+    error,
+    load,
+    refreshTracking,
+    get,
+    clearWorkspace,
+    stopWatching,
+    reset,
+  }
 })
