@@ -12,6 +12,15 @@
 
   <q-dialog v-model="dialog">
     <q-card class="estimate-dialog">
+      <q-btn
+        flat
+        round
+        dense
+        icon="close"
+        class="dialog-close"
+        :aria-label="t('common.cancel')"
+        v-close-popup
+      />
       <q-card-section>
         <h2>{{ t('expenses.quickEdit.title') }}</h2>
         <div class="estimate-fields">

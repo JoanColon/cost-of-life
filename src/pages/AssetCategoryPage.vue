@@ -33,7 +33,6 @@
               :to="assetsRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('assets.eyebrow') }}</div>
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -53,7 +52,7 @@
             <div class="asset-main">
               <span class="asset-icon"><q-icon :name="category.icon" /></span>
               <span class="asset-copy">
-                <strong>{{ asset.name }}</strong>
+                <strong>{{ assetDisplayName(asset) }}</strong>
                 <small>{{ assetSubtitle(asset) }}</small>
               </span>
             </div>
@@ -84,7 +83,7 @@
               dense
               icon="more_vert"
               color="grey-7"
-              :aria-label="t('assets.moreActions', { name: asset.name })"
+              :aria-label="t('assets.moreActions', { name: assetDisplayName(asset) })"
             >
               <q-menu anchor="bottom right" self="top right">
                 <q-list dense class="asset-menu">
@@ -148,9 +147,20 @@
 
     <q-dialog v-model="confirmDelete">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('assets.delete.title') }}</h2>
-          <p>{{ t('assets.delete.description', { name: deletingAsset?.name }) }}</p>
+          <p>
+            {{ t('assets.delete.description', { name: assetDisplayName(deletingAsset) }) }}
+          </p>
         </q-card-section>
         <q-card-actions align="between">
           <q-btn
@@ -186,7 +196,12 @@ import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
+import {
+  applyOwnership,
+  cloneOwnership,
+  createEqualOwnership,
+  createSingleOwnership,
+} from '@/domain/financial/ownership'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -230,18 +245,24 @@ const assetDefaults = computed(() => {
   if (!config) return null
 
   const firstItem = allCategoryAssets.value.length === 0
+  const ownership =
+    memberIds.value.length === 1
+      ? createSingleOwnership(authUser.value?.uid)
+      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
     subtype: category.value?.subtypes?.[0] || null,
     name: '',
     currentValue: firstItem ? (config.manualValue ?? 0) : 0,
-    ownership: cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value)),
+    ownership,
   }
 })
 const scopedAssets = computed(() =>
-  allCategoryAssets.value.map((asset) => ({
-    ...asset,
-    scopedValue: applyOwnership(asset.currentValue, asset.ownership, selectedMemberId.value),
-  })),
+  allCategoryAssets.value
+    .map((asset) => ({
+      ...asset,
+      scopedValue: applyOwnership(asset.currentValue, asset.ownership, selectedMemberId.value),
+    }))
+    .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
 )
 const categoryTotal = computed(() =>
   financialYearMonthCategoryValue(
@@ -292,6 +313,12 @@ async function preparePage(force = false) {
 
 function assetSubtitle(asset) {
   return asset.subtype ? t(`assets.subtypes.${asset.subtype}`) : t(category.value.descriptionKey)
+}
+
+function assetDisplayName(asset) {
+  if (asset?.name) return asset.name
+  if (asset?.subtype) return t(`assets.subtypes.${asset.subtype}`)
+  return category.value ? t(category.value.itemNameKey) : ''
 }
 
 function add() {
@@ -417,9 +444,6 @@ async function persist(action) {
 }
 .back-button {
   @include financial-back-button;
-}
-.eyebrow {
-  @include financial-eyebrow;
 }
 h1 {
   @include financial-title;

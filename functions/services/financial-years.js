@@ -24,11 +24,11 @@ async function rebuildFinancialYear(
       return
     }
     const latest = latestSnapshot.data() || {}
-    if (createOnly && latestSnapshot.exists && latest.totals) {
+    if (createOnly && latestSnapshot.exists && latest.months) {
       status = 'existing'
       return
     }
-    const affectedSections = latest.totals ? normalizeSections(sections) : PROJECTION_SECTIONS
+    const affectedSections = latest.months ? normalizeSections(sections) : PROJECTION_SECTIONS
     const config = await loadConfig(workspace, affectedSections, transaction)
     const [assetsSnapshot, liabilitiesSnapshot, incomeSnapshot, expenseSnapshot, trackingSnapshot] =
       await Promise.all([

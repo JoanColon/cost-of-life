@@ -2,7 +2,6 @@
   <q-card class="asset-form-card">
     <q-card-section class="form-header">
       <div>
-        <div class="eyebrow">{{ t(category.nameKey) }}</div>
         <h2>{{ asset ? t('assets.form.editTitle') : t(category.addLabelKey) }}</h2>
       </div>
       <q-btn
@@ -10,6 +9,7 @@
         round
         dense
         icon="close"
+        class="dialog-close"
         :aria-label="t('common.cancel')"
         @click="$emit('cancel')"
       />
@@ -26,18 +26,11 @@
           :label="t('assets.form.type')"
           :options="subtypeOptions"
         />
-        <q-input
-          v-model.trim="name"
-          outlined
-          autofocus
-          :label="t('assets.form.name')"
-          maxlength="80"
-          lazy-rules
-          :rules="[(value) => Boolean(value) || t('assets.form.nameRequired')]"
-        />
+        <q-input v-model.trim="name" outlined :label="t('assets.form.name')" maxlength="80" />
         <q-input
           v-model="currentValue"
           outlined
+          autofocus
           type="number"
           min="0"
           step="0.01"
@@ -77,7 +70,7 @@
               no-caps
               color="primary"
               type="button"
-              :label="asset ? t('common.save') : t('common.add')"
+              :label="t('common.save')"
               :loading="saving || submitting"
               :disable="!ownershipValid || saving || submitting"
               @click="submit"
@@ -152,7 +145,7 @@ async function submit() {
 
   const formIsValid = await form.value?.validate()
   const value = normalizeMoney(currentValue.value)
-  if (!formIsValid || !name.value || value === null || !ownershipValid.value) return
+  if (!formIsValid || value === null || !ownershipValid.value) return
 
   submitting.value = true
   emit('save', {
@@ -178,16 +171,8 @@ async function submit() {
   gap: 1rem;
 }
 
-.eyebrow {
-  color: var(--color-primary);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
 h2 {
-  margin: 0.25rem 0 0;
+  margin: 0;
   color: var(--color-ink);
   font-size: 1.65rem;
   letter-spacing: -0.035em;

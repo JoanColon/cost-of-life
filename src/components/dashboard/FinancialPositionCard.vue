@@ -5,7 +5,6 @@
     :subtitle="t('dashboard.financialPosition.subtitle')"
     icon="bar_chart"
     icon-tone="green"
-    @open="$emit('open')"
   >
     <div class="position-layout">
       <div class="position-summary">
@@ -56,7 +55,7 @@ defineProps({
   historyLoading: { type: Boolean, default: false },
   historyError: { type: Boolean, default: false },
 })
-defineEmits(['open', 'open-assets', 'open-liabilities'])
+defineEmits(['open-assets', 'open-liabilities'])
 const { t } = useI18n()
 </script>
 

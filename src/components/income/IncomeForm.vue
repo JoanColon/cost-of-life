@@ -2,7 +2,6 @@
   <q-card class="income-form-card">
     <q-card-section class="form-header">
       <div>
-        <div class="eyebrow">{{ t(category.nameKey) }}</div>
         <h2>{{ income ? t('income.form.editTitle') : t(category.addLabelKey) }}</h2>
       </div>
       <q-btn
@@ -10,6 +9,7 @@
         round
         dense
         icon="close"
+        class="dialog-close"
         :aria-label="t('common.cancel')"
         @click="$emit('cancel')"
       />
@@ -421,15 +421,8 @@ function submit() {
 .form-body {
   padding-top: 0;
 }
-.eyebrow {
-  color: var(--color-primary);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
 h2 {
-  margin: 0.25rem 0 0;
+  margin: 0;
   color: var(--color-ink);
   font-size: 1.65rem;
   letter-spacing: -0.035em;

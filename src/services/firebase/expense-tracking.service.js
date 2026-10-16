@@ -2,20 +2,14 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
-  query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   Timestamp,
-  where,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 import {
-  defaultExpenseTrackingCategoryIds,
   expenseTrackingCategories,
   expenseTrackingCategoryIds,
-  trackingSubcategoryIdsForModelExpenses,
 } from '@/config/expense-tracking-categories'
 import {
   addTrackedItem,
@@ -29,20 +23,11 @@ import {
 import { normalizeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { currentUserId } from '@/services/firebase/current-user'
-import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
-
-const DEFAULT_TRACKING_CATEGORIES = [...defaultExpenseTrackingCategoryIds]
+import { getModelConfig } from '@/services/firebase/model-config.service'
+import { syncExpenseTrackingModel } from '@/services/firebase/financial-model-mutations.service'
 
 function trackingRef(workspaceId, period) {
   return doc(db, 'workspaces', workspaceId, 'expenseTracking', period)
-}
-
-function configRef(workspaceId) {
-  return modelConfigRef(workspaceId, 'expenseTracking')
-}
-
-function modelExpensesRef(workspaceId) {
-  return collection(db, 'workspaces', workspaceId, 'modelExpenses')
 }
 
 export async function getExpenseTrackingMonth(workspaceId, period) {
@@ -54,38 +39,29 @@ export async function getExpenseTrackingMonth(workspaceId, period) {
 }
 
 export async function getExpenseTrackingPreferences(workspaceId) {
-  const [config, availableSubcategories] = await Promise.all([
-    getModelConfig(workspaceId, 'expenseTracking'),
-    getTrackingEligibleSubcategories(workspaceId),
-  ])
+  const config = await getModelConfig(workspaceId, 'expenseTracking')
   const saved = config?.enabledSubcategories
   return {
-    availableSubcategories,
-    enabledSubcategories: normalizeEnabledCategories(
-      Array.isArray(saved) ? saved : DEFAULT_TRACKING_CATEGORIES,
-      availableSubcategories,
-    ),
+    enabledSubcategories: normalizeEnabledCategories(Array.isArray(saved) ? saved : []),
   }
 }
 
 export async function saveExpenseTrackingPreferences(workspaceId, categoryIds) {
-  const userId = currentUserId()
-  const availableSubcategories = await getTrackingEligibleSubcategories(workspaceId)
-  const trackingEnabledSubcategories = normalizeEnabledCategories(
-    categoryIds,
-    availableSubcategories,
-  )
-  await setDoc(
-    configRef(workspaceId),
-    {
-      schemaVersion: 1,
-      enabledSubcategories: trackingEnabledSubcategories,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    },
-    { merge: true },
-  )
-  return trackingEnabledSubcategories
+  const selected = new Set(normalizeEnabledCategories(categoryIds))
+  const subcategories = expenseTrackingCategories
+    .filter(({ id }) => selected.has(id))
+    .map(({ id, categoryId, defaults }) => ({
+      category: categoryId,
+      type: id,
+      name: '',
+      estimate: { amount: 0, frequency: defaults.frequency },
+      variability: defaults.variability,
+      recurrence: defaults.recurrence,
+      necessity: defaults.necessity,
+      trackingEligible: true,
+    }))
+  const result = await syncExpenseTrackingModel(workspaceId, subcategories)
+  return normalizeEnabledCategories(result.enabledSubcategories)
 }
 
 export async function createTrackedExpense(workspaceId, period, subcategoryId, input, memberIds) {
@@ -96,12 +72,8 @@ export async function createTrackedExpense(workspaceId, period, subcategoryId, i
     memberIds,
     period,
   )
-  return mutateMonth(
-    workspaceId,
-    period,
-    userId,
-    (month) => addTrackedItem(month, subcategoryId, item),
-    [subcategoryId],
+  return mutateMonth(workspaceId, period, userId, (month) =>
+    addTrackedItem(month, subcategoryId, item),
   )
 }
 
@@ -116,12 +88,8 @@ export async function updateTrackedExpense(
   const userId = currentUserId()
   assertSubcategory(subcategoryId)
   const changes = normalizeItem({ ...input, id: itemId }, memberIds, period)
-  return mutateMonth(
-    workspaceId,
-    period,
-    userId,
-    (month) => updateTrackedItem(month, subcategoryId, itemId, changes),
-    [subcategoryId],
+  return mutateMonth(workspaceId, period, userId, (month) =>
+    updateTrackedItem(month, subcategoryId, itemId, changes),
   )
 }
 
@@ -136,40 +104,24 @@ export async function removeTrackedExpense(workspaceId, period, subcategoryId, i
 export async function saveTrackingReconciliation(workspaceId, period, subcategoryId, decision) {
   const userId = currentUserId()
   assertSubcategory(subcategoryId)
-  return mutateMonth(
-    workspaceId,
-    period,
-    userId,
-    (month) => setTrackingDecision(month, subcategoryId, decision),
-    decision === 'tracked' ? [subcategoryId] : [],
+  return mutateMonth(workspaceId, period, userId, (month) =>
+    setTrackingDecision(month, subcategoryId, decision),
   )
 }
 
 export async function saveTrackingReconciliations(workspaceId, period, subcategoryIds, decision) {
   const userId = currentUserId()
   subcategoryIds.forEach(assertSubcategory)
-  return mutateMonth(
-    workspaceId,
-    period,
-    userId,
-    (month) => setTrackingDecisions(month, subcategoryIds, decision),
-    decision === 'tracked' ? subcategoryIds : [],
+  return mutateMonth(workspaceId, period, userId, (month) =>
+    setTrackingDecisions(month, subcategoryIds, decision),
   )
 }
 
-async function mutateMonth(workspaceId, period, userId, mutation, requiredSubcategoryIds = []) {
+async function mutateMonth(workspaceId, period, userId, mutation) {
   assertPeriod(period)
   const documentRef = trackingRef(workspaceId, period)
   return runTransaction(db, async (transaction) => {
-    const [snapshot, ...modelSnapshots] = await Promise.all([
-      transaction.get(documentRef),
-      ...requiredSubcategoryIds.map((subcategoryId) =>
-        transaction.get(modelExpenseRef(workspaceId, subcategoryId)),
-      ),
-    ])
-    modelSnapshots.forEach((modelSnapshot, index) => {
-      assertTrackingEligibleModel(modelSnapshot, requiredSubcategoryIds[index])
-    })
+    const snapshot = await transaction.get(documentRef)
     const current = snapshot.exists()
       ? normalizeTrackingMonth(snapshot.data(), period)
       : emptyExpenseTrackingMonth(period)
@@ -217,52 +169,9 @@ function dateTimestamp(value, period) {
   return Timestamp.fromDate(date)
 }
 
-async function getTrackingEligibleSubcategories(workspaceId) {
-  const [snapshot, expenseConfig] = await Promise.all([
-    getDocs(query(modelExpensesRef(workspaceId), where('trackingEligible', '==', true))),
-    getModelConfig(workspaceId, 'expenses'),
-  ])
-  const enabledCategories = new Set(
-    Object.entries(expenseConfig.categories || {})
-      .filter(([, category]) => category.enabled)
-      .map(([categoryId]) => categoryId),
-  )
-  return trackingSubcategoryIdsForModelExpenses(
-    snapshot.docs
-      .map((document) => document.data())
-      .filter((expense) => enabledCategories.has(expense.category)),
-  )
-}
-
-function normalizeEnabledCategories(
-  categoryIds,
-  availableSubcategories = expenseTrackingCategoryIds,
-) {
+function normalizeEnabledCategories(categoryIds) {
   const selected = new Set(categoryIds)
-  const available = new Set(availableSubcategories)
-  return expenseTrackingCategoryIds.filter((id) => selected.has(id) && available.has(id))
-}
-
-function modelExpenseRef(workspaceId, subcategoryId) {
-  const category = trackingCategory(subcategoryId)
-  return doc(modelExpensesRef(workspaceId), `${category.categoryId}--${subcategoryId}`)
-}
-
-function trackingCategory(subcategoryId) {
-  return expenseTrackingCategories.find(({ id }) => id === subcategoryId) || null
-}
-
-function assertTrackingEligibleModel(snapshot, subcategoryId) {
-  const expected = trackingCategory(subcategoryId)
-  const expense = snapshot.data()
-  if (
-    !snapshot.exists() ||
-    expense?.trackingEligible !== true ||
-    expense?.type !== subcategoryId ||
-    expense?.category !== expected?.categoryId
-  ) {
-    throw new Error('Tracking requires an eligible model expense')
-  }
+  return expenseTrackingCategoryIds.filter((id) => selected.has(id))
 }
 
 function assertSubcategory(subcategoryId) {

@@ -13,8 +13,6 @@ const MONTHS = [
   'december',
 ]
 
-const SCHEMA_VERSION = 1
-
 function buildFinancialYear({
   year,
   config = {},
@@ -68,11 +66,11 @@ function updateFinancialYearProjection(
       const assetsValue =
         affected.has('assets') && monthKey >= assetStartMonth ?
           buildPositionMonth(config.assets?.categories || {}, assets, 'currentValue') :
-          previous.assets || aggregateSection({})
+          canonicalSection(previous.assets)
       const liabilitiesValue =
         affected.has('liabilities') && monthKey >= liabilityStartMonth ?
           buildPositionMonth(config.liabilities?.categories || {}, liabilities, 'balance') :
-          previous.liabilities || aggregateSection({})
+          canonicalSection(previous.liabilities)
       const expensesValue = affected.has('expenses') ?
         buildExpenseMonth(
             config.expenses?.categories || {},
@@ -80,22 +78,17 @@ function updateFinancialYearProjection(
             trackingMonths[`${year}-${monthKey}`],
             monthName,
           ) :
-        previous.expenses || aggregateSection({})
+        canonicalSection(previous.expenses)
       const incomeValue = affected.has('income') ?
         buildIncomeMonth(config.income?.categories || {}, income, monthIndex) :
-        previous.income || aggregateSection({})
+        canonicalSection(previous.income)
       return [
         monthKey,
         {
-          ...previous,
           assets: assetsValue,
           liabilities: liabilitiesValue,
           income: incomeValue,
           expenses: expensesValue,
-          netWorth: money(assetsValue.total - liabilitiesValue.total),
-          memberNetWorth: subtractMaps(assetsValue.memberValues, liabilitiesValue.memberValues),
-          savings: money(incomeValue.total - expensesValue.total),
-          memberSavings: subtractMaps(incomeValue.memberValues, expensesValue.memberValues),
         },
       ]
     }),
@@ -117,14 +110,13 @@ function updateFinancialYearProjection(
     projectionState.liabilitiesInitializedMonth = positionObservedMonth
   }
 
-  return {
-    ...financialYear,
+  const result = {
+    ...financialYearMetadata(financialYear),
     year,
-    schemaVersion: SCHEMA_VERSION,
     projectionState,
     months,
-    totals: annualTotals(months),
   }
+  return result
 }
 
 function hasPositionValue(config, items) {
@@ -160,9 +152,9 @@ function buildPositionMonth(categoryConfig, items, valueField) {
         memberValues: allocate(total, category.ownership),
       }
     }
-    categories[categoryId] = aggregateCategory(subcategories, 'total')
+    categories[categoryId] = { subcategories }
   }
-  return aggregateSection(categories)
+  return { categories }
 }
 
 function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
@@ -204,9 +196,9 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
         actualMemberValues: {},
       }
     }
-    categories[categoryId] = aggregateCategory(subcategories, 'effective')
+    categories[categoryId] = { subcategories }
   }
-  return aggregateSection(categories)
+  return { categories }
 }
 
 function buildIncomeMonth(categoryConfig, income, monthIndex) {
@@ -227,7 +219,7 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
         }
       }
     } else {
-      const total = money((Number(category.manualValue) || 0) / 12)
+      const total = distributeAnnual(category.manualValue, monthIndex)
       subcategories[categoryId] = {
         name: '',
         type: categoryId,
@@ -235,65 +227,9 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
         memberValues: allocate(total, category.ownership),
       }
     }
-    categories[categoryId] = aggregateCategory(subcategories, 'total')
+    categories[categoryId] = { subcategories }
   }
-  return aggregateSection(categories)
-}
-
-function annualTotals(months) {
-  const endingPosition = months['12']
-  const incomeCategories = annualCategories(months, 'income')
-  const expensesCategories = annualCategories(months, 'expenses')
-  const incomeMemberValues = sumMonthMaps(months, 'income')
-  const expensesMemberValues = sumMonthMaps(months, 'expenses')
-  return {
-    assets: endingPosition.assets.total,
-    liabilities: endingPosition.liabilities.total,
-    netWorth: endingPosition.netWorth,
-    assetsMemberValues: endingPosition.assets.memberValues,
-    liabilitiesMemberValues: endingPosition.liabilities.memberValues,
-    memberNetWorth: endingPosition.memberNetWorth,
-    assetsCategories: endingPosition.assets.categories,
-    liabilitiesCategories: endingPosition.liabilities.categories,
-    income: sumMonths(months, 'income'),
-    expenses: sumMonths(months, 'expenses'),
-    savings: money(Object.values(months).reduce((sum, month) => sum + month.savings, 0)),
-    incomeMemberValues,
-    expensesMemberValues,
-    memberSavings: subtractMaps(incomeMemberValues, expensesMemberValues),
-    incomeCategories,
-    expensesCategories,
-  }
-}
-
-function annualCategories(months, section) {
-  const result = {}
-  for (const month of Object.values(months)) {
-    for (const [categoryId, category] of Object.entries(month[section].categories)) {
-      const target = (result[categoryId] ||= { total: 0, memberValues: {}, subcategories: {} })
-      target.total = money(target.total + category.total)
-      target.memberValues = addMaps(target.memberValues, category.memberValues)
-      for (const [id, item] of Object.entries(category.subcategories)) {
-        const annual = (target.subcategories[id] ||= {
-          name: item.name,
-          type: item.type,
-          estimated: 0,
-          actual: 0,
-          effective: 0,
-          total: 0,
-          trackedMonths: 0,
-          memberValues: {},
-        })
-        annual.estimated = money(annual.estimated + (Number(item.estimated) || 0))
-        if (item.actual != null) annual.actual = money(annual.actual + item.actual)
-        annual.effective = money(annual.effective + (Number(item.effective) || 0))
-        annual.total = money(annual.total + (Number(item.total) || 0))
-        if (item.source === 'tracked') annual.trackedMonths += 1
-        annual.memberValues = addMaps(annual.memberValues, item.memberValues)
-      }
-    }
-  }
-  return result
+  return { categories }
 }
 
 function expenseMonth(expense, monthName) {
@@ -328,7 +264,7 @@ function incomeMonth(calculation, monthIndex) {
     )
   }
   if (calculation?.mode === 'annual_salary') {
-    return money((Number(calculation.annualAmount) || 0) / 12)
+    return distributeAnnual(calculation.annualAmount, monthIndex)
   }
   if (calculation?.mode === 'one_time') {
     const month = MONTHS.includes(calculation.month) ? calculation.month : 'january'
@@ -336,7 +272,14 @@ function incomeMonth(calculation, monthIndex) {
   }
   const multiplier =
     { weekly: 52, monthly: 12, quarterly: 4, yearly: 1 }[calculation?.frequency] || 0
-  return money(((Number(calculation?.amount) || 0) * multiplier) / 12)
+  return distributeAnnual((Number(calculation?.amount) || 0) * multiplier, monthIndex)
+}
+
+function distributeAnnual(value, monthIndex) {
+  const annualCents = Math.round(money(value) * 100)
+  const monthlyCents = Math.floor(annualCents / 12)
+  const remainder = annualCents % 12
+  return money((monthlyCents + (monthIndex < remainder ? 1 : 0)) / 100)
 }
 
 function trackedValue(month, id) {
@@ -382,40 +325,40 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
         actualMemberValues: tracked.actualMemberValues,
       }
     }
-    categories[categoryId] = aggregateCategory(subcategories, 'effective')
+    categories[categoryId] = { subcategories }
   }
-  const expenses = aggregateSection(categories)
+  const expenses = { categories }
   const month = {
-    ...previous,
+    assets: canonicalSection(previous.assets),
+    liabilities: canonicalSection(previous.liabilities),
+    income: canonicalSection(previous.income),
     expenses,
-    savings: money(previous.income.total - expenses.total),
-    memberSavings: subtractMaps(previous.income.memberValues, expenses.memberValues),
   }
   const months = { ...financialYear.months, [monthKey]: month }
-  return { ...financialYear, months, totals: annualTotals(months) }
-}
-
-function aggregateCategory(subcategories, field) {
   return {
-    total: money(
-      Object.values(subcategories).reduce((sum, item) => sum + (Number(item[field]) || 0), 0),
-    ),
-    memberValues: Object.values(subcategories).reduce(
-      (sum, item) => addMaps(sum, item.memberValues),
-      {},
-    ),
-    subcategories,
+    ...financialYearMetadata(financialYear),
+    year: financialYear.year,
+    projectionState: { ...(financialYear.projectionState || {}) },
+    months,
   }
 }
 
-function aggregateSection(categories) {
+function financialYearMetadata(financialYear) {
+  return Object.fromEntries(
+    ['status', 'generatedAt', 'updatedAt']
+      .filter((field) => financialYear?.[field] != null)
+      .map((field) => [field, financialYear[field]]),
+  )
+}
+
+function canonicalSection(section) {
   return {
-    total: money(Object.values(categories).reduce((sum, category) => sum + category.total, 0)),
-    memberValues: Object.values(categories).reduce(
-      (sum, category) => addMaps(sum, category.memberValues),
-      {},
+    categories: Object.fromEntries(
+      Object.entries(section?.categories || {}).map(([categoryId, category]) => [
+        categoryId,
+        { subcategories: { ...(category?.subcategories || {}) } },
+      ]),
     ),
-    categories,
   }
 }
 
@@ -449,21 +392,6 @@ function addMaps(first = {}, second = {}) {
   )
 }
 
-function subtractMaps(first = {}, second = {}) {
-  const keys = new Set([...Object.keys(first), ...Object.keys(second)])
-  return Object.fromEntries(
-    [...keys].map((key) => [key, money((Number(first[key]) || 0) - (Number(second[key]) || 0))]),
-  )
-}
-
-function sumMonths(months, section) {
-  return money(Object.values(months).reduce((sum, month) => sum + month[section].total, 0))
-}
-
-function sumMonthMaps(months, section) {
-  return Object.values(months).reduce((sum, month) => addMaps(sum, month[section].memberValues), {})
-}
-
 function money(value) {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : 0
@@ -482,7 +410,6 @@ function assertMonth(month) {
 }
 
 module.exports = {
-  SCHEMA_VERSION,
   applyTrackingMonth,
   buildFinancialYear,
   updateFinancialYearProjection,

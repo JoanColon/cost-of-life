@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { buildNetWorthSeries } from '../../../src/domain/financial/history'
 
+function positionMonth(assets, liabilities = 0) {
+  const memberValues = { member: assets }
+  return {
+    assets: {
+      categories: {
+        assets: { subcategories: { assets: { total: assets, memberValues } } },
+      },
+    },
+    liabilities: {
+      categories: {
+        liabilities: {
+          subcategories: {
+            liabilities: { total: liabilities, memberValues: { member: liabilities } },
+          },
+        },
+      },
+    },
+  }
+}
+
 describe('financial history series', () => {
   it('flattens and sorts annual documents into monthly net worth points', () => {
     expect(
@@ -8,11 +28,11 @@ describe('financial history series', () => {
         {
           id: '2026',
           months: {
-            '02': { netWorth: 120 },
-            '01': { netWorth: 100 },
+            '02': positionMonth(120),
+            '01': positionMonth(100),
           },
         },
-        { year: 2025, months: { 12: { netWorth: 90 } } },
+        { year: 2025, months: { 12: positionMonth(90) } },
       ]),
     ).toEqual([
       { period: '2025-12', value: 90 },
@@ -26,16 +46,16 @@ describe('financial history series', () => {
       buildNetWorthSeries([
         {
           id: 'invalid',
-          months: { '01': { netWorth: 10 } },
+          months: { '01': positionMonth(10) },
         },
         {
           year: 2026,
           months: {
-            '00': { netWorth: 10 },
-            13: { netWorth: 20 },
-            '03': { netWorth: 'not-a-number' },
-            '04': { netWorth: -50 },
-            '05': { netWorth: null },
+            '00': positionMonth(10),
+            13: positionMonth(20),
+            '03': {},
+            '04': positionMonth(50, 100),
+            '05': null,
           },
         },
       ]),
@@ -53,9 +73,9 @@ describe('financial history series', () => {
           {
             year: 2026,
             months: {
-              '09': { netWorth: 90 },
-              10: { netWorth: 100 },
-              11: { netWorth: 110 },
+              '09': positionMonth(90),
+              10: positionMonth(100),
+              11: positionMonth(110),
             },
           },
         ],

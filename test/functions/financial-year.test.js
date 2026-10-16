@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import financialYearDomain from '../../functions/domain/financial-year.js'
+import {
+  financialYearExpenseItemValue,
+  financialYearMonthValue,
+  financialYearValue,
+} from '../../src/domain/financial/financial-year.js'
 
 const { applyTrackingMonth, buildFinancialYear, updateFinancialYearProjection } =
   financialYearDomain
@@ -31,15 +36,27 @@ function projection() {
 }
 
 describe('server financial year projection', () => {
+  it('uses one client selector for canonical and edited expense values', () => {
+    expect(
+      financialYearExpenseItemValue({ source: 'tracked', effective: 437 }, 500),
+    ).toBe(437)
+    expect(financialYearExpenseItemValue({ source: 'model', effective: 500 }, 600)).toBe(600)
+    expect(financialYearExpenseItemValue({ source: 'model', effective: 500 })).toBe(500)
+  })
+
   it('creates the twelve estimated months from the current model', () => {
     const result = projection()
 
     expect(Object.keys(result.months)).toHaveLength(12)
-    expect(result.months['01'].assets.total).toBe(1000)
-    expect(result.months['01'].liabilities.total).toBe(400)
-    expect(result.months['01'].netWorth).toBe(600)
-    expect(result.months['12'].netWorth).toBe(600)
-    expect(result.totals.expenses).toBe(6000)
+    expect(result.totals).toBeUndefined()
+    expect(result.schemaVersion).toBeUndefined()
+    expect(result.months['01'].assets.total).toBeUndefined()
+    expect(result.months['01'].assets.categories.cash.total).toBeUndefined()
+    expect(financialYearMonthValue(result, '01', 'assets')).toBe(1000)
+    expect(financialYearMonthValue(result, '01', 'liabilities')).toBe(400)
+    expect(financialYearMonthValue(result, '01', 'netWorth')).toBe(600)
+    expect(financialYearMonthValue(result, '12', 'netWorth')).toBe(600)
+    expect(financialYearValue(result, 'expenses')).toBe(6000)
     expect(result.months['10'].expenses.categories.food.subcategories.groceries.source).toBe(
       'model',
     )
@@ -64,9 +81,29 @@ describe('server financial year projection', () => {
       },
     })
 
-    expect(result.months['01'].assets.total).toBe(2500)
-    expect(result.totals.expenses).toBe(7200)
-    expect(result.totals.income).toBe(12000)
+    expect(financialYearMonthValue(result, '01', 'assets')).toBe(2500)
+    expect(financialYearValue(result, 'expenses')).toBe(7200)
+    expect(financialYearValue(result, 'income')).toBe(12000)
+  })
+
+  it('distributes annual income cents without changing the annual amount', () => {
+    const result = buildFinancialYear({
+      year: 2026,
+      config: { income: { categories: { employment: { enabled: true } } } },
+      income: [
+        {
+          id: 'salary',
+          category: 'employment',
+          subtype: 'salary',
+          calculation: { mode: 'annual_salary', annualAmount: 100, paymentsPerYear: 12 },
+          ownership,
+        },
+      ],
+    })
+
+    expect(financialYearMonthValue(result, '01', 'income')).toBe(8.34)
+    expect(financialYearMonthValue(result, '12', 'income')).toBe(8.33)
+    expect(financialYearValue(result, 'income')).toBe(100)
   })
 
   it('does not rewrite closed position months when assets change in December', () => {
@@ -79,12 +116,12 @@ describe('server financial year projection', () => {
       positionFromMonths: { assets: '12' },
     })
 
-    expect(updated.months['01'].assets.total).toBe(1000)
-    expect(updated.months['12'].assets.total).toBe(1200)
+    expect(financialYearMonthValue(updated, '01', 'assets')).toBe(1000)
+    expect(financialYearMonthValue(updated, '12', 'assets')).toBe(1200)
     expect(updated.months['01'].liabilities).toEqual(original.months['01'].liabilities)
     expect(updated.months['01'].expenses).toEqual(original.months['01'].expenses)
-    expect(updated.months['01'].netWorth).toBe(600)
-    expect(updated.months['12'].netWorth).toBe(800)
+    expect(financialYearMonthValue(updated, '01', 'netWorth')).toBe(600)
+    expect(financialYearMonthValue(updated, '12', 'netWorth')).toBe(800)
   })
 
   it('updates a historical tracked month without changing its stored estimates', () => {
@@ -100,8 +137,8 @@ describe('server financial year projection', () => {
       effective: 437,
       source: 'tracked',
     })
-    expect(updated.totals.expenses).toBe(5937)
-    expect(original.totals.expenses).toBe(6000)
+    expect(financialYearValue(updated, 'expenses')).toBe(5937)
+    expect(financialYearValue(original, 'expenses')).toBe(6000)
   })
 
   it('keeps the tracked actual when a historical month uses the model', () => {
@@ -116,6 +153,6 @@ describe('server financial year projection', () => {
       source: 'model',
       actualMemberValues: { 'member-a': 437 },
     })
-    expect(updated.totals.expenses).toBe(6000)
+    expect(financialYearValue(updated, 'expenses')).toBe(6000)
   })
 })

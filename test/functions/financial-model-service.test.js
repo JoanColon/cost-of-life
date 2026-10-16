@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import financialModelService from '../../functions/services/financial-model.js'
 import financialYearDomain from '../../functions/domain/financial-year.js'
 import financialYearsService from '../../functions/services/financial-years.js'
+import { financialYearValue } from '../../src/domain/financial/financial-year.js'
 
 const { mutateFinancialModel } = financialModelService
 const { buildFinancialYear } = financialYearDomain
@@ -18,7 +19,13 @@ describe('atomic financial model mutations', () => {
       section: 'assets',
       collection: 'modelAssets',
       result: 'asset',
-      item: { category: 'cash', name: 'Account', currentValue: 100, ownership },
+      item: {
+        category: 'cash',
+        subtype: 'current_account',
+        name: '',
+        currentValue: 100,
+        ownership,
+      },
       expected: { assets: 100, netWorth: 100 },
     },
     {
@@ -77,7 +84,10 @@ describe('atomic financial model mutations', () => {
       `workspaces/workspace-a/${testCase.collection}/${result[testCase.result].id}`,
     )
     const financialYearWrite = writes.find(({ path }) => path.endsWith(`/financialYears/${currentYear()}`))
-    expect(financialYearWrite.data.totals).toMatchObject(testCase.expected)
+    expect(financialYearWrite.data.totals).toBeUndefined()
+    for (const [section, value] of Object.entries(testCase.expected)) {
+      expect(financialYearValue(financialYearWrite.data, section)).toBe(value)
+    }
   })
 
   it('rejects ownership that references someone outside the workspace', async () => {
@@ -106,7 +116,7 @@ describe('atomic financial model mutations', () => {
     expect(writes).toEqual([])
   })
 
-  it('updates an existing item and its projected totals in the same transaction', async () => {
+  it('updates an existing item and its monthly projection in the same transaction', async () => {
     const existing = {
       id: 'housing--mortgage_rent',
       category: 'housing',
@@ -135,12 +145,73 @@ describe('atomic financial model mutations', () => {
     })
 
     expect(result.expense.estimate.amount).toBe(20)
-    expect(writes.find(({ path }) => path.endsWith(`/financialYears/${currentYear()}`)).data.totals)
-      .toMatchObject({ expenses: 240, savings: -240 })
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'expenses')).toBe(240)
+    expect(financialYearValue(financialYear, 'savings')).toBe(-240)
+  })
+
+  it('adds newly tracked expenses and preserves the simple category estimate', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'expenses',
+      collection: 'modelExpenses',
+      category: 'food',
+      configCategory: {
+        enabled: false,
+        manualEstimate: { amount: 500, frequency: 'monthly' },
+        ownership,
+      },
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'expenses',
+      operation: 'syncTracking',
+      subcategories: [
+        {
+          category: 'food',
+          type: 'groceries',
+          estimate: { amount: 0, frequency: 'monthly' },
+          variability: 'variable',
+          recurrence: 'recurring',
+          necessity: 'essential',
+        },
+      ],
+    })
+
+    expect(result.enabledSubcategories).toEqual(['groceries'])
+    expect(
+      writes.find(({ path }) => path.endsWith('/modelExpenses/food--groceries')).data,
+    ).toMatchObject({
+      category: 'food',
+      type: 'groceries',
+      estimate: { amount: 500, frequency: 'monthly' },
+      trackingEligible: true,
+      ownership,
+    })
+    expect(
+      writes.find(({ path }) => path.endsWith('/modelConfig/expenses')).data.categories.food.enabled,
+    ).toBe(true)
+    expect(
+      writes.find(({ path }) => path.endsWith('/modelConfig/expenseTracking')).data
+        .enabledSubcategories,
+    ).toEqual(['groceries'])
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'expenses')).toBe(6000)
   })
 })
 
-function createFirestore({ section, collection, category, items = [] }) {
+function createFirestore({
+  section,
+  collection,
+  category,
+  items = [],
+  configCategory = { enabled: true, ownership },
+}) {
   const writes = []
   let generatedId = 0
   const year = currentYear()
@@ -170,7 +241,7 @@ function createFirestore({ section, collection, category, items = [] }) {
       return documentSnapshot({ memberIds: ['member-a'] })
     }
     if (target.path === `workspaces/workspace-a/modelConfig/${section}`) {
-      return documentSnapshot({ categories: { [category]: { enabled: true, ownership } } })
+      return documentSnapshot({ categories: { [category]: configCategory } })
     }
     if (target.path === `workspaces/workspace-a/financialYears/${year}`) {
       return documentSnapshot(financialYear)

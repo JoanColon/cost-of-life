@@ -1,3 +1,5 @@
+import { financialYearMonthValue } from './financial-year'
+
 export function buildNetWorthSeries(historyDocuments = [], { throughPeriod = null } = {}) {
   return historyDocuments
     .flatMap((history) => {
@@ -6,7 +8,10 @@ export function buildNetWorthSeries(historyDocuments = [], { throughPeriod = nul
 
       return Object.entries(history.months || {}).map(([month, projection]) => ({
         period: `${year}-${month}`,
-        value: projection?.netWorth == null ? Number.NaN : Number(projection.netWorth),
+        value:
+          projection?.assets && projection?.liabilities
+            ? financialYearMonthValue(history, month, 'netWorth')
+            : Number.NaN,
       }))
     })
     .filter(

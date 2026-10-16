@@ -26,23 +26,38 @@ const sectionDefinitions = {
 
 async function mutateFinancialModel(
   firestore,
-  { workspaceId, userId, section, operation, itemId = null, item = null, categoryId = null },
+  {
+    workspaceId,
+    userId,
+    section,
+    operation,
+    itemId = null,
+    item = null,
+    categoryId = null,
+    subcategories = null,
+  },
 ) {
   assertText(workspaceId, 'A workspace is required')
   assertText(userId, 'Authentication is required')
   const definition = sectionDefinitions[section]
   if (!definition) throw new Error('A valid financial section is required')
-  if (!['create', 'update', 'delete', 'deleteCategory'].includes(operation)) {
+  if (!['create', 'update', 'delete', 'deleteCategory', 'syncTracking'].includes(operation)) {
     throw new Error('A valid model operation is required')
+  }
+  if (operation === 'syncTracking' && section !== 'expenses') {
+    throw new Error('Tracking can only be synchronized with expenses')
   }
 
   const year = currentYear()
   const month = currentMonth()
   const workspaceReference = firestore.collection('workspaces').doc(workspaceId)
   const configReference = workspaceReference.collection('modelConfig').doc(section)
+  const trackingConfigReference = workspaceReference.collection('modelConfig').doc('expenseTracking')
   const itemsReference = workspaceReference.collection(definition.collection)
   const financialYearReference = workspaceReference.collection('financialYears').doc(String(year))
   const requestedItem = operation === 'create' ? normalizeItem(section, item) : null
+  const requestedSubcategories =
+    operation === 'syncTracking' ? normalizeTrackingSubcategories(subcategories) : []
   const itemReference = resolveItemReference(
     itemsReference,
     section,
@@ -58,11 +73,14 @@ async function mutateFinancialModel(
       transaction.get(financialYearReference),
     ])
     const workspace = assertWorkspaceAccess(workspaceSnapshot, userId)
-    if (!financialYearSnapshot.exists || !financialYearSnapshot.data()?.totals) {
+    if (!financialYearSnapshot.exists || !financialYearSnapshot.data()?.months) {
       throw new Error('The current financial year must exist before changing the financial model')
     }
 
-    const config = configSnapshot.data() || { categories: {} }
+    const config = {
+      ...(configSnapshot.data() || {}),
+      categories: { ...(configSnapshot.data()?.categories || {}) },
+    }
     const itemSnapshot = itemReference ? await transaction.get(itemReference) : null
     const reads = [transaction.get(itemsReference)]
     if (section === 'expenses') {
@@ -79,6 +97,8 @@ async function mutateFinancialModel(
     const existingItems = documents(itemsSnapshot)
     let nextItems = existingItems
     let response
+    let modelChanged = operation !== 'syncTracking'
+    let configChanged = false
 
     if (operation === 'create') {
       assertCategoryEnabled(config, requestedItem.category, section)
@@ -113,9 +133,13 @@ async function mutateFinancialModel(
 
     if (operation === 'delete') {
       if (!itemSnapshot?.exists) throw new Error(`${capitalize(definition.result)} not found`)
+      const deletedItem = itemSnapshot.data()
       nextItems = existingItems.filter((candidate) => candidate.id !== itemReference.id)
       transaction.delete(itemReference)
-      response = { categoryId: itemSnapshot.data().category }
+      if (section === 'expenses' && deletedItem.type !== 'other') {
+        removeTrackingPreferences(transaction, trackingConfigReference, [deletedItem.type], userId)
+      }
+      response = { categoryId: deletedItem.category }
     }
 
     if (operation === 'deleteCategory') {
@@ -126,6 +150,14 @@ async function mutateFinancialModel(
       }
       nextItems = existingItems.filter((candidate) => candidate.category !== categoryId)
       categoryItems.forEach((candidate) => transaction.delete(itemsReference.doc(candidate.id)))
+      if (section === 'expenses') {
+        removeTrackingPreferences(
+          transaction,
+          trackingConfigReference,
+          categoryItems.filter(({ type }) => type !== 'other').map(({ type }) => type),
+          userId,
+        )
+      }
       const categories = { ...(config.categories || {}) }
       delete categories[categoryId]
       config.categories = categories
@@ -140,6 +172,86 @@ async function mutateFinancialModel(
       )
       response = { categoryId }
     }
+
+    if (operation === 'syncTracking') {
+      const selectedIds = requestedSubcategories.map(({ type }) => type)
+
+      for (const requested of requestedSubcategories) {
+        const previousCategory = config.categories[requested.category] || {
+          enabled: false,
+          manualEstimate: { amount: 0, frequency: 'monthly' },
+          necessity: null,
+          ownership: equalOwnership(workspace.memberIds),
+        }
+        if (!previousCategory.enabled) {
+          config.categories[requested.category] = { ...previousCategory, enabled: true }
+          modelChanged = true
+          configChanged = true
+        }
+
+        const existing = nextItems.find(
+          (candidate) =>
+            candidate.category === requested.category && candidate.type === requested.type,
+        )
+        if (existing) {
+          if (existing.trackingEligible !== true) {
+            const updated = withAuditFields(
+              cleanItem({ ...existing, trackingEligible: true }),
+              userId,
+              false,
+            )
+            nextItems = nextItems.map((candidate) =>
+              candidate.id === existing.id ? { id: existing.id, ...updated } : candidate,
+            )
+            transaction.set(itemsReference.doc(existing.id), updated)
+            modelChanged = true
+          }
+          continue
+        }
+
+        const firstItem = !nextItems.some(
+          (candidate) => candidate.category === requested.category,
+        )
+        const category = config.categories[requested.category]
+        const expense = normalizeItem('expenses', {
+          ...requested,
+          estimate: firstItem ? category.manualEstimate || requested.estimate : requested.estimate,
+          monthlyAmounts: undefined,
+          ownership: category.ownership || equalOwnership(workspace.memberIds),
+        })
+        assertOwnershipMembers(expense.ownership, workspace.memberIds)
+        const itemData = withAuditFields(expense, userId, true)
+        const reference = itemsReference.doc(`${expense.category}--${expense.type}`)
+        nextItems = [...nextItems, { id: reference.id, ...itemData }]
+        transaction.set(reference, itemData)
+        modelChanged = true
+      }
+
+      if (configChanged) {
+        transaction.set(
+          configReference,
+          {
+            categories: config.categories,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: userId,
+          },
+          { merge: true },
+        )
+      }
+      transaction.set(
+        trackingConfigReference,
+        {
+          schemaVersion: 1,
+          enabledSubcategories: selectedIds,
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: userId,
+        },
+        { merge: true },
+      )
+      response = { enabledSubcategories: selectedIds }
+    }
+
+    if (!modelChanged) return response
 
     const latest = financialYearSnapshot.data()
     const projectionInput = {
@@ -205,6 +317,38 @@ function normalizeItem(section, item = {}) {
   }
 
   return normalizeExpense(item, category, ownership)
+}
+
+function normalizeTrackingSubcategories(subcategories) {
+  if (!Array.isArray(subcategories)) {
+    throw new Error('Tracking subcategories are required')
+  }
+  const seen = new Set()
+  return subcategories.map((subcategory) => {
+    const category = String(subcategory?.category || '').trim()
+    const type = String(subcategory?.type || '').trim()
+    assertText(category, 'A valid expense category is required')
+    assertText(type, 'A valid expense type is required')
+    if (type === 'other' || seen.has(type)) {
+      throw new Error('Tracking subcategories must be unique standard expenses')
+    }
+    seen.add(type)
+    const normalized = normalizeExpense(
+      {
+        type,
+        name: '',
+        estimate: subcategory.estimate,
+        variability: subcategory.variability,
+        recurrence: subcategory.recurrence,
+        necessity: subcategory.necessity,
+        trackingEligible: true,
+      },
+      category,
+      { mode: 'single', shares: [{ memberId: 'pending', percentage: 100 }] },
+    )
+    delete normalized.ownership
+    return normalized
+  })
 }
 
 function normalizeExpense(item, category, ownership) {
@@ -284,7 +428,7 @@ function normalizeIncomeCalculation(calculation) {
 }
 
 function resolveItemReference(itemsReference, section, operation, itemId, item) {
-  if (operation === 'deleteCategory') return null
+  if (operation === 'deleteCategory' || operation === 'syncTracking') return null
   if (operation === 'create') {
     if (section === 'expenses' && item.type !== 'other') {
       return itemsReference.doc(`${item.category}--${item.type}`)
@@ -302,6 +446,19 @@ function withAuditFields(item, userId, creating) {
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: userId,
   }
+}
+
+function removeTrackingPreferences(transaction, reference, subcategoryIds, userId) {
+  if (!subcategoryIds.length) return
+  transaction.set(
+    reference,
+    {
+      enabledSubcategories: FieldValue.arrayRemove(...subcategoryIds),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: userId,
+    },
+    { merge: true },
+  )
 }
 
 function clientItem(id, item) {
@@ -340,6 +497,18 @@ function normalizeOwnership(ownership) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
   return { mode: ownership?.mode || (shares.length > 1 ? 'shared' : 'single'), shares }
+}
+
+function equalOwnership(memberIds) {
+  if (!memberIds.length) throw new Error('Workspace membership is required')
+  const percentage = rounded(100 / memberIds.length)
+  let allocated = 0
+  const shares = memberIds.map((memberId, index) => {
+    const share = index === memberIds.length - 1 ? rounded(100 - allocated) : percentage
+    allocated = rounded(allocated + share)
+    return { memberId, percentage: share }
+  })
+  return { mode: memberIds.length > 1 ? 'shared' : 'single', shares }
 }
 
 function assertOwnershipMembers(ownership, memberIds = []) {

@@ -4,7 +4,6 @@
       <q-card-section>
         <div class="form-heading">
           <div>
-            <span>{{ t(category.nameKey) }}</span>
             <h2>{{ expense ? t('expenses.form.editTitle') : t('expenses.form.addTitle') }}</h2>
           </div>
           <q-btn
@@ -12,6 +11,7 @@
             round
             dense
             icon="close"
+            class="dialog-close"
             :aria-label="t('common.cancel')"
             @click="$emit('cancel')"
           />
@@ -107,14 +107,13 @@
             <tbody>
               <tr v-for="month in incomeMonths" :key="month">
                 <td>{{ t(`income.months.${month}`) }}</td>
-                <td class="model-amount">
-                  <span>{{ formatCurrency(monthAmount(month)) }}</span>
+                <td class="model-amount-cell">
                   <q-btn
                     flat
-                    round
                     dense
-                    color="primary"
-                    icon="edit"
+                    no-caps
+                    class="model-amount-value"
+                    :label="formatCurrency(monthAmount(month))"
                     :aria-label="
                       t('expenses.form.editMonth', { month: t(`income.months.${month}`) })
                     "
@@ -160,7 +159,7 @@
           <small>{{ formatCurrency(breakdown.monthly) }} / {{ t('dashboard.month') }}</small>
         </div>
 
-        <div class="ownership-section">
+        <div v-if="members.length > 1" class="ownership-section">
           <h3>{{ t('expenses.ownership.label') }}</h3>
           <OwnershipEditor
             v-model="ownership"
@@ -202,7 +201,6 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
-  annualMonthlyExpenseValue,
   expenseNecessities,
   expenseRecurrences,
   expenseVariabilities,
@@ -214,6 +212,7 @@ import {
   updateMonthlyExpenseAmounts,
 } from '@/domain/financial/expense-calculations'
 import { incomeMonths } from '@/domain/financial/income-calculations'
+import { financialYearExpenseItemValue } from '@/domain/financial/financial-year'
 import { normalizeMoney } from '@/domain/financial/money'
 import {
   cloneOwnership,
@@ -266,17 +265,17 @@ const normalizedAttributes = computed(() =>
     necessity: necessity.value,
   }),
 )
-const breakdown = computed(() =>
-  normalizedEstimate.value && monthlyAmounts.value
-    ? {
-        annual: annualMonthlyExpenseValue(monthlyAmounts.value, normalizedEstimate.value),
-        monthly:
-          normalizeMoney(
-            annualMonthlyExpenseValue(monthlyAmounts.value, normalizedEstimate.value) / 12,
-          ) || 0,
-      }
-    : null,
-)
+const breakdown = computed(() => {
+  if (!normalizedEstimate.value || !monthlyAmounts.value) return null
+  const annual = normalizeMoney(
+    incomeMonths.reduce(
+      (total, month) =>
+        total + financialYearExpenseItemValue(financialYearMonthExpense(month), monthAmount(month)),
+      0,
+    ),
+  )
+  return { annual, monthly: normalizeMoney(annual / 12) || 0 }
+})
 const formValid = computed(
   () => Boolean(expenseType.value) && Boolean(normalizedEstimate.value) && ownershipValid.value,
 )
@@ -323,12 +322,16 @@ function monthAmount(month) {
 }
 
 function actualAmount(month) {
+  return financialYearMonthExpense(month)?.actual ?? null
+}
+
+function financialYearMonthExpense(month) {
   const monthNumber = incomeMonths.indexOf(month) + 1
   if (monthNumber < 1 || expenseType.value === 'other') return null
   const monthKey = String(monthNumber).padStart(2, '0')
   return (
     props.financialYear?.months?.[monthKey]?.expenses?.categories?.[props.category.id]
-      ?.subcategories?.[expenseType.value]?.actual ?? null
+      ?.subcategories?.[expenseType.value] || null
   )
 }
 
@@ -384,15 +387,8 @@ function submit() {
   gap: 1rem;
 }
 
-.form-heading span {
-  color: var(--color-primary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
 .form-heading h2 {
-  margin: 0.2rem 0 1.25rem;
+  margin: 0 0 1.25rem;
 }
 
 .form-field {
@@ -424,11 +420,20 @@ function submit() {
   margin-top: 0.25rem;
 }
 
-.model-amount {
-  display: flex;
-  align-items: center;
+.model-amount-cell {
+  width: 8rem;
+  text-align: right;
+}
+
+.model-amount-value {
+  min-width: 6.5rem;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.model-amount-value :deep(.q-btn__content) {
   justify-content: flex-end;
-  gap: 0.25rem;
+  width: 100%;
 }
 
 .actual-amount {
@@ -460,6 +465,9 @@ function submit() {
 
 .ownership-section h3 {
   margin: 0 0 0.75rem;
+  font-size: 1rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 @media (max-width: 599px) {

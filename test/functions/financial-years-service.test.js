@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import financialYearsService from '../../functions/services/financial-years.js'
+import { financialYearMonthValue } from '../../src/domain/financial/financial-year.js'
 
 const { rebuildFinancialYear } = financialYearsService
 
@@ -87,14 +88,8 @@ describe('financial year persistence', () => {
     expect(writes[0].data.months['01'].liabilities).toBeDefined()
     expect(writes[0].data.months['01'].income).toBeDefined()
     expect(writes[0].data.months['01'].expenses).toBeDefined()
-    expect(writes[0].data.totals).toMatchObject({
-      assets: 0,
-      liabilities: 0,
-      netWorth: 0,
-      income: 0,
-      expenses: 0,
-      savings: 0,
-    })
+    expect(writes[0].data.totals).toBeUndefined()
+    expect(writes[0].data.schemaVersion).toBeUndefined()
   })
 
   it('backfills the first known asset value, then preserves closed months', async () => {
@@ -114,8 +109,8 @@ describe('financial year persistence', () => {
       positionMonth: '10',
     })
 
-    expect(firstValue.writes[0].data.months['01'].assets.total).toBe(1200)
-    expect(firstValue.writes[0].data.months['10'].assets.total).toBe(1200)
+    expect(financialYearMonthValue(firstValue.writes[0].data, '01', 'assets')).toBe(1200)
+    expect(financialYearMonthValue(firstValue.writes[0].data, '10', 'assets')).toBe(1200)
     expect(firstValue.writes[0].data.projectionState.assetsInitializedMonth).toBe('10')
 
     const sameMonthValue = createFirestore({
@@ -133,7 +128,7 @@ describe('financial year persistence', () => {
       positionMonth: '10',
     })
 
-    expect(sameMonthValue.writes[0].data.months['01'].assets.total).toBe(1700)
+    expect(financialYearMonthValue(sameMonthValue.writes[0].data, '01', 'assets')).toBe(1700)
 
     const nextValue = createFirestore({
       financialYear: sameMonthValue.writes[0].data,
@@ -150,9 +145,9 @@ describe('financial year persistence', () => {
       positionMonth: '12',
     })
 
-    expect(nextValue.writes[0].data.months['01'].assets.total).toBe(1700)
-    expect(nextValue.writes[0].data.months['11'].assets.total).toBe(1700)
-    expect(nextValue.writes[0].data.months['12'].assets.total).toBe(1800)
+    expect(financialYearMonthValue(nextValue.writes[0].data, '01', 'assets')).toBe(1700)
+    expect(financialYearMonthValue(nextValue.writes[0].data, '11', 'assets')).toBe(1700)
+    expect(financialYearMonthValue(nextValue.writes[0].data, '12', 'assets')).toBe(1800)
   })
 
   it('treats a zero-valued item as an observed position', async () => {
@@ -186,7 +181,7 @@ describe('financial year persistence', () => {
       positionMonth: '12',
     })
 
-    expect(laterValue.writes[0].data.months['11'].assets.total).toBe(0)
-    expect(laterValue.writes[0].data.months['12'].assets.total).toBe(1000)
+    expect(financialYearMonthValue(laterValue.writes[0].data, '11', 'assets')).toBe(0)
+    expect(financialYearMonthValue(laterValue.writes[0].data, '12', 'assets')).toBe(1000)
   })
 })

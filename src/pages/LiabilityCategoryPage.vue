@@ -31,7 +31,6 @@
               :to="liabilitiesRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('liabilities.eyebrow') }}</div>
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -141,6 +140,16 @@
 
     <q-dialog v-model="confirmDelete" persistent>
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          :disable="formSaving"
+          v-close-popup
+        />
         <q-card-section
           ><h2>{{ t('liabilities.delete.title') }}</h2>
           <p>
@@ -181,7 +190,12 @@ import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { applyOwnership, cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
+import {
+  applyOwnership,
+  cloneOwnership,
+  createEqualOwnership,
+  createSingleOwnership,
+} from '@/domain/financial/ownership'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -227,17 +241,23 @@ const liabilityDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config) return null
   const firstItem = allCategoryLiabilities.value.length === 0
+  const ownership =
+    memberIds.value.length === 1
+      ? createSingleOwnership(authUser.value?.uid)
+      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
     name: '',
     balance: firstItem ? (config.manualValue ?? 0) : 0,
-    ownership: cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value)),
+    ownership,
   }
 })
 const scopedLiabilities = computed(() =>
-  allCategoryLiabilities.value.map((liability) => ({
-    ...liability,
-    scopedValue: applyOwnership(liability.balance, liability.ownership, selectedMemberId.value),
-  })),
+  allCategoryLiabilities.value
+    .map((liability) => ({
+      ...liability,
+      scopedValue: applyOwnership(liability.balance, liability.ownership, selectedMemberId.value),
+    }))
+    .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
 )
 const categoryTotal = computed(() =>
   financialYearMonthCategoryValue(
@@ -395,9 +415,6 @@ async function persist(action) {
 }
 .back-button {
   @include financial-back-button;
-}
-.eyebrow {
-  @include financial-eyebrow;
 }
 h1 {
   @include financial-title;

@@ -14,6 +14,7 @@ const mutateFinancialModel = onCall({ region: 'europe-west1' }, async (request) 
       itemId: request.data?.itemId,
       item: request.data?.item,
       categoryId: request.data?.categoryId,
+      subcategories: request.data?.subcategories,
     })
   } catch (error) {
     if (error instanceof HttpsError) throw error

@@ -175,6 +175,7 @@ function normalizeExpenseItem(expense) {
     monthlyAmounts,
     trackingEligible: type !== 'other' && expense.trackingEligible !== false,
     ...attributes,
+    ownership: cloneOwnership(expense.ownership),
   }
 }
 

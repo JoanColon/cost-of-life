@@ -1,7 +1,6 @@
 <template>
   <section class="setup-panel">
     <div class="setup-copy">
-      <div class="eyebrow">{{ t('income.eyebrow') }}</div>
       <h1>{{ editMode ? t('income.setup.editTitle') : t('income.setup.title') }}</h1>
       <p>{{ t('income.setup.subtitle') }}</p>
     </div>
@@ -85,15 +84,8 @@ function toggle(categoryId) {
 .setup-copy {
   max-width: 40rem;
 }
-.eyebrow {
-  color: var(--color-primary);
-  font-size: 0.75rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
 h1 {
-  margin: 0.45rem 0 0;
+  margin: 0;
   color: var(--color-ink);
   font-size: clamp(2.25rem, 5vw, 4rem);
   line-height: 1;
@@ -114,8 +106,8 @@ p {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
-  min-height: 7rem;
-  padding: 1.25rem;
+  min-height: 5.5rem;
+  padding: 0.9rem 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface);

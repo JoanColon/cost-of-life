@@ -11,6 +11,7 @@
           round
           dense
           icon="close"
+          class="dialog-close"
           :aria-label="t('common.cancel')"
           @click="$emit('cancel')"
         />

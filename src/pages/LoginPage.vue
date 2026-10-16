@@ -12,7 +12,6 @@
 
         <q-card flat class="auth-card">
           <q-card-section class="q-pa-none">
-            <div class="eyebrow">{{ t('auth.welcome') }}</div>
             <h1>{{ isRegistering ? t('auth.registerTitle') : t('auth.signInTitle') }}</h1>
             <p class="auth-subtitle">
               {{ isRegistering ? t('auth.registerSubtitle') : t('auth.signInSubtitle') }}
@@ -312,16 +311,8 @@ function getAuthErrorMessage(error) {
   backdrop-filter: blur(10px);
 }
 
-.eyebrow {
-  color: #477763;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 h1 {
-  margin: 0.35rem 0 0;
+  margin: 0;
   color: #1c2c26;
   font-family: Georgia, serif;
   font-size: 2.15rem;

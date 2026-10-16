@@ -30,7 +30,6 @@
               :to="incomeRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('income.eyebrow') }}</div>
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -131,7 +130,14 @@
     /></q-dialog>
     <q-dialog v-model="confirmDelete"
       ><q-card class="confirm-card"
-        ><q-card-section
+        ><q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup /><q-card-section
           ><h2>{{ t('income.delete.title') }}</h2>
           <p>
             {{ t('income.delete.description', { name: incomeDisplayName(deletingIncome) }) }}
@@ -166,7 +172,11 @@ import {
   financialYearCategoryValue,
   financialYearSubcategoryValue,
 } from '@/domain/financial/financial-year'
-import { cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
+import {
+  cloneOwnership,
+  createEqualOwnership,
+  createSingleOwnership,
+} from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
@@ -212,26 +222,32 @@ const incomeDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config || !category.value) return null
   const firstItem = allCategoryIncome.value.length === 0
+  const ownership =
+    memberIds.value.length === 1
+      ? createSingleOwnership(authUser.value?.uid)
+      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
     subtype: category.value.subtypes[0],
     name: '',
     calculation: firstItem
       ? defaultCalculation(category.value.calculationModes[0], config.manualValue ?? 0)
       : defaultCalculation(category.value.calculationModes[0], 0),
-    ownership: cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value)),
+    ownership,
   }
 })
 const scopedIncome = computed(() =>
-  allCategoryIncome.value.map((item) => ({
-    ...item,
-    scopedValue: financialYearSubcategoryValue(
-      financialYear.value,
-      'income',
-      categoryId.value,
-      item.id,
-      selectedMemberId.value,
-    ),
-  })),
+  allCategoryIncome.value
+    .map((item) => ({
+      ...item,
+      scopedValue: financialYearSubcategoryValue(
+        financialYear.value,
+        'income',
+        categoryId.value,
+        item.id,
+        selectedMemberId.value,
+      ),
+    }))
+    .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
 )
 const categoryTotal = computed(() =>
   financialYearCategoryValue(
@@ -403,9 +419,6 @@ async function persist(action) {
 }
 .back-button {
   @include financial-back-button;
-}
-.eyebrow {
-  @include financial-eyebrow;
 }
 h1 {
   @include financial-title;

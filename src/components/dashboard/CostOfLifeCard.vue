@@ -5,7 +5,6 @@
     :subtitle="t('dashboard.costOfLife.subtitle')"
     icon="account_balance_wallet"
     icon-tone="blue"
-    @open="$emit('open')"
   >
     <template #default>
       <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
@@ -41,9 +40,9 @@
           class="equation-card costs"
           role="button"
           tabindex="0"
-          @click="emit('open')"
-          @keydown.enter.self="emit('open')"
-          @keydown.space.self.prevent="emit('open')"
+          @click="emit('open-expenses')"
+          @keydown.enter.self="emit('open-expenses')"
+          @keydown.space.self.prevent="emit('open-expenses')"
         >
           <q-btn
             flat
@@ -82,7 +81,7 @@ import DashboardCard from './DashboardCard.vue'
 import { formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({ data: { type: Object, required: true } })
-const emit = defineEmits(['open', 'open-income', 'open-tracker'])
+const emit = defineEmits(['open-expenses', 'open-income', 'open-tracker'])
 const { t } = useI18n()
 const period = ref('annual')
 
@@ -118,11 +117,12 @@ const periodLabel = computed(() =>
   .period-switch {
     position: absolute;
     top: 1.4rem;
-    right: 4.7rem;
+    right: clamp(1.25rem, 2.5vw, 2rem);
     display: flex;
     padding: 0.22rem;
+    overflow: hidden;
     border: 1px solid var(--color-line);
-    border-radius: 999px;
+    border-radius: 999px !important;
     background: #f3f6f9;
   }
 

@@ -39,7 +39,6 @@
               :to="workspaceHomeRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('expenses.eyebrow') }}</div>
             <h1>{{ t('expenses.title') }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -72,92 +71,103 @@
         </section>
 
         <section class="category-list" :aria-label="t('expenses.enabledCategories')">
-          <div v-for="category in enabledCategories" :key="category.id" class="category-row">
-            <button type="button" class="category-main" @click="openCategory(category.id)">
-              <span class="category-icon"><q-icon :name="category.icon" /></span>
-              <span class="category-copy">
-                <strong>{{ t(category.nameKey) }}</strong>
-                <small>{{ categoryStatus(category.id) }}</small>
-              </span>
-            </button>
+          <div class="category-rows">
+            <div v-for="category in enabledCategories" :key="category.id" class="category-row">
+              <button type="button" class="category-main" @click="openCategory(category.id)">
+                <span class="category-icon"><q-icon :name="category.icon" /></span>
+                <span class="category-copy">
+                  <strong>{{ t(category.nameKey) }}</strong>
+                  <small>{{ categoryStatus(category.id) }}</small>
+                </span>
+              </button>
 
-            <button
-              type="button"
-              class="category-ownership"
-              :disabled="isItemized(category.id)"
-              :aria-label="t('expenses.ownership.edit')"
-              @click="openOwnership(category.id)"
-            >
-              <q-avatar
-                v-for="member in categoryMembers(category.id)"
-                :key="member.id"
-                size="2.2rem"
-                class="ownership-avatar"
+              <button
+                type="button"
+                class="category-ownership"
+                :disabled="isItemized(category.id)"
+                :aria-label="t('expenses.ownership.edit')"
+                @click="openOwnership(category.id)"
               >
-                <img v-if="member.photoURL" :src="member.photoURL" alt="" />
-                <span v-else>{{ initials(member.name) }}</span>
-              </q-avatar>
-            </button>
+                <q-avatar
+                  v-for="member in categoryMembers(category.id)"
+                  :key="member.id"
+                  size="2.2rem"
+                  class="ownership-avatar"
+                >
+                  <img v-if="member.photoURL" :src="member.photoURL" alt="" />
+                  <span v-else>{{ initials(member.name) }}</span>
+                </q-avatar>
+              </button>
 
-            <div v-if="isItemized(category.id)" class="category-value">
-              <strong>{{ formatCurrency(categoryDisplayValue(category.id)) }}</strong>
-              <small>/ {{ categoryPeriodLabel }}</small>
+              <div v-if="isItemized(category.id)" class="category-value">
+                <strong>{{ formatCurrency(categoryDisplayValue(category.id)) }}</strong>
+                <small>/ {{ categoryPeriodLabel }}</small>
+              </div>
+
+              <SimpleExpenseEstimateEditor
+                v-else
+                :estimate="categoryEstimate(category.id)"
+                :display-value="formatCurrency(categoryDisplayValue(category.id))"
+                :display-period="categoryPeriodLabel"
+                :saving="savingCategoryIds.has(category.id)"
+                @save="saveEstimate(category.id, $event)"
+              />
+
+              <button type="button" class="category-link" @click="openCategory(category.id)">
+                <q-icon name="chevron_right" />
+              </button>
+
+              <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop>
+                <q-menu>
+                  <q-list dense>
+                    <q-item
+                      clickable
+                      v-close-popup
+                      class="text-negative"
+                      @click="requestDelete(category)"
+                    >
+                      <q-item-section avatar><q-icon name="delete_outline" /></q-item-section>
+                      <q-item-section>{{ t('common.delete') }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </q-btn>
             </div>
+          </div>
 
-            <SimpleExpenseEstimateEditor
-              v-else
-              :estimate="categoryEstimate(category.id)"
-              :display-value="formatCurrency(categoryDisplayValue(category.id))"
-              :display-period="categoryPeriodLabel"
-              :saving="savingCategoryIds.has(category.id)"
-              @save="saveEstimate(category.id, $event)"
+          <div class="category-actions">
+            <q-btn
+              flat
+              no-caps
+              icon="receipt_long"
+              color="primary"
+              :label="t('expenseTracker.open')"
+              :to="{ name: 'expense-tracker', params: { workspaceId } }"
             />
-
-            <button type="button" class="category-link" @click="openCategory(category.id)">
-              <q-icon name="chevron_right" />
-            </button>
-
-            <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop>
-              <q-menu>
-                <q-list dense>
-                  <q-item
-                    clickable
-                    v-close-popup
-                    class="text-negative"
-                    @click="requestDelete(category)"
-                  >
-                    <q-item-section avatar><q-icon name="delete_outline" /></q-item-section>
-                    <q-item-section>{{ t('common.delete') }}</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-btn>
+            <q-btn
+              flat
+              no-caps
+              icon="tune"
+              color="primary"
+              :label="t('expenses.editCategories')"
+              @click="editingCategories = true"
+            />
           </div>
         </section>
-
-        <div class="expense-actions">
-          <q-btn
-            unelevated
-            no-caps
-            icon="receipt_long"
-            color="primary"
-            :label="t('expenseTracker.open')"
-            :to="{ name: 'expense-tracker', params: { workspaceId } }"
-          />
-          <q-btn
-            flat
-            no-caps
-            icon="tune"
-            color="primary"
-            :label="t('expenses.editCategories')"
-            @click="editingCategories = true"
-          />
-        </div>
       </template>
     </main>
 
     <q-dialog v-model="editingCategories" :maximized="$q.screen.lt.sm">
       <q-card class="category-dialog">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="editingCategories = false"
+        />
         <ExpenseCategorySetup
           edit-mode
           :initial-selected="expensesStore.enabledCategories"
@@ -170,6 +180,15 @@
 
     <q-dialog v-model="confirmDisable">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('expenses.setup.disableTitle') }}</h2>
           <p>{{ t('expenses.setup.disableDescription') }}</p>
@@ -190,6 +209,15 @@
 
     <q-dialog v-model="ownershipDialog">
       <q-card class="ownership-dialog">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('expenses.ownership.label') }}</h2>
           <OwnershipEditor
@@ -216,6 +244,15 @@
 
     <q-dialog v-model="deleteDialog">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('expenses.deleteCategory.title') }}</h2>
           <p>
@@ -304,10 +341,12 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
-const enabledCategories = computed(() =>
-  expenseCategories.filter((category) => expensesStore.config?.categories?.[category.id]?.enabled),
-)
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const enabledCategories = computed(() =>
+  expenseCategories
+    .filter((category) => expensesStore.config?.categories?.[category.id]?.enabled)
+    .sort((left, right) => categoryAnnualValue(right.id) - categoryAnnualValue(left.id)),
+)
 const financialYearError = computed(() =>
   financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
@@ -355,13 +394,17 @@ function isItemized(categoryId) {
 }
 
 function categoryDisplayValue(categoryId) {
-  const annualValue = financialYearCategoryValue(
+  const annualValue = categoryAnnualValue(categoryId)
+  return period.value === 'annual' ? annualValue : annualValue / 12
+}
+
+function categoryAnnualValue(categoryId) {
+  return financialYearCategoryValue(
     financialYear.value,
     'expenses',
     categoryId,
     selectedMemberId.value,
   )
-  return period.value === 'annual' ? annualValue : annualValue / 12
 }
 
 function categoryStatus(categoryId) {
@@ -516,13 +559,6 @@ async function runSaving(operation) {
   @include financial-shell;
 }
 
-.expense-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
 .state {
   display: grid;
   place-items: center;
@@ -545,10 +581,6 @@ async function runSaving(operation) {
 
 .expenses-header h1 {
   @include financial-title;
-}
-
-.eyebrow {
-  @include financial-eyebrow;
 }
 
 .total-card {
@@ -598,6 +630,15 @@ async function runSaving(operation) {
 
 .category-row:last-child {
   border-bottom: 0;
+}
+
+.category-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0.75rem;
+  border-top: 1px solid var(--color-line);
 }
 
 .category-main,
@@ -667,8 +708,12 @@ async function runSaving(operation) {
 }
 
 .category-dialog {
-  width: min(68rem, calc(100vw - 2rem));
+  width: min(76rem, calc(100vw - 3rem));
+  max-width: none;
   padding: clamp(1rem, 4vw, 2.5rem);
+}
+.category-dialog :deep(.setup-panel) {
+  max-width: none;
 }
 
 @media (max-width: 749px) {
@@ -701,6 +746,15 @@ async function runSaving(operation) {
 
   .period-switch button {
     flex: 1;
+  }
+
+  .category-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .category-actions :deep(.q-btn) {
+    width: 100%;
   }
 }
 </style>

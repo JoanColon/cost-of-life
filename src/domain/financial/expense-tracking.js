@@ -1,4 +1,5 @@
 import { normalizeMoney } from './money'
+import { financialYearExpenseItemValue } from './financial-year'
 
 export function emptyExpenseTrackingMonth(period) {
   return {
@@ -76,11 +77,12 @@ export function resolveExpenseTrackingValue(modelValue, actualValue, decision) {
   const model = normalizeMoney(modelValue) || 0
   const actual = actualValue == null ? null : normalizeMoney(actualValue)
   const usesTracked = decision === 'tracked' && actual !== null
+  const source = usesTracked ? 'tracked' : 'model'
   return {
     model,
     actual,
-    effective: usesTracked ? actual : model,
-    source: usesTracked ? 'tracked' : 'model',
+    effective: financialYearExpenseItemValue({ source, effective: actual }, model),
+    source,
   }
 }
 

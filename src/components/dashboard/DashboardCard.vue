@@ -10,15 +10,6 @@
           <p v-if="subtitle">{{ subtitle }}</p>
         </div>
       </div>
-      <q-btn
-        flat
-        round
-        dense
-        icon="chevron_right"
-        class="card-link"
-        :aria-label="title"
-        @click="$emit('open')"
-      />
     </header>
     <slot />
   </q-card>
@@ -31,8 +22,6 @@ defineProps({
   icon: { type: String, default: '' },
   iconTone: { type: String, default: 'green' },
 })
-
-defineEmits(['open'])
 </script>
 
 <style scoped lang="scss">
@@ -97,12 +86,6 @@ p {
   margin: 0.35rem 0 0;
   color: var(--color-copy);
   font-size: 0.95rem;
-}
-
-.card-link {
-  flex: 0 0 auto;
-  margin: -0.4rem -0.55rem 0 0;
-  color: var(--color-copy);
 }
 
 @media (max-width: 599px) {

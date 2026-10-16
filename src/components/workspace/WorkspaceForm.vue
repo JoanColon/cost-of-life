@@ -1,9 +1,6 @@
 <template>
   <q-card flat class="workspace-card">
     <q-card-section class="q-pa-none">
-      <div class="eyebrow">
-        {{ firstWorkspace ? t('workspace.firstEyebrow') : t('workspace.newEyebrow') }}
-      </div>
       <h1>{{ firstWorkspace ? t('workspace.firstTitle') : t('workspace.newTitle') }}</h1>
       <p class="description">
         {{ firstWorkspace ? t('workspace.firstDescription') : t('workspace.newDescription') }}
@@ -153,16 +150,8 @@ function clearInviteEmail(value) {
   box-shadow: 0 24px 70px rgba(31, 48, 42, 0.1);
 }
 
-.eyebrow {
-  color: #477763;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 h1 {
-  margin: 0.45rem 0 0;
+  margin: 0;
   color: #1c2c26;
   font-family: Georgia, serif;
   font-size: clamp(2rem, 5vw, 3rem);

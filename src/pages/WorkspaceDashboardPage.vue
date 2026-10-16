@@ -16,13 +16,12 @@
           :history-points="historyPoints"
           :history-loading="historyLoading"
           :history-error="Boolean(historyError)"
-          @open="openSection('assets')"
           @open-assets="openSection('assets')"
           @open-liabilities="openSection('liabilities')"
         />
         <CostOfLifeCard
           :data="dashboardData"
-          @open="openSection('expenses')"
+          @open-expenses="openSection('expenses')"
           @open-income="openSection('income')"
           @open-tracker="openSection('expense-tracker')"
         />
@@ -211,7 +210,7 @@ function openSection(section) {
 
 h1 {
   margin: 0;
-  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  font-size: clamp(2rem, 3.5vw, 3.1rem);
   font-weight: 780;
   line-height: 1;
   letter-spacing: -0.055em;
@@ -250,7 +249,7 @@ h1 {
   }
 
   h1 {
-    font-size: clamp(2.1rem, 9vw, 3rem);
+    font-size: clamp(1.9rem, 8vw, 2.65rem);
   }
 
   .dashboard-heading p {

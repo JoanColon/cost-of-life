@@ -6,10 +6,13 @@
     :tabindex="disabled || saving ? -1 : 0"
   >
     <q-spinner v-if="saving" color="primary" size="1.1rem" />
-    <template v-else
-      ><span>{{ formattedValue }}</span
-      ><q-icon v-if="!disabled" name="edit" class="edit-icon"
-    /></template>
+    <template v-else>
+      <span class="value-copy">
+        <strong>{{ formattedValue }}</strong>
+        <small>/ {{ formattedPeriod }}</small>
+      </span>
+      <q-icon v-if="!disabled" name="edit" class="edit-icon" />
+    </template>
     <q-popup-edit
       v-model="editorValue"
       buttons
@@ -52,6 +55,7 @@ import { currencySymbol } from '@/utils/formatters'
 const props = defineProps({
   value: { type: Number, default: 0 },
   formattedValue: { type: String, required: true },
+  formattedPeriod: { type: String, required: true },
   saving: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
 })
@@ -77,15 +81,24 @@ function save(value) {
   align-items: center;
   justify-content: flex-end;
   gap: 0.35rem;
-  min-width: 7rem;
+  min-width: 8.5rem;
   min-height: 2.5rem;
   padding: 0.35rem 0.55rem;
   border-radius: 0.55rem;
   color: var(--color-ink);
-  font-size: 1.15rem;
-  font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
+}
+.value-copy {
+  display: grid;
+  justify-items: end;
+}
+.value-copy strong {
+  font-size: 1rem;
+}
+.value-copy small {
+  color: var(--color-muted);
+  font-weight: 400;
 }
 .simple-value:hover {
   background: var(--color-green-soft);

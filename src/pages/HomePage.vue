@@ -9,7 +9,6 @@
     <main v-else class="workspace-hub">
       <header class="hub-header">
         <div>
-          <div class="eyebrow">{{ t('home.eyebrow') }}</div>
           <h1>{{ t('home.workspacesTitle') }}</h1>
           <p>{{ t('home.workspacesDescription') }}</p>
         </div>
@@ -69,6 +68,16 @@
 
     <q-dialog v-model="deleteDialog" persistent @hide="clearDeleteRequest">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          :disable="deleting"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('workspace.delete.title') }}</h2>
           <p>
@@ -192,16 +201,8 @@ async function workspaceCreated({ workspace, hasPendingInvite }) {
   gap: 2rem;
 }
 
-.eyebrow {
-  color: var(--color-primary);
-  font-size: 0.75rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 h1 {
-  margin: 0.35rem 0 0;
+  margin: 0;
   color: var(--color-ink);
   font-size: clamp(2.25rem, 5vw, 4rem);
   line-height: 1;

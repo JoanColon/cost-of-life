@@ -20,7 +20,6 @@ export default {
   },
   auth: {
     brandMessage: 'Understand what your life costs and make better decisions with your money.',
-    welcome: 'Welcome',
     signInTitle: 'Sign in',
     registerTitle: 'Create your account',
     signInSubtitle: 'Sign in to continue where you left off.',
@@ -74,11 +73,9 @@ export default {
     signOut: 'Sign out',
   },
   workspace: {
-    firstEyebrow: 'Your financial starting point',
     firstTitle: 'Create your first financial workspace',
     firstDescription:
       'A workspace keeps assets, liabilities, income, expenses, and plans together. You can use it on your own or share it with someone.',
-    newEyebrow: 'New workspace',
     newTitle: 'Create a financial workspace',
     newDescription: 'Create a separate space for personal or shared finances.',
     name: 'Workspace name',
@@ -111,7 +108,6 @@ export default {
   },
   home: {
     loadingWorkspace: 'Loading your financial workspace…',
-    eyebrow: 'Financial position',
     greeting: 'Hello, {name}.',
     greetingFallback: 'Hello.',
     emptyPosition:
@@ -168,7 +164,6 @@ export default {
   },
   assets: {
     title: 'Assets',
-    eyebrow: 'Financial position',
     total: 'Total',
     totalAssets: 'Total assets',
     enabledCategories: 'Enabled asset categories',
@@ -236,10 +231,9 @@ export default {
     form: {
       editTitle: 'Edit asset',
       type: 'Type',
-      name: 'Name',
+      name: 'Name (optional)',
       currentValue: 'Current value',
       totalValue: 'Total value',
-      nameRequired: 'Enter a name',
       valueInvalid: 'Enter a valid value of zero or more',
     },
     categories: {
@@ -324,7 +318,6 @@ export default {
   },
   liabilities: {
     title: 'Liabilities',
-    eyebrow: 'Financial position',
     total: 'Total',
     totalLiabilities: 'Total liabilities',
     enabledCategories: 'Enabled liability categories',
@@ -427,7 +420,6 @@ export default {
   },
   income: {
     title: 'Income',
-    eyebrow: 'Cash flow',
     totalIncome: 'Total income',
     annualTotal: 'Annual total',
     perYear: '/ year',
@@ -590,7 +582,6 @@ export default {
   },
   expenses: {
     title: 'Expenses',
-    eyebrow: 'Cost of Life',
     totalCostOfLife: 'Your Cost of Life',
     annualCategoryCost: 'Annual category cost',
     enabledCategories: 'Enabled expense categories',
@@ -753,7 +744,6 @@ export default {
     },
   },
   historic: {
-    eyebrow: 'Financial history',
     title: 'Historic',
     year: 'Year',
     empty: 'No financial years are available yet.',
@@ -761,9 +751,8 @@ export default {
   },
   expenseTracker: {
     title: 'Expense Tracker',
-    eyebrow: 'Observe your spending',
-    open: 'Open Expense Tracker',
-    backToExpenses: 'Expense model',
+    open: 'Expense Tracker',
+    backToExpenses: 'Expenses',
     loading: 'Loading tracked expenses…',
     saved: 'Expense tracking updated.',
     sourceUpdated: 'The monthly source has been updated.',
@@ -776,10 +765,10 @@ export default {
       action: 'Manage categories',
       editAction: 'Edit expense tracker categories',
       title: 'Tracking categories',
-      description: 'Choose the expenses you want to make available for quick tracking.',
+      description:
+        'Choose the expenses you want to track. Missing expenses will also be added to your expense model.',
     },
     entry: {
-      eyebrow: 'Tracked expense',
       amount: 'Amount',
       quickAmounts: 'Quick amounts',
       date: 'Date',
@@ -788,12 +777,13 @@ export default {
     review: {
       month: 'Month',
       trackedTotal: 'Tracked total',
+      modelTotal: 'Model total',
       tracked: 'Tracked',
       model: 'Expense model',
       view: 'View',
       useTracked: 'Use tracked',
       keepModel: 'Keep model',
-      useAllTracked: 'Use all tracked',
+      useAllTracked: 'Apply all tracked',
       keepAllModel: 'Keep all model',
       itemCount: '{count} entries',
       noItems: 'No expenses tracked in this category yet.',

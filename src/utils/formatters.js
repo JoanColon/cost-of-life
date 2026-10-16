@@ -2,7 +2,7 @@ const euroFormatter = new Intl.NumberFormat('en-IE', {
   style: 'currency',
   currency: 'EUR',
   minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 })
 
 export const currencySymbol =

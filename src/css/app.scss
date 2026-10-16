@@ -25,6 +25,23 @@ select {
   font: inherit;
 }
 
+button,
+.q-btn {
+  text-transform: none !important;
+}
+
+button:not(.q-btn--round),
+.q-btn:not(.q-btn--round) {
+  border-radius: var(--radius-button) !important;
+}
+
+.dialog-close {
+  position: absolute;
+  z-index: 2;
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
 ::selection {
   background: rgb(22 136 248 / 18%);
 }

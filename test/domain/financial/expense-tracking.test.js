@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { expenseCategories } from '../../../src/config/expense-categories'
 import {
-  defaultExpenseTrackingCategoryIds,
+  expenseTrackingCategories,
   expenseTrackingCategoryIds,
   reviewExpenseTrackingCategories,
-  trackingSubcategoryIdsForModelExpenses,
 } from '../../../src/config/expense-tracking-categories'
 import {
   addTrackedItem,
@@ -28,28 +27,13 @@ describe('expense tracking month', () => {
     expect(expenseTrackingCategoryIds).toEqual(suggestionIds)
   })
 
-  it('keeps the focused variable categories as defaults without gym and fitness', () => {
-    expect(defaultExpenseTrackingCategoryIds).toEqual([
-      'groceries',
-      'restaurants_takeaway',
-      'fuel_charging',
-      'public_transport',
-      'clothes_shoes',
-      'entertainment',
-      'home_repairs',
-    ])
-    expect(defaultExpenseTrackingCategoryIds).not.toContain('gym_fitness')
-  })
-
-  it('offers only tracking-eligible subcategories backed by matching model expenses', () => {
+  it('provides model defaults for every trackable subcategory', () => {
+    expect(expenseTrackingCategories).toHaveLength(expenseTrackingCategoryIds.length)
     expect(
-      trackingSubcategoryIdsForModelExpenses([
-        { category: 'food', type: 'groceries', trackingEligible: true },
-        { category: 'food', type: 'restaurants_takeaway', trackingEligible: false },
-        { category: 'housing', type: 'fuel_charging', trackingEligible: true },
-        { category: 'other', type: 'other', trackingEligible: true },
-      ]),
-    ).toEqual(['groceries'])
+      expenseTrackingCategories.every(
+        ({ defaults }) => defaults.frequency && defaults.variability && defaults.recurrence,
+      ),
+    ).toBe(true)
   })
 
   it('keeps stored historical categories visible after they leave the current model', () => {

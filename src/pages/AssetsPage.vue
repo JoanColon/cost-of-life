@@ -39,7 +39,6 @@
               :to="workspaceHomeRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('assets.eyebrow') }}</div>
             <h1>{{ t('assets.title') }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -136,6 +135,15 @@
 
     <q-dialog v-model="editingCategories" :maximized="$q.screen.lt.sm">
       <q-card class="category-dialog">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="editingCategories = false"
+        />
         <AssetCategorySetup
           edit-mode
           :initial-selected="assetsStore.enabledCategories"
@@ -148,6 +156,15 @@
 
     <q-dialog v-model="confirmDisable">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('assets.setup.disableTitle') }}</h2>
           <p>{{ t('assets.setup.disableDescription') }}</p>
@@ -167,6 +184,15 @@
 
     <q-dialog v-model="confirmCategoryDelete">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('assets.deleteCategory.title') }}</h2>
           <p>
@@ -193,6 +219,15 @@
 
     <q-dialog v-model="ownershipDialog">
       <q-card class="ownership-dialog-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('assets.ownership.label') }}</h2>
           <OwnershipEditor
@@ -282,10 +317,12 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
-const enabledCategories = computed(() =>
-  assetCategories.filter((category) => assetsStore.enabledCategories.includes(category.id)),
-)
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const enabledCategories = computed(() =>
+  assetCategories
+    .filter((category) => assetsStore.enabledCategories.includes(category.id))
+    .sort((left, right) => categoryNumericValue(right.id) - categoryNumericValue(left.id)),
+)
 const total = computed(() =>
   financialYearMonthValue(financialYear.value, currentMonth, 'assets', selectedMemberId.value),
 )
@@ -370,14 +407,16 @@ function categoryStatus(categoryId) {
 }
 
 function categoryValue(categoryId) {
-  return formatCurrency(
-    financialYearMonthCategoryValue(
-      financialYear.value,
-      currentMonth,
-      'assets',
-      categoryId,
-      selectedMemberId.value,
-    ),
+  return formatCurrency(categoryNumericValue(categoryId))
+}
+
+function categoryNumericValue(categoryId) {
+  return financialYearMonthCategoryValue(
+    financialYear.value,
+    currentMonth,
+    'assets',
+    categoryId,
+    selectedMemberId.value,
   )
 }
 
@@ -541,10 +580,6 @@ async function persist(action) {
 
 .back-button {
   @include financial-back-button;
-}
-
-.eyebrow {
-  @include financial-eyebrow;
 }
 
 h1 {

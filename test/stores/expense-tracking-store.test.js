@@ -31,7 +31,6 @@ describe('expense tracking store', () => {
     getExpenseTrackingMonth.mockImplementation(async (_, period) => ({ period, categories: {} }))
     getExpenseTrackingPreferences.mockResolvedValue({
       enabledSubcategories: ['groceries'],
-      availableSubcategories: ['groceries'],
     })
   })
 

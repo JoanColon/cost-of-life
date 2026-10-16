@@ -35,7 +35,6 @@
               :to="workspaceHomeRoute"
               class="back-button"
             />
-            <div class="eyebrow">{{ t('income.eyebrow') }}</div>
             <h1>{{ t('income.title') }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -93,7 +92,8 @@
             </button>
             <SimpleIncomeValueEditor
               :value="canonicalCategoryValue(category.id)"
-              :formatted-value="`${categoryValue(category.id)} / ${categoryPeriodLabel}`"
+              :formatted-value="categoryValue(category.id)"
+              :formatted-period="categoryPeriodLabel"
               :saving="isCategorySaving(category.id)"
               :disabled="isItemizedCategory(category.id)"
               @save="saveSimpleCategoryValue(category.id, $event)"
@@ -121,22 +121,31 @@
               ></q-btn
             >
           </div>
+
+          <footer class="category-actions">
+            <q-btn
+              flat
+              no-caps
+              icon="tune"
+              color="primary"
+              :label="t('income.editCategories')"
+              @click="editingCategories = true"
+            />
+          </footer>
         </section>
-        <q-btn
-          flat
-          no-caps
-          icon="tune"
-          color="primary"
-          :label="t('income.editCategories')"
-          class="edit-categories"
-          @click="editingCategories = true"
-        />
       </template>
     </main>
 
     <q-dialog v-model="editingCategories" :maximized="$q.screen.lt.sm"
       ><q-card class="category-dialog"
-        ><IncomeCategorySetup
+        ><q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="editingCategories = false" /><IncomeCategorySetup
           edit-mode
           :initial-selected="incomeStore.enabledCategories"
           :saving="saving"
@@ -145,7 +154,14 @@
     ></q-dialog>
     <q-dialog v-model="confirmDisable"
       ><q-card class="confirm-card"
-        ><q-card-section
+        ><q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup /><q-card-section
           ><h2>{{ t('income.setup.disableTitle') }}</h2>
           <p>{{ t('income.setup.disableDescription') }}</p></q-card-section
         ><q-card-actions align="right"
@@ -158,7 +174,14 @@
     ></q-dialog>
     <q-dialog v-model="confirmCategoryDelete"
       ><q-card class="confirm-card"
-        ><q-card-section
+        ><q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup /><q-card-section
           ><h2>{{ t('income.deleteCategory.title') }}</h2>
           <p>
             {{
@@ -178,7 +201,14 @@
     ></q-dialog>
     <q-dialog v-model="ownershipDialog"
       ><q-card class="ownership-dialog"
-        ><q-card-section
+        ><q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup /><q-card-section
           ><h2>{{ t('income.ownership.label') }}</h2>
           <OwnershipEditor
             v-if="editingOwnershipCategoryId"
@@ -259,10 +289,12 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
-const enabledCategories = computed(() =>
-  incomeCategories.filter((category) => incomeStore.enabledCategories.includes(category.id)),
-)
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const enabledCategories = computed(() =>
+  incomeCategories
+    .filter((category) => incomeStore.enabledCategories.includes(category.id))
+    .sort((left, right) => categoryAnnualValue(right.id) - categoryAnnualValue(left.id)),
+)
 const financialYearError = computed(() =>
   financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
@@ -339,13 +371,11 @@ function categoryStatus(id) {
   return count ? t('income.itemCount', { count }) : t('income.simpleTotal')
 }
 function categoryValue(id) {
-  const annualValue = financialYearCategoryValue(
-    financialYear.value,
-    'income',
-    id,
-    selectedMemberId.value,
-  )
+  const annualValue = categoryAnnualValue(id)
   return formatCurrency(period.value === 'annual' ? annualValue : annualValue / 12)
+}
+function categoryAnnualValue(id) {
+  return financialYearCategoryValue(financialYear.value, 'income', id, selectedMemberId.value)
 }
 function categoryMembers(id) {
   const category = incomeStore.config?.categories?.[id]
@@ -464,9 +494,6 @@ async function persist(action) {
 .back-button {
   @include financial-back-button;
 }
-.eyebrow {
-  @include financial-eyebrow;
-}
 h1 {
   @include financial-title;
 }
@@ -509,8 +536,14 @@ h1 {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-line);
 }
-.category-row:last-child {
+.category-row:last-of-type {
   border-bottom: 0;
+}
+.category-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--color-line);
 }
 .category-main,
 .category-link,
@@ -560,12 +593,13 @@ h1 {
   color: var(--color-copy);
   font-size: 1.25rem;
 }
-.edit-categories {
-  margin-top: 1rem;
-}
 .category-dialog {
-  width: min(68rem, calc(100vw - 2rem));
+  width: min(76rem, calc(100vw - 3rem));
+  max-width: none;
   padding: clamp(1rem, 4vw, 2.5rem);
+}
+.category-dialog :deep(.setup-panel) {
+  max-width: none;
 }
 .confirm-card,
 .ownership-dialog {
@@ -599,6 +633,9 @@ h1 {
   }
   .period-switch button {
     flex: 1;
+  }
+  .category-actions :deep(.q-btn) {
+    width: 100%;
   }
 }
 </style>

@@ -14,7 +14,6 @@ import {
 export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
   const month = ref(null)
   const enabledSubcategories = ref([])
-  const availableSubcategories = ref([])
   const loading = ref(false)
   const saving = ref(false)
   const error = ref(null)
@@ -59,7 +58,6 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
       const preferences = await promise
       if (currentRequest !== preferencesRequestId) return
       enabledSubcategories.value = preferences.enabledSubcategories
-      availableSubcategories.value = preferences.availableSubcategories
       loadedPreferencesWorkspaceId.value = workspaceId
     } finally {
       if (currentRequest === preferencesRequestId) pendingPreferences = null
@@ -143,7 +141,6 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
     pendingPreferences = null
     month.value = null
     enabledSubcategories.value = []
-    availableSubcategories.value = []
     loading.value = false
     saving.value = false
     error.value = null
@@ -154,7 +151,6 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
   return {
     month,
     enabledSubcategories,
-    availableSubcategories,
     loading,
     saving,
     error,

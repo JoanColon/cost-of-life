@@ -11,8 +11,8 @@
             icon="arrow_back"
             :label="t('navigation.backToWorkspaceHome')"
             :to="{ name: 'workspace-dashboard', params: { workspaceId } }"
+            class="back-button"
           />
-          <div class="eyebrow">{{ t('historic.eyebrow') }}</div>
           <h1>{{ t('historic.title') }}</h1>
         </div>
         <q-select
@@ -34,21 +34,15 @@
       <section v-else-if="financialYear" class="totals-grid">
         <article>
           <span>{{ t('dashboard.costOfLife.income') }}</span>
-          <strong>{{
-            financialYear.totals ? formatCurrency(financialYear.totals.income || 0) : '—'
-          }}</strong>
+          <strong>{{ formatCurrency(annualIncome) }}</strong>
         </article>
         <article>
           <span>{{ t('dashboard.costOfLife.lifeCosts') }}</span>
-          <strong>{{
-            financialYear.totals ? formatCurrency(financialYear.totals.expenses || 0) : '—'
-          }}</strong>
+          <strong>{{ formatCurrency(annualExpenses) }}</strong>
         </article>
         <article>
           <span>{{ t('dashboard.costOfLife.savingsCapacity') }}</span>
-          <strong>{{
-            financialYear.totals ? formatCurrency(financialYear.totals.savings || 0) : '—'
-          }}</strong>
+          <strong>{{ formatCurrency(annualSavings) }}</strong>
         </article>
         <article>
           <span>{{ t('dashboard.financialPosition.netWorth') }}</span>
@@ -66,7 +60,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { currentFinancialYear } from '@/domain/financial/financial-year'
+import { currentFinancialYear, financialYearValue } from '@/domain/financial/financial-year'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -92,13 +86,10 @@ const workspaceStartYear = computed(() => {
   return date && !Number.isNaN(date.getTime()) ? date.getFullYear() : currentFinancialYear() - 10
 })
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, selectedYear.value))
-const latestNetWorth = computed(() => {
-  const months = Object.entries(financialYear.value?.months || {}).sort(([first], [second]) =>
-    second.localeCompare(first),
-  )
-  const month = months.find(([, value]) => value?.netWorth != null)
-  return month ? Number(month[1].netWorth) : null
-})
+const annualIncome = computed(() => financialYearValue(financialYear.value, 'income'))
+const annualExpenses = computed(() => financialYearValue(financialYear.value, 'expenses'))
+const annualSavings = computed(() => financialYearValue(financialYear.value, 'savings'))
+const latestNetWorth = computed(() => financialYearValue(financialYear.value, 'netWorth'))
 const loading = computed(() => financialYearsStore.loading)
 const error = computed(() => financialYearsStore.errorFor(workspaceId.value, selectedYear.value))
 
@@ -130,8 +121,8 @@ function yearsBetween(latest, earliest) {
 .historic-header {
   @include financial-header;
 }
-.eyebrow {
-  @include financial-eyebrow;
+.back-button {
+  @include financial-back-button;
 }
 h1 {
   @include financial-title;

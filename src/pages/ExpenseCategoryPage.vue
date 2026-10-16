@@ -30,8 +30,8 @@
               icon="arrow_back"
               :label="t('expenses.backToExpenses')"
               :to="expensesRoute"
+              class="back-button"
             />
-            <div class="eyebrow">{{ t('expenses.eyebrow') }}</div>
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
@@ -128,6 +128,15 @@
 
     <q-dialog v-model="deleteDialog">
       <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          v-close-popup
+        />
         <q-card-section>
           <h2>{{ t('expenses.delete.title') }}</h2>
           <p>
@@ -163,7 +172,11 @@ import {
   financialYearCategoryValue,
   financialYearSubcategoryValue,
 } from '@/domain/financial/financial-year'
-import { cloneOwnership, createEqualOwnership } from '@/domain/financial/ownership'
+import {
+  cloneOwnership,
+  createEqualOwnership,
+  createSingleOwnership,
+} from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -213,16 +226,18 @@ const usedStandardTypes = computed(() =>
   allExpenses.value.filter(({ type }) => type !== 'other').map(({ type }) => type),
 )
 const scopedExpenses = computed(() =>
-  allExpenses.value.map((item) => ({
-    ...item,
-    scopedValue: financialYearSubcategoryValue(
-      financialYear.value,
-      'expenses',
-      categoryId.value,
-      item.type === 'other' ? item.id : item.type,
-      selectedMemberId.value,
-    ),
-  })),
+  allExpenses.value
+    .map((item) => ({
+      ...item,
+      scopedValue: financialYearSubcategoryValue(
+        financialYear.value,
+        'expenses',
+        categoryId.value,
+        item.type === 'other' ? item.id : item.type,
+        selectedMemberId.value,
+      ),
+    }))
+    .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
 )
 const categoryTotal = computed(() =>
   financialYearCategoryValue(
@@ -236,6 +251,10 @@ const expenseDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config) return null
   const firstItem = allExpenses.value.length === 0
+  const ownership =
+    memberIds.value.length === 1
+      ? createSingleOwnership(authUser.value?.uid)
+      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
     name: '',
     type: null,
@@ -243,7 +262,7 @@ const expenseDefaults = computed(() => {
     variability: 'fixed',
     recurrence: 'recurring',
     necessity: null,
-    ownership: cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value)),
+    ownership,
   }
 })
 const pageLoading = computed(
@@ -340,23 +359,28 @@ async function persist(operation) {
     await operation()
     $q.notify({ type: 'positive', message: t('expenses.saved'), position: 'top' })
     return true
-  } catch {
-    $q.notify({ type: 'negative', message: t('expenses.errors.save'), position: 'top' })
+  } catch (error) {
+    console.error('Unable to save expense', error)
+    $q.notify({
+      type: 'negative',
+      message: t('expenses.errors.save'),
+      caption: error?.message || undefined,
+      position: 'top',
+    })
     return false
   }
 }
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .expense-category-page {
-  min-height: calc(100vh - 64px);
-  padding: clamp(1.25rem, 3vw, 3rem);
-  background: var(--color-page);
+  @include financial-page;
 }
 
 .category-shell {
-  width: min(68rem, 100%);
-  margin: 0 auto;
+  @include financial-shell;
 }
 
 .state {
@@ -367,29 +391,22 @@ async function persist(operation) {
 }
 
 .category-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  @include financial-header;
 }
 
 .category-header h1 {
-  margin: 0.2rem 0 0;
-  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  @include financial-title;
 }
 
-.eyebrow {
-  color: var(--color-primary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
+.back-button {
+  @include financial-back-button;
 }
 
 .summary-card {
   display: flex;
   align-items: center;
   gap: 1rem;
+  margin-top: 2rem;
   margin-bottom: 1rem;
   padding: 1.25rem;
   border: 1px solid var(--color-line);
@@ -491,6 +508,10 @@ async function persist(operation) {
 }
 
 .add-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.25rem;
   width: 100%;
   padding: 1rem;
   border: 0;

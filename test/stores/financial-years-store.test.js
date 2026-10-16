@@ -19,7 +19,7 @@ describe('financial years store', () => {
     setActivePinia(createPinia())
     getFinancialYear.mockReset()
     subscribeFinancialYear.mockReset()
-    getFinancialYear.mockResolvedValue({ id: String(currentFinancialYear()), totals: {} })
+    getFinancialYear.mockResolvedValue({ id: String(currentFinancialYear()), months: {} })
     subscribeFinancialYear.mockImplementation(() => vi.fn())
   })
 

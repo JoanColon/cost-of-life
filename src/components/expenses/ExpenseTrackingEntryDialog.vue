@@ -4,10 +4,17 @@
       <q-form @submit.prevent="submit">
         <q-card-section class="entry-heading">
           <div>
-            <span>{{ t('expenseTracker.entry.eyebrow') }}</span>
             <h2>{{ t(subcategory.nameKey) }}</h2>
           </div>
-          <q-btn flat round dense icon="close" :aria-label="t('common.cancel')" v-close-popup />
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            class="dialog-close"
+            :aria-label="t('common.cancel')"
+            v-close-popup
+          />
         </q-card-section>
 
         <q-card-section class="entry-fields">
@@ -47,6 +54,7 @@
           />
 
           <OwnershipEditor
+            v-if="members.length > 1"
             v-model="ownership"
             :members="members"
             @validity="ownershipValid = $event"
@@ -117,7 +125,10 @@ const lastDate = computed(() => {
   return `${props.period}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 })
 const valid = computed(
-  () => Number(amount.value) > 0 && Boolean(date.value) && ownershipValid.value,
+  () =>
+    Number(amount.value) > 0 &&
+    Boolean(date.value) &&
+    (props.members.length === 1 || ownershipValid.value),
 )
 
 watch(
@@ -125,6 +136,7 @@ watch(
   (open) => {
     if (open) seed()
   },
+  { immediate: true },
 )
 
 function seed() {
@@ -183,16 +195,8 @@ function submit() {
   justify-content: space-between;
 }
 
-.entry-heading span {
-  color: var(--color-primary);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .entry-heading h2 {
-  margin: 0.25rem 0 0;
+  margin: 0;
 }
 
 .entry-fields {
