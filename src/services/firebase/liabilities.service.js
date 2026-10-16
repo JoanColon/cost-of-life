@@ -1,7 +1,5 @@
 import {
   collection,
-  deleteField,
-  doc,
   getDocs,
   query,
   runTransaction,
@@ -11,6 +9,12 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 import { currentUserId } from '@/services/firebase/current-user'
+import {
+  createFinancialModelItem,
+  deleteFinancialModelCategory,
+  deleteFinancialModelItem,
+  updateFinancialModelItem,
+} from '@/services/firebase/financial-model-mutations.service'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 import { normalizeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
@@ -118,110 +122,21 @@ export async function updateSimpleLiabilityOwnership(
 }
 
 export async function createLiability(workspaceId, liability, memberIds) {
-  const userId = currentUserId()
   assertValidOwnership(liability.ownership, memberIds)
-  const liabilityRef = doc(modelLiabilitiesRef(workspaceId))
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const configSnapshot = await transaction.get(documentRef)
-    const category = configSnapshot.data()?.categories?.[liability.category]
-    if (!category?.enabled) throw new Error('Liability category is not enabled')
-
-    const balance = normalizeMoney(liability.balance)
-    if (balance === null) throw new Error('A non-negative balance is required')
-
-    const liabilityData = {
-      ...liability,
-      balance,
-      ownership: cloneOwnership(liability.ownership),
-      createdAt: serverTimestamp(),
-      createdBy: userId,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.set(liabilityRef, liabilityData)
-    return {
-      liability: { ...liabilityData, id: liabilityRef.id, createdAt: null, updatedAt: null },
-    }
-  })
+  return createFinancialModelItem(workspaceId, 'liabilities', liability)
 }
 
 export async function updateLiability(workspaceId, liabilityId, changes, memberIds) {
-  const userId = currentUserId()
-  const liabilityRef = doc(modelLiabilitiesRef(workspaceId), liabilityId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [liabilitySnapshot, configSnapshot] = await Promise.all([
-      transaction.get(liabilityRef),
-      transaction.get(documentRef),
-    ])
-    if (!liabilitySnapshot.exists()) throw new Error('Liability not found')
-
-    const previousLiability = liabilitySnapshot.data()
-    const categoryId = previousLiability.category
-    const category = configSnapshot.data()?.categories?.[categoryId]
-    if (!category) {
-      throw new Error('Itemized liability category not found')
-    }
-
-    const balance = normalizeMoney(changes.balance)
-    if (balance === null) throw new Error('A non-negative balance is required')
-
-    const updatedLiability = {
-      ...previousLiability,
-      ...changes,
-      category: categoryId,
-      balance,
-      ownership: cloneOwnership(changes.ownership || previousLiability.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    assertValidOwnership(updatedLiability.ownership, memberIds)
-    transaction.update(liabilityRef, updatedLiability)
-    return {
-      liability: { id: liabilityId, ...updatedLiability, updatedAt: null },
-    }
-  })
+  assertValidOwnership(changes.ownership, memberIds)
+  return updateFinancialModelItem(workspaceId, 'liabilities', liabilityId, changes)
 }
 
 export async function deleteLiability(workspaceId, liabilityId) {
-  const liabilityRef = doc(modelLiabilitiesRef(workspaceId), liabilityId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [liabilitySnapshot, configSnapshot] = await Promise.all([
-      transaction.get(liabilityRef),
-      transaction.get(documentRef),
-    ])
-    if (!liabilitySnapshot.exists()) throw new Error('Liability not found')
-
-    const liability = liabilitySnapshot.data()
-    const category = configSnapshot.data()?.categories?.[liability.category]
-    if (!category) throw new Error('Liability category not found')
-
-    transaction.delete(liabilityRef)
-    return {
-      categoryId: liability.category,
-    }
-  })
+  return deleteFinancialModelItem(workspaceId, 'liabilities', liabilityId)
 }
 
 export async function deleteLiabilityCategory(workspaceId, categoryId) {
-  const userId = currentUserId()
-  const categorySnapshot = await getDocs(
-    query(modelLiabilitiesRef(workspaceId), where('category', '==', categoryId)),
-  )
-  if (categorySnapshot.size > 498) {
-    throw new Error('Liability categories with more than 498 items cannot be deleted at once')
-  }
-
-  const batch = writeBatch(db)
-  categorySnapshot.docs.forEach((liabilityDocument) => batch.delete(liabilityDocument.ref))
-  batch.update(configRef(workspaceId), {
-    [`categories.${categoryId}`]: deleteField(),
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
-  await batch.commit()
+  await deleteFinancialModelCategory(workspaceId, 'liabilities', categoryId)
 }
 
 function assertValidOwnership(ownership, memberIds) {

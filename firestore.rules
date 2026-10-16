@@ -46,9 +46,8 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // During development, workspace members can collaborate on the model
-      // and operational data below their workspace. Administrative access to
-      // the workspace document itself remains owner-only above.
+      // Model items are read here but mutated through the callable function so
+      // each item and its financial-year projection commit atomically.
       match /{collectionId}/{document=**} {
         allow read: if (
           collectionId == 'modelAssets'
@@ -60,11 +59,7 @@ service cloud.firestore {
         )
           && isWorkspaceMemberById(workspaceId);
         allow write: if (
-          collectionId == 'modelAssets'
-          || collectionId == 'modelLiabilities'
-          || collectionId == 'modelIncome'
-          || collectionId == 'modelExpenses'
-          || collectionId == 'modelConfig'
+          collectionId == 'modelConfig'
           || collectionId == 'expenseTracking'
         )
           && isWorkspaceMemberById(workspaceId)

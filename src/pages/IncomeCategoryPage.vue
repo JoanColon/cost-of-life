@@ -44,11 +44,20 @@
           </div>
         </section>
         <section v-if="allCategoryIncome.length" class="income-list">
-          <article v-for="item in scopedIncome" :key="item.id" class="income-row">
+          <article
+            v-for="item in scopedIncome"
+            :key="item.id"
+            class="income-row"
+            role="button"
+            tabindex="0"
+            @click="edit(item)"
+            @keydown.enter.self="edit(item)"
+            @keydown.space.self.prevent="edit(item)"
+          >
             <div class="income-main">
               <span class="income-icon"><q-icon :name="category.icon" /></span
               ><span class="income-copy"
-                ><strong>{{ item.name }}</strong
+                ><strong>{{ incomeDisplayName(item) }}</strong
                 ><small>{{ itemSubtitle(item) }}</small></span
               >
             </div>
@@ -71,7 +80,7 @@
               >{{ formatCurrency(item.scopedValue)
               }}<small>/{{ t('dashboard.year') }}</small></strong
             >
-            <q-btn flat round dense icon="more_vert" color="grey-7"
+            <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop
               ><q-menu
                 ><q-list dense
                   ><q-item clickable v-close-popup @click="edit(item)"
@@ -125,7 +134,7 @@
         ><q-card-section
           ><h2>{{ t('income.delete.title') }}</h2>
           <p>
-            {{ t('income.delete.description', { name: deletingIncome?.name }) }}
+            {{ t('income.delete.description', { name: incomeDisplayName(deletingIncome) }) }}
           </p></q-card-section
         ><q-card-actions align="between"
           ><q-btn
@@ -296,6 +305,9 @@ function itemSubtitle(item) {
     return `${type} · ${formatCurrency(item.calculation.amount)} / ${t(`income.frequencies.${item.calculation.frequency}`).toLowerCase()}`
   return `${type} · ${t('income.calculationModes.one_time')}`
 }
+function incomeDisplayName(item) {
+  return item?.name?.trim() || (item ? t(`income.subtypes.${item.subtype}`) : '')
+}
 function add() {
   editingIncome.value = null
   incomeDialog.value = true
@@ -449,6 +461,18 @@ h1 {
   min-height: 5rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-line);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.income-row:hover {
+  background: #f8fafc;
+}
+.income-row:focus-visible {
+  position: relative;
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 .income-main {
   display: flex;

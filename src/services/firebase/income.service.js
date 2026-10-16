@@ -1,7 +1,5 @@
 import {
   collection,
-  deleteField,
-  doc,
   getDocs,
   query,
   runTransaction,
@@ -16,6 +14,12 @@ import { normalizeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
+import {
+  createFinancialModelItem,
+  deleteFinancialModelCategory,
+  deleteFinancialModelItem,
+  updateFinancialModelItem,
+} from '@/services/firebase/financial-model-mutations.service'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
 function configRef(workspaceId) {
@@ -118,105 +122,26 @@ export async function updateSimpleIncomeOwnership(workspaceId, categoryId, owner
 }
 
 export async function createIncome(workspaceId, income, memberIds) {
-  const userId = currentUserId()
   assertValidOwnership(income.ownership, memberIds)
   const normalized = normalizeIncomeItem(income)
-  const itemRef = doc(modelIncomeRef(workspaceId))
-  const documentRef = configRef(workspaceId)
-
-  return runTransaction(db, async (transaction) => {
-    const configSnapshot = await transaction.get(documentRef)
-    const category = configSnapshot.data()?.categories?.[normalized.category]
-    if (!category?.enabled) throw new Error('Income category is not enabled')
-
-    const itemData = {
-      ...income,
-      ...normalized,
-      ownership: cloneOwnership(income.ownership),
-      createdAt: serverTimestamp(),
-      createdBy: userId,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.set(itemRef, itemData)
-    return {
-      income: { ...itemData, id: itemRef.id, createdAt: null, updatedAt: null },
-    }
+  return createFinancialModelItem(workspaceId, 'income', {
+    ...income,
+    ...normalized,
+    ownership: cloneOwnership(income.ownership),
   })
 }
 
 export async function updateIncome(workspaceId, incomeId, changes, memberIds) {
-  const userId = currentUserId()
-  const itemRef = doc(modelIncomeRef(workspaceId), incomeId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [itemSnapshot, configSnapshot] = await Promise.all([
-      transaction.get(itemRef),
-      transaction.get(documentRef),
-    ])
-    if (!itemSnapshot.exists()) throw new Error('Income source not found')
-
-    const previousIncome = itemSnapshot.data()
-    const categoryId = previousIncome.category
-    const category = configSnapshot.data()?.categories?.[categoryId]
-    if (!category) {
-      throw new Error('Itemized income category not found')
-    }
-
-    const normalized = normalizeIncomeItem({ ...previousIncome, ...changes, category: categoryId })
-    const updatedIncome = {
-      ...previousIncome,
-      ...changes,
-      ...normalized,
-      category: categoryId,
-      ownership: cloneOwnership(changes.ownership || previousIncome.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    assertValidOwnership(updatedIncome.ownership, memberIds)
-    transaction.update(itemRef, updatedIncome)
-    return {
-      income: { id: incomeId, ...updatedIncome, updatedAt: null },
-    }
-  })
+  assertValidOwnership(changes.ownership, memberIds)
+  return updateFinancialModelItem(workspaceId, 'income', incomeId, changes)
 }
 
 export async function deleteIncome(workspaceId, incomeId) {
-  const itemRef = doc(modelIncomeRef(workspaceId), incomeId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [itemSnapshot, configSnapshot] = await Promise.all([
-      transaction.get(itemRef),
-      transaction.get(documentRef),
-    ])
-    if (!itemSnapshot.exists()) throw new Error('Income source not found')
-
-    const income = itemSnapshot.data()
-    const category = configSnapshot.data()?.categories?.[income.category]
-    if (!category) throw new Error('Income category not found')
-    transaction.delete(itemRef)
-    return {
-      categoryId: income.category,
-    }
-  })
+  return deleteFinancialModelItem(workspaceId, 'income', incomeId)
 }
 
 export async function deleteIncomeCategory(workspaceId, categoryId) {
-  const userId = currentUserId()
-  const snapshot = await getDocs(
-    query(modelIncomeRef(workspaceId), where('category', '==', categoryId)),
-  )
-  if (snapshot.size > 498) {
-    throw new Error('Income categories with more than 498 sources cannot be deleted at once')
-  }
-  const batch = writeBatch(db)
-  snapshot.docs.forEach((incomeDocument) => batch.delete(incomeDocument.ref))
-  batch.update(configRef(workspaceId), {
-    [`categories.${categoryId}`]: deleteField(),
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
-  await batch.commit()
+  await deleteFinancialModelCategory(workspaceId, 'income', categoryId)
 }
 
 function normalizeIncomeItem(income) {
@@ -224,13 +149,16 @@ function normalizeIncomeItem(income) {
   if (!category) throw new Error('A valid income category is required')
   if (!category.subtypes.includes(income.subtype))
     throw new Error('A valid income type is required')
-  if (!String(income.name || '').trim()) throw new Error('An income source name is required')
-
   const calculation = normalizeIncomeCalculation(income.calculation)
   if (!calculation || !category.calculationModes.includes(calculation.mode)) {
     throw new Error('A valid income calculation is required')
   }
-  return { category: category.id, subtype: income.subtype, name: income.name.trim(), calculation }
+  return {
+    category: category.id,
+    subtype: income.subtype,
+    name: String(income.name || '').trim(),
+    calculation,
+  }
 }
 
 function assertValidOwnership(ownership, memberIds) {

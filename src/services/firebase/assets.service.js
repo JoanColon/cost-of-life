@@ -1,7 +1,5 @@
 import {
   collection,
-  deleteField,
-  doc,
   getDocs,
   query,
   runTransaction,
@@ -11,6 +9,12 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 import { currentUserId } from '@/services/firebase/current-user'
+import {
+  createFinancialModelItem,
+  deleteFinancialModelCategory,
+  deleteFinancialModelItem,
+  updateFinancialModelItem,
+} from '@/services/firebase/financial-model-mutations.service'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 import { normalizeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
@@ -115,118 +119,21 @@ export async function updateSimpleCategoryOwnership(workspaceId, categoryId, own
 }
 
 export async function createAsset(workspaceId, asset, memberIds) {
-  const userId = currentUserId()
   assertValidOwnership(asset.ownership, memberIds)
-  const assetRef = doc(modelAssetsRef(workspaceId))
-  const documentRef = configRef(workspaceId)
-
-  return runTransaction(db, async (transaction) => {
-    const configSnapshot = await transaction.get(documentRef)
-    const category = configSnapshot.data()?.categories?.[asset.category]
-    if (!category?.enabled) throw new Error('Asset category is not enabled')
-
-    const currentValue = normalizeMoney(asset.currentValue)
-    if (currentValue === null) throw new Error('A non-negative numeric value is required')
-
-    const assetData = {
-      ...asset,
-      currentValue,
-      ownership: cloneOwnership(asset.ownership),
-      detail: asset.detail || {},
-      valueSource: 'manual',
-      createdAt: serverTimestamp(),
-      createdBy: userId,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.set(assetRef, assetData)
-
-    return {
-      asset: { ...assetData, id: assetRef.id, createdAt: null, updatedAt: null },
-    }
-  })
+  return createFinancialModelItem(workspaceId, 'assets', asset)
 }
 
 export async function updateAsset(workspaceId, assetId, changes, memberIds) {
-  const userId = currentUserId()
-  const assetRef = doc(modelAssetsRef(workspaceId), assetId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [assetSnapshot, configSnapshot] = await Promise.all([
-      transaction.get(assetRef),
-      transaction.get(documentRef),
-    ])
-    if (!assetSnapshot.exists()) throw new Error('Asset not found')
-
-    const previousAsset = assetSnapshot.data()
-    const categoryId = previousAsset.category
-    const category = configSnapshot.data()?.categories?.[categoryId]
-    if (!category) {
-      throw new Error('Itemized asset category not found')
-    }
-
-    const currentValue = normalizeMoney(changes.currentValue)
-    if (currentValue === null) throw new Error('A non-negative numeric value is required')
-
-    const updatedAsset = {
-      ...previousAsset,
-      ...changes,
-      category: categoryId,
-      currentValue,
-      ownership: cloneOwnership(changes.ownership || previousAsset.ownership),
-      detail: changes.detail || previousAsset.detail || {},
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    assertValidOwnership(updatedAsset.ownership, memberIds)
-    transaction.update(assetRef, updatedAsset)
-
-    return {
-      asset: { id: assetId, ...updatedAsset, updatedAt: null },
-    }
-  })
+  assertValidOwnership(changes.ownership, memberIds)
+  return updateFinancialModelItem(workspaceId, 'assets', assetId, changes)
 }
 
 export async function deleteAsset(workspaceId, assetId) {
-  const assetRef = doc(modelAssetsRef(workspaceId), assetId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [assetSnapshot, configSnapshot] = await Promise.all([
-      transaction.get(assetRef),
-      transaction.get(documentRef),
-    ])
-    if (!assetSnapshot.exists()) throw new Error('Asset not found')
-
-    const asset = assetSnapshot.data()
-    const category = configSnapshot.data()?.categories?.[asset.category]
-    if (!category) throw new Error('Asset category not found')
-
-    transaction.delete(assetRef)
-
-    return {
-      categoryId: asset.category,
-    }
-  })
+  return deleteFinancialModelItem(workspaceId, 'assets', assetId)
 }
 
 export async function deleteAssetCategory(workspaceId, categoryId) {
-  const userId = currentUserId()
-  const categoryAssetsSnapshot = await getDocs(
-    query(modelAssetsRef(workspaceId), where('category', '==', categoryId)),
-  )
-
-  if (categoryAssetsSnapshot.size > 498) {
-    throw new Error('Asset categories with more than 498 items cannot be deleted in one operation')
-  }
-
-  const batch = writeBatch(db)
-  categoryAssetsSnapshot.docs.forEach((assetDocument) => batch.delete(assetDocument.ref))
-  batch.update(configRef(workspaceId), {
-    [`categories.${categoryId}`]: deleteField(),
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
-  await batch.commit()
+  await deleteFinancialModelCategory(workspaceId, 'assets', categoryId)
 }
 
 function assertValidOwnership(ownership, memberIds) {

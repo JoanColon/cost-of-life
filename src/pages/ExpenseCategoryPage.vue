@@ -47,7 +47,16 @@
         </section>
 
         <section v-if="allExpenses.length" class="expense-list">
-          <article v-for="item in scopedExpenses" :key="item.id" class="expense-row">
+          <article
+            v-for="item in scopedExpenses"
+            :key="item.id"
+            class="expense-row"
+            role="button"
+            tabindex="0"
+            @click="edit(item)"
+            @keydown.enter.self="edit(item)"
+            @keydown.space.self.prevent="edit(item)"
+          >
             <span class="expense-icon"><q-icon :name="category.icon" /></span>
             <span class="expense-copy">
               <strong>{{ expenseTypeLabel(item) }}</strong>
@@ -59,7 +68,7 @@
               {{ formatCurrency(item.scopedValue) }}
               <small>/ {{ t('dashboard.year') }}</small>
             </strong>
-            <q-btn flat round dense icon="more_vert" color="grey-7">
+            <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop>
               <q-menu>
                 <q-list dense>
                   <q-item clickable v-close-popup @click="edit(item)">
@@ -121,7 +130,9 @@
       <q-card class="confirm-card">
         <q-card-section>
           <h2>{{ t('expenses.delete.title') }}</h2>
-          <p>{{ t('expenses.delete.description', { name: deletingExpense?.name }) }}</p>
+          <p>
+            {{ t('expenses.delete.description', { name: expenseDisplayName(deletingExpense) }) }}
+          </p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
@@ -270,6 +281,10 @@ async function preparePage(force = false) {
 function expenseTypeLabel(item) {
   const suggestion = category.value?.suggestions.find((candidate) => candidate.id === item.type)
   return suggestion ? t(suggestion.nameKey) : t('expenses.suggestions.other')
+}
+
+function expenseDisplayName(item) {
+  return item?.name?.trim() || (item ? expenseTypeLabel(item) : '')
 }
 
 function add() {
@@ -421,6 +436,20 @@ async function persist(operation) {
   gap: 0.8rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--color-line);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.expense-row:hover {
+  background: #f8fafc;
+}
+
+.expense-row:focus-visible {
+  position: relative;
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .expense-icon {

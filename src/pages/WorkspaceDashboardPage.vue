@@ -104,34 +104,20 @@ const dashboardData = computed(() => {
   const income = financialYear.value
     ? financialYearValue(financialYear.value, 'income', selectedMemberId.value)
     : 0
-  const monthlyIncome = financialYearMonthValue(
-    financialYear.value,
-    currentMonth,
-    'income',
-    selectedMemberId.value,
-  )
   const annualCostOfLife = financialYear.value
     ? financialYearValue(financialYear.value, 'expenses', selectedMemberId.value)
     : 0
-  const monthlyCostOfLife = financialYearMonthValue(
-    financialYear.value,
-    currentMonth,
-    'expenses',
-    selectedMemberId.value,
-  )
   const savingsCapacity = Math.round((income - annualCostOfLife + Number.EPSILON) * 100) / 100
-  const monthlySavingsCapacity =
-    Math.round((monthlyIncome - monthlyCostOfLife + Number.EPSILON) * 100) / 100
 
   return {
     assets,
     liabilities,
     income,
-    monthlyIncome,
+    monthlyIncome: income / 12,
     annualCost: annualCostOfLife,
-    monthlyCost: monthlyCostOfLife,
+    monthlyCost: annualCostOfLife / 12,
     savingsCapacity,
-    monthlySavingsCapacity,
+    monthlySavingsCapacity: savingsCapacity / 12,
     savingsRate: income > 0 ? Math.round((savingsCapacity / income) * 100) : 0,
     costRatio: income > 0 ? Math.round((annualCostOfLife / income) * 100) : 0,
     netWorth: financialYearMonthValue(

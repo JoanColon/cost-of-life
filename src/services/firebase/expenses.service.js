@@ -1,7 +1,5 @@
 import {
   collection,
-  deleteField,
-  doc,
   getDocs,
   query,
   runTransaction,
@@ -21,6 +19,12 @@ import {
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
+import {
+  createFinancialModelItem,
+  deleteFinancialModelCategory,
+  deleteFinancialModelItem,
+  updateFinancialModelItem,
+} from '@/services/firebase/financial-model-mutations.service'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
 function configRef(workspaceId) {
@@ -129,118 +133,21 @@ export async function updateSimpleExpenseOwnership(workspaceId, categoryId, owne
 }
 
 export async function createExpense(workspaceId, expense, memberIds) {
-  const userId = currentUserId()
   assertValidOwnership(expense.ownership, memberIds)
-  const normalized = normalizeExpenseItem(expense)
-  const itemRef =
-    normalized.type === 'other'
-      ? doc(modelExpensesRef(workspaceId))
-      : doc(modelExpensesRef(workspaceId), standardExpenseDocumentId(normalized))
-  const documentRef = configRef(workspaceId)
-
-  return runTransaction(db, async (transaction) => {
-    const [configSnapshot, existingItemSnapshot] = await Promise.all([
-      transaction.get(documentRef),
-      normalized.type === 'other' ? Promise.resolve(null) : transaction.get(itemRef),
-    ])
-    const category = configSnapshot.data()?.categories?.[normalized.category]
-    if (!category?.enabled) throw new Error('Expense category is not enabled')
-    if (existingItemSnapshot?.exists()) {
-      throw new Error('Only one expense is allowed for each standard subcategory')
-    }
-
-    const itemData = {
-      ...normalized,
-      ownership: cloneOwnership(expense.ownership),
-      createdAt: serverTimestamp(),
-      createdBy: userId,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    transaction.set(itemRef, itemData)
-    return {
-      expense: { ...itemData, id: itemRef.id, createdAt: null, updatedAt: null },
-    }
-  })
+  return createFinancialModelItem(workspaceId, 'expenses', normalizeExpenseItem(expense))
 }
 
 export async function updateExpense(workspaceId, expenseId, changes, memberIds) {
-  const userId = currentUserId()
-  const itemRef = doc(modelExpensesRef(workspaceId), expenseId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [itemSnapshot, configSnapshot] = await Promise.all([
-      transaction.get(itemRef),
-      transaction.get(documentRef),
-    ])
-    if (!itemSnapshot.exists()) throw new Error('Expense not found')
-
-    const previousExpense = itemSnapshot.data()
-    if (changes.type && changes.type !== previousExpense.type) {
-      throw new Error('An expense subcategory cannot be changed after creation')
-    }
-    const categoryId = previousExpense.category
-    const category = configSnapshot.data()?.categories?.[categoryId]
-    if (!category) {
-      throw new Error('Itemized expense category not found')
-    }
-
-    const normalized = normalizeExpenseItem({
-      ...previousExpense,
-      ...changes,
-      category: categoryId,
-    })
-    const updatedExpense = {
-      ...previousExpense,
-      ...normalized,
-      ownership: cloneOwnership(changes.ownership || previousExpense.ownership),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-    assertValidOwnership(updatedExpense.ownership, memberIds)
-    transaction.update(itemRef, updatedExpense)
-    return {
-      expense: { id: expenseId, ...updatedExpense, updatedAt: null },
-    }
-  })
+  assertValidOwnership(changes.ownership, memberIds)
+  return updateFinancialModelItem(workspaceId, 'expenses', expenseId, changes)
 }
 
 export async function deleteExpense(workspaceId, expenseId) {
-  const itemRef = doc(modelExpensesRef(workspaceId), expenseId)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const [itemSnapshot, configSnapshot] = await Promise.all([
-      transaction.get(itemRef),
-      transaction.get(documentRef),
-    ])
-    if (!itemSnapshot.exists()) throw new Error('Expense not found')
-
-    const expense = itemSnapshot.data()
-    const category = configSnapshot.data()?.categories?.[expense.category]
-    if (!category) throw new Error('Expense category not found')
-    transaction.delete(itemRef)
-    return {
-      categoryId: expense.category,
-    }
-  })
+  return deleteFinancialModelItem(workspaceId, 'expenses', expenseId)
 }
 
 export async function deleteExpenseCategory(workspaceId, categoryId) {
-  const userId = currentUserId()
-  const snapshot = await getDocs(
-    query(modelExpensesRef(workspaceId), where('category', '==', categoryId)),
-  )
-  if (snapshot.size > 498) {
-    throw new Error('Expense categories with more than 498 items cannot be deleted at once')
-  }
-  const batch = writeBatch(db)
-  snapshot.docs.forEach((expenseDocument) => batch.delete(expenseDocument.ref))
-  batch.update(configRef(workspaceId), {
-    [`categories.${categoryId}`]: deleteField(),
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
-  await batch.commit()
+  await deleteFinancialModelCategory(workspaceId, 'expenses', categoryId)
 }
 
 function normalizeExpenseItem(expense) {
@@ -251,7 +158,6 @@ function normalizeExpenseItem(expense) {
     throw new Error('A valid expense type is required')
   }
   const name = String(expense.name || '').trim()
-  if (!name) throw new Error('An expense name is required')
 
   const estimate = normalizeExpenseEstimate(expense.estimate)
   if (!estimate) throw new Error('A valid expense estimate is required')
@@ -270,10 +176,6 @@ function normalizeExpenseItem(expense) {
     trackingEligible: type !== 'other' && expense.trackingEligible !== false,
     ...attributes,
   }
-}
-
-function standardExpenseDocumentId(expense) {
-  return `${expense.category}--${expense.type}`
 }
 
 function canonicalExpenseCategories(categories) {

@@ -91,18 +91,6 @@ export function normalizeMonthlyExpenseAmounts(amounts) {
   return normalized
 }
 
-function expenseAmountsForModel(expense) {
-  return (
-    normalizeMonthlyExpenseAmounts(expense?.monthlyAmounts) ||
-    generateMonthlyExpenseAmounts(expense?.estimate)
-  )
-}
-
-export function expenseAmountForMonth(expense, month) {
-  if (!incomeMonths.includes(month)) return 0
-  return normalizeMoney(expenseAmountsForModel(expense)?.[month]) || 0
-}
-
 export function annualMonthlyExpenseValue(amounts, fallbackEstimate = null) {
   const normalized = normalizeMonthlyExpenseAmounts(amounts)
   if (!normalized) return annualExpenseValue(fallbackEstimate)

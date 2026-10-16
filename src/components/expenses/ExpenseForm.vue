@@ -29,13 +29,7 @@
           class="form-field"
           @update:model-value="applySuggestion"
         />
-        <q-input
-          v-model="name"
-          outlined
-          :label="t('expenses.form.name')"
-          :rules="[(value) => Boolean(value?.trim()) || t('expenses.validation.nameRequired')]"
-          class="form-field"
-        />
+        <q-input v-model="name" outlined :label="t('expenses.form.name')" class="form-field" />
 
         <div class="form-grid">
           <q-input
@@ -284,13 +278,7 @@ const breakdown = computed(() =>
     : null,
 )
 const formValid = computed(
-  () =>
-    Boolean(expenseType.value) &&
-    Boolean(name.value.trim()) &&
-    Boolean(normalizedEstimate.value) &&
-    Boolean(normalizeMonthlyExpenseAmounts(monthlyAmounts.value)) &&
-    Boolean(normalizedAttributes.value) &&
-    ownershipValid.value,
+  () => Boolean(expenseType.value) && Boolean(normalizedEstimate.value) && ownershipValid.value,
 )
 
 watch(

@@ -46,26 +46,6 @@ const onModelConfigWritten = onDocumentWritten(
   },
 )
 
-const onExpenseModelWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelExpenses/{expenseId}' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['expenses']),
-)
-
-const onIncomeModelWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelIncome/{incomeId}' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['income']),
-)
-
-const onAssetModelWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelAssets/{assetId}' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['assets']),
-)
-
-const onLiabilityModelWritten = onDocumentWritten(
-  { ...options, document: 'workspaces/{workspaceId}/modelLiabilities/{liabilityId}' },
-  (event) => rebuildCurrent(event.params.workspaceId, ['liabilities']),
-)
-
 const onExpenseTrackingWritten = onDocumentWritten(
   { ...options, document: 'workspaces/{workspaceId}/expenseTracking/{period}' },
   async (event) => {
@@ -85,10 +65,6 @@ async function rebuildCurrent(workspaceId, sections) {
 
 module.exports = {
   ensureFinancialYear,
-  onAssetModelWritten,
-  onExpenseModelWritten,
   onExpenseTrackingWritten,
-  onIncomeModelWritten,
-  onLiabilityModelWritten,
   onModelConfigWritten,
 }

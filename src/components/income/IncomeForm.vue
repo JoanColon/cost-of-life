@@ -15,7 +15,7 @@
       />
     </q-card-section>
     <q-card-section class="form-body">
-      <q-form ref="form" class="income-form" @submit.prevent="submit">
+      <q-form class="income-form" @submit.prevent="submit">
         <q-select
           v-if="category.subtypes.length > 1"
           v-model="subtype"
@@ -31,8 +31,6 @@
           autofocus
           :label="t('income.form.name')"
           maxlength="80"
-          lazy-rules
-          :rules="[(value) => Boolean(value) || t('income.form.nameRequired')]"
         />
         <q-option-group
           v-if="category.id === 'employment'"
@@ -87,59 +85,69 @@
             :label="t('income.form.monthlyNetSalary')"
             :rules="[moneyRule]"
           />
-          <q-markup-table flat bordered dense class="monthly-schedule">
-            <thead>
-              <tr>
-                <th class="text-left">{{ t('income.form.month') }}</th>
-                <th class="text-right">{{ t('income.form.monthlyNetSalary') }}</th>
-                <th class="text-right">{{ t('income.form.extraPayment') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="month in incomeMonths" :key="month">
-                <td>{{ t(`income.months.${month}`) }}</td>
-                <td class="text-right">{{ formatCurrency(normalizedMonthlyAmount) }}</td>
-                <td class="text-right">
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    color="primary"
-                    :icon="normalizedExtra(month) > 0 ? undefined : 'edit'"
-                    :icon-right="normalizedExtra(month) > 0 ? 'edit' : undefined"
-                    :label="
-                      normalizedExtra(month) > 0
-                        ? formatCurrency(normalizedExtra(month))
-                        : undefined
-                    "
-                  >
-                    <q-popup-edit
-                      v-model="extrasByMonth[month]"
-                      buttons
-                      :label-set="t('common.save')"
-                      :label-cancel="t('common.cancel')"
-                      #default="scope"
+          <q-expansion-item
+            icon="calendar_month"
+            :label="t('income.form.yearBreakdown')"
+            class="year-breakdown"
+          >
+            <q-markup-table flat bordered dense class="monthly-schedule">
+              <thead>
+                <tr>
+                  <th class="text-left">{{ t('income.form.month') }}</th>
+                  <th class="text-right">{{ t('income.form.monthlyNetSalary') }}</th>
+                  <th class="text-right">{{ t('income.form.extraPayment') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="month in incomeMonths" :key="month">
+                  <td>{{ t(`income.months.${month}`) }}</td>
+                  <td class="text-right">{{ formatCurrency(normalizedMonthlyAmount) }}</td>
+                  <td class="extra-payment-cell">
+                    <q-btn
+                      flat
+                      dense
+                      no-caps
+                      class="extra-payment-value"
+                      :class="{ empty: normalizedExtra(month) === 0 }"
+                      :label="
+                        normalizedExtra(month) > 0 ? formatCurrency(normalizedExtra(month)) : '—'
+                      "
+                      :aria-label="
+                        t('income.form.extraForMonth', {
+                          month: t(`income.months.${month}`),
+                        })
+                      "
                     >
-                      <q-input
-                        v-model="scope.value"
-                        autofocus
-                        dense
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        :prefix="currencySymbol"
-                        :label="
-                          t('income.form.extraForMonth', { month: t(`income.months.${month}`) })
-                        "
-                        :rules="[moneyRule]"
-                        @keyup.enter="scope.set"
-                      />
-                    </q-popup-edit>
-                  </q-btn>
-                </td>
-              </tr>
-            </tbody>
-          </q-markup-table>
+                      <q-popup-edit
+                        v-model="extrasByMonth[month]"
+                        buttons
+                        :label-set="t('common.save')"
+                        :label-cancel="t('common.cancel')"
+                        #default="scope"
+                      >
+                        <q-input
+                          v-model="scope.value"
+                          autofocus
+                          dense
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          :prefix="currencySymbol"
+                          :label="
+                            t('income.form.extraForMonth', {
+                              month: t(`income.months.${month}`),
+                            })
+                          "
+                          :rules="[moneyRule]"
+                          @keyup.enter="scope.set"
+                        />
+                      </q-popup-edit>
+                    </q-btn>
+                  </td>
+                </tr>
+              </tbody>
+            </q-markup-table>
+          </q-expansion-item>
         </template>
 
         <template v-else-if="calculationMode === 'recurring'">
@@ -214,7 +222,7 @@
             color="negative"
             icon="delete_outline"
             :label="t('common.delete')"
-            :disable="saving || submitting"
+            :disable="saving"
             @click="$emit('delete')"
           />
           <div class="primary-actions">
@@ -222,18 +230,17 @@
               flat
               no-caps
               :label="t('common.cancel')"
-              :disable="saving || submitting"
+              :disable="saving"
               @click="$emit('cancel')"
             />
             <q-btn
               unelevated
               no-caps
               color="primary"
-              type="button"
-              :label="income ? t('common.save') : t('common.add')"
-              :loading="saving || submitting"
-              :disable="!ownershipValid || !calculationValid || saving || submitting"
-              @click="submit"
+              type="submit"
+              :label="t('common.save')"
+              :loading="saving"
+              :disable="!formValid"
             />
           </div>
         </div>
@@ -269,7 +276,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
-const form = ref(null)
 const subtype = ref('')
 const name = ref('')
 const calculationMode = ref('recurring')
@@ -283,7 +289,6 @@ const oneTimeAmount = ref('')
 const oneTimeMonth = ref('january')
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
-const submitting = ref(false)
 const lastAnnualValue = ref(0)
 
 const subtypeOptions = computed(() =>
@@ -320,7 +325,9 @@ const calculation = computed(() => {
   return { mode: 'recurring', amount: recurringAmount.value, frequency: frequency.value }
 })
 const normalizedCalculation = computed(() => normalizeIncomeCalculation(calculation.value))
-const calculationValid = computed(() => Boolean(normalizedCalculation.value))
+const formValid = computed(
+  () => Boolean(subtype.value) && Boolean(normalizedCalculation.value) && ownershipValid.value,
+)
 const breakdown = computed(() => incomeCalculationBreakdown(calculation.value))
 const normalizedMonthlyAmount = computed(() => normalizeMoney(monthlyAmount.value) || 0)
 
@@ -328,12 +335,6 @@ watch(breakdown, (value) => {
   if (value) lastAnnualValue.value = value.annualValue
 })
 watch(() => [props.income, props.defaults, props.category.id], reset, { immediate: true })
-watch(
-  () => props.saving,
-  (saving) => {
-    if (!saving) submitting.value = false
-  },
-)
 
 function reset() {
   const initial = props.income || props.defaults
@@ -393,15 +394,12 @@ function createEmptyExtras() {
   return Object.fromEntries(incomeMonths.map((month) => [month, 0]))
 }
 
-async function submit() {
-  if (props.saving || submitting.value) return
-  const formIsValid = await form.value?.validate()
-  if (!formIsValid || !name.value || !normalizedCalculation.value || !ownershipValid.value) return
-  submitting.value = true
+function submit() {
+  if (!formValid.value) return
   emit('save', {
     category: props.category.id,
     subtype: subtype.value,
-    name: name.value,
+    name: name.value.trim(),
     calculation: normalizedCalculation.value,
     ownership: cloneOwnership(ownership.value),
   })
@@ -446,7 +444,29 @@ h2 {
   gap: 0.75rem;
 }
 .monthly-schedule {
+  margin-top: 0.5rem;
   overflow: visible;
+}
+.year-breakdown {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+.extra-payment-cell {
+  width: 8rem;
+  text-align: right;
+}
+.extra-payment-value {
+  min-width: 6.5rem;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.extra-payment-value.empty {
+  color: var(--color-copy);
+  font-weight: 400;
+}
+.extra-payment-value :deep(.q-btn__content) {
+  justify-content: flex-end;
+  width: 100%;
 }
 .calculation-preview {
   display: grid;
