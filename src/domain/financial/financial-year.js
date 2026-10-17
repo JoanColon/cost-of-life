@@ -21,13 +21,13 @@ export function currentFinancialMonth(date = new Date()) {
 export function financialYearValue(financialYear, section, memberId = 'all') {
   if (!financialYear) return 0
   if (section === 'netWorth') {
-    return money(
+    return moneyOrZero(
       financialYearValue(financialYear, 'assets', memberId) -
         financialYearValue(financialYear, 'liabilities', memberId),
     )
   }
   if (section === 'savings') {
-    return money(
+    return moneyOrZero(
       financialYearValue(financialYear, 'income', memberId) -
         financialYearValue(financialYear, 'expenses', memberId),
     )
@@ -35,7 +35,7 @@ export function financialYearValue(financialYear, section, memberId = 'all') {
   if (POSITION_SECTIONS.has(section)) {
     return financialYearMonthValue(financialYear, '12', section, memberId)
   }
-  return money(
+  return moneyOrZero(
     Object.keys(financialYear.months || {}).reduce(
       (sum, month) => sum + financialYearMonthValue(financialYear, month, section, memberId),
       0,
@@ -45,18 +45,18 @@ export function financialYearValue(financialYear, section, memberId = 'all') {
 
 export function financialYearMonthValue(financialYear, month, section, memberId = 'all') {
   if (section === 'netWorth') {
-    return money(
+    return moneyOrZero(
       financialYearMonthValue(financialYear, month, 'assets', memberId) -
         financialYearMonthValue(financialYear, month, 'liabilities', memberId),
     )
   }
   if (section === 'savings') {
-    return money(
+    return moneyOrZero(
       financialYearMonthValue(financialYear, month, 'income', memberId) -
         financialYearMonthValue(financialYear, month, 'expenses', memberId),
     )
   }
-  return money(
+  return moneyOrZero(
     Object.values(financialYear?.months?.[month]?.[section]?.categories || {}).reduce(
       (sum, category) => sum + categoryValue(category, section, memberId),
       0,
@@ -68,7 +68,7 @@ export function financialYearCategoryValue(financialYear, section, categoryId, m
   if (POSITION_SECTIONS.has(section)) {
     return financialYearMonthCategoryValue(financialYear, '12', section, categoryId, memberId)
   }
-  return money(
+  return moneyOrZero(
     Object.keys(financialYear?.months || {}).reduce(
       (sum, month) =>
         sum + financialYearMonthCategoryValue(financialYear, month, section, categoryId, memberId),
@@ -122,7 +122,7 @@ export function financialYearSubcategoryValue(
       ]
     return itemValue(item, section, memberId)
   }
-  return money(
+  return moneyOrZero(
     Object.values(financialYear?.months || {}).reduce((sum, month) => {
       const item = month?.[section]?.categories?.[categoryId]?.subcategories?.[subcategoryId]
       return sum + itemValue(item, section, memberId)
@@ -131,8 +131,8 @@ export function financialYearSubcategoryValue(
 }
 
 export function financialYearExpenseItemValue(item, modelValue) {
-  if (item?.source === 'tracked') return money(item.effective)
-  return modelValue === undefined ? money(item?.effective) : money(modelValue)
+  if (item?.source === 'tracked') return moneyOrZero(item.effective)
+  return modelValue === undefined ? moneyOrZero(item?.effective) : moneyOrZero(modelValue)
 }
 
 function annualCategory(financialYear, section, categoryId) {
@@ -145,7 +145,7 @@ function annualCategory(financialYear, section, categoryId) {
     for (const [id, item] of Object.entries(category?.subcategories || {})) {
       const target = (subcategories[id] ||= { memberValues: {} })
       for (const [memberId, value] of Object.entries(item.memberValues || {})) {
-        target.memberValues[memberId] = money(
+        target.memberValues[memberId] = moneyOrZero(
           (Number(target.memberValues[memberId]) || 0) + (Number(value) || 0),
         )
       }
@@ -155,7 +155,7 @@ function annualCategory(financialYear, section, categoryId) {
 }
 
 function categoryValue(category, section, memberId) {
-  return money(
+  return moneyOrZero(
     Object.values(category?.subcategories || {}).reduce(
       (sum, item) => sum + itemValue(item, section, memberId),
       0,
@@ -165,11 +165,11 @@ function categoryValue(category, section, memberId) {
 
 function itemValue(item, section, memberId) {
   if (!item) return 0
-  if (memberId && memberId !== 'all') return money(item.memberValues?.[memberId])
-  return section === 'expenses' ? financialYearExpenseItemValue(item) : money(item.total)
+  if (memberId && memberId !== 'all') return moneyOrZero(item.memberValues?.[memberId])
+  return section === 'expenses' ? financialYearExpenseItemValue(item) : moneyOrZero(item.total)
 }
 
-function money(value) {
+function moneyOrZero(value) {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : 0
 }

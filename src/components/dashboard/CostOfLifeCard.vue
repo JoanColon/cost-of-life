@@ -121,18 +121,18 @@ const periodLabel = computed(() =>
     display: flex;
     padding: 0.22rem;
     overflow: hidden;
-    border: 1px solid var(--color-line);
+    border: 1px solid var(--color-ink);
     border-radius: 999px !important;
-    background: #f3f6f9;
+    background: var(--color-ink);
   }
 
   .period-switch button {
     min-width: 5.4rem;
     padding: 0.45rem 0.8rem;
     border: 0;
-    border-radius: 999px;
+    border-radius: 999px !important;
     background: transparent;
-    color: var(--color-copy);
+    color: rgb(255 255 255 / 72%);
     font-size: 0.8rem;
     font-weight: 650;
     cursor: pointer;
@@ -298,6 +298,52 @@ const periodLabel = computed(() =>
 
     .period-switch button {
       flex: 1;
+      min-height: 1.9rem;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.72rem;
+    }
+
+    .equation-card {
+      grid-template-columns: auto auto;
+      align-content: center;
+      min-height: 7.75rem;
+      padding: 0.75rem;
+      column-gap: 0.3rem;
+    }
+
+    .equation-icon,
+    .equation-card strong {
+      grid-column: 1 / -1;
+    }
+
+    .equation-icon {
+      width: 2.35rem;
+      height: 2.35rem;
+      margin-bottom: 0.3rem;
+      font-size: 1.1rem;
+    }
+
+    .equation-card strong {
+      font-size: 1.55rem;
+    }
+
+    .equation-card span {
+      justify-self: end;
+      margin-top: 0.25rem;
+      font-size: 0.85rem;
+    }
+
+    .equation-card small {
+      align-self: end;
+      justify-self: start;
+      margin-top: 0.25rem;
+      font-size: 0.68rem;
+    }
+
+    .operator {
+      width: 100%;
+      justify-self: center;
+      text-align: center;
     }
   }
 }

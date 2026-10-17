@@ -538,17 +538,29 @@ async function persist(operation) {
 }
 
 .confirm-card {
-  width: min(32rem, calc(100vw - 2rem));
+  @include financial-simple-dialog;
 }
 
 @media (max-width: 699px) {
-  .expense-category-page {
-    padding: 1rem;
-    padding-bottom: calc(var(--mobile-nav-height) + 1.5rem);
+  .summary-card {
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+    padding: 0.8rem;
+  }
+
+  .summary-icon {
+    width: 2.6rem;
+    height: 2.6rem;
+    font-size: 1.2rem;
+  }
+
+  .summary-card strong {
+    font-size: 1.55rem;
   }
 
   .expense-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
+    @include mobile-financial-row;
   }
 
   .necessity-badge {
@@ -558,6 +570,15 @@ async function persist(operation) {
   .expense-value {
     grid-column: 2;
     text-align: left;
+    font-size: 0.9rem;
+  }
+
+  .expense-icon {
+    font-size: 1.15rem;
+  }
+
+  .add-row {
+    padding: 0.75rem;
   }
 }
 </style>

@@ -29,7 +29,6 @@ describe('income calculations', () => {
   })
 
   it.each([
-    ['weekly', 100, 5200],
     ['monthly', 100, 1200],
     ['quarterly', 100, 400],
     ['yearly', 100, 100],

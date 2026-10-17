@@ -1,55 +1,74 @@
 <template>
   <q-card class="expense-form-card">
-    <q-form @submit.prevent="submit">
-      <q-card-section>
-        <div class="form-heading">
-          <div>
-            <h2>{{ expense ? t('expenses.form.editTitle') : t('expenses.form.addTitle') }}</h2>
-          </div>
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            class="dialog-close"
-            :aria-label="t('common.cancel')"
-            @click="$emit('cancel')"
+    <q-form class="dialog-layout" @submit.prevent="submit">
+      <q-card-section class="form-header">
+        <h2>{{ expense ? t('expenses.form.editTitle') : t('expenses.form.addTitle') }}</h2>
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="$emit('cancel')"
+        />
+      </q-card-section>
+
+      <q-card-section class="form-body">
+        <div class="dialog-field">
+          <label>{{ t('expenses.form.suggestion') }}</label>
+          <q-select
+            v-model="expenseType"
+            outlined
+            hide-bottom-space
+            emit-value
+            map-options
+            :options="suggestionOptions"
+            :disable="Boolean(expense)"
+            :rules="[(value) => Boolean(value) || t('expenses.validation.typeRequired')]"
+            @update:model-value="applySuggestion"
+          >
+            <template #prepend>
+              <q-icon :name="suggestionIcon" />
+            </template>
+          </q-select>
+        </div>
+
+        <div class="dialog-field">
+          <label>{{ t('expenses.form.name') }}</label>
+          <q-input
+            v-model="name"
+            outlined
+            hide-bottom-space
+            :placeholder="t('expenses.form.namePlaceholder')"
           />
         </div>
 
-        <q-select
-          v-model="expenseType"
-          outlined
-          emit-value
-          map-options
-          :label="t('expenses.form.suggestion')"
-          :options="suggestionOptions"
-          :disable="Boolean(expense)"
-          :rules="[(value) => Boolean(value) || t('expenses.validation.typeRequired')]"
-          class="form-field"
-          @update:model-value="applySuggestion"
-        />
-        <q-input v-model="name" outlined :label="t('expenses.form.name')" class="form-field" />
-
         <div class="form-grid">
-          <q-input
-            v-model.number="amount"
-            type="number"
-            min="0"
-            step="0.01"
-            outlined
-            prefix="€"
-            :label="t('expenses.form.amount')"
-            :rules="[(value) => value >= 0 || t('expenses.validation.amount')]"
-          />
-          <q-select
-            v-model="frequency"
-            outlined
-            emit-value
-            map-options
-            :label="t('expenses.form.frequency')"
-            :options="frequencyOptions"
-          />
+          <div class="dialog-field">
+            <label>{{ t('expenses.form.amount') }}</label>
+            <q-input
+              v-model.number="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              outlined
+              hide-bottom-space
+              prefix="€"
+              :rules="[(value) => value >= 0 || t('expenses.validation.amount')]"
+            />
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('expenses.form.frequency') }}</label>
+            <q-select
+              v-model="frequency"
+              outlined
+              hide-bottom-space
+              emit-value
+              map-options
+              :options="frequencyOptions"
+            />
+          </div>
         </div>
 
         <q-expansion-item
@@ -57,34 +76,42 @@
           :label="t('expenses.form.advancedOptions')"
           class="advanced-options"
         >
-          <div class="form-grid q-pt-sm">
-            <q-select
-              v-model="variability"
-              outlined
-              emit-value
-              map-options
-              :label="t('expenses.form.variability')"
-              :options="variabilityOptions"
-            />
-            <q-select
-              v-model="recurrence"
-              outlined
-              emit-value
-              map-options
-              :label="t('expenses.form.recurrence')"
-              :options="recurrenceOptions"
-            />
-            <q-select
-              v-model="necessity"
-              outlined
-              clearable
-              emit-value
-              map-options
-              :label="t('expenses.form.necessity')"
-              :hint="t('expenses.form.necessityHint')"
-              :options="necessityOptions"
-              class="full-width"
-            />
+          <div class="form-grid">
+            <div class="dialog-field">
+              <label>{{ t('expenses.form.variability') }}</label>
+              <q-select
+                v-model="variability"
+                outlined
+                hide-bottom-space
+                emit-value
+                map-options
+                :options="variabilityOptions"
+              />
+            </div>
+            <div class="dialog-field">
+              <label>{{ t('expenses.form.recurrence') }}</label>
+              <q-select
+                v-model="recurrence"
+                outlined
+                hide-bottom-space
+                emit-value
+                map-options
+                :options="recurrenceOptions"
+              />
+            </div>
+            <div class="dialog-field full-width">
+              <label>{{ t('expenses.form.necessity') }}</label>
+              <q-select
+                v-model="necessity"
+                outlined
+                hide-bottom-space
+                clearable
+                emit-value
+                map-options
+                :options="necessityOptions"
+              />
+              <p class="field-hint">{{ t('expenses.form.necessityHint') }}</p>
+            </div>
           </div>
         </q-expansion-item>
 
@@ -154,9 +181,12 @@
         </q-expansion-item>
 
         <div v-if="breakdown" class="calculation-preview">
-          <span>{{ t('expenses.form.normalizedCost') }}</span>
-          <strong>{{ formatCurrency(breakdown.annual) }} / {{ t('dashboard.year') }}</strong>
-          <small>{{ formatCurrency(breakdown.monthly) }} / {{ t('dashboard.month') }}</small>
+          <q-icon name="bar_chart" />
+          <div>
+            <span>{{ t('expenses.form.normalizedCost') }}</span>
+            <strong>{{ formatCurrency(breakdown.annual) }} / {{ t('dashboard.year') }}</strong>
+            <small>{{ formatCurrency(breakdown.monthly) }} / {{ t('dashboard.month') }}</small>
+          </div>
         </div>
 
         <div v-if="members.length > 1" class="ownership-section">
@@ -169,18 +199,18 @@
         </div>
       </q-card-section>
 
-      <q-card-actions align="between">
+      <q-card-actions class="form-actions">
         <q-btn
           v-if="expense"
           flat
           no-caps
           color="negative"
+          icon="delete_outline"
           :label="t('common.delete')"
           @click="$emit('delete')"
         />
-        <span v-else />
-        <div>
-          <q-btn flat no-caps :label="t('common.cancel')" @click="$emit('cancel')" />
+        <div class="primary-actions">
+          <q-btn outline no-caps :label="t('common.cancel')" @click="$emit('cancel')" />
           <q-btn
             type="submit"
             unelevated
@@ -200,6 +230,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
+import { expenseTrackingCategories } from '@/config/expense-tracking-categories'
 import {
   expenseNecessities,
   expenseRecurrences,
@@ -208,12 +239,12 @@ import {
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
   normalizeMonthlyExpenseAmounts,
-  selectableExpenseFrequencies,
+  expenseFrequencies,
   updateMonthlyExpenseAmounts,
 } from '@/domain/financial/expense-calculations'
 import { incomeMonths } from '@/domain/financial/income-calculations'
 import { financialYearExpenseItemValue } from '@/domain/financial/financial-year'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import {
   cloneOwnership,
   createEqualOwnership,
@@ -245,7 +276,7 @@ const monthlyAmounts = ref(null)
 let seeding = false
 
 const option = (namespace) => (value) => ({ value, label: t(`expenses.${namespace}.${value}`) })
-const frequencyOptions = computed(() => selectableExpenseFrequencies.map(option('frequencies')))
+const frequencyOptions = computed(() => expenseFrequencies.map(option('frequencies')))
 const variabilityOptions = computed(() => expenseVariabilities.map(option('variabilities')))
 const recurrenceOptions = computed(() => expenseRecurrences.map(option('recurrences')))
 const necessityOptions = computed(() => expenseNecessities.map(option('necessities')))
@@ -255,6 +286,12 @@ const suggestionOptions = computed(() => [
     .map((item) => ({ value: item.id, label: t(item.nameKey) })),
   { value: 'other', label: t('expenses.suggestions.other') },
 ])
+const suggestionIcon = computed(
+  () =>
+    expenseTrackingCategories.find(({ id }) => id === expenseType.value)?.icon ||
+    props.category.icon ||
+    'category',
+)
 const normalizedEstimate = computed(() =>
   normalizeExpenseEstimate({ amount: amount.value, frequency: frequency.value }),
 )
@@ -267,14 +304,14 @@ const normalizedAttributes = computed(() =>
 )
 const breakdown = computed(() => {
   if (!normalizedEstimate.value || !monthlyAmounts.value) return null
-  const annual = normalizeMoney(
+  const annual = normalizeNonNegativeMoney(
     incomeMonths.reduce(
       (total, month) =>
         total + financialYearExpenseItemValue(financialYearMonthExpense(month), monthAmount(month)),
       0,
     ),
   )
-  return { annual, monthly: normalizeMoney(annual / 12) || 0 }
+  return { annual, monthly: normalizeNonNegativeMoney(annual / 12) || 0 }
 })
 const formValid = computed(
   () => Boolean(expenseType.value) && Boolean(normalizedEstimate.value) && ownershipValid.value,
@@ -318,7 +355,7 @@ function seed() {
 }
 
 function monthAmount(month) {
-  return normalizeMoney(monthlyAmounts.value?.[month]) || 0
+  return normalizeNonNegativeMoney(monthlyAmounts.value?.[month]) || 0
 }
 
 function actualAmount(month) {
@@ -336,7 +373,7 @@ function financialYearMonthExpense(month) {
 }
 
 function setMonthAmount(month, value) {
-  const normalized = normalizeMoney(value)
+  const normalized = normalizeNonNegativeMoney(value)
   if (normalized === null) return
   monthlyAmounts.value = { ...monthlyAmounts.value, [month]: normalized }
 }
@@ -374,31 +411,40 @@ function submit() {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .expense-form-card {
-  width: min(46rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
+  @include financial-dialog-card(46rem);
 }
 
-.form-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+.dialog-layout {
+  @include financial-dialog-layout;
 }
 
-.form-heading h2 {
-  margin: 0 0 1.25rem;
+.form-header {
+  @include financial-dialog-header;
 }
 
-.form-field {
-  margin-bottom: 0.85rem;
+.form-body {
+  @include financial-dialog-body;
+}
+
+.dialog-field {
+  @include financial-dialog-field;
+}
+
+.field-hint {
+  @include financial-dialog-hint;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
+}
+
+.form-grid .dialog-field {
+  margin-bottom: 0;
 }
 
 .full-width {
@@ -414,10 +460,28 @@ function submit() {
   margin-top: 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .advanced-options {
-  margin-top: 0.25rem;
+  margin-top: 0.95rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  overflow: hidden;
+}
+
+.advanced-options :deep(.q-expansion-item__content),
+.year-breakdown :deep(.q-expansion-item__content) {
+  padding: 0 1rem 1rem;
+}
+
+.advanced-options :deep(.q-item),
+.year-breakdown :deep(.q-item) {
+  min-height: 4.25rem;
+  padding: 0.75rem 1rem;
+  color: var(--color-ink);
+  font-weight: 700;
 }
 
 .model-amount-cell {
@@ -443,10 +507,22 @@ function submit() {
 
 .calculation-preview {
   display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1rem;
   margin-top: 1rem;
   padding: 1rem;
   border-radius: var(--radius-md);
-  background: #f1fbf7;
+  background: var(--color-blue-soft);
+}
+
+.calculation-preview .q-icon {
+  color: var(--color-primary);
+  font-size: 1.75rem;
+}
+
+.calculation-preview > div {
+  display: grid;
 }
 
 .calculation-preview span,
@@ -468,6 +544,10 @@ function submit() {
   font-size: 1rem;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.form-actions {
+  @include financial-dialog-actions;
 }
 
 @media (max-width: 599px) {

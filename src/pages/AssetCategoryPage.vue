@@ -593,52 +593,45 @@ h1 {
   margin-bottom: 0.75rem;
   font-size: 1.8rem;
 }
-.empty-card h2,
-.confirm-card h2 {
+.empty-card h2 {
   margin: 0;
   color: var(--color-ink);
 }
-.empty-card p,
-.confirm-card p {
+.empty-card p {
   margin: 0.45rem 0 1.25rem;
 }
 .confirm-card {
-  width: min(28rem, calc(100vw - 2rem));
-  border-radius: var(--radius-md);
+  @include financial-simple-dialog(28rem);
 }
 
 @media (max-width: 760px) {
-  .category-page {
-    padding: 1.2rem;
-  }
-  .category-header {
-    align-items: flex-end;
-    gap: 1rem;
-  }
-  .category-header :deep(.member-selector) {
-    max-width: 52%;
-  }
-  .summary-icon {
-    width: 3.8rem;
-    height: 3.8rem;
-    font-size: 1.55rem;
-  }
   .asset-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 0.45rem;
+    @include mobile-financial-row;
   }
   .asset-main {
-    grid-column: 1 / span 2;
+    grid-column: 1;
+    gap: 0.6rem;
   }
   .ownership-display {
-    grid-column: 1;
+    display: none;
   }
   .asset-value {
     grid-column: 2;
+    font-size: 0.95rem;
   }
   .asset-row > .q-btn {
     grid-column: 3;
     grid-row: 1;
+  }
+  .asset-icon {
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.05rem;
+  }
+  .add-row {
+    min-height: 3.5rem;
+    padding: 0.6rem 0.75rem;
   }
 }
 </style>

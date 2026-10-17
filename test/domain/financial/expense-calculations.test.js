@@ -6,29 +6,26 @@ import {
   monthlyExpenseValue,
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
-  selectableExpenseFrequencies,
+  expenseFrequencies,
   updateMonthlyExpenseAmounts,
 } from '../../../src/domain/financial/expense-calculations'
 
 describe('expense calculations', () => {
-  it('allows irregular annual estimates in the expense form', () => {
-    expect(selectableExpenseFrequencies).toContain('irregular')
+  it('exposes only the supported expense frequencies', () => {
+    expect(expenseFrequencies).toEqual(['monthly', 'every_two_months', 'quarterly', 'yearly'])
   })
 
   it.each([
-    ['weekly', 100, 5200],
     ['monthly', 100, 1200],
     ['every_two_months', 100, 600],
     ['quarterly', 300, 1200],
     ['yearly', 600, 600],
-    ['irregular', 1000, 1000],
   ])('normalizes %s estimates to an annual value', (frequency, amount, expected) => {
     expect(annualExpenseValue({ amount, frequency })).toBe(expected)
   })
 
   it('derives the monthly equivalent from the annual total', () => {
     expect(monthlyExpenseValue({ amount: 600, frequency: 'yearly' })).toBe(50)
-    expect(monthlyExpenseValue({ amount: 1000, frequency: 'irregular' })).toBe(83.33)
   })
 
   it('generates an editable Jan-Dec schedule from the estimate', () => {

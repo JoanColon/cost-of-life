@@ -60,145 +60,26 @@
           </div>
         </header>
 
-        <section v-if="tab === 'track'" class="track-panel">
-          <div v-if="enabledCategories.length" class="tracking-grid">
-            <button
-              v-for="subcategory in enabledCategories"
-              :key="subcategory.id"
-              type="button"
-              class="tracking-button"
-              :class="`tracking-button--${subcategory.categoryId}`"
-              @click="openAdd(subcategory)"
-            >
-              <span class="tracking-icon">
-                <q-icon :name="subcategory.icon" />
-              </span>
-              <span class="tracking-copy">
-                <strong>{{ t(subcategory.nameKey) }}</strong>
-                <small>{{ t(subcategory.categoryNameKey) }}</small>
-              </span>
-              <q-icon name="chevron_right" class="tracking-chevron" />
-            </button>
-          </div>
-          <section v-else class="empty-card">
-            <q-icon name="tune" />
-            <h2>{{ t('expenseTracker.empty.title') }}</h2>
-            <p>{{ t('expenseTracker.empty.description') }}</p>
-            <q-btn
-              unelevated
-              no-caps
-              color="primary"
-              :label="t('expenseTracker.manage.action')"
-              @click="manageDialog = true"
-            />
-          </section>
-          <q-btn
-            v-if="enabledCategories.length"
-            flat
-            no-caps
-            icon="tune"
-            color="primary"
-            :label="t('expenseTracker.manage.editAction')"
-            class="edit-tracker-categories"
-            @click="manageDialog = true"
-          />
-        </section>
+        <ExpenseTrackingPanel
+          v-if="tab === 'track'"
+          :categories="enabledCategories"
+          @add="openAdd"
+          @manage="manageDialog = true"
+        />
 
-        <section v-else class="review-panel">
-          <div class="review-toolbar">
-            <q-input
-              v-model="period"
-              outlined
-              dense
-              type="month"
-              :label="t('expenseTracker.review.month')"
-              class="month-input"
-            />
-            <div class="month-total">
-              <span>{{ t('expenseTracker.review.trackedTotal') }}</span>
-              <strong>{{ formatCurrency(trackingStore.month?.total || 0) }}</strong>
-            </div>
-            <div class="month-total">
-              <span>{{ t('expenseTracker.review.modelTotal') }}</span>
-              <strong>{{ formatCurrency(reviewModelTotal) }}</strong>
-            </div>
-            <div class="review-toolbar-action">
-              <q-btn
-                unelevated
-                no-caps
-                color="primary"
-                :disable="decisionSaving || !categoriesWithTrackedItems.length"
-                :label="t('expenseTracker.review.useAllTracked')"
-                @click="applyAllTracked"
-              />
-            </div>
-          </div>
-
-          <div class="review-groups">
-            <section
-              v-for="group in reviewGroups"
-              :key="group.id"
-              class="review-group"
-              :class="`tracking-button--${group.id}`"
-            >
-              <h2>
-                <span class="review-group-icon"><q-icon :name="group.icon" /></span>
-                {{ t(group.nameKey) }}
-              </h2>
-              <div class="review-list">
-                <article
-                  v-for="subcategory in group.subcategories"
-                  :key="subcategory.id"
-                  class="review-row"
-                >
-                  <button type="button" class="review-name" @click="openItems(subcategory)">
-                    <span>
-                      <strong>{{ t(subcategory.nameKey) }}</strong>
-                      <q-icon name="chevron_right" />
-                    </span>
-                    <small>
-                      {{
-                        t('expenseTracker.review.itemCount', {
-                          count: trackingStore.itemsFor(subcategory.id).length,
-                        })
-                      }}
-                    </small>
-                  </button>
-                  <div class="review-value">
-                    <span>{{ t('expenseTracker.review.tracked') }}</span>
-                    <strong>{{ formatCurrency(trackingStore.totalFor(subcategory.id)) }}</strong>
-                  </div>
-                  <div class="review-value">
-                    <span>{{ t('expenseTracker.review.model') }}</span>
-                    <strong>{{ formatCurrency(modelValue(subcategory)) }}</strong>
-                  </div>
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    color="primary"
-                    :label="t('expenseTracker.review.view')"
-                    @click="openItems(subcategory)"
-                  />
-                  <div class="review-decisions" role="group" :aria-label="t(subcategory.nameKey)">
-                    <button
-                      v-for="option in decisionOptions"
-                      :key="option.value"
-                      type="button"
-                      class="review-decision"
-                      :class="{ selected: decisionFor(subcategory.id) === option.value }"
-                      :disabled="decisionDisabled(subcategory.id)"
-                      @click="setDecision(subcategory, option.value)"
-                    >
-                      <q-icon v-if="decisionFor(subcategory.id) === option.value" name="check" />
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </article>
-              </div>
-            </section>
-          </div>
-        </section>
+        <ExpenseReviewPanel
+          v-else
+          v-model="period"
+          :groups="reviewGroups"
+          :tracked-total="trackingStore.month?.total || 0"
+          :model-total="reviewModelTotal"
+          :decision-options="decisionOptions"
+          :can-use-all-tracked="Boolean(categoriesWithTrackedItems.length)"
+          :saving="decisionSaving"
+          @view="openItems"
+          @decision="setDecision"
+          @use-all-tracked="applyAllTracked"
+        />
       </template>
     </main>
 
@@ -330,6 +211,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import ExpenseTrackingCategorySetup from '@/components/expenses/ExpenseTrackingCategorySetup.vue'
 import ExpenseTrackingEntryDialog from '@/components/expenses/ExpenseTrackingEntryDialog.vue'
+import ExpenseTrackingPanel from '@/components/expenses/ExpenseTrackingPanel.vue'
+import ExpenseReviewPanel from '@/components/expenses/ExpenseReviewPanel.vue'
 import {
   expenseTrackingCategories,
   groupedExpenseTrackingCategories,
@@ -337,7 +220,7 @@ import {
 } from '@/config/expense-tracking-categories'
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
 import { FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -385,12 +268,22 @@ const reviewGroups = computed(() =>
       enabledCategories.value.map(({ id }) => id),
       trackingStore.month,
     ),
-  ),
+  ).map((group) => ({
+    ...group,
+    subcategories: group.subcategories.map((subcategory) => ({
+      ...subcategory,
+      itemCount: trackingStore.itemsFor(subcategory.id).length,
+      trackedTotal: trackingStore.totalFor(subcategory.id),
+      modelValue: modelValue(subcategory),
+      decision: decisionFor(subcategory.id),
+      decisionDisabled: decisionDisabled(subcategory.id),
+    })),
+  })),
 )
 const reviewModelTotal = computed(() =>
   reviewGroups.value.reduce(
     (total, group) =>
-      total + group.subcategories.reduce((groupTotal, item) => groupTotal + modelValue(item), 0),
+      total + group.subcategories.reduce((groupTotal, item) => groupTotal + item.modelValue, 0),
     0,
   ),
 )
@@ -546,7 +439,7 @@ function modelValue(subcategory) {
 
 function currentModelValue(subcategory) {
   return (
-    normalizeMoney(
+    normalizeNonNegativeMoney(
       financialYear.value?.months?.[period.value.slice(5, 7)]?.expenses?.categories?.[
         subcategory.categoryId
       ]?.subcategories?.[subcategory.id]?.estimated,
@@ -651,8 +544,6 @@ function currentPeriod() {
 }
 
 .tracker-header,
-.review-toolbar,
-.review-row,
 .items-heading,
 .item-row {
   display: flex;
@@ -718,157 +609,6 @@ h1 {
   @include focus-ring;
 }
 
-.track-panel,
-.review-panel {
-  margin-top: 2rem;
-}
-
-.review-groups {
-  display: grid;
-  gap: 1rem;
-}
-
-.review-group h2 {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  margin: 0 0 0.55rem;
-  padding-left: 0.5rem;
-  font-size: 1.05rem;
-}
-
-.tracking-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.1rem;
-}
-
-.tracking-button {
-  display: grid;
-  grid-template-columns: 3.1rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.9rem;
-  min-height: 5.2rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--color-line);
-  border-radius: 0.7rem !important;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
-}
-
-.tracking-button:hover {
-  border-color: color-mix(in srgb, var(--tracking-color, var(--color-primary)) 45%, white);
-  box-shadow: 0 8px 22px rgb(34 55 78 / 8%);
-  transform: translateY(-1px);
-}
-
-.tracking-button:focus-visible {
-  @include focus-ring;
-}
-
-.tracking-icon {
-  display: grid;
-  place-items: center;
-  width: 3.1rem;
-  height: 3.1rem;
-  border-radius: 50%;
-  background: var(--tracking-soft, var(--color-blue-soft));
-  color: var(--tracking-color, var(--color-primary));
-}
-
-.tracking-icon .q-icon {
-  font-size: 1.55rem;
-}
-
-.tracking-copy {
-  display: grid;
-  min-width: 0;
-  gap: 0.2rem;
-}
-
-.tracking-copy strong,
-.tracking-copy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tracking-copy strong {
-  font-size: 1.04rem;
-}
-
-.tracking-copy small {
-  color: var(--color-copy);
-  font-size: 0.86rem;
-}
-
-.tracking-chevron {
-  color: var(--color-ink);
-  font-size: 1.3rem;
-}
-
-.tracking-button--housing {
-  --tracking-color: #c92f3f;
-  --tracking-soft: #ffe1e4;
-}
-
-.tracking-button--transportation {
-  --tracking-color: #087cf0;
-  --tracking-soft: #e6f1ff;
-}
-
-.tracking-button--food {
-  --tracking-color: #f08a00;
-  --tracking-soft: #fff0cc;
-}
-
-.tracking-button--utilities {
-  --tracking-color: #526d82;
-  --tracking-soft: #e7eef3;
-}
-
-.tracking-button--healthcare {
-  --tracking-color: #07958a;
-  --tracking-soft: #dff7f4;
-}
-
-.tracking-button--debt {
-  --tracking-color: #9a5b32;
-  --tracking-soft: #f7ebe3;
-}
-
-.tracking-button--personal {
-  --tracking-color: #7146e8;
-  --tracking-soft: #f0eaff;
-}
-
-.tracking-button--leisure {
-  --tracking-color: #10ae61;
-  --tracking-soft: #e2f8eb;
-}
-
-.tracking-button--travel {
-  --tracking-color: #b326d1;
-  --tracking-soft: #f7e5ff;
-}
-
-.tracking-button--education_childcare {
-  --tracking-color: #0789a8;
-  --tracking-soft: #e1f5fa;
-}
-
-.edit-tracker-categories {
-  margin-top: 1rem;
-  margin-left: -0.75rem;
-}
-
-.empty-card,
 .state {
   display: grid;
   min-height: 18rem;
@@ -877,170 +617,18 @@ h1 {
   text-align: center;
 }
 
-.empty-card p,
 .state p {
   color: var(--color-copy);
 }
 
-.review-toolbar {
-  min-height: 5.8rem;
-  margin-bottom: 1.35rem;
-  padding: 1rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px rgb(34 55 78 / 4%);
-}
-
-.month-input {
-  width: 15rem;
-  margin-right: auto;
-}
-
-.month-total {
-  display: grid;
-  min-width: 8.5rem;
-  gap: 0.15rem;
-}
-
-.month-total span,
-.review-value span {
-  color: var(--color-copy);
-  font-size: 0.75rem;
-}
-
-.month-total strong {
-  color: var(--color-ink);
-  font-size: 1.65rem;
-  line-height: 1;
-}
-
-.review-toolbar-action {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  padding-left: 1.25rem;
-  border-left: 1px solid var(--color-line);
-}
-
-.review-toolbar-action .q-btn {
-  min-height: 3rem;
-  padding-inline: 1.15rem;
-}
-
-.review-group-icon {
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  background: var(--tracking-soft, var(--color-blue-soft));
-  color: var(--tracking-color, var(--color-primary));
-  font-size: 1.35rem;
-}
-
-.review-list {
-  overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: 0 6px 20px rgb(34 55 78 / 3%);
-}
-
-.review-row {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) 6rem 6rem auto minmax(15rem, auto);
-  min-height: 4.6rem;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--color-line);
-}
-
-.review-row:last-child {
-  border-bottom: 0;
-}
-
-.review-value {
-  display: grid;
-}
-
-.review-name {
-  display: grid;
-  justify-items: start;
-  min-width: 10rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.review-name > span {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.review-name .q-icon {
-  font-size: 1.15rem;
-}
-
-.review-name small {
-  color: var(--color-copy);
-  font-size: 0.78rem;
-}
-
-.review-value {
-  gap: 0.15rem;
-  text-align: left;
-}
-
-.review-value strong {
-  font-size: 0.95rem;
-}
-
-.review-decisions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-
-.review-decision {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.4rem;
-  padding: 0.45rem 0.8rem;
-  border: 0;
-  border-radius: 999px !important;
-  background: transparent;
-  color: var(--color-copy);
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.review-decision.selected {
-  background: var(--color-blue-soft);
-  color: #0759b8;
-}
-
-.review-decision:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.review-decision:not(:disabled):focus-visible {
-  @include focus-ring;
-}
-
 .items-card {
-  width: min(40rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 2rem);
-  overflow: auto;
+  @include financial-dialog-card(40rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.confirm-card {
+  @include financial-simple-dialog;
 }
 
 .items-heading span {
@@ -1071,27 +659,6 @@ h1 {
   color: var(--color-copy);
 }
 
-@media (max-width: 899px) {
-  .tracking-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .review-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem 1rem;
-    padding: 0.9rem 1rem;
-  }
-
-  .review-name,
-  .review-decisions {
-    grid-column: 1 / -1;
-  }
-
-  .review-decisions {
-    justify-content: flex-start;
-  }
-}
-
 @media (max-width: 599px) {
   .tracker-page {
     padding-right: max(0.75rem, env(safe-area-inset-right));
@@ -1100,51 +667,28 @@ h1 {
   }
 
   .tracker-header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 1.25rem;
+    align-items: flex-end;
+    gap: 0.75rem;
   }
 
   .tracker-tabs {
-    width: 100%;
+    width: 8.5rem;
     flex-basis: auto;
   }
 
-  .track-panel,
-  .review-panel {
-    margin-top: 1.5rem;
+  .tracker-header h1 {
+    font-size: 1.55rem;
   }
 
-  .tracking-grid {
-    grid-template-columns: 1fr;
+  .tracker-tabs button {
+    min-height: 2rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.72rem;
   }
 
-  .review-toolbar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .month-input {
-    width: auto;
-    margin-right: 0;
-    grid-column: 1 / -1;
-  }
-
-  .review-toolbar-action {
-    grid-column: 1 / -1;
-    justify-content: stretch;
-    padding-top: 0.75rem;
-    padding-left: 0;
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
-  }
-
-  .review-toolbar-action .q-btn {
-    width: 100%;
-  }
-
-  .review-row > .q-btn {
-    justify-self: start;
+  .workspace-name {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
   }
 }
 </style>

@@ -562,45 +562,38 @@ h1 {
   margin: 0.55rem 0 1.25rem;
 }
 .confirm-card {
-  width: min(28rem, calc(100vw - 2rem));
-  border-radius: var(--radius-md);
-}
-.confirm-card h2 {
-  margin: 0;
-}
-.confirm-card p {
-  color: var(--color-copy);
+  @include financial-simple-dialog(28rem);
 }
 @media (max-width: 699px) {
-  .category-page {
-    padding: 1.2rem;
-  }
-  .category-header {
-    align-items: flex-end;
-    gap: 1rem;
-  }
-  .category-header :deep(.member-selector) {
-    max-width: 52%;
-  }
   .liability-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.45rem;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    @include mobile-financial-row;
   }
   .liability-main {
     grid-column: 1;
+    gap: 0.6rem;
   }
   .ownership-display {
-    grid-column: 1;
-    grid-row: 2;
+    display: none;
   }
   .liability-value {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     min-width: 0;
+    font-size: 0.95rem;
   }
   .liability-row > .q-btn {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
+  }
+  .liability-icon {
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.05rem;
+  }
+  .add-row {
+    min-height: 3.5rem;
+    padding: 0.6rem 0.75rem;
   }
 }
 </style>

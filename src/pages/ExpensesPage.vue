@@ -704,7 +704,11 @@ async function runSaving(operation) {
 
 .ownership-dialog,
 .confirm-card {
-  width: min(34rem, calc(100vw - 2rem));
+  @include financial-simple-dialog(34rem);
+}
+
+.ownership-dialog h2 {
+  margin-bottom: 1.25rem;
 }
 
 .category-dialog {
@@ -717,13 +721,9 @@ async function runSaving(operation) {
 }
 
 @media (max-width: 749px) {
-  .expenses-page {
-    padding: 1rem;
-    padding-bottom: calc(var(--mobile-nav-height) + 1.5rem);
-  }
-
   .category-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
+    @include mobile-financial-row;
   }
 
   .category-ownership {
@@ -735,13 +735,12 @@ async function runSaving(operation) {
   }
 
   .total-card {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 1rem;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .period-switch {
-    width: 100%;
+    width: 8.25rem;
   }
 
   .period-switch button {
@@ -749,12 +748,28 @@ async function runSaving(operation) {
   }
 
   .category-actions {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .category-icon {
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.1rem;
+  }
+
+  .category-main {
+    gap: 0.6rem;
+  }
+
+  .category-value {
+    min-width: 5.5rem;
+    padding: 0.25rem;
   }
 
   .category-actions :deep(.q-btn) {
-    width: 100%;
+    width: auto;
   }
 }
 </style>

@@ -1,6 +1,6 @@
 const { FieldPath, FieldValue } = require('firebase-admin/firestore')
 const { updateFinancialYearProjection } = require('../domain/financial-year')
-const { currentMonth, currentYear } = require('./financial-years')
+const { currentMonth, currentYear, positionStartMonth } = require('./financial-years')
 
 const MONTHS = [
   'january',
@@ -55,9 +55,9 @@ async function mutateFinancialModel(
   const trackingConfigReference = workspaceReference.collection('modelConfig').doc('expenseTracking')
   const itemsReference = workspaceReference.collection(definition.collection)
   const financialYearReference = workspaceReference.collection('financialYears').doc(String(year))
-  const requestedItem = operation === 'create' ? normalizeItem(section, item) : null
+  const requestedItem = operation === 'create' ? validatedCanonicalItem(section, item) : null
   const requestedSubcategories =
-    operation === 'syncTracking' ? normalizeTrackingSubcategories(subcategories) : []
+    operation === 'syncTracking' ? canonicalTrackingSubcategories(subcategories) : []
   const itemReference = resolveItemReference(
     itemsReference,
     section,
@@ -118,7 +118,11 @@ async function mutateFinancialModel(
       if (!config.categories?.[previous.category]) {
         throw new Error(`Itemized ${definition.result} category not found`)
       }
-      const updated = normalizeItem(section, { ...previous, ...item, category: previous.category })
+      const updated = validatedCanonicalItem(section, {
+        ...previous,
+        ...item,
+        category: previous.category,
+      })
       assertOwnershipMembers(updated.ownership, workspace.memberIds)
       if (section === 'expenses' && updated.type !== previous.type) {
         throw new Error('An expense subcategory cannot be changed after creation')
@@ -181,7 +185,7 @@ async function mutateFinancialModel(
           enabled: false,
           manualEstimate: { amount: 0, frequency: 'monthly' },
           necessity: null,
-          ownership: equalOwnership(workspace.memberIds),
+          ownership: createTrackingOwnership(workspace.memberIds),
         }
         if (!previousCategory.enabled) {
           config.categories[requested.category] = { ...previousCategory, enabled: true }
@@ -194,18 +198,6 @@ async function mutateFinancialModel(
             candidate.category === requested.category && candidate.type === requested.type,
         )
         if (existing) {
-          if (existing.trackingEligible !== true) {
-            const updated = withAuditFields(
-              cleanItem({ ...existing, trackingEligible: true }),
-              userId,
-              false,
-            )
-            nextItems = nextItems.map((candidate) =>
-              candidate.id === existing.id ? { id: existing.id, ...updated } : candidate,
-            )
-            transaction.set(itemsReference.doc(existing.id), updated)
-            modelChanged = true
-          }
           continue
         }
 
@@ -213,11 +205,14 @@ async function mutateFinancialModel(
           (candidate) => candidate.category === requested.category,
         )
         const category = config.categories[requested.category]
-        const expense = normalizeItem('expenses', {
+        const estimate = firstItem ? category.manualEstimate || requested.estimate : requested.estimate
+        const expense = validatedCanonicalItem('expenses', {
           ...requested,
-          estimate: firstItem ? category.manualEstimate || requested.estimate : requested.estimate,
-          monthlyAmounts: undefined,
-          ownership: category.ownership || equalOwnership(workspace.memberIds),
+          estimate,
+          monthlyAmounts:
+            (firstItem ? category.monthlyAmounts : requested.monthlyAmounts) ||
+            generateTrackingMonthlyAmounts(estimate),
+          ownership: category.ownership || createTrackingOwnership(workspace.memberIds),
         })
         assertOwnershipMembers(expense.ownership, workspace.memberIds)
         const itemData = withAuditFields(expense, userId, true)
@@ -283,84 +278,73 @@ async function mutateFinancialModel(
   })
 }
 
-function normalizeItem(section, item = {}) {
-  const category = String(item.category || '').trim()
+function validatedCanonicalItem(section, item = {}) {
+  const category = item.category
   assertText(category, `A valid ${section} category is required`)
-  const ownership = normalizeOwnership(item.ownership)
+  if (category !== category.trim()) throw new Error(`A valid ${section} category is required`)
+  assertCanonicalOwnership(item.ownership)
 
   if (section === 'assets') {
-    const currentValue = money(item.currentValue)
-    if (currentValue === null) throw new Error('A non-negative numeric value is required')
+    assertNonNegativeMoney(item.currentValue, 'A non-negative numeric value is required')
+    if (!isPlainObject(item.detail) || item.valueSource !== 'manual') {
+      throw new Error('A canonical asset is required')
+    }
     return cleanItem({
       ...item,
       category,
-      currentValue,
-      ownership,
-      detail: isPlainObject(item.detail) ? item.detail : {},
-      valueSource: 'manual',
     })
   }
 
   if (section === 'liabilities') {
-    const balance = money(item.balance)
-    if (balance === null) throw new Error('A non-negative balance is required')
-    return cleanItem({ ...item, category, balance, ownership })
+    assertNonNegativeMoney(item.balance, 'A non-negative balance is required')
+    return cleanItem({ ...item, category })
   }
 
   if (section === 'income') {
-    const subtype = String(item.subtype || '').trim()
-    const name = String(item.name || '').trim()
-    assertText(subtype, 'A valid income type is required')
-    const calculation = normalizeIncomeCalculation(item.calculation)
-    if (!calculation) throw new Error('A valid income calculation is required')
-    return cleanItem({ ...item, category, subtype, name, calculation, ownership })
+    assertCanonicalText(item.subtype, 'A valid income type is required')
+    assertCanonicalTextField(item.name, 'A canonical income name is required')
+    assertCanonicalIncomeCalculation(item.calculation)
+    return cleanItem({ ...item, category })
   }
 
-  return normalizeExpense(item, category, ownership)
+  return canonicalExpense(item, category)
 }
 
-function normalizeTrackingSubcategories(subcategories) {
+function canonicalTrackingSubcategories(subcategories) {
   if (!Array.isArray(subcategories)) {
     throw new Error('Tracking subcategories are required')
   }
   const seen = new Set()
   return subcategories.map((subcategory) => {
-    const category = String(subcategory?.category || '').trim()
-    const type = String(subcategory?.type || '').trim()
-    assertText(category, 'A valid expense category is required')
-    assertText(type, 'A valid expense type is required')
+    const category = subcategory?.category
+    const type = subcategory?.type
+    assertCanonicalText(category, 'A valid expense category is required')
+    assertCanonicalText(type, 'A valid expense type is required')
     if (type === 'other' || seen.has(type)) {
       throw new Error('Tracking subcategories must be unique standard expenses')
     }
     seen.add(type)
-    const normalized = normalizeExpense(
+    const canonical = canonicalExpense(
       {
+        ...subcategory,
+        category,
         type,
-        name: '',
-        estimate: subcategory.estimate,
-        variability: subcategory.variability,
-        recurrence: subcategory.recurrence,
-        necessity: subcategory.necessity,
-        trackingEligible: true,
+        ownership: { mode: 'single', shares: [{ memberId: 'pending', percentage: 100 }] },
       },
       category,
-      { mode: 'single', shares: [{ memberId: 'pending', percentage: 100 }] },
     )
-    delete normalized.ownership
-    return normalized
+    delete canonical.ownership
+    return canonical
   })
 }
 
-function normalizeExpense(item, category, ownership) {
-  const type = String(item.type || '').trim()
-  assertText(type, 'A valid expense type is required')
-  const amount = money(item.estimate?.amount)
+function canonicalExpense(item, category) {
+  assertCanonicalText(item.type, 'A valid expense type is required')
+  assertCanonicalTextField(item.name, 'A canonical expense name is required')
+  assertNonNegativeMoney(item.estimate?.amount, 'A valid expense estimate is required')
   const frequency = item.estimate?.frequency
   if (
-    amount === null ||
-    !['weekly', 'monthly', 'every_two_months', 'quarterly', 'yearly', 'irregular'].includes(
-      frequency,
-    )
+    !['monthly', 'every_two_months', 'quarterly', 'yearly'].includes(frequency)
   ) {
     throw new Error('A valid expense estimate is required')
   }
@@ -373,58 +357,43 @@ function normalizeExpense(item, category, ownership) {
   if (item.necessity != null && !['essential', 'lifestyle'].includes(item.necessity)) {
     throw new Error('A valid expense necessity is required')
   }
-  const estimate = { amount, frequency }
+  assertCanonicalMonthlyAmounts(item.monthlyAmounts)
   return cleanItem({
     ...item,
     category,
-    type,
-    name: String(item.name || '').trim(),
-    estimate,
-    monthlyAmounts: normalizeMonthlyAmounts(item.monthlyAmounts) || monthlyAmounts(estimate),
-    variability: item.variability,
-    recurrence: item.recurrence,
-    necessity: item.necessity ?? null,
-    ownership,
-    trackingEligible: type !== 'other' && item.trackingEligible !== false,
   })
 }
 
-function normalizeIncomeCalculation(calculation) {
+function assertCanonicalIncomeCalculation(calculation) {
   if (calculation?.mode === 'annual_salary') {
-    const annualAmount = money(calculation.annualAmount)
-    const paymentsPerYear = Number(calculation.paymentsPerYear)
-    if (annualAmount === null || !Number.isInteger(paymentsPerYear) || paymentsPerYear <= 0) {
-      return null
+    assertNonNegativeMoney(calculation.annualAmount, 'A valid income calculation is required')
+    if (!Number.isInteger(calculation.paymentsPerYear) || calculation.paymentsPerYear <= 0) {
+      throw new Error('A valid income calculation is required')
     }
-    return { mode: 'annual_salary', annualAmount, paymentsPerYear }
+    return
   }
   if (calculation?.mode === 'monthly_schedule') {
-    const monthlyAmount = money(calculation.monthlyAmount)
-    if (monthlyAmount === null || !isPlainObject(calculation.extrasByMonth)) return null
-    const extrasByMonth = {}
+    assertNonNegativeMoney(calculation.monthlyAmount, 'A valid income calculation is required')
+    if (!isPlainObject(calculation.extrasByMonth)) {
+      throw new Error('A valid income calculation is required')
+    }
     for (const [month, value] of Object.entries(calculation.extrasByMonth)) {
-      const amount = money(value)
-      if (!MONTHS.includes(month) || amount === null) return null
-      if (amount > 0) extrasByMonth[month] = amount
+      if (!MONTHS.includes(month)) throw new Error('A valid income calculation is required')
+      assertNonNegativeMoney(value, 'A valid income calculation is required')
     }
-    return { mode: 'monthly_schedule', monthlyAmount, extrasByMonth }
+    return
   }
-  const amount = money(calculation?.amount)
-  if (amount === null) return null
+  assertNonNegativeMoney(calculation?.amount, 'A valid income calculation is required')
   if (calculation.mode === 'one_time') {
-    return {
-      mode: 'one_time',
-      amount,
-      month: MONTHS.includes(calculation.month) ? calculation.month : 'january',
-    }
+    if (!MONTHS.includes(calculation.month)) throw new Error('A valid income calculation is required')
+    return
   }
   if (
     calculation.mode !== 'recurring' ||
-    !['weekly', 'monthly', 'quarterly', 'yearly'].includes(calculation.frequency)
+    !['monthly', 'quarterly', 'yearly'].includes(calculation.frequency)
   ) {
-    return null
+    throw new Error('A valid income calculation is required')
   }
-  return { mode: 'recurring', amount, frequency: calculation.frequency }
 }
 
 function resolveItemReference(itemsReference, section, operation, itemId, item) {
@@ -475,11 +444,8 @@ function cleanItem(item) {
   return clean
 }
 
-function normalizeOwnership(ownership) {
-  const shares = (ownership?.shares || []).map((share) => ({
-    memberId: String(share.memberId || '').trim(),
-    percentage: Number(share.percentage),
-  }))
+function assertCanonicalOwnership(ownership) {
+  const shares = ownership?.shares || []
   const uniqueMembers = new Set(shares.map((share) => share.memberId))
   const total = shares.reduce((sum, share) => sum + share.percentage, 0)
   if (
@@ -487,7 +453,9 @@ function normalizeOwnership(ownership) {
     uniqueMembers.size !== shares.length ||
     shares.some(
       (share) =>
+        typeof share.memberId !== 'string' ||
         !share.memberId ||
+        share.memberId !== share.memberId.trim() ||
         !Number.isFinite(share.percentage) ||
         share.percentage < 0 ||
         share.percentage > 100,
@@ -496,16 +464,21 @@ function normalizeOwnership(ownership) {
   ) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
-  return { mode: ownership?.mode || (shares.length > 1 ? 'shared' : 'single'), shares }
+  const expectedMode = shares.length > 1 ? 'shared' : 'single'
+  if (ownership.mode !== expectedMode) {
+    throw new Error('Ownership must reference workspace members and add up to 100%')
+  }
 }
 
-function equalOwnership(memberIds) {
+function createTrackingOwnership(memberIds) {
   if (!memberIds.length) throw new Error('Workspace membership is required')
-  const percentage = rounded(100 / memberIds.length)
+  const percentage = Math.floor(100000 / memberIds.length) / 1000
   let allocated = 0
   const shares = memberIds.map((memberId, index) => {
-    const share = index === memberIds.length - 1 ? rounded(100 - allocated) : percentage
-    allocated = rounded(allocated + share)
+    const share = index === memberIds.length - 1 ?
+      Math.round((100 - allocated) * 1000) / 1000 :
+      percentage
+    allocated += share
     return { memberId, percentage: share }
   })
   return { mode: memberIds.length > 1 ? 'shared' : 'single', shares }
@@ -518,34 +491,20 @@ function assertOwnershipMembers(ownership, memberIds = []) {
   }
 }
 
-function normalizeMonthlyAmounts(amounts) {
-  if (!isPlainObject(amounts)) return null
-  const normalized = {}
+function assertCanonicalMonthlyAmounts(amounts) {
+  if (!isPlainObject(amounts)) throw new Error('Canonical monthly expense amounts are required')
   for (const month of MONTHS) {
-    const value = money(amounts[month])
-    if (value === null) return null
-    normalized[month] = value
+    assertNonNegativeMoney(amounts[month], 'Canonical monthly expense amounts are required')
   }
-  return normalized
 }
 
-function monthlyAmounts(estimate) {
+function generateTrackingMonthlyAmounts(estimate) {
   const interval = { monthly: 1, every_two_months: 2, quarterly: 3, yearly: 12 }[
     estimate.frequency
   ]
-  if (!interval) {
-    const multiplier = estimate.frequency === 'weekly' ? 52 : 1
-    const monthly = rounded((estimate.amount * multiplier) / 12)
-    return Object.fromEntries(MONTHS.map((month) => [month, monthly]))
-  }
   return Object.fromEntries(
     MONTHS.map((month, index) => [month, index % interval === 0 ? estimate.amount : 0]),
   )
-}
-
-function positionStartMonth(financialYear, section, observedMonth) {
-  const initializedMonth = financialYear?.projectionState?.[`${section}InitializedMonth`]
-  return !initializedMonth || initializedMonth === observedMonth ? '01' : observedMonth
 }
 
 function assertWorkspaceAccess(snapshot, userId) {
@@ -566,13 +525,27 @@ function documents(snapshot) {
   return (snapshot?.docs || []).map((document) => ({ id: document.id, ...document.data() }))
 }
 
-function money(value) {
-  if (value === '' || value == null) return null
-  const number = Number(value)
-  return Number.isFinite(number) && number >= 0 ? rounded(number) : null
+function assertNonNegativeMoney(value, message) {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    roundMoney(value) !== value
+  ) {
+    throw new Error(message)
+  }
 }
 
-function rounded(value) {
+function assertCanonicalText(value, message) {
+  assertText(value, message)
+  if (typeof value !== 'string' || value !== value.trim()) throw new Error(message)
+}
+
+function assertCanonicalTextField(value, message) {
+  if (typeof value !== 'string' || value !== value.trim()) throw new Error(message)
+}
+
+function roundMoney(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 

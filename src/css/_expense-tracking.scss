@@ -1,0 +1,51 @@
+@mixin category-colors {
+  .tracking-category--housing {
+    --tracking-color: #c92f3f;
+    --tracking-soft: #ffe1e4;
+  }
+
+  .tracking-category--transportation {
+    --tracking-color: #087cf0;
+    --tracking-soft: #e6f1ff;
+  }
+
+  .tracking-category--food {
+    --tracking-color: #f08a00;
+    --tracking-soft: #fff0cc;
+  }
+
+  .tracking-category--utilities {
+    --tracking-color: #526d82;
+    --tracking-soft: #e7eef3;
+  }
+
+  .tracking-category--healthcare {
+    --tracking-color: #07958a;
+    --tracking-soft: #dff7f4;
+  }
+
+  .tracking-category--debt {
+    --tracking-color: #9a5b32;
+    --tracking-soft: #f7ebe3;
+  }
+
+  .tracking-category--personal {
+    --tracking-color: #7146e8;
+    --tracking-soft: #f0eaff;
+  }
+
+  .tracking-category--leisure {
+    --tracking-color: #10ae61;
+    --tracking-soft: #e2f8eb;
+  }
+
+  .tracking-category--travel {
+    --tracking-color: #b326d1;
+    --tracking-soft: #f7e5ff;
+  }
+
+  .tracking-category--education_childcare {
+    --tracking-color: #0789a8;
+    --tracking-soft: #e1f5fa;
+  }
+}

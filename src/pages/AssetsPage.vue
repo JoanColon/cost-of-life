@@ -20,8 +20,11 @@
         />
       </section>
 
-      <AssetCategorySetup
+      <PositionCategorySetup
         v-else-if="!assetsStore.setupCompleted"
+        :categories="assetCategories"
+        translation-namespace="assets"
+        variant="assets"
         :saving="saving"
         @save="completeSetup"
       />
@@ -144,8 +147,11 @@
           :aria-label="t('common.cancel')"
           @click="editingCategories = false"
         />
-        <AssetCategorySetup
+        <PositionCategorySetup
           edit-mode
+          :categories="assetCategories"
+          translation-namespace="assets"
+          variant="assets"
           :initial-selected="assetsStore.enabledCategories"
           :saving="saving"
           @save="requestCategorySave"
@@ -259,8 +265,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import AssetCategorySetup from '@/components/assets/AssetCategorySetup.vue'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
+import PositionCategorySetup from '@/components/financial/PositionCategorySetup.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { assetCategories } from '@/config/asset-categories'
@@ -728,79 +734,56 @@ h1 {
 }
 
 .confirm-card {
-  width: min(28rem, calc(100vw - 2rem));
-  border-radius: var(--radius-md);
+  @include financial-simple-dialog(28rem);
 }
 
 .ownership-dialog-card {
-  width: min(34rem, calc(100vw - 2rem));
-  border-radius: var(--radius-md);
-}
+  @include financial-simple-dialog(34rem);
 
-.ownership-dialog-card h2 {
-  margin: 0 0 1.25rem;
-}
-
-.confirm-card h2 {
-  margin: 0;
-  color: var(--color-ink);
-}
-
-.confirm-card p {
-  margin: 0.75rem 0 0;
-  color: var(--color-copy);
+  h2 {
+    margin-bottom: 1.25rem;
+  }
 }
 
 @media (max-width: 699px) {
-  .assets-page {
-    padding: 1.2rem;
-  }
-
-  .assets-header {
-    align-items: flex-end;
-    gap: 1rem;
-  }
-
-  .assets-header :deep(.member-selector) {
-    max-width: 52%;
-  }
-
   .category-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 0.2rem 0.5rem;
-    padding: 0.75rem 0.5rem 0.75rem 1rem;
+    @include mobile-financial-row;
   }
 
   .category-main {
     grid-column: 1;
-    min-height: 3rem;
+    min-height: 2.75rem;
     padding: 0;
   }
 
   .category-row :deep(.simple-value) {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     justify-self: end;
   }
 
   .category-ownership {
-    grid-column: 1;
-    grid-row: 2;
+    display: none;
   }
 
   .category-link {
-    grid-column: 2;
-    grid-row: 1;
-    min-height: 3rem;
+    display: none;
   }
 
   .category-row > .q-btn {
     grid-column: 3;
-    grid-row: 1 / span 2;
+    grid-row: 1;
+  }
+
+  .category-main {
+    gap: 0.6rem;
   }
 
   .category-icon {
-    grid-row: 1;
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.1rem;
   }
 }
 </style>

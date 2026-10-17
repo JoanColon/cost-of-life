@@ -1,84 +1,96 @@
 <template>
   <q-card class="asset-form-card">
-    <q-card-section class="form-header">
-      <div>
+    <q-form ref="form" class="dialog-layout" @submit.prevent="submit">
+      <q-card-section class="form-header">
         <h2>{{ asset ? t('assets.form.editTitle') : t(category.addLabelKey) }}</h2>
-      </div>
-      <q-btn
-        flat
-        round
-        dense
-        icon="close"
-        class="dialog-close"
-        :aria-label="t('common.cancel')"
-        @click="$emit('cancel')"
-      />
-    </q-card-section>
-
-    <q-card-section>
-      <q-form ref="form" class="asset-form" @submit.prevent="submit">
-        <q-select
-          v-if="category.subtypes.length > 1"
-          v-model="subtype"
-          outlined
-          emit-value
-          map-options
-          :label="t('assets.form.type')"
-          :options="subtypeOptions"
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="$emit('cancel')"
         />
-        <q-input v-model.trim="name" outlined :label="t('assets.form.name')" maxlength="80" />
-        <q-input
-          v-model="currentValue"
-          outlined
-          autofocus
-          type="number"
-          min="0"
-          step="0.01"
-          prefix="€"
-          :label="t('assets.form.currentValue')"
-          lazy-rules
-          :rules="[(value) => normalizeMoney(value) !== null || t('assets.form.valueInvalid')]"
-        />
+      </q-card-section>
 
-        <OwnershipEditor
-          v-model="ownership"
-          :members="members"
-          @validity="ownershipValid = $event"
-        />
-
-        <div class="form-actions">
-          <q-btn
-            v-if="asset"
-            flat
-            no-caps
-            color="negative"
-            icon="delete_outline"
-            :label="t('common.delete')"
-            :disable="saving || submitting"
-            @click="$emit('delete')"
-          />
-          <div class="primary-actions">
-            <q-btn
-              flat
-              no-caps
-              :label="t('common.cancel')"
-              :disable="saving || submitting"
-              @click="$emit('cancel')"
-            />
-            <q-btn
-              unelevated
-              no-caps
-              color="primary"
-              type="button"
-              :label="t('common.save')"
-              :loading="saving || submitting"
-              :disable="!ownershipValid || saving || submitting"
-              @click="submit"
+      <q-card-section class="form-body">
+        <div class="asset-form">
+          <div v-if="category.subtypes.length > 1" class="dialog-field">
+            <label>{{ t('assets.form.type') }}</label>
+            <q-select
+              v-model="subtype"
+              outlined
+              hide-bottom-space
+              emit-value
+              map-options
+              :options="subtypeOptions"
+            >
+              <template #prepend><q-icon :name="category.icon" /></template>
+            </q-select>
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('assets.form.name') }}</label>
+            <q-input v-model.trim="name" outlined hide-bottom-space maxlength="80" />
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('assets.form.currentValue') }}</label>
+            <q-input
+              v-model="currentValue"
+              outlined
+              hide-bottom-space
+              autofocus
+              type="number"
+              min="0"
+              step="0.01"
+              prefix="€"
+              lazy-rules
+              :rules="[
+                (value) =>
+                  normalizeNonNegativeMoney(value) !== null || t('assets.form.valueInvalid'),
+              ]"
             />
           </div>
+
+          <OwnershipEditor
+            v-model="ownership"
+            :members="members"
+            @validity="ownershipValid = $event"
+          />
         </div>
-      </q-form>
-    </q-card-section>
+      </q-card-section>
+
+      <q-card-actions class="form-actions">
+        <q-btn
+          v-if="asset"
+          flat
+          no-caps
+          color="negative"
+          icon="delete_outline"
+          :label="t('common.delete')"
+          :disable="saving || submitting"
+          @click="$emit('delete')"
+        />
+        <div class="primary-actions">
+          <q-btn
+            outline
+            no-caps
+            :label="t('common.cancel')"
+            :disable="saving || submitting"
+            @click="$emit('cancel')"
+          />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            type="submit"
+            :label="t('common.save')"
+            :loading="saving || submitting"
+            :disable="!ownershipValid || saving || submitting"
+          />
+        </div>
+      </q-card-actions>
+    </q-form>
   </q-card>
 </template>
 
@@ -91,7 +103,7 @@ import {
   createEqualOwnership,
   isValidOwnership,
 } from '@/domain/financial/ownership'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 
 const props = defineProps({
   category: { type: Object, required: true },
@@ -144,7 +156,7 @@ async function submit() {
   if (props.saving || submitting.value) return
 
   const formIsValid = await form.value?.validate()
-  const value = normalizeMoney(currentValue.value)
+  const value = normalizeNonNegativeMoney(currentValue.value)
   if (!formIsValid || value === null || !ownershipValid.value) return
 
   submitting.value = true
@@ -159,23 +171,22 @@ async function submit() {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .asset-form-card {
-  width: min(34rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
+  @include financial-dialog-card(38rem);
+}
+
+.dialog-layout {
+  @include financial-dialog-layout;
 }
 
 .form-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  @include financial-dialog-header;
 }
 
-h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 1.65rem;
-  letter-spacing: -0.035em;
+.form-body {
+  @include financial-dialog-body;
 }
 
 .asset-form {
@@ -183,16 +194,12 @@ h2 {
   gap: 1rem;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+.dialog-field {
+  @include financial-dialog-field;
+  margin-bottom: 0;
 }
 
-.primary-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-left: auto;
+.form-actions {
+  @include financial-dialog-actions;
 }
 </style>

@@ -12,7 +12,7 @@ export const expenseCategories = [
       suggestion('mortgage_rent', 'monthly', 'fixed', 'recurring', 'essential'),
       suggestion('property_taxes', 'yearly', 'fixed', 'recurring', 'essential'),
       suggestion('home_insurance', 'yearly', 'fixed', 'recurring', 'essential'),
-      suggestion('home_repairs', 'irregular', 'variable', 'occasional', 'essential'),
+      suggestion('home_repairs', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('community_fees', 'monthly', 'fixed', 'recurring', 'essential'),
       suggestion('home_services', 'monthly', 'variable', 'recurring', null),
     ],
@@ -24,7 +24,7 @@ export const expenseCategories = [
       suggestion('vehicle_payment', 'monthly', 'fixed', 'recurring', 'essential'),
       suggestion('vehicle_insurance', 'yearly', 'fixed', 'recurring', 'essential'),
       suggestion('fuel_charging', 'monthly', 'variable', 'recurring', 'essential'),
-      suggestion('vehicle_maintenance', 'irregular', 'variable', 'occasional', 'essential'),
+      suggestion('vehicle_maintenance', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('parking', 'monthly', 'variable', 'recurring', null),
       suggestion('vehicle_taxes', 'yearly', 'fixed', 'recurring', 'essential'),
       suggestion('public_transport', 'monthly', 'variable', 'recurring', 'essential'),
@@ -54,10 +54,10 @@ export const expenseCategories = [
     icon: 'health_and_safety',
     suggestions: [
       suggestion('health_insurance', 'monthly', 'fixed', 'recurring', 'essential'),
-      suggestion('medical_care', 'irregular', 'variable', 'occasional', 'essential'),
-      suggestion('dental_vision', 'irregular', 'variable', 'occasional', 'essential'),
+      suggestion('medical_care', 'yearly', 'variable', 'occasional', 'essential'),
+      suggestion('dental_vision', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('medication', 'monthly', 'variable', 'recurring', 'essential'),
-      suggestion('medical_supplies', 'irregular', 'variable', 'occasional', 'essential'),
+      suggestion('medical_supplies', 'yearly', 'variable', 'occasional', 'essential'),
     ],
   },
   {
@@ -74,10 +74,10 @@ export const expenseCategories = [
     id: 'personal',
     icon: 'person',
     suggestions: [
-      suggestion('clothes_shoes', 'irregular', 'variable', 'occasional', null),
+      suggestion('clothes_shoes', 'yearly', 'variable', 'occasional', null),
       suggestion('personal_care', 'monthly', 'variable', 'recurring', null),
       suggestion('gym_fitness', 'monthly', 'fixed', 'recurring', 'lifestyle'),
-      suggestion('gifts', 'irregular', 'variable', 'occasional', 'lifestyle'),
+      suggestion('gifts', 'yearly', 'variable', 'occasional', 'lifestyle'),
     ],
   },
   {
@@ -86,7 +86,7 @@ export const expenseCategories = [
     suggestions: [
       suggestion('streaming', 'monthly', 'fixed', 'recurring', 'lifestyle'),
       suggestion('hobbies', 'monthly', 'variable', 'recurring', 'lifestyle'),
-      suggestion('events', 'irregular', 'variable', 'occasional', 'lifestyle'),
+      suggestion('events', 'yearly', 'variable', 'occasional', 'lifestyle'),
       suggestion('entertainment', 'monthly', 'variable', 'recurring', 'lifestyle'),
     ],
   },
@@ -95,8 +95,8 @@ export const expenseCategories = [
     icon: 'flight',
     suggestions: [
       suggestion('holidays', 'yearly', 'variable', 'recurring', 'lifestyle'),
-      suggestion('accommodation', 'irregular', 'variable', 'occasional', 'lifestyle'),
-      suggestion('flights_transport', 'irregular', 'variable', 'occasional', 'lifestyle'),
+      suggestion('accommodation', 'yearly', 'variable', 'occasional', 'lifestyle'),
+      suggestion('flights_transport', 'yearly', 'variable', 'occasional', 'lifestyle'),
     ],
   },
   {

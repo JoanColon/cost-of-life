@@ -176,6 +176,8 @@ async function workspaceCreated({ workspace, hasPendingInvite }) {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .global-home-page {
   min-height: calc(100vh - 64px);
   min-height: calc(100dvh - 64px);
@@ -296,19 +298,7 @@ h1 {
 }
 
 .confirm-card {
-  width: min(32rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
-}
-
-.confirm-card h2 {
-  margin: 0;
-  color: var(--color-ink);
-}
-
-.confirm-card p {
-  margin: 0.75rem 0 0;
-  color: var(--color-copy);
-  line-height: 1.6;
+  @include financial-simple-dialog;
 }
 
 @media (max-width: 699px) {

@@ -24,20 +24,21 @@
     </div>
 
     <div v-if="selection === 'shared'" class="share-grid">
-      <q-input
-        v-for="share in sharedShares"
-        :key="share.memberId"
-        outlined
-        dense
-        type="number"
-        min="0"
-        max="100"
-        step="0.01"
-        suffix="%"
-        :label="memberName(share.memberId)"
-        :model-value="share.percentage"
-        @update:model-value="updateShare(share.memberId, $event)"
-      />
+      <div v-for="share in sharedShares" :key="share.memberId" class="share-field">
+        <label>{{ memberName(share.memberId) }}</label>
+        <q-input
+          outlined
+          dense
+          hide-bottom-space
+          type="number"
+          min="0"
+          max="100"
+          step="0.01"
+          suffix="%"
+          :model-value="share.percentage"
+          @update:model-value="updateShare(share.memberId, $event)"
+        />
+      </div>
     </div>
 
     <div v-if="selection === 'shared'" class="share-total" :class="{ invalid: !valid }">
@@ -161,6 +162,17 @@ function memberName(memberId) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: 0.75rem;
+}
+
+.share-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.share-field label {
+  color: var(--color-copy);
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 .share-total {

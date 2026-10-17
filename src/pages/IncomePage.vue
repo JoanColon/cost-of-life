@@ -90,12 +90,16 @@
                 }}</span></q-avatar
               >
             </button>
-            <SimpleIncomeValueEditor
+            <SimpleValueEditor
               :value="canonicalCategoryValue(category.id)"
               :formatted-value="categoryValue(category.id)"
               :formatted-period="categoryPeriodLabel"
               :saving="isCategorySaving(category.id)"
               :disabled="isItemizedCategory(category.id)"
+              :title="t('income.quickEdit.title')"
+              :input-label="t('income.form.annualIncome')"
+              :input-suffix="t('income.perYear')"
+              :invalid-message="t('income.form.valueInvalid')"
               @save="saveSimpleCategoryValue(category.id, $event)"
             />
             <button
@@ -236,7 +240,7 @@ import { useRoute, useRouter } from 'vue-router'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import IncomeCategorySetup from '@/components/income/IncomeCategorySetup.vue'
-import SimpleIncomeValueEditor from '@/components/income/SimpleIncomeValueEditor.vue'
+import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import { incomeCategories } from '@/config/income-categories'
 import {
   currentFinancialYear,
@@ -603,16 +607,15 @@ h1 {
 }
 .confirm-card,
 .ownership-dialog {
-  width: min(32rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
+  @include financial-simple-dialog;
+}
+.ownership-dialog h2 {
+  margin-bottom: 1.25rem;
 }
 @media (max-width: 760px) {
-  .income-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
   .category-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
+    @include mobile-financial-row;
   }
   .category-ownership {
     display: none;
@@ -624,18 +627,28 @@ h1 {
     font-size: 1rem;
   }
   .total-card {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 1rem;
+    align-items: center;
+    gap: 0.75rem;
   }
   .period-switch {
-    width: 100%;
+    width: 8.25rem;
   }
   .period-switch button {
     flex: 1;
   }
   .category-actions :deep(.q-btn) {
     width: 100%;
+  }
+
+  .category-main {
+    gap: 0.6rem;
+  }
+
+  .category-icon {
+    flex-basis: 2.35rem;
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.1rem;
   }
 }
 </style>

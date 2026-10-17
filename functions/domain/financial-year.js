@@ -135,7 +135,7 @@ function buildPositionMonth(categoryConfig, items, valueField) {
     const subcategories = {}
     if (categoryItems.length) {
       for (const item of categoryItems) {
-        const total = money(item[valueField])
+        const total = moneyOrZero(item[valueField])
         subcategories[item.id] = {
           name: item.name || '',
           type: item.type || '',
@@ -144,7 +144,7 @@ function buildPositionMonth(categoryConfig, items, valueField) {
         }
       }
     } else {
-      const total = money(category.manualValue)
+      const total = moneyOrZero(category.manualValue)
       subcategories[categoryId] = {
         name: '',
         type: categoryId,
@@ -234,31 +234,31 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
 
 function expenseMonth(expense, monthName) {
   if (expense.monthlyAmounts && Object.hasOwn(expense.monthlyAmounts, monthName)) {
-    return money(expense.monthlyAmounts[monthName])
+    return moneyOrZero(expense.monthlyAmounts[monthName])
   }
-  return estimateMonth(expense.estimate, monthName, 0)
+  return estimateMonth(expense.estimate, monthName)
 }
 
 function simpleExpenseMonth(category = {}, monthName) {
   if (category.monthlyAmounts && Object.hasOwn(category.monthlyAmounts, monthName)) {
-    return money(category.monthlyAmounts[monthName])
+    return moneyOrZero(category.monthlyAmounts[monthName])
   }
-  return estimateMonth(category.manualEstimate, monthName, 0)
+  return estimateMonth(category.manualEstimate, monthName)
 }
 
-function estimateMonth(estimate, monthName, annualFallback) {
+function estimateMonth(estimate, monthName) {
   const amount = Number(estimate?.amount) || 0
   const index = MONTHS.indexOf(monthName)
-  if (estimate?.frequency === 'monthly') return money(amount)
-  if (estimate?.frequency === 'every_two_months') return index % 2 === 0 ? money(amount) : 0
-  if (estimate?.frequency === 'quarterly') return index % 3 === 0 ? money(amount) : 0
-  if (estimate?.frequency === 'yearly') return index === 0 ? money(amount) : 0
-  return money((Number(annualFallback) || 0) / 12)
+  if (estimate?.frequency === 'monthly') return moneyOrZero(amount)
+  if (estimate?.frequency === 'every_two_months') return index % 2 === 0 ? moneyOrZero(amount) : 0
+  if (estimate?.frequency === 'quarterly') return index % 3 === 0 ? moneyOrZero(amount) : 0
+  if (estimate?.frequency === 'yearly') return index === 0 ? moneyOrZero(amount) : 0
+  return 0
 }
 
 function incomeMonth(calculation, monthIndex) {
   if (calculation?.mode === 'monthly_schedule') {
-    return money(
+    return moneyOrZero(
       (Number(calculation.monthlyAmount) || 0) +
         (Number(calculation.extrasByMonth?.[MONTHS[monthIndex]]) || 0),
     )
@@ -268,18 +268,17 @@ function incomeMonth(calculation, monthIndex) {
   }
   if (calculation?.mode === 'one_time') {
     const month = MONTHS.includes(calculation.month) ? calculation.month : 'january'
-    return month === MONTHS[monthIndex] ? money(calculation.amount) : 0
+    return month === MONTHS[monthIndex] ? moneyOrZero(calculation.amount) : 0
   }
-  const multiplier =
-    { weekly: 52, monthly: 12, quarterly: 4, yearly: 1 }[calculation?.frequency] || 0
+  const multiplier = { monthly: 12, quarterly: 4, yearly: 1 }[calculation?.frequency] || 0
   return distributeAnnual((Number(calculation?.amount) || 0) * multiplier, monthIndex)
 }
 
 function distributeAnnual(value, monthIndex) {
-  const annualCents = Math.round(money(value) * 100)
+  const annualCents = Math.round(moneyOrZero(value) * 100)
   const monthlyCents = Math.floor(annualCents / 12)
   const remainder = annualCents % 12
-  return money((monthlyCents + (monthIndex < remainder ? 1 : 0)) / 100)
+  return moneyOrZero((monthlyCents + (monthIndex < remainder ? 1 : 0)) / 100)
 }
 
 function trackedValue(month, id) {
@@ -287,7 +286,7 @@ function trackedValue(month, id) {
   const applied = month?.reconciliation?.[id]?.decision === 'tracked'
   const hasActual = Boolean(category) || applied
   const items = category?.items || []
-  const total = money(items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))
+  const total = moneyOrZero(items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))
   const memberValues = items.reduce(
     (sum, item) => addMaps(sum, allocate(item.amount, item.ownership)),
     {},
@@ -364,7 +363,7 @@ function canonicalSection(section) {
 
 function allocate(value, ownership) {
   const result = {}
-  const amountInCents = Math.round(money(value) * 100)
+  const amountInCents = Math.round(moneyOrZero(value) * 100)
   const shares = (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
   let assignedCents = 0
   shares.forEach((share, index) => {
@@ -373,7 +372,7 @@ function allocate(value, ownership) {
         amountInCents - assignedCents :
         Math.round((amountInCents * Number(share.percentage)) / 100)
     assignedCents += cents
-    result[share.memberId] = money((result[share.memberId] || 0) + cents / 100)
+    result[share.memberId] = moneyOrZero((result[share.memberId] || 0) + cents / 100)
   })
   return result
 }
@@ -388,11 +387,14 @@ function groupBy(items, field) {
 function addMaps(first = {}, second = {}) {
   const keys = new Set([...Object.keys(first), ...Object.keys(second)])
   return Object.fromEntries(
-    [...keys].map((key) => [key, money((Number(first[key]) || 0) + (Number(second[key]) || 0))]),
+    [...keys].map((key) => [
+      key,
+      moneyOrZero((Number(first[key]) || 0) + (Number(second[key]) || 0)),
+    ]),
   )
 }
 
-function money(value) {
+function moneyOrZero(value) {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : 0
 }

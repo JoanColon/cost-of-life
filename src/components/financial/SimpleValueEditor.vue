@@ -1,7 +1,7 @@
 <template>
   <span
     class="simple-value"
-    :class="{ disabled: disabled || saving }"
+    :class="{ disabled: disabled || saving, 'with-period': formattedPeriod }"
     role="button"
     :aria-label="ariaLabel || t('assets.quickEdit.editLabel', { value: formattedValue })"
     :aria-disabled="disabled || saving"
@@ -9,7 +9,11 @@
   >
     <q-spinner v-if="saving" color="primary" size="1.1rem" />
     <template v-else>
-      <span>{{ formattedValue }}</span>
+      <span v-if="formattedPeriod" class="value-copy">
+        <strong>{{ formattedValue }}</strong>
+        <small>/ {{ formattedPeriod }}</small>
+      </span>
+      <span v-else>{{ formattedValue }}</span>
       <q-icon v-if="!disabled" name="edit" class="edit-icon" aria-hidden="true" />
     </template>
 
@@ -37,6 +41,7 @@
           min="0"
           step="0.01"
           :prefix="currencySymbol"
+          :suffix="inputSuffix"
           :label="inputLabel || t('assets.form.totalValue')"
           :rules="[valueRule]"
           @keyup.enter="scope.set"
@@ -49,17 +54,20 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { currencySymbol } from '@/utils/formatters'
 
 const props = defineProps({
   value: { type: Number, default: 0 },
   formattedValue: { type: String, required: true },
+  formattedPeriod: { type: String, default: '' },
   saving: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   ariaLabel: { type: String, default: '' },
   title: { type: String, default: '' },
   inputLabel: { type: String, default: '' },
+  inputSuffix: { type: String, default: '' },
+  invalidMessage: { type: String, default: '' },
 })
 
 const emit = defineEmits(['save'])
@@ -74,11 +82,11 @@ watch(
 )
 
 function isValidValue(value) {
-  return normalizeMoney(value) !== null
+  return normalizeNonNegativeMoney(value) !== null
 }
 
 function valueRule(value) {
-  return isValidValue(value) || t('assets.form.valueInvalid')
+  return isValidValue(value) || props.invalidMessage || t('assets.form.valueInvalid')
 }
 
 function resetEditor() {
@@ -86,7 +94,7 @@ function resetEditor() {
 }
 
 function save(value) {
-  const normalizedValue = normalizeMoney(value)
+  const normalizedValue = normalizeNonNegativeMoney(value)
   if (normalizedValue !== null) emit('save', normalizedValue)
 }
 </script>
@@ -121,6 +129,26 @@ function save(value) {
   color: var(--color-success-dark);
 }
 
+.simple-value.with-period {
+  min-width: 8.5rem;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.value-copy {
+  display: grid;
+  justify-items: end;
+}
+
+.value-copy strong {
+  font-size: 1rem;
+}
+
+.value-copy small {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
 .simple-value:focus-visible {
   @include focus-ring;
 }
@@ -148,5 +176,10 @@ function save(value) {
 .simple-value:focus-visible .edit-icon {
   width: 0.9rem;
   opacity: 1;
+}
+
+.simple-value.with-period .edit-icon {
+  width: 0.9rem;
+  overflow: visible;
 }
 </style>

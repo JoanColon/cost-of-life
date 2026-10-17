@@ -109,4 +109,50 @@ function initials(name) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (max-width: 760px) {
+  .member-selector {
+    gap: 0.2rem;
+    max-width: 48vw;
+    padding: 0 0 0.15rem;
+  }
+
+  .member-option {
+    gap: 0.12rem;
+    min-width: 2.65rem;
+  }
+
+  .member-avatar {
+    width: 2.15rem !important;
+    height: 2.15rem !important;
+    font-size: 0.7rem;
+  }
+
+  .member-avatar :deep(.q-avatar__content),
+  .member-avatar :deep(.q-avatar__content > span) {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+    line-height: 1;
+  }
+
+  .member-avatar :deep(.q-avatar__content > span) {
+    font-size: 0.62rem;
+    transform: translateY(-0.03em);
+  }
+
+  .member-avatar :deep(.q-icon) {
+    font-size: 1.1rem !important;
+  }
+
+  .member-name {
+    max-width: 3.4rem;
+    font-size: 0.64rem;
+  }
+
+  .member-option.selected .member-avatar {
+    box-shadow: 0 0 0 2px rgb(22 136 248 / 12%);
+  }
+}
 </style>

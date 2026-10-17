@@ -1,4 +1,4 @@
-import { normalizeMoney } from './money'
+import { normalizeNonNegativeMoney } from './money'
 import { financialYearExpenseItemValue } from './financial-year'
 
 export function emptyExpenseTrackingMonth(period) {
@@ -50,7 +50,7 @@ export function normalizeTrackingMonth(month, period) {
     month: base.month,
     categories,
     reconciliation: normalizeReconciliation(month?.reconciliation),
-    total: money(Object.values(categories).reduce((sum, category) => sum + category.total, 0)),
+    total: roundMoney(Object.values(categories).reduce((sum, category) => sum + category.total, 0)),
   }
 }
 
@@ -74,8 +74,8 @@ export function setTrackingDecisions(month, subcategoryIds, decision) {
 }
 
 export function resolveExpenseTrackingValue(modelValue, actualValue, decision) {
-  const model = normalizeMoney(modelValue) || 0
-  const actual = actualValue == null ? null : normalizeMoney(actualValue)
+  const model = normalizeNonNegativeMoney(modelValue) || 0
+  const actual = actualValue == null ? null : normalizeNonNegativeMoney(actualValue)
   const usesTracked = decision === 'tracked' && actual !== null
   const source = usesTracked ? 'tracked' : 'model'
   return {
@@ -100,13 +100,15 @@ function replaceCategoryItems(month, subcategoryId, items) {
     ...month,
     categories,
     reconciliation,
-    total: money(Object.values(categories).reduce((sum, category) => sum + category.total, 0)),
+    total: roundMoney(Object.values(categories).reduce((sum, category) => sum + category.total, 0)),
   }
 }
 
 function buildCategory(items) {
   return {
-    total: money(items.reduce((sum, item) => sum + (normalizeMoney(item.amount) || 0), 0)),
+    total: roundMoney(
+      items.reduce((sum, item) => sum + (normalizeNonNegativeMoney(item.amount) || 0), 0),
+    ),
     items,
   }
 }
@@ -119,6 +121,6 @@ function normalizeReconciliation(value) {
   )
 }
 
-function money(value) {
+function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }

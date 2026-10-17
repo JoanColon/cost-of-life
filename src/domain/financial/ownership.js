@@ -1,4 +1,4 @@
-import { normalizeMoney } from './money'
+import { normalizeNonNegativeMoney } from './money'
 
 export function createSingleOwnership(memberId) {
   return {
@@ -63,7 +63,7 @@ export function isValidOwnership(ownership, memberIds = []) {
 }
 
 export function allocateValueByOwnership(value, ownership, memberIds = []) {
-  const amountInCents = Math.round((normalizeMoney(value) || 0) * 100)
+  const amountInCents = Math.round((normalizeNonNegativeMoney(value) || 0) * 100)
   const shares = (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
   const values = Object.fromEntries(memberIds.filter(Boolean).map((memberId) => [memberId, 0]))
   let assignedCents = 0
@@ -82,7 +82,7 @@ export function allocateValueByOwnership(value, ownership, memberIds = []) {
 }
 
 export function applyOwnership(value, ownership, memberId) {
-  const amount = normalizeMoney(value) || 0
+  const amount = normalizeNonNegativeMoney(value) || 0
   if (!memberId || memberId === 'all') return amount
   return allocateValueByOwnership(amount, ownership)[memberId] || 0
 }

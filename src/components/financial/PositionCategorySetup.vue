@@ -1,13 +1,19 @@
 <template>
-  <section class="setup-panel">
+  <section class="setup-panel" :class="`setup-panel--${variant}`">
     <div class="setup-copy">
-      <h1>{{ editMode ? t('assets.setup.editTitle') : t('assets.setup.title') }}</h1>
-      <p>{{ t('assets.setup.subtitle') }}</p>
+      <h1>
+        {{
+          editMode
+            ? t(`${translationNamespace}.setup.editTitle`)
+            : t(`${translationNamespace}.setup.title`)
+        }}
+      </h1>
+      <p>{{ t(`${translationNamespace}.setup.subtitle`) }}</p>
     </div>
 
     <div class="category-grid">
       <button
-        v-for="category in assetCategories"
+        v-for="category in categories"
         :key="category.id"
         type="button"
         class="category-choice"
@@ -53,9 +59,11 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { assetCategories } from '@/config/asset-categories'
 
 const props = defineProps({
+  categories: { type: Array, required: true },
+  translationNamespace: { type: String, required: true },
+  variant: { type: String, required: true },
   initialSelected: { type: Array, default: () => [] },
   editMode: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
@@ -103,6 +111,10 @@ h1 {
 p {
   margin: 0.8rem 0 0;
   color: var(--color-copy);
+}
+
+.setup-panel--assets p,
+.setup-panel--assets .category-choice strong {
   font-size: 1rem;
 }
 
@@ -127,13 +139,16 @@ p {
   text-align: left;
   box-shadow: var(--shadow-card);
   cursor: pointer;
+}
+
+.setup-panel--assets .category-choice {
   transition:
     border-color 160ms ease,
     transform 160ms ease,
     box-shadow 160ms ease;
 }
 
-.category-choice:hover {
+.setup-panel--assets .category-choice:hover {
   transform: translateY(-2px);
 }
 
@@ -157,13 +172,14 @@ p {
   font-size: 1.4rem;
 }
 
+.setup-panel--liabilities .category-icon {
+  background: var(--color-red-soft, #fdebed);
+  color: var(--color-danger);
+}
+
 .category-choice strong,
 .category-choice small {
   display: block;
-}
-
-.category-choice strong {
-  font-size: 1rem;
 }
 
 .category-choice small {

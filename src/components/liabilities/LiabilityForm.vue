@@ -1,84 +1,92 @@
 <template>
   <q-card class="liability-form-card">
-    <q-card-section class="form-header">
-      <div>
+    <q-form ref="form" class="dialog-layout" @submit.prevent="submit">
+      <q-card-section class="form-header">
         <h2>{{ liability ? t('liabilities.form.editTitle') : t(category.addLabelKey) }}</h2>
-      </div>
-      <q-btn
-        flat
-        round
-        dense
-        icon="close"
-        class="dialog-close"
-        :aria-label="t('common.cancel')"
-        @click="$emit('cancel')"
-      />
-    </q-card-section>
-
-    <q-card-section>
-      <q-form ref="form" class="liability-form" @submit.prevent="submit">
-        <q-input
-          v-model.trim="name"
-          outlined
-          autofocus
-          :label="t('liabilities.form.name')"
-          maxlength="80"
-          lazy-rules
-          :rules="[(value) => Boolean(value) || t('liabilities.form.nameRequired')]"
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="$emit('cancel')"
         />
-        <q-input
-          v-model="balance"
-          outlined
-          type="number"
-          min="0"
-          step="0.01"
-          prefix="€"
-          :label="t('liabilities.form.balance')"
-          lazy-rules
-          :rules="[
-            (value) => normalizeMoney(value) !== null || t('liabilities.form.balanceInvalid'),
-          ]"
-        />
+      </q-card-section>
 
-        <OwnershipEditor
-          v-model="ownership"
-          :members="members"
-          @validity="ownershipValid = $event"
-        />
-
-        <div class="form-actions">
-          <q-btn
-            v-if="liability"
-            flat
-            no-caps
-            color="negative"
-            icon="delete_outline"
-            :label="t('common.delete')"
-            :disable="saving || submitting"
-            @click="$emit('delete')"
-          />
-          <div class="primary-actions">
-            <q-btn
-              flat
-              no-caps
-              :label="t('common.cancel')"
-              :disable="saving || submitting"
-              @click="$emit('cancel')"
-            />
-            <q-btn
-              unelevated
-              no-caps
-              color="primary"
-              type="button"
-              :label="liability ? t('common.save') : t('common.add')"
-              :loading="saving || submitting"
-              :disable="!ownershipValid || saving || submitting"
-              @click="submit"
+      <q-card-section class="form-body">
+        <div class="liability-form">
+          <div class="dialog-field">
+            <label>{{ t('liabilities.form.name') }}</label>
+            <q-input
+              v-model.trim="name"
+              outlined
+              hide-bottom-space
+              autofocus
+              maxlength="80"
+              lazy-rules
+              :rules="[(value) => Boolean(value) || t('liabilities.form.nameRequired')]"
+            >
+              <template #prepend><q-icon :name="category.icon" /></template>
+            </q-input>
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('liabilities.form.balance') }}</label>
+            <q-input
+              v-model="balance"
+              outlined
+              hide-bottom-space
+              type="number"
+              min="0"
+              step="0.01"
+              prefix="€"
+              lazy-rules
+              :rules="[
+                (value) =>
+                  normalizeNonNegativeMoney(value) !== null || t('liabilities.form.balanceInvalid'),
+              ]"
             />
           </div>
+
+          <OwnershipEditor
+            v-model="ownership"
+            :members="members"
+            @validity="ownershipValid = $event"
+          />
         </div>
-      </q-form>
-    </q-card-section>
+      </q-card-section>
+
+      <q-card-actions class="form-actions">
+        <q-btn
+          v-if="liability"
+          flat
+          no-caps
+          color="negative"
+          icon="delete_outline"
+          :label="t('common.delete')"
+          :disable="saving || submitting"
+          @click="$emit('delete')"
+        />
+        <div class="primary-actions">
+          <q-btn
+            outline
+            no-caps
+            :label="t('common.cancel')"
+            :disable="saving || submitting"
+            @click="$emit('cancel')"
+          />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            type="submit"
+            :label="liability ? t('common.save') : t('common.add')"
+            :loading="saving || submitting"
+            :disable="!ownershipValid || saving || submitting"
+          />
+        </div>
+      </q-card-actions>
+    </q-form>
   </q-card>
 </template>
 
@@ -91,7 +99,7 @@ import {
   createEqualOwnership,
   isValidOwnership,
 } from '@/domain/financial/ownership'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 
 const props = defineProps({
   category: { type: Object, required: true },
@@ -134,7 +142,7 @@ function reset() {
 async function submit() {
   if (props.saving || submitting.value) return
   const formIsValid = await form.value?.validate()
-  const normalizedBalance = normalizeMoney(balance.value)
+  const normalizedBalance = normalizeNonNegativeMoney(balance.value)
   if (!formIsValid || !name.value || normalizedBalance === null || !ownershipValid.value) return
 
   submitting.value = true
@@ -148,35 +156,35 @@ async function submit() {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .liability-form-card {
-  width: min(34rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
+  @include financial-dialog-card(38rem);
 }
+
+.dialog-layout {
+  @include financial-dialog-layout;
+}
+
 .form-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  @include financial-dialog-header;
 }
-h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 1.65rem;
-  letter-spacing: -0.035em;
+
+.form-body {
+  @include financial-dialog-body;
 }
+
 .liability-form {
   display: grid;
   gap: 1rem;
 }
-.form-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+
+.dialog-field {
+  @include financial-dialog-field;
+  margin-bottom: 0;
 }
-.primary-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-left: auto;
+
+.form-actions {
+  @include financial-dialog-actions;
 }
 </style>

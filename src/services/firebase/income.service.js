@@ -10,7 +10,7 @@ import {
 import { db } from '@/firebase/firebase'
 import { getIncomeCategory } from '@/config/income-categories'
 import { normalizeIncomeCalculation } from '@/domain/financial/income-calculations'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
@@ -89,7 +89,7 @@ export async function updateSimpleIncomeValue(workspaceId, categoryId, value) {
       throw new Error('Only simple income categories can be edited directly')
     }
 
-    const manualValue = normalizeMoney(value)
+    const manualValue = normalizeNonNegativeMoney(value)
     if (manualValue === null) throw new Error('A non-negative annual income is required')
     const updatedCategory = { ...category, manualValue }
     transaction.update(documentRef, {
@@ -133,7 +133,10 @@ export async function createIncome(workspaceId, income, memberIds) {
 
 export async function updateIncome(workspaceId, incomeId, changes, memberIds) {
   assertValidOwnership(changes.ownership, memberIds)
-  return updateFinancialModelItem(workspaceId, 'income', incomeId, changes)
+  return updateFinancialModelItem(workspaceId, 'income', incomeId, {
+    ...normalizeIncomeItem(changes),
+    ownership: cloneOwnership(changes.ownership),
+  })
 }
 
 export async function deleteIncome(workspaceId, incomeId) {

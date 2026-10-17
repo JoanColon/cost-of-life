@@ -1,7 +1,7 @@
 <template>
   <q-card class="setup-card">
-    <q-card-section>
-      <div class="setup-heading">
+    <div class="dialog-layout">
+      <q-card-section class="setup-heading">
         <div>
           <h2>{{ t('expenseTracker.manage.title') }}</h2>
           <p>{{ t('expenseTracker.manage.description') }}</p>
@@ -15,10 +15,11 @@
           :aria-label="t('common.cancel')"
           @click="$emit('cancel')"
         />
-      </div>
+      </q-card-section>
 
-      <div class="setup-groups">
-        <section v-for="group in groups" :key="group.id" class="setup-group">
+      <q-card-section class="setup-body">
+        <div class="setup-groups">
+          <section v-for="group in groups" :key="group.id" class="setup-group">
           <header class="group-heading">
             <span class="group-icon"><q-icon :name="group.icon" /></span>
             <h3>{{ t(group.nameKey) }}</h3>
@@ -39,21 +40,24 @@
               <span>{{ t(subcategory.nameKey) }}</span>
             </button>
           </div>
-        </section>
-      </div>
-    </q-card-section>
+          </section>
+        </div>
+      </q-card-section>
 
-    <q-card-actions align="right">
-      <q-btn flat no-caps :label="t('common.cancel')" @click="$emit('cancel')" />
-      <q-btn
-        unelevated
-        no-caps
-        color="primary"
-        :label="t('common.save')"
-        :loading="saving"
-        @click="$emit('save', selected)"
-      />
-    </q-card-actions>
+      <q-card-actions class="setup-actions">
+        <div class="primary-actions">
+          <q-btn outline no-caps :label="t('common.cancel')" @click="$emit('cancel')" />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            :label="t('common.save')"
+            :loading="saving"
+            @click="$emit('save', selected)"
+          />
+        </div>
+      </q-card-actions>
+    </div>
   </q-card>
 </template>
 
@@ -91,28 +95,24 @@ function toggle(subcategoryId) {
 @use '@/css/mixins' as *;
 
 .setup-card {
-  width: min(72rem, calc(100vw - 3rem));
+  @include financial-dialog-card(72rem);
   max-width: none;
-  max-height: calc(100dvh - 2rem);
-  overflow: auto;
-  border-radius: var(--radius-card);
-  box-shadow: 0 24px 70px rgb(11 22 51 / 18%);
+}
+
+.dialog-layout {
+  @include financial-dialog-layout;
 }
 
 .setup-heading {
+  @include financial-dialog-header;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 2rem;
-  padding: 0.35rem 0.35rem 0;
 }
 
 .setup-heading h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: clamp(2rem, 4vw, 3.25rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  font-size: 2rem;
 }
 
 .setup-heading p {
@@ -121,11 +121,15 @@ function toggle(subcategoryId) {
   color: var(--color-copy);
 }
 
+.setup-body {
+  @include financial-dialog-body;
+}
+
 .setup-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
-  margin-top: 1.5rem;
+  margin-top: 0;
 }
 
 .setup-group {
@@ -212,14 +216,8 @@ function toggle(subcategoryId) {
   color: var(--color-primary);
 }
 
-.setup-card :deep(.q-card__actions) {
-  position: sticky;
-  bottom: 0;
-  gap: 0.5rem;
-  padding: 0.85rem 1.25rem 1rem;
-  border-top: 1px solid var(--color-line);
-  background: rgb(255 255 255 / 94%);
-  backdrop-filter: blur(10px);
+.setup-actions {
+  @include financial-dialog-actions;
 }
 
 @media (max-width: 749px) {
@@ -233,10 +231,6 @@ function toggle(subcategoryId) {
     min-height: 100dvh;
     max-height: 100dvh;
     border-radius: 0;
-  }
-
-  .setup-heading h2 {
-    font-size: 2.15rem;
   }
 
   .setup-group {

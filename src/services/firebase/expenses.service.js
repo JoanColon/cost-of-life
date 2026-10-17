@@ -139,7 +139,7 @@ export async function createExpense(workspaceId, expense, memberIds) {
 
 export async function updateExpense(workspaceId, expenseId, changes, memberIds) {
   assertValidOwnership(changes.ownership, memberIds)
-  return updateFinancialModelItem(workspaceId, 'expenses', expenseId, changes)
+  return updateFinancialModelItem(workspaceId, 'expenses', expenseId, normalizeExpenseItem(changes))
 }
 
 export async function deleteExpense(workspaceId, expenseId) {
@@ -173,7 +173,6 @@ function normalizeExpenseItem(expense) {
     name,
     estimate,
     monthlyAmounts,
-    trackingEligible: type !== 'other' && expense.trackingEligible !== false,
     ...attributes,
     ownership: cloneOwnership(expense.ownership),
   }

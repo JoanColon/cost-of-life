@@ -1,131 +1,54 @@
-import {
-  collection,
-  getDocs,
-  query,
-  runTransaction,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from 'firebase/firestore'
-import { db } from '@/firebase/firebase'
-import { currentUserId } from '@/services/firebase/current-user'
+import { getAssetCategory } from '@/config/asset-categories'
 import {
   createFinancialModelItem,
   deleteFinancialModelCategory,
   deleteFinancialModelItem,
   updateFinancialModelItem,
 } from '@/services/firebase/financial-model-mutations.service'
-import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
-import { normalizeMoney } from '@/domain/financial/money'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
-import { canonicalCategories } from '@/domain/financial/model-categories'
-
-function configRef(workspaceId) {
-  return modelConfigRef(workspaceId, 'assets')
-}
-
-function modelAssetsRef(workspaceId) {
-  return collection(db, 'workspaces', workspaceId, 'modelAssets')
-}
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+import { cloneOwnership } from '@/domain/financial/ownership'
+import {
+  assertPositionOwnership,
+  getCategoryPositionItems,
+  getPositionConfig,
+  savePositionSetup,
+  updatePositionCategories,
+  updateSimplePositionOwnership,
+  updateSimplePositionValue,
+} from '@/services/firebase/position-model.service'
 
 export async function getAssetsConfig(workspaceId) {
-  return getModelConfig(workspaceId, 'assets')
+  return getPositionConfig(workspaceId, 'assets')
 }
 
 export async function getCategoryAssets(workspaceId, categoryId) {
-  const snapshot = await getDocs(
-    query(modelAssetsRef(workspaceId), where('category', '==', categoryId)),
-  )
-
-  return snapshot.docs.map((assetDocument) => ({ id: assetDocument.id, ...assetDocument.data() }))
+  return getCategoryPositionItems(workspaceId, 'assets', categoryId)
 }
 
 export async function saveAssetsSetup(workspaceId, categories) {
-  const userId = currentUserId()
-  const batch = writeBatch(db)
-  batch.set(configRef(workspaceId), {
-    schemaVersion: 1,
-    setupCompleted: true,
-    categories: canonicalCategories(categories),
-    createdAt: serverTimestamp(),
-    createdBy: userId,
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
-  await batch.commit()
+  return savePositionSetup(workspaceId, 'assets', categories)
 }
 
 export async function updateAssetsCategories(workspaceId, categories) {
-  const userId = currentUserId()
-  const batch = writeBatch(db)
-  batch.set(
-    configRef(workspaceId),
-    {
-      setupCompleted: true,
-      categories: canonicalCategories(categories),
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    },
-    { merge: true },
-  )
-  await batch.commit()
+  return updatePositionCategories(workspaceId, 'assets', categories)
 }
 
 export async function updateSimpleCategoryValue(workspaceId, categoryId, value) {
-  const userId = currentUserId()
-  const documentRef = configRef(workspaceId)
-
-  return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled) {
-      throw new Error('Only simple asset categories can be edited directly')
-    }
-
-    const manualValue = normalizeMoney(value)
-    if (manualValue === null) throw new Error('A non-negative numeric value is required')
-
-    const updatedCategory = { ...category, manualValue }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-
-    return updatedCategory
-  })
+  return updateSimplePositionValue(workspaceId, 'assets', categoryId, value)
 }
 
 export async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, memberIds) {
-  const userId = currentUserId()
-  assertValidOwnership(ownership, memberIds)
-  const documentRef = configRef(workspaceId)
-
-  return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled) {
-      throw new Error('Only simple asset category ownership can be edited')
-    }
-    const updatedCategory = { ...category, ownership: cloneOwnership(ownership) }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-
-    return updatedCategory
-  })
+  return updateSimplePositionOwnership(workspaceId, 'assets', categoryId, ownership, memberIds)
 }
 
 export async function createAsset(workspaceId, asset, memberIds) {
-  assertValidOwnership(asset.ownership, memberIds)
-  return createFinancialModelItem(workspaceId, 'assets', asset)
+  assertPositionOwnership(asset.ownership, memberIds)
+  return createFinancialModelItem(workspaceId, 'assets', canonicalAsset(asset, true))
 }
 
 export async function updateAsset(workspaceId, assetId, changes, memberIds) {
-  assertValidOwnership(changes.ownership, memberIds)
-  return updateFinancialModelItem(workspaceId, 'assets', assetId, changes)
+  assertPositionOwnership(changes.ownership, memberIds)
+  return updateFinancialModelItem(workspaceId, 'assets', assetId, canonicalAsset(changes))
 }
 
 export async function deleteAsset(workspaceId, assetId) {
@@ -136,8 +59,27 @@ export async function deleteAssetCategory(workspaceId, categoryId) {
   await deleteFinancialModelCategory(workspaceId, 'assets', categoryId)
 }
 
-function assertValidOwnership(ownership, memberIds) {
-  if (!isValidOwnership(ownership, memberIds)) {
-    throw new Error('Ownership must reference workspace members and add up to 100%')
+function canonicalAsset(asset, includeDefaultDetail = false) {
+  const category = getAssetCategory(asset.category)
+  if (!category) throw new Error('A valid asset category is required')
+  if (asset.subtype && !category.subtypes.includes(asset.subtype)) {
+    throw new Error('A valid asset type is required')
   }
+  const currentValue = normalizeNonNegativeMoney(asset.currentValue)
+  if (currentValue === null) throw new Error('A non-negative numeric value is required')
+  const canonical = {
+    category: category.id,
+    subtype: asset.subtype || null,
+    name: String(asset.name || '').trim(),
+    currentValue,
+    ownership: cloneOwnership(asset.ownership),
+    valueSource: 'manual',
+  }
+  if (includeDefaultDetail || Object.hasOwn(asset, 'detail')) {
+    canonical.detail =
+      asset.detail && typeof asset.detail === 'object' && !Array.isArray(asset.detail)
+        ? { ...asset.detail }
+        : {}
+  }
+  return canonical
 }

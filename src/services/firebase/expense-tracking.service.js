@@ -12,6 +12,10 @@ import {
   expenseTrackingCategoryIds,
 } from '@/config/expense-tracking-categories'
 import {
+  generateMonthlyExpenseAmounts,
+  normalizeExpenseEstimate,
+} from '@/domain/financial/expense-calculations'
+import {
   addTrackedItem,
   deleteTrackedItem,
   emptyExpenseTrackingMonth,
@@ -20,7 +24,7 @@ import {
   setTrackingDecisions,
   updateTrackedItem,
 } from '@/domain/financial/expense-tracking'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { currentUserId } from '@/services/firebase/current-user'
 import { getModelConfig } from '@/services/firebase/model-config.service'
@@ -50,16 +54,19 @@ export async function saveExpenseTrackingPreferences(workspaceId, categoryIds) {
   const selected = new Set(normalizeEnabledCategories(categoryIds))
   const subcategories = expenseTrackingCategories
     .filter(({ id }) => selected.has(id))
-    .map(({ id, categoryId, defaults }) => ({
-      category: categoryId,
-      type: id,
-      name: '',
-      estimate: { amount: 0, frequency: defaults.frequency },
-      variability: defaults.variability,
-      recurrence: defaults.recurrence,
-      necessity: defaults.necessity,
-      trackingEligible: true,
-    }))
+    .map(({ id, categoryId, defaults }) => {
+      const estimate = normalizeExpenseEstimate({ amount: 0, frequency: defaults.frequency })
+      return {
+        category: categoryId,
+        type: id,
+        name: '',
+        estimate,
+        monthlyAmounts: generateMonthlyExpenseAmounts(estimate),
+        variability: defaults.variability,
+        recurrence: defaults.recurrence,
+        necessity: defaults.necessity,
+      }
+    })
   const result = await syncExpenseTrackingModel(workspaceId, subcategories)
   return normalizeEnabledCategories(result.enabledSubcategories)
 }
@@ -132,7 +139,7 @@ async function mutateMonth(workspaceId, period, userId, mutation) {
 }
 
 function normalizeItem(input, memberIds, period) {
-  const amount = normalizeMoney(input.amount)
+  const amount = normalizeNonNegativeMoney(input.amount)
   if (amount === null || amount <= 0) throw new Error('A positive amount is required')
   if (!isValidOwnership(input.ownership, memberIds)) {
     throw new Error('Ownership must reference workspace members and add up to 100%')

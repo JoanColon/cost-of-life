@@ -25,6 +25,8 @@ describe('atomic financial model mutations', () => {
         name: '',
         currentValue: 100,
         ownership,
+        detail: {},
+        valueSource: 'manual',
       },
       expected: { assets: 100, netWorth: 100 },
     },
@@ -60,6 +62,7 @@ describe('atomic financial model mutations', () => {
         variability: 'fixed',
         recurrence: 'recurring',
         necessity: 'essential',
+        monthlyAmounts: monthlyAmounts(10),
         ownership,
       },
       expected: { expenses: 120, savings: -120 },
@@ -106,6 +109,8 @@ describe('atomic financial model mutations', () => {
         item: {
           category: 'cash',
           currentValue: 100,
+          detail: {},
+          valueSource: 'manual',
           ownership: {
             mode: 'single',
             shares: [{ memberId: 'intruder', percentage: 100 }],
@@ -113,6 +118,31 @@ describe('atomic financial model mutations', () => {
         },
       }),
     ).rejects.toThrow('Ownership must reference workspace members')
+    expect(writes).toEqual([])
+  })
+
+  it('rejects money that the client has not canonicalized', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'assets',
+      collection: 'modelAssets',
+      category: 'cash',
+    })
+
+    await expect(
+      mutateFinancialModel(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'member-a',
+        section: 'assets',
+        operation: 'create',
+        item: {
+          category: 'cash',
+          currentValue: 100.126,
+          detail: {},
+          valueSource: 'manual',
+          ownership,
+        },
+      }),
+    ).rejects.toThrow('A non-negative numeric value is required')
     expect(writes).toEqual([])
   })
 
@@ -126,6 +156,7 @@ describe('atomic financial model mutations', () => {
       variability: 'fixed',
       recurrence: 'recurring',
       necessity: 'essential',
+      monthlyAmounts: monthlyAmounts(10),
       ownership,
     }
     const { firestore, writes } = createFirestore({
@@ -141,7 +172,11 @@ describe('atomic financial model mutations', () => {
       section: 'expenses',
       operation: 'update',
       itemId: existing.id,
-      item: { ...existing, estimate: { amount: 20, frequency: 'monthly' } },
+      item: {
+        ...existing,
+        estimate: { amount: 20, frequency: 'monthly' },
+        monthlyAmounts: monthlyAmounts(20),
+      },
     })
 
     expect(result.expense.estimate.amount).toBe(20)
@@ -173,7 +208,9 @@ describe('atomic financial model mutations', () => {
         {
           category: 'food',
           type: 'groceries',
+          name: '',
           estimate: { amount: 0, frequency: 'monthly' },
+          monthlyAmounts: monthlyAmounts(0),
           variability: 'variable',
           recurrence: 'recurring',
           necessity: 'essential',
@@ -188,7 +225,6 @@ describe('atomic financial model mutations', () => {
       category: 'food',
       type: 'groceries',
       estimate: { amount: 500, frequency: 'monthly' },
-      trackingEligible: true,
       ownership,
     })
     expect(
@@ -203,6 +239,90 @@ describe('atomic financial model mutations', () => {
     ).data
     expect(financialYearValue(financialYear, 'expenses')).toBe(6000)
   })
+
+  it('uses tracking preferences as the only tracker state', async () => {
+    const existing = {
+      id: 'food--groceries',
+      category: 'food',
+      type: 'groceries',
+      name: '',
+      estimate: { amount: 100, frequency: 'monthly' },
+      monthlyAmounts: monthlyAmounts(100),
+      variability: 'variable',
+      recurrence: 'recurring',
+      necessity: 'essential',
+      ownership,
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'expenses',
+      collection: 'modelExpenses',
+      category: 'food',
+      items: [existing],
+    })
+
+    await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'expenses',
+      operation: 'syncTracking',
+      subcategories: [
+        {
+          category: 'food',
+          type: 'groceries',
+          name: '',
+          estimate: { amount: 0, frequency: 'monthly' },
+          monthlyAmounts: monthlyAmounts(0),
+          variability: 'variable',
+          recurrence: 'recurring',
+          necessity: 'essential',
+        },
+      ],
+    })
+
+    expect(writes.map(({ path }) => path)).toEqual([
+      'workspaces/workspace-a/modelConfig/expenseTracking',
+    ])
+  })
+
+  it('uses the frontend ownership precision when tracking creates a missing category', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'expenses',
+      collection: 'modelExpenses',
+      category: 'food',
+      configCategory: null,
+      memberIds: ['member-a', 'member-b', 'member-c'],
+    })
+
+    await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'expenses',
+      operation: 'syncTracking',
+      subcategories: [
+        {
+          category: 'food',
+          type: 'groceries',
+          name: '',
+          estimate: { amount: 0, frequency: 'monthly' },
+          monthlyAmounts: monthlyAmounts(0),
+          variability: 'variable',
+          recurrence: 'recurring',
+          necessity: 'essential',
+        },
+      ],
+    })
+
+    expect(
+      writes.find(({ path }) => path.endsWith('/modelExpenses/food--groceries')).data.ownership,
+    ).toEqual({
+      mode: 'shared',
+      shares: [
+        { memberId: 'member-a', percentage: 33.333 },
+        { memberId: 'member-b', percentage: 33.333 },
+        { memberId: 'member-c', percentage: 33.334 },
+      ],
+    })
+  })
 })
 
 function createFirestore({
@@ -211,6 +331,7 @@ function createFirestore({
   category,
   items = [],
   configCategory = { enabled: true, ownership },
+  memberIds = ['member-a'],
 }) {
   const writes = []
   let generatedId = 0
@@ -238,7 +359,7 @@ function createFirestore({
 
   function snapshotFor(target) {
     if (target.path === 'workspaces/workspace-a') {
-      return documentSnapshot({ memberIds: ['member-a'] })
+      return documentSnapshot({ memberIds })
     }
     if (target.path === `workspaces/workspace-a/modelConfig/${section}`) {
       return documentSnapshot({ categories: { [category]: configCategory } })
@@ -283,4 +404,23 @@ function querySnapshot(documents) {
   return {
     docs: documents.map(({ id, ...data }) => ({ id, data: () => data })),
   }
+}
+
+function monthlyAmounts(amount) {
+  return Object.fromEntries(
+    [
+      'january',
+      'february',
+      'march',
+      'april',
+      'may',
+      'june',
+      'july',
+      'august',
+      'september',
+      'october',
+      'november',
+      'december',
+    ].map((month) => [month, amount]),
+  )
 }

@@ -176,6 +176,7 @@ function assertYear(value) {
 module.exports = {
   currentMonth,
   currentYear,
+  positionStartMonth,
   rebuildFinancialYear,
   refreshFinancialYearTrackingMonth,
 }

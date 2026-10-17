@@ -565,22 +565,32 @@ h1 {
   color: var(--color-copy);
 }
 .confirm-card {
-  width: min(32rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
+  @include financial-simple-dialog;
 }
 @media (max-width: 720px) {
-  .category-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
   .income-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
+    @include mobile-financial-row;
   }
   .avatar-cluster {
     display: none;
   }
   .income-copy small {
     white-space: normal;
+  }
+  .income-main {
+    gap: 0.6rem;
+  }
+  .income-icon {
+    flex-basis: 2.35rem;
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+  .income-value {
+    font-size: 0.95rem;
+  }
+  .add-row {
+    padding: 0.75rem;
   }
 }
 </style>

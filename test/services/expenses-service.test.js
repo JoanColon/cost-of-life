@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-const { createFinancialModelItem } = vi.hoisted(() => ({
+const { createFinancialModelItem, updateFinancialModelItem } = vi.hoisted(() => ({
   createFinancialModelItem: vi.fn(async (_workspaceId, _section, item) => ({ expense: item })),
+  updateFinancialModelItem: vi.fn(async (_workspaceId, _section, _itemId, item) => ({
+    expense: item,
+  })),
 }))
 
 vi.mock('firebase/firestore', () => ({
@@ -20,10 +23,10 @@ vi.mock('@/services/firebase/financial-model-mutations.service', () => ({
   createFinancialModelItem,
   deleteFinancialModelCategory: vi.fn(),
   deleteFinancialModelItem: vi.fn(),
-  updateFinancialModelItem: vi.fn(),
+  updateFinancialModelItem,
 }))
 
-import { createExpense } from '../../src/services/firebase/expenses.service.js'
+import { createExpense, updateExpense } from '../../src/services/firebase/expenses.service.js'
 
 describe('expenses service', () => {
   it('keeps ownership in the normalized expense sent to the callable function', async () => {
@@ -67,6 +70,41 @@ describe('expenses service', () => {
       'workspace-a',
       'expenses',
       expect.objectContaining({ ownership }),
+    )
+  })
+
+  it('canonicalizes expense updates before sending them to the callable function', async () => {
+    const ownership = {
+      mode: 'single',
+      shares: [{ memberId: 'member-a', percentage: 100 }],
+    }
+
+    await updateExpense(
+      'workspace-a',
+      'expense-a',
+      {
+        category: 'housing',
+        type: 'mortgage_rent',
+        name: '  Home  ',
+        estimate: { amount: '950.126', frequency: 'monthly' },
+        variability: 'fixed',
+        recurrence: 'recurring',
+        necessity: 'essential',
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'expenses',
+      'expense-a',
+      expect.objectContaining({
+        name: 'Home',
+        estimate: { amount: 950.13, frequency: 'monthly' },
+        monthlyAmounts: expect.objectContaining({ january: 950.13, december: 950.13 }),
+        ownership,
+      }),
     )
   })
 })

@@ -1,251 +1,280 @@
 <template>
   <q-card class="income-form-card">
-    <q-card-section class="form-header">
-      <div>
+    <q-form class="dialog-layout" @submit.prevent="submit">
+      <q-card-section class="form-header">
         <h2>{{ income ? t('income.form.editTitle') : t(category.addLabelKey) }}</h2>
-      </div>
-      <q-btn
-        flat
-        round
-        dense
-        icon="close"
-        class="dialog-close"
-        :aria-label="t('common.cancel')"
-        @click="$emit('cancel')"
-      />
-    </q-card-section>
-    <q-card-section class="form-body">
-      <q-form class="income-form" @submit.prevent="submit">
-        <q-select
-          v-if="category.subtypes.length > 1"
-          v-model="subtype"
-          outlined
-          emit-value
-          map-options
-          :label="t('income.form.type')"
-          :options="subtypeOptions"
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          @click="$emit('cancel')"
         />
-        <q-input
-          v-model.trim="name"
-          outlined
-          autofocus
-          :label="t('income.form.name')"
-          maxlength="80"
-        />
-        <q-option-group
-          v-if="category.id === 'employment'"
-          v-model="calculationMode"
-          inline
-          type="radio"
-          color="primary"
-          :options="calculationModeOptions"
-          @update:model-value="changeCalculationMode"
-        />
-        <q-select
-          v-else
-          v-model="calculationMode"
-          outlined
-          emit-value
-          map-options
-          :label="t('income.form.calculationMethod')"
-          :options="calculationModeOptions"
-          @update:model-value="changeCalculationMode"
-        />
+      </q-card-section>
 
-        <template v-if="calculationMode === 'annual_salary'">
-          <q-input
-            v-model="annualAmount"
-            outlined
-            type="number"
-            min="0"
-            step="0.01"
-            :prefix="currencySymbol"
-            :label="t('income.form.annualIncome')"
-            :rules="[moneyRule]"
-          />
-          <q-input
-            v-model="paymentsPerYear"
-            outlined
-            type="number"
-            min="1"
-            step="1"
-            :label="t('income.form.paymentsPerYear')"
-            :rules="[positiveIntegerRule]"
-          />
-        </template>
-
-        <template v-else-if="calculationMode === 'monthly_schedule'">
-          <q-input
-            v-model="monthlyAmount"
-            outlined
-            type="number"
-            min="0"
-            step="0.01"
-            :prefix="currencySymbol"
-            :label="t('income.form.monthlyNetSalary')"
-            :rules="[moneyRule]"
-          />
-          <q-expansion-item
-            icon="calendar_month"
-            :label="t('income.form.yearBreakdown')"
-            class="year-breakdown"
-          >
-            <q-markup-table flat bordered dense class="monthly-schedule">
-              <thead>
-                <tr>
-                  <th class="text-left">{{ t('income.form.month') }}</th>
-                  <th class="text-right">{{ t('income.form.monthlyNetSalary') }}</th>
-                  <th class="text-right">{{ t('income.form.extraPayment') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="month in incomeMonths" :key="month">
-                  <td>{{ t(`income.months.${month}`) }}</td>
-                  <td class="text-right">{{ formatCurrency(normalizedMonthlyAmount) }}</td>
-                  <td class="extra-payment-cell">
-                    <q-btn
-                      flat
-                      dense
-                      no-caps
-                      class="extra-payment-value"
-                      :class="{ empty: normalizedExtra(month) === 0 }"
-                      :label="
-                        normalizedExtra(month) > 0 ? formatCurrency(normalizedExtra(month)) : '—'
-                      "
-                      :aria-label="
-                        t('income.form.extraForMonth', {
-                          month: t(`income.months.${month}`),
-                        })
-                      "
-                    >
-                      <q-popup-edit
-                        v-model="extrasByMonth[month]"
-                        buttons
-                        :label-set="t('common.save')"
-                        :label-cancel="t('common.cancel')"
-                        #default="scope"
-                      >
-                        <q-input
-                          v-model="scope.value"
-                          autofocus
-                          dense
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          :prefix="currencySymbol"
-                          :label="
-                            t('income.form.extraForMonth', {
-                              month: t(`income.months.${month}`),
-                            })
-                          "
-                          :rules="[moneyRule]"
-                          @keyup.enter="scope.set"
-                        />
-                      </q-popup-edit>
-                    </q-btn>
-                  </td>
-                </tr>
-              </tbody>
-            </q-markup-table>
-          </q-expansion-item>
-        </template>
-
-        <template v-else-if="calculationMode === 'recurring'">
-          <div class="amount-frequency">
-            <q-input
-              v-model="recurringAmount"
-              outlined
-              type="number"
-              min="0"
-              step="0.01"
-              :prefix="currencySymbol"
-              :label="t('income.form.amount')"
-              :rules="[moneyRule]"
-            />
+      <q-card-section class="form-body">
+        <div class="income-form">
+          <div v-if="category.subtypes.length > 1" class="dialog-field">
+            <label>{{ t('income.form.type') }}</label>
             <q-select
-              v-model="frequency"
+              v-model="subtype"
               outlined
+              hide-bottom-space
               emit-value
               map-options
-              :label="t('income.form.frequency')"
-              :options="frequencyOptions"
-            />
+              :options="subtypeOptions"
+            >
+              <template #prepend><q-icon :name="category.icon" /></template>
+            </q-select>
           </div>
-        </template>
-
-        <div v-else class="amount-frequency">
-          <q-input
-            v-model="oneTimeAmount"
-            outlined
-            type="number"
-            min="0"
-            step="0.01"
-            :prefix="currencySymbol"
-            :label="t('income.form.oneTimeAmount')"
-            :rules="[moneyRule]"
-          />
-          <q-select
-            v-model="oneTimeMonth"
-            outlined
-            emit-value
-            map-options
-            :label="t('income.form.recognitionMonth')"
-            :options="monthOptions"
-          />
-        </div>
-
-        <div v-if="breakdown" class="calculation-preview">
-          <div>
-            <span>{{ t('income.form.annualTotal') }}</span
-            ><strong>{{ formatCurrency(breakdown.annualValue) }}</strong>
+          <div class="dialog-field">
+            <label>{{ t('income.form.name') }}</label>
+            <q-input v-model.trim="name" outlined hide-bottom-space autofocus maxlength="80" />
           </div>
-          <div v-if="breakdown.perPayment != null">
-            <span>{{ t('income.form.perPayment') }}</span
-            ><strong>{{ formatCurrency(breakdown.perPayment) }}</strong>
-          </div>
-          <div>
-            <span>{{ t('income.form.monthlyAverage') }}</span
-            ><strong>{{ formatCurrency(breakdown.monthlyAverage) }}</strong>
-          </div>
-        </div>
-
-        <OwnershipEditor
-          v-model="ownership"
-          :members="members"
-          @validity="ownershipValid = $event"
-        />
-        <div class="form-actions">
-          <q-btn
-            v-if="income"
-            flat
-            no-caps
-            color="negative"
-            icon="delete_outline"
-            :label="t('common.delete')"
-            :disable="saving"
-            @click="$emit('delete')"
-          />
-          <div class="primary-actions">
-            <q-btn
-              flat
-              no-caps
-              :label="t('common.cancel')"
-              :disable="saving"
-              @click="$emit('cancel')"
-            />
-            <q-btn
-              unelevated
-              no-caps
+          <div class="dialog-field calculation-method">
+            <label>{{ t('income.form.calculationMethod') }}</label>
+            <q-option-group
+              v-if="category.id === 'employment'"
+              v-model="calculationMode"
+              inline
+              type="radio"
               color="primary"
-              type="submit"
-              :label="t('common.save')"
-              :loading="saving"
-              :disable="!formValid"
+              :options="calculationModeOptions"
+              @update:model-value="changeCalculationMode"
+            />
+            <q-select
+              v-else
+              v-model="calculationMode"
+              outlined
+              hide-bottom-space
+              emit-value
+              map-options
+              :options="calculationModeOptions"
+              @update:model-value="changeCalculationMode"
             />
           </div>
+
+          <template v-if="calculationMode === 'annual_salary'">
+            <div class="amount-frequency">
+              <div class="dialog-field">
+                <label>{{ t('income.form.annualIncome') }}</label>
+                <q-input
+                  v-model="annualAmount"
+                  outlined
+                  hide-bottom-space
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  :prefix="currencySymbol"
+                  :rules="[moneyRule]"
+                />
+              </div>
+              <div class="dialog-field">
+                <label>{{ t('income.form.paymentsPerYear') }}</label>
+                <q-input
+                  v-model="paymentsPerYear"
+                  outlined
+                  hide-bottom-space
+                  type="number"
+                  min="1"
+                  step="1"
+                  :rules="[positiveIntegerRule]"
+                />
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="calculationMode === 'monthly_schedule'">
+            <div class="dialog-field">
+              <label>{{ t('income.form.monthlyNetSalary') }}</label>
+              <q-input
+                v-model="monthlyAmount"
+                outlined
+                hide-bottom-space
+                type="number"
+                min="0"
+                step="0.01"
+                :prefix="currencySymbol"
+                :rules="[moneyRule]"
+              />
+            </div>
+            <q-expansion-item
+              icon="calendar_month"
+              :label="t('income.form.yearBreakdown')"
+              class="year-breakdown"
+            >
+              <q-markup-table flat bordered dense class="monthly-schedule">
+                <thead>
+                  <tr>
+                    <th class="text-left">{{ t('income.form.month') }}</th>
+                    <th class="text-right">{{ t('income.form.monthlyNetSalary') }}</th>
+                    <th class="text-right">{{ t('income.form.extraPayment') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="month in incomeMonths" :key="month">
+                    <td>{{ t(`income.months.${month}`) }}</td>
+                    <td class="text-right">{{ formatCurrency(normalizedMonthlyAmount) }}</td>
+                    <td class="extra-payment-cell">
+                      <q-btn
+                        flat
+                        dense
+                        no-caps
+                        class="extra-payment-value"
+                        :class="{ empty: normalizedExtra(month) === 0 }"
+                        :label="
+                          normalizedExtra(month) > 0 ? formatCurrency(normalizedExtra(month)) : '—'
+                        "
+                        :aria-label="
+                          t('income.form.extraForMonth', {
+                            month: t(`income.months.${month}`),
+                          })
+                        "
+                      >
+                        <q-popup-edit
+                          v-model="extrasByMonth[month]"
+                          buttons
+                          :label-set="t('common.save')"
+                          :label-cancel="t('common.cancel')"
+                          #default="scope"
+                        >
+                          <q-input
+                            v-model="scope.value"
+                            autofocus
+                            dense
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            :prefix="currencySymbol"
+                            :label="
+                              t('income.form.extraForMonth', {
+                                month: t(`income.months.${month}`),
+                              })
+                            "
+                            :rules="[moneyRule]"
+                            @keyup.enter="scope.set"
+                          />
+                        </q-popup-edit>
+                      </q-btn>
+                    </td>
+                  </tr>
+                </tbody>
+              </q-markup-table>
+            </q-expansion-item>
+          </template>
+
+          <template v-else-if="calculationMode === 'recurring'">
+            <div class="amount-frequency">
+              <div class="dialog-field">
+                <label>{{ t('income.form.amount') }}</label>
+                <q-input
+                  v-model="recurringAmount"
+                  outlined
+                  hide-bottom-space
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  :prefix="currencySymbol"
+                  :rules="[moneyRule]"
+                />
+              </div>
+              <div class="dialog-field">
+                <label>{{ t('income.form.frequency') }}</label>
+                <q-select
+                  v-model="frequency"
+                  outlined
+                  hide-bottom-space
+                  emit-value
+                  map-options
+                  :options="frequencyOptions"
+                />
+              </div>
+            </div>
+          </template>
+
+          <div v-else class="amount-frequency">
+            <div class="dialog-field">
+              <label>{{ t('income.form.oneTimeAmount') }}</label>
+              <q-input
+                v-model="oneTimeAmount"
+                outlined
+                hide-bottom-space
+                type="number"
+                min="0"
+                step="0.01"
+                :prefix="currencySymbol"
+                :rules="[moneyRule]"
+              />
+            </div>
+            <div class="dialog-field">
+              <label>{{ t('income.form.recognitionMonth') }}</label>
+              <q-select
+                v-model="oneTimeMonth"
+                outlined
+                hide-bottom-space
+                emit-value
+                map-options
+                :options="monthOptions"
+              />
+            </div>
+          </div>
+
+          <div v-if="breakdown" class="calculation-preview">
+            <div>
+              <span>{{ t('income.form.annualTotal') }}</span
+              ><strong>{{ formatCurrency(breakdown.annualValue) }}</strong>
+            </div>
+            <div v-if="breakdown.perPayment != null">
+              <span>{{ t('income.form.perPayment') }}</span
+              ><strong>{{ formatCurrency(breakdown.perPayment) }}</strong>
+            </div>
+            <div>
+              <span>{{ t('income.form.monthlyAverage') }}</span
+              ><strong>{{ formatCurrency(breakdown.monthlyAverage) }}</strong>
+            </div>
+          </div>
+
+          <OwnershipEditor
+            v-model="ownership"
+            :members="members"
+            @validity="ownershipValid = $event"
+          />
         </div>
-      </q-form>
-    </q-card-section>
+      </q-card-section>
+
+      <q-card-actions class="form-actions">
+        <q-btn
+          v-if="income"
+          flat
+          no-caps
+          color="negative"
+          icon="delete_outline"
+          :label="t('common.delete')"
+          :disable="saving"
+          @click="$emit('delete')"
+        />
+        <div class="primary-actions">
+          <q-btn
+            outline
+            no-caps
+            :label="t('common.cancel')"
+            :disable="saving"
+            @click="$emit('cancel')"
+          />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            type="submit"
+            :label="t('common.save')"
+            :loading="saving"
+            :disable="!formValid"
+          />
+        </div>
+      </q-card-actions>
+    </q-form>
   </q-card>
 </template>
 
@@ -259,7 +288,7 @@ import {
   normalizeIncomeCalculation,
   recurringIncomeFrequencies,
 } from '@/domain/financial/income-calculations'
-import { normalizeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import {
   cloneOwnership,
   createEqualOwnership,
@@ -329,7 +358,7 @@ const formValid = computed(
   () => Boolean(subtype.value) && Boolean(normalizedCalculation.value) && ownershipValid.value,
 )
 const breakdown = computed(() => incomeCalculationBreakdown(calculation.value))
-const normalizedMonthlyAmount = computed(() => normalizeMoney(monthlyAmount.value) || 0)
+const normalizedMonthlyAmount = computed(() => normalizeNonNegativeMoney(monthlyAmount.value) || 0)
 
 watch(breakdown, (value) => {
   if (value) lastAnnualValue.value = value.annualValue
@@ -376,18 +405,19 @@ function defaultCalculation(mode, annualSeed) {
   if (mode === 'monthly_schedule')
     return {
       mode,
-      monthlyAmount: normalizeMoney(annualSeed / 12) || 0,
+      monthlyAmount: normalizeNonNegativeMoney(annualSeed / 12) || 0,
       extrasByMonth: {},
     }
   if (mode === 'one_time') return { mode, amount: annualSeed, month: 'january' }
   return { mode: 'recurring', amount: annualSeed, frequency: 'yearly' }
 }
 
-const moneyRule = (value) => normalizeMoney(value) !== null || t('income.form.valueInvalid')
+const moneyRule = (value) =>
+  normalizeNonNegativeMoney(value) !== null || t('income.form.valueInvalid')
 const positiveIntegerRule = (value) =>
   (Number.isInteger(Number(value)) && Number(value) > 0) || t('income.form.integerInvalid')
 function normalizedExtra(month) {
-  return normalizeMoney(extrasByMonth.value[month]) || 0
+  return normalizeNonNegativeMoney(extrasByMonth.value[month]) || 0
 }
 
 function createEmptyExtras() {
@@ -407,30 +437,43 @@ function submit() {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .income-form-card {
-  width: min(38rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
+  @include financial-dialog-card(42rem);
 }
+
+.dialog-layout {
+  @include financial-dialog-layout;
+}
+
 .form-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.5rem;
+  @include financial-dialog-header;
 }
+
 .form-body {
-  padding-top: 0;
+  @include financial-dialog-body;
 }
-h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 1.65rem;
-  letter-spacing: -0.035em;
-}
+
 .income-form {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
+
+.dialog-field {
+  @include financial-dialog-field;
+  margin-bottom: 0;
+}
+
+.calculation-method :deep(.q-option-group) {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-button);
+}
+
 .amount-frequency {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -443,6 +486,18 @@ h2 {
 .year-breakdown {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.year-breakdown :deep(.q-item) {
+  min-height: 4.25rem;
+  padding: 0.75rem 1rem;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.year-breakdown :deep(.q-expansion-item__content) {
+  padding: 0 1rem 1rem;
 }
 .extra-payment-cell {
   width: 8rem;
@@ -467,7 +522,7 @@ h2 {
   gap: 0.5rem;
   padding: 1rem;
   border-radius: 0.8rem;
-  background: var(--color-green-soft);
+  background: var(--color-blue-soft);
 }
 .calculation-preview span,
 .calculation-preview strong {
@@ -479,18 +534,10 @@ h2 {
 }
 .calculation-preview strong {
   margin-top: 0.2rem;
-  color: var(--color-success-dark);
+  color: var(--color-ink);
 }
 .form-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-.primary-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-left: auto;
+  @include financial-dialog-actions;
 }
 @media (max-width: 520px) {
   .amount-frequency,
