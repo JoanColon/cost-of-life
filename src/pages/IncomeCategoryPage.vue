@@ -36,10 +36,28 @@
         </header>
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
-          <div>
-            <span>{{ t('income.annualTotal') }}</span
-            ><strong>{{ formatCurrency(categoryTotal) }}</strong
+          <div class="summary-copy">
+            <span>{{ summaryLabel }}</span
+            ><strong>{{ formatCurrency(displayedCategoryTotal) }}</strong
             ><small>{{ itemSummary }}</small>
+          </div>
+          <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
+            <button
+              type="button"
+              :class="{ selected: period === 'annual' }"
+              :aria-pressed="period === 'annual'"
+              @click="period = 'annual'"
+            >
+              {{ t('dashboard.costOfLife.annual') }}
+            </button>
+            <button
+              type="button"
+              :class="{ selected: period === 'monthly' }"
+              :aria-pressed="period === 'monthly'"
+              @click="period = 'monthly'"
+            >
+              {{ t('dashboard.costOfLife.monthly') }}
+            </button>
           </div>
         </section>
         <section v-if="allCategoryIncome.length" class="income-list">
@@ -76,8 +94,8 @@
               ></span
             >
             <strong class="income-value"
-              >{{ formatCurrency(item.scopedValue)
-              }}<small>/{{ t('dashboard.year') }}</small></strong
+              >{{ formatCurrency(displayedItemValue(item.scopedValue))
+              }}<small>/ {{ periodLabel }}</small></strong
             >
             <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop
               ><q-menu
@@ -200,6 +218,7 @@ const editingIncome = ref(null)
 const deletingIncome = ref(null)
 const confirmDelete = ref(false)
 const formSaving = ref(false)
+const period = ref('annual')
 let preparationId = 0
 const currentYear = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
@@ -257,6 +276,13 @@ const categoryTotal = computed(() =>
     selectedMemberId.value,
   ),
 )
+const displayedCategoryTotal = computed(() => displayedValue(categoryTotal.value))
+const summaryLabel = computed(() =>
+  period.value === 'annual' ? t('income.annualTotal') : t('income.monthlyTotal'),
+)
+const periodLabel = computed(() =>
+  period.value === 'annual' ? t('dashboard.year') : t('dashboard.month'),
+)
 const itemSummary = computed(() => {
   const count = allCategoryIncome.value.length
   const key = count === 1 ? category.value.itemNameKey : category.value.itemNamePluralKey
@@ -281,6 +307,12 @@ function defaultCalculation(mode, value) {
     }
   if (mode === 'one_time') return { mode, amount: value }
   return { mode: 'recurring', amount: value, frequency: 'yearly' }
+}
+function displayedValue(annualValue) {
+  return period.value === 'annual' ? Number(annualValue || 0) : Number(annualValue || 0) / 12
+}
+function displayedItemValue(annualValue) {
+  return displayedValue(annualValue)
 }
 async function preparePage(force = false) {
   const current = ++preparationId
@@ -424,12 +456,7 @@ h1 {
   @include financial-title;
 }
 .summary-card {
-  @include financial-total-card(flex);
-  align-items: center;
-  gap: 1.1rem;
-}
-.summary-card > div {
-  display: grid;
+  @include financial-category-summary;
 }
 .summary-icon,
 .income-icon,
@@ -442,21 +469,6 @@ h1 {
 }
 .summary-icon {
   @include financial-summary-icon;
-}
-.summary-card span:not(.summary-icon),
-.summary-card strong,
-.summary-card small {
-  display: block;
-}
-.summary-card strong {
-  @include financial-total-value;
-}
-.summary-card small,
-.summary-card div > span {
-  @include financial-total-secondary;
-}
-.summary-card small {
-  @include financial-total-meta;
 }
 .income-list {
   margin-top: 1.25rem;
@@ -526,6 +538,7 @@ h1 {
   white-space: nowrap;
 }
 .income-value small {
+  display: block;
   color: var(--color-copy);
   font-weight: 500;
 }

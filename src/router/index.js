@@ -42,6 +42,10 @@ export default defineRouter((/* { store, ssrContext } */) => {
     }
 
     if (to.name === 'login' && authUser.value) {
+      const redirect = to.query.redirect
+      if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+        return redirect
+      }
       return { name: 'home' }
     }
   })

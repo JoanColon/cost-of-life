@@ -5,6 +5,11 @@ const routes = [
     component: () => import('@/pages/LoginPage.vue'),
   },
   {
+    path: '/invite/:token',
+    name: 'workspace-invite',
+    component: () => import('@/pages/WorkspaceInvitePage.vue'),
+  },
+  {
     path: '/home',
     component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },

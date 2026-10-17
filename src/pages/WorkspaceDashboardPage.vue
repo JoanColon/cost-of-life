@@ -134,10 +134,7 @@ const greeting = computed(() => {
   const name = firstName(selectedMember?.name || fallbackMember?.name)
 
   if (!name) return t('dashboard.greeting.fallback')
-
-  const hour = new Date().getHours()
-  const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'
-  return t(`dashboard.greeting.${period}`, { name })
+  return t('dashboard.greeting.personalized', { name })
 })
 
 function firstName(name = '') {
@@ -229,8 +226,8 @@ h1 {
 
 @media (max-width: 1023px) {
   .workspace-dashboard-page {
-    min-height: 100vh;
-    min-height: 100dvh;
+    min-height: calc(100vh - 56px);
+    min-height: calc(100dvh - 56px - env(safe-area-inset-top));
     padding-top: max(1.25rem, env(safe-area-inset-top));
     padding-right: max(1rem, env(safe-area-inset-right));
     padding-bottom: calc(var(--mobile-nav-height) + max(1.5rem, env(safe-area-inset-bottom)));

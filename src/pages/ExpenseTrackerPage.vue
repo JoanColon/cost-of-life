@@ -78,7 +78,7 @@
           :saving="decisionSaving"
           @view="openItems"
           @decision="setDecision"
-          @use-all-tracked="applyAllTracked"
+          @use-all-tracked="requestApplyAllTracked"
         />
       </template>
     </main>
@@ -160,7 +160,7 @@
             {{ t('expenseTracker.review.noItems') }}
           </div>
         </q-card-section>
-        <q-card-actions v-if="canMutateActiveSubcategory" align="right">
+        <q-card-actions v-if="canMutateActiveSubcategory" class="items-actions">
           <q-btn
             unelevated
             no-caps
@@ -168,6 +168,43 @@
             icon="add"
             :label="t('common.add')"
             @click="openAdd(activeSubcategory, true)"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="applyAllDialog" persistent>
+      <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          :disable="decisionSaving"
+          v-close-popup
+        />
+        <q-card-section>
+          <h2>{{ t('expenseTracker.review.applyAllConfirm.title') }}</h2>
+          <p>
+            {{
+              t('expenseTracker.review.applyAllConfirm.description', {
+                period: periodLabel,
+              })
+            }}
+          </p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps :label="t('common.cancel')" :disable="decisionSaving" v-close-popup />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            icon="done_all"
+            :label="t('expenseTracker.review.applyAllConfirm.action')"
+            :loading="decisionSaving"
+            @click="applyAllTracked"
           />
         </q-card-actions>
       </q-card>
@@ -244,6 +281,7 @@ const manageDialog = ref(false)
 const entryDialog = ref(false)
 const itemsDialog = ref(false)
 const deleteDialog = ref(false)
+const applyAllDialog = ref(false)
 const activeSubcategory = ref(null)
 const editingItem = ref(null)
 const deletingItem = ref(null)
@@ -486,6 +524,7 @@ async function setDecision(subcategory, decision) {
 }
 
 async function applyAllTracked() {
+  if (decisionSaving.value) return
   decisionSaving.value = true
   try {
     const subcategoryIds = categoriesWithTrackedItems.value.map(({ id }) => id)
@@ -495,12 +534,18 @@ async function applyAllTracked() {
       subcategoryIds,
       'tracked',
     )
+    applyAllDialog.value = false
     $q.notify({ type: 'positive', message: t('expenseTracker.sourcesUpdated'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('expenseTracker.errors.sourceSave'), position: 'top' })
   } finally {
     decisionSaving.value = false
   }
+}
+
+function requestApplyAllTracked() {
+  if (!categoriesWithTrackedItems.value.length || decisionSaving.value) return
+  applyAllDialog.value = true
 }
 
 function formatItemDate(value) {
@@ -636,13 +681,23 @@ h1 {
   text-transform: capitalize;
 }
 
+.items-heading {
+  @include financial-dialog-header;
+}
+
 .items-heading h2 {
   margin: 0.2rem 0 0;
 }
 
 .items-list {
+  @include financial-dialog-body;
   display: grid;
   gap: 0.25rem;
+}
+
+.items-actions {
+  @include financial-dialog-actions;
+  justify-content: flex-end;
 }
 
 .item-row {

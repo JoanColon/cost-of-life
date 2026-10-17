@@ -712,9 +712,8 @@ async function runSaving(operation) {
 }
 
 .category-dialog {
-  width: min(76rem, calc(100vw - 3rem));
+  @include financial-dialog-card(76rem);
   max-width: none;
-  padding: clamp(1rem, 4vw, 2.5rem);
 }
 .category-dialog :deep(.setup-panel) {
   max-width: none;

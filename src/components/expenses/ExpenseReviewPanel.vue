@@ -17,16 +17,6 @@
         <span>{{ t('expenseTracker.review.modelTotal') }}</span>
         <strong>{{ formatCurrency(modelTotal) }}</strong>
       </div>
-      <div class="review-toolbar-action">
-        <q-btn
-          unelevated
-          no-caps
-          color="primary"
-          :disable="saving || !canUseAllTracked"
-          :label="t('expenseTracker.review.useAllTracked')"
-          @click="$emit('use-all-tracked')"
-        />
-      </div>
     </div>
 
     <div class="review-groups">
@@ -36,11 +26,26 @@
         class="review-group"
         :class="`tracking-category--${group.id}`"
       >
-        <h2>
+        <button
+          type="button"
+          class="review-group-toggle"
+          :aria-expanded="isOpen(group.id)"
+          :aria-controls="`review-group-${group.id}`"
+          @click="toggleGroup(group.id)"
+        >
           <span class="review-group-icon"><q-icon :name="group.icon" /></span>
-          {{ t(group.nameKey) }}
-        </h2>
-        <div class="review-list">
+          <span class="review-group-copy">
+            <strong>{{ t(group.nameKey) }}</strong>
+            <small>
+              {{ formatCurrency(groupTrackedTotal(group)) }}
+              {{ t('expenseTracker.review.tracked').toLowerCase() }} ·
+              {{ formatCurrency(groupModelTotal(group)) }}
+              {{ t('expenseTracker.review.model').toLowerCase() }}
+            </small>
+          </span>
+          <q-icon name="expand_more" class="review-chevron" :class="{ open: isOpen(group.id) }" />
+        </button>
+        <div v-show="isOpen(group.id)" :id="`review-group-${group.id}`" class="review-list">
           <article
             v-for="subcategory in group.subcategories"
             :key="subcategory.id"
@@ -105,10 +110,23 @@
         </div>
       </section>
     </div>
+
+    <div class="review-actions">
+      <q-btn
+        flat
+        no-caps
+        icon="done_all"
+        color="primary"
+        :disable="saving || !canUseAllTracked"
+        :label="t('expenseTracker.review.useAllTracked')"
+        @click="$emit('use-all-tracked')"
+      />
+    </div>
   </section>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatCurrency } from '@/utils/formatters'
 
@@ -123,6 +141,32 @@ defineProps({
 })
 defineEmits(['view', 'decision', 'use-all-tracked'])
 const { t } = useI18n()
+const openGroupIds = ref(new Set())
+
+function isOpen(groupId) {
+  return openGroupIds.value.has(groupId)
+}
+
+function toggleGroup(groupId) {
+  const next = new Set(openGroupIds.value)
+  if (next.has(groupId)) next.delete(groupId)
+  else next.add(groupId)
+  openGroupIds.value = next
+}
+
+function groupTrackedTotal(group) {
+  return group.subcategories.reduce(
+    (total, subcategory) => total + Number(subcategory.trackedTotal || 0),
+    0,
+  )
+}
+
+function groupModelTotal(group) {
+  return group.subcategories.reduce(
+    (total, subcategory) => total + Number(subcategory.modelValue || 0),
+    0,
+  )
+}
 
 function hasChanges(subcategory) {
   return (
@@ -179,42 +223,55 @@ function hasChanges(subcategory) {
   line-height: 1;
 }
 
-.review-toolbar-action {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  padding-left: 1.25rem;
-  border-left: 1px solid var(--color-line);
-}
-
-.review-toolbar-action .q-btn {
-  min-height: 3rem;
-  padding-inline: 1.15rem;
-}
-
 .review-groups {
-  display: grid;
-  gap: 1rem;
-}
-
-.review-group {
   overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 6px 20px rgb(34 55 78 / 3%);
+  box-shadow: var(--shadow-card);
 }
 
-.review-group h2 {
+.review-actions {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  min-height: 4.5rem;
-  margin: 0;
-  padding: 0.75rem 1rem;
+  justify-content: flex-start;
+  margin-top: 0;
+  padding: 0;
+}
+
+.review-actions .q-btn {
+  margin-left: -0.75rem;
+}
+
+.review-group {
   border-bottom: 1px solid var(--color-line);
-  font-size: 1.05rem;
-  font-weight: 600;
+}
+
+.review-group:last-child {
+  border-bottom: 0;
+}
+
+.review-group-toggle {
+  display: grid;
+  grid-template-columns: 3.1rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  min-height: 5.2rem;
+  padding: 0.85rem 1rem;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.review-group-toggle:hover {
+  background: color-mix(in srgb, var(--tracking-soft, var(--color-blue-soft)) 28%, white);
+}
+
+.review-group-toggle:focus-visible {
+  @include focus-ring;
 }
 
 .review-group-icon {
@@ -228,8 +285,41 @@ function hasChanges(subcategory) {
   font-size: 1.35rem;
 }
 
+.review-group-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.review-group-copy strong,
+.review-group-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-group-copy strong {
+  font-size: 1.04rem;
+}
+
+.review-group-copy small {
+  color: var(--color-copy);
+  font-size: 0.8rem;
+}
+
+.review-chevron {
+  color: var(--color-ink);
+  font-size: 1.4rem;
+  transition: transform 160ms ease;
+}
+
+.review-chevron.open {
+  transform: rotate(180deg);
+}
+
 .review-list {
   background: inherit;
+  border-top: 1px solid var(--color-line);
 }
 
 .review-row {
@@ -387,20 +477,6 @@ function hasChanges(subcategory) {
     grid-column: 1 / -1;
   }
 
-  .review-toolbar-action {
-    grid-column: 1 / -1;
-    justify-content: stretch;
-    padding-top: 0.6rem;
-    padding-left: 0;
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
-  }
-
-  .review-toolbar-action .q-btn {
-    width: 100%;
-    min-height: 2.45rem;
-  }
-
   .month-total {
     min-width: 0;
   }
@@ -409,21 +485,30 @@ function hasChanges(subcategory) {
     font-size: 1.3rem;
   }
 
-  .review-groups {
-    gap: 0.75rem;
+  .review-actions {
+    margin-top: 0;
+    padding: 0;
   }
 
-  .review-group h2 {
-    gap: 1rem;
-    min-height: 3.35rem;
-    padding: 0.5rem 0.7rem;
-    font-size: 0.95rem;
+  .review-group-toggle {
+    grid-template-columns: 2.65rem minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    min-height: 4.6rem;
+    padding: 0.65rem 0.75rem;
   }
 
   .review-group-icon {
-    width: 2.15rem;
-    height: 2.15rem;
-    font-size: 1.05rem;
+    width: 2.65rem;
+    height: 2.65rem;
+    font-size: 1.2rem;
+  }
+
+  .review-group-copy strong {
+    font-size: 0.95rem;
+  }
+
+  .review-group-copy small {
+    font-size: 0.72rem;
   }
 
   .review-name {

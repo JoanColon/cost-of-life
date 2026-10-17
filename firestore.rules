@@ -26,10 +26,6 @@ service cloud.firestore {
       );
     }
 
-    function workspaceAfterWrite(workspaceId) {
-      return getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data;
-    }
-
     match /workspaces/{workspaceId} {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
@@ -38,7 +34,9 @@ service cloud.firestore {
       allow read: if isWorkspaceMember(resource.data);
       allow update: if isWorkspaceOwner(resource.data)
         && isWorkspaceActive(resource.data)
-        && isWorkspaceActive(request.resource.data);
+        && isWorkspaceActive(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['memberIds', 'members']);
       allow delete: if false;
 
       match /financialYears/{year} {
@@ -70,19 +68,7 @@ service cloud.firestore {
     }
 
     match /workspaceInvites/{inviteId} {
-      allow create: if isWorkspaceOwner(
-        workspaceAfterWrite(request.resource.data.workspaceId)
-      ) && isWorkspaceActive(
-        workspaceAfterWrite(request.resource.data.workspaceId)
-      );
-      allow read: if isWorkspaceOwner(
-        get(/databases/$(database)/documents/workspaces/$(resource.data.workspaceId)).data
-      );
-      allow update, delete: if isWorkspaceOwner(
-        get(/databases/$(database)/documents/workspaces/$(resource.data.workspaceId)).data
-      ) && isWorkspaceActive(
-        get(/databases/$(database)/documents/workspaces/$(resource.data.workspaceId)).data
-      );
+      allow read, write: if false;
     }
 
     match /{document=**} {

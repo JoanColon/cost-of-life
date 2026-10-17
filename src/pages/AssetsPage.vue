@@ -727,10 +727,8 @@ h1 {
 }
 
 .category-dialog {
-  width: min(68rem, calc(100vw - 2rem));
+  @include financial-dialog-card(68rem);
   max-width: none;
-  padding: clamp(1.25rem, 4vw, 2.5rem);
-  border-radius: var(--radius-card);
 }
 
 .confirm-card {

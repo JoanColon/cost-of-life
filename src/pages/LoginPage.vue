@@ -226,8 +226,11 @@ function toggleMode() {
 }
 
 async function goToDestination() {
+  const redirect = route.query.redirect
   const destination =
-    typeof route.query.redirect === 'string' ? route.query.redirect : { name: 'home' }
+    typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+      ? redirect
+      : { name: 'home' }
   await router.replace(destination)
 }
 

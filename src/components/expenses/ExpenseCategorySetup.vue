@@ -1,5 +1,5 @@
 <template>
-  <section class="setup-panel">
+  <section class="setup-panel" :class="{ 'setup-panel--dialog': editMode }">
     <div class="setup-copy">
       <h1>{{ editMode ? t('expenses.setup.editTitle') : t('expenses.setup.title') }}</h1>
       <p>{{ t('expenses.setup.description') }}</p>
@@ -30,7 +30,7 @@
     <div class="setup-actions">
       <q-btn
         v-if="editMode"
-        flat
+        outline
         no-caps
         :label="t('common.cancel')"
         :disable="saving"
@@ -83,6 +83,47 @@ function toggle(categoryId) {
   width: 100%;
   max-width: 64rem;
   margin: 0 auto;
+}
+
+.setup-panel--dialog {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+}
+
+.setup-panel--dialog .setup-copy {
+  flex: 0 0 auto;
+  max-width: none;
+  padding: 1.5rem 1.75rem 0.85rem;
+}
+
+.setup-panel--dialog .setup-copy h1 {
+  padding-right: 2.75rem;
+  font-size: 2rem;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+
+.setup-panel--dialog .setup-copy p {
+  margin-top: 0.5rem;
+}
+
+.setup-panel--dialog .category-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
+  padding: 0.75rem 1.75rem 1.5rem;
+  overflow-y: auto;
+}
+
+.setup-panel--dialog .setup-actions {
+  flex: 0 0 auto;
+  min-height: 4.75rem;
+  margin-top: 0;
+  padding: 0.85rem 1.75rem;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
 }
 
 .setup-copy {
@@ -183,6 +224,26 @@ p {
   .setup-actions,
   .setup-actions .q-btn {
     width: 100%;
+  }
+
+  .setup-panel--dialog {
+    max-height: 100dvh;
+  }
+
+  .setup-panel--dialog .setup-copy {
+    padding: 1.15rem 1rem 0.65rem;
+  }
+
+  .setup-panel--dialog .setup-copy h1 {
+    font-size: 1.55rem;
+  }
+
+  .setup-panel--dialog .category-grid {
+    padding: 0.6rem 1rem 1rem;
+  }
+
+  .setup-panel--dialog .setup-actions {
+    padding: 0.65rem 1rem;
   }
 }
 </style>

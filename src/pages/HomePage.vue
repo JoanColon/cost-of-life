@@ -50,6 +50,10 @@
           >
             <q-menu anchor="bottom right" self="top right">
               <q-list dense class="workspace-menu">
+                <q-item clickable v-close-popup @click="requestInvite(workspace)">
+                  <q-item-section avatar><q-icon name="person_add_alt" /></q-item-section>
+                  <q-item-section>{{ t('workspace.invite.action') }}</q-item-section>
+                </q-item>
                 <q-item
                   clickable
                   v-close-popup
@@ -97,16 +101,82 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="inviteDialog" persistent @hide="clearInviteRequest">
+      <q-card class="confirm-card">
+        <q-btn
+          flat
+          round
+          dense
+          icon="close"
+          class="dialog-close"
+          :aria-label="t('common.cancel')"
+          :disable="creatingInvite"
+          v-close-popup
+        />
+        <q-card-section>
+          <h2>{{ t('workspace.invite.title') }}</h2>
+          <p>{{ t('workspace.invite.description', { name: workspaceToInvite?.name || '' }) }}</p>
+
+          <div v-if="creatingInvite" class="invite-loading">
+            <q-spinner color="primary" size="2rem" />
+            <span>{{ t('workspace.invite.creating') }}</span>
+          </div>
+
+          <q-banner v-else-if="inviteError" rounded class="invite-error">
+            <template #avatar><q-icon name="error_outline" color="negative" /></template>
+            {{ t('workspace.invite.errors.create') }}
+          </q-banner>
+
+          <q-input
+            v-else-if="inviteLink"
+            :model-value="inviteLink"
+            outlined
+            readonly
+            :label="t('workspace.invite.linkLabel')"
+            class="invite-link"
+          />
+        </q-card-section>
+        <q-card-actions v-if="inviteLink" align="right">
+          <q-btn
+            v-if="canShare"
+            flat
+            no-caps
+            icon="share"
+            :label="t('workspace.invite.share')"
+            @click="shareInvite"
+          />
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            icon="content_copy"
+            :label="t('workspace.invite.copy')"
+            @click="copyInvite"
+          />
+        </q-card-actions>
+        <q-card-actions v-else-if="inviteError" align="right">
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            :label="t('common.retry')"
+            @click="generateInvite"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import WorkspaceForm from '@/components/workspace/WorkspaceForm.vue'
 import { authUser } from '@/services/auth'
+import { createWorkspaceInvite } from '@/services/firebase/workspace.service'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
@@ -118,6 +188,12 @@ const workspaceStore = useWorkspaceStore()
 const deleteDialog = ref(false)
 const deleting = ref(false)
 const workspaceToDelete = ref(null)
+const inviteDialog = ref(false)
+const creatingInvite = ref(false)
+const workspaceToInvite = ref(null)
+const inviteLink = ref('')
+const inviteError = ref(null)
+const canShare = computed(() => typeof navigator.share === 'function')
 
 function openWorkspace(workspaceId) {
   router.push({ name: 'workspace-dashboard', params: { workspaceId } })
@@ -143,6 +219,76 @@ function requestDelete(workspace) {
   deleteDialog.value = true
 }
 
+function requestInvite(workspace) {
+  workspaceToInvite.value = workspace
+  inviteDialog.value = true
+  generateInvite()
+}
+
+async function generateInvite() {
+  if (!workspaceToInvite.value || creatingInvite.value) return
+
+  creatingInvite.value = true
+  inviteLink.value = ''
+  inviteError.value = null
+  try {
+    const { token } = await createWorkspaceInvite(workspaceToInvite.value.id)
+    const routePath = router.resolve({ name: 'workspace-invite', params: { token } }).href
+    const appOrigin = $q.platform.is.capacitor
+      ? import.meta.env.VITE_APP_URL || 'https://cost-of-life-f23b2.web.app'
+      : window.location.origin
+    inviteLink.value = new URL(routePath, appOrigin).href
+  } catch (error) {
+    inviteError.value = error
+  } finally {
+    creatingInvite.value = false
+  }
+}
+
+async function copyInvite() {
+  try {
+    await copyText(inviteLink.value)
+    $q.notify({ type: 'positive', message: t('workspace.invite.copied'), position: 'top' })
+  } catch {
+    $q.notify({ type: 'negative', message: t('workspace.invite.errors.copy'), position: 'top' })
+  }
+}
+
+async function shareInvite() {
+  try {
+    await navigator.share({
+      title: t('workspace.invite.shareTitle'),
+      text: t('workspace.invite.shareText', { name: workspaceToInvite.value?.name || '' }),
+      url: inviteLink.value,
+    })
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      $q.notify({ type: 'negative', message: t('workspace.invite.errors.share'), position: 'top' })
+    }
+  }
+}
+
+function copyText(value) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value)
+
+  const input = document.createElement('textarea')
+  input.value = value
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  document.body.appendChild(input)
+  input.select()
+  const copied = document.execCommand('copy')
+  input.remove()
+  if (!copied) throw new Error('Copy failed')
+}
+
+function clearInviteRequest() {
+  if (creatingInvite.value) return
+  workspaceToInvite.value = null
+  inviteLink.value = ''
+  inviteError.value = null
+}
+
 function clearDeleteRequest() {
   if (!deleting.value) workspaceToDelete.value = null
 }
@@ -165,10 +311,10 @@ async function deleteWorkspace() {
   }
 }
 
-async function workspaceCreated({ workspace, hasPendingInvite }) {
+async function workspaceCreated({ workspace }) {
   $q.notify({
     type: 'positive',
-    message: hasPendingInvite ? t('workspace.pendingInvite') : t('workspace.created'),
+    message: t('workspace.created'),
     position: 'top',
   })
   await router.replace({ name: 'workspace-dashboard', params: { workspaceId: workspace.id } })
@@ -299,6 +445,24 @@ h1 {
 
 .confirm-card {
   @include financial-simple-dialog;
+}
+
+.invite-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4rem;
+  color: var(--color-copy);
+}
+
+.invite-link {
+  margin-top: 1.25rem;
+}
+
+.invite-error {
+  margin-top: 1.25rem;
+  background: #fff0ef;
+  color: #7d2823;
 }
 
 @media (max-width: 699px) {

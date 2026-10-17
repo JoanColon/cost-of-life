@@ -14,7 +14,7 @@
           <strong>{{ t(subcategory.nameKey) }}</strong>
           <small>{{ t(subcategory.categoryNameKey) }}</small>
         </span>
-        <q-icon name="chevron_right" class="tracking-chevron" />
+        <q-icon name="add_circle_outline" class="tracking-action" />
       </button>
     </div>
 
@@ -133,13 +133,13 @@ const { t } = useI18n()
   font-size: 0.86rem;
 }
 
-.tracking-chevron {
-  color: var(--color-ink);
-  font-size: 1.3rem;
+.tracking-action {
+  color: var(--tracking-color, var(--color-primary));
+  font-size: 1.45rem;
 }
 
 .edit-tracker-categories {
-  margin-top: 1rem;
+  margin-top: 0.35rem;
   margin-left: -0.75rem;
 }
 

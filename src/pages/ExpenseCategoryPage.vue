@@ -39,10 +39,28 @@
 
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
-          <div>
-            <span>{{ t('expenses.annualCategoryCost') }}</span>
-            <strong>{{ formatCurrency(categoryTotal) }}</strong>
-            <small>{{ formatCurrency(categoryTotal / 12) }} / {{ t('dashboard.month') }}</small>
+          <div class="summary-copy">
+            <span>{{ summaryLabel }}</span>
+            <strong>{{ formatCurrency(displayedCategoryTotal) }}</strong>
+            <small>{{ itemSummary }}</small>
+          </div>
+          <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
+            <button
+              type="button"
+              :class="{ selected: period === 'annual' }"
+              :aria-pressed="period === 'annual'"
+              @click="period = 'annual'"
+            >
+              {{ t('dashboard.costOfLife.annual') }}
+            </button>
+            <button
+              type="button"
+              :class="{ selected: period === 'monthly' }"
+              :aria-pressed="period === 'monthly'"
+              @click="period = 'monthly'"
+            >
+              {{ t('dashboard.costOfLife.monthly') }}
+            </button>
           </div>
         </section>
 
@@ -65,8 +83,8 @@
               {{ t(`expenses.necessities.${item.necessity || 'unclassified'}`) }}
             </span>
             <strong class="expense-value">
-              {{ formatCurrency(item.scopedValue) }}
-              <small>/ {{ t('dashboard.year') }}</small>
+              {{ formatCurrency(displayedItemValue(item.scopedValue)) }}
+              <small>/ {{ periodLabel }}</small>
             </strong>
             <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop>
               <q-menu>
@@ -200,6 +218,7 @@ const editingExpense = ref(null)
 const deletingExpense = ref(null)
 const deleteDialog = ref(false)
 const formSaving = ref(false)
+const period = ref('annual')
 let preparationId = 0
 const currentYear = currentFinancialYear()
 
@@ -247,6 +266,18 @@ const categoryTotal = computed(() =>
     selectedMemberId.value,
   ),
 )
+const displayedCategoryTotal = computed(() => displayedValue(categoryTotal.value))
+const summaryLabel = computed(() =>
+  period.value === 'annual' ? t('expenses.annualCategoryCost') : t('expenses.monthlyCategoryCost'),
+)
+const periodLabel = computed(() =>
+  period.value === 'annual' ? t('dashboard.year') : t('dashboard.month'),
+)
+const itemSummary = computed(() => {
+  const count = allExpenses.value.length
+  const key = count === 1 ? 'expenses.itemName' : 'expenses.itemNamePlural'
+  return t('expenses.itemSummary', { count, items: t(key) })
+})
 const expenseDefaults = computed(() => {
   const config = categoryConfig.value
   if (!config) return null
@@ -274,6 +305,14 @@ const pageLoading = computed(
 )
 
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
+
+function displayedValue(annualValue) {
+  return period.value === 'annual' ? Number(annualValue || 0) : Number(annualValue || 0) / 12
+}
+
+function displayedItemValue(annualValue) {
+  return displayedValue(annualValue)
+}
 
 async function preparePage(force = false) {
   const current = ++preparationId
@@ -403,15 +442,7 @@ async function persist(operation) {
 }
 
 .summary-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 2rem;
-  margin-bottom: 1rem;
-  padding: 1.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  @include financial-category-summary;
 }
 
 .summary-icon,
@@ -426,24 +457,14 @@ async function persist(operation) {
   font-size: 1.4rem;
 }
 
-.summary-card div {
-  display: grid;
-}
-
-.summary-card strong {
-  font-size: 2rem;
-}
-
-.summary-card small {
-  color: var(--color-copy);
-}
-
 .expense-list,
 .empty-card {
+  margin-top: 1.25rem;
   overflow: hidden;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .expense-row {
@@ -542,24 +563,14 @@ async function persist(operation) {
 }
 
 @media (max-width: 699px) {
-  .summary-card {
-    gap: 0.75rem;
-    margin-top: 0.85rem;
-    padding: 0.8rem;
-  }
-
   .summary-icon {
     width: 2.6rem;
     height: 2.6rem;
     font-size: 1.2rem;
   }
 
-  .summary-card strong {
-    font-size: 1.55rem;
-  }
-
   .expense-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     @include mobile-financial-row;
   }
 
@@ -568,9 +579,10 @@ async function persist(operation) {
   }
 
   .expense-value {
-    grid-column: 2;
-    text-align: left;
+    grid-column: auto;
+    text-align: right;
     font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .expense-icon {

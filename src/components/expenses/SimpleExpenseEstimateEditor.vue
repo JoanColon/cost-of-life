@@ -12,50 +12,62 @@
 
   <q-dialog v-model="dialog">
     <q-card class="estimate-dialog">
-      <q-btn
-        flat
-        round
-        dense
-        icon="close"
-        class="dialog-close"
-        :aria-label="t('common.cancel')"
-        v-close-popup
-      />
-      <q-card-section>
-        <h2>{{ t('expenses.quickEdit.title') }}</h2>
-        <div class="estimate-fields">
-          <q-input
-            v-model.number="amount"
-            type="number"
-            min="0"
-            step="0.01"
-            outlined
-            :label="t('expenses.form.amount')"
-            prefix="€"
-            autofocus
+      <div class="dialog-layout">
+        <q-card-section class="estimate-heading">
+          <h2>{{ t('expenses.quickEdit.title') }}</h2>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            class="dialog-close"
+            :aria-label="t('common.cancel')"
+            v-close-popup
           />
-          <q-select
-            v-model="frequency"
-            outlined
-            emit-value
-            map-options
-            :label="t('expenses.form.frequency')"
-            :options="frequencyOptions"
-          />
-        </div>
-      </q-card-section>
-      <q-card-actions align="right">
-        <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
-        <q-btn
-          unelevated
-          no-caps
-          color="primary"
-          :label="t('common.save')"
-          :loading="saving"
-          :disable="!valid"
-          @click="save"
-        />
-      </q-card-actions>
+        </q-card-section>
+        <q-card-section class="estimate-body">
+          <div class="estimate-fields">
+            <div class="dialog-field">
+              <label>{{ t('expenses.form.amount') }}</label>
+              <q-input
+                v-model.number="amount"
+                type="number"
+                min="0"
+                step="0.01"
+                outlined
+                hide-bottom-space
+                prefix="€"
+                autofocus
+              />
+            </div>
+            <div class="dialog-field">
+              <label>{{ t('expenses.form.frequency') }}</label>
+              <q-select
+                v-model="frequency"
+                outlined
+                hide-bottom-space
+                emit-value
+                map-options
+                :options="frequencyOptions"
+              />
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions class="estimate-actions">
+          <div class="primary-actions">
+            <q-btn outline no-caps :label="t('common.cancel')" v-close-popup />
+            <q-btn
+              unelevated
+              no-caps
+              color="primary"
+              :label="t('common.save')"
+              :loading="saving"
+              :disable="!valid"
+              @click="save"
+            />
+          </div>
+        </q-card-actions>
+      </div>
     </q-card>
   </q-dialog>
 </template>
@@ -114,6 +126,8 @@ function save() {
 </script>
 
 <style scoped lang="scss">
+@use '@/css/mixins' as *;
+
 .estimate-button {
   display: grid;
   justify-items: end;
@@ -143,17 +157,34 @@ function save() {
 }
 
 .estimate-dialog {
-  width: min(32rem, calc(100vw - 2rem));
+  @include financial-dialog-card(32rem);
 }
 
-.estimate-dialog h2 {
-  margin: 0 0 1rem;
+.dialog-layout {
+  @include financial-dialog-layout;
+}
+
+.estimate-heading {
+  @include financial-dialog-header;
+}
+
+.estimate-body {
+  @include financial-dialog-body;
 }
 
 .estimate-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
+}
+
+.dialog-field {
+  @include financial-dialog-field;
+  margin-bottom: 0;
+}
+
+.estimate-actions {
+  @include financial-dialog-actions;
 }
 
 @media (max-width: 499px) {

@@ -18,10 +18,10 @@ const $q = useQuasar()
 const { t } = useI18n()
 const router = useRouter()
 
-async function workspaceCreated({ workspace, hasPendingInvite }) {
+async function workspaceCreated({ workspace }) {
   $q.notify({
     type: 'positive',
-    message: hasPendingInvite ? t('workspace.pendingInvite') : t('workspace.created'),
+    message: t('workspace.created'),
     position: 'top',
   })
   await router.replace({ name: 'workspace-dashboard', params: { workspaceId: workspace.id } })

@@ -1,6 +1,6 @@
 <template>
   <q-layout view="hHh Lpr fFf" class="app-layout">
-    <q-header v-if="showAppHeader" class="app-header">
+    <q-header class="app-header">
       <q-toolbar class="app-toolbar">
         <q-btn
           flat
@@ -228,8 +228,6 @@ const activeWorkspace = computed(
   () =>
     workspaceStore.workspaces.find((workspace) => workspace.id === activeWorkspaceId.value) || null,
 )
-const isWorkspaceDashboard = computed(() => route.name === 'workspace-dashboard')
-const showAppHeader = computed(() => $q.screen.gt.sm || !isWorkspaceDashboard.value)
 const showMobileNavigation = computed(() => $q.screen.lt.md && Boolean(activeWorkspaceId.value))
 
 onMounted(async () => {

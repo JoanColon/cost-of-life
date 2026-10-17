@@ -14,37 +14,12 @@
           outlined
           autofocus
           :label="t('workspace.name')"
-          :hint="t('workspace.nameHint')"
           maxlength="60"
           lazy-rules
           :rules="nameRules"
         >
           <template #prepend><q-icon name="account_balance_wallet" /></template>
         </q-input>
-
-        <q-toggle
-          v-model="wantsToShare"
-          color="primary"
-          :label="t('workspace.shareQuestion')"
-          @update:model-value="clearInviteEmail"
-        />
-
-        <q-slide-transition>
-          <div v-if="wantsToShare">
-            <q-input
-              v-model.trim="inviteEmail"
-              outlined
-              type="email"
-              :label="t('workspace.inviteEmail')"
-              :hint="t('workspace.inviteHint')"
-              autocomplete="email"
-              lazy-rules
-              :rules="inviteEmailRules"
-            >
-              <template #prepend><q-icon name="person_add_alt" /></template>
-            </q-input>
-          </div>
-        </q-slide-transition>
 
         <q-banner v-if="errorMessage" rounded class="error-banner">
           <template #avatar><q-icon name="error_outline" color="negative" /></template>
@@ -97,8 +72,6 @@ const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 
 const name = ref('')
-const wantsToShare = ref(false)
-const inviteEmail = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 
@@ -106,11 +79,6 @@ const nameRules = [
   (value) => Boolean(value) || t('workspace.validation.nameRequired'),
   (value) => value.length <= 60 || t('workspace.validation.nameLength'),
 ]
-const inviteEmailRules = [
-  (value) => Boolean(value) || t('workspace.validation.emailRequired'),
-  (value) => /.+@.+\..+/.test(value) || t('workspace.validation.emailInvalid'),
-]
-
 async function submit() {
   if (!authUser.value) return
 
@@ -118,24 +86,14 @@ async function submit() {
   errorMessage.value = ''
 
   try {
-    const workspace = await workspaceStore.create({
-      name: name.value,
-      inviteEmail: wantsToShare.value ? inviteEmail.value : null,
-    })
+    const workspace = await workspaceStore.create({ name: name.value })
 
-    emit('created', {
-      workspace,
-      hasPendingInvite: wantsToShare.value,
-    })
+    emit('created', { workspace })
   } catch {
     errorMessage.value = t('workspace.errors.create')
   } finally {
     loading.value = false
   }
-}
-
-function clearInviteEmail(value) {
-  if (!value) inviteEmail.value = ''
 }
 </script>
 

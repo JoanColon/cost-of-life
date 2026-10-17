@@ -20,26 +20,26 @@
       <q-card-section class="setup-body">
         <div class="setup-groups">
           <section v-for="group in groups" :key="group.id" class="setup-group">
-          <header class="group-heading">
-            <span class="group-icon"><q-icon :name="group.icon" /></span>
-            <h3>{{ t(group.nameKey) }}</h3>
-          </header>
-          <div class="setup-options">
-            <button
-              v-for="subcategory in group.subcategories"
-              :key="subcategory.id"
-              type="button"
-              class="subcategory-option"
-              :class="{ selected: selected.includes(subcategory.id) }"
-              :aria-pressed="selected.includes(subcategory.id)"
-              @click="toggle(subcategory.id)"
-            >
-              <q-icon
-                :name="selected.includes(subcategory.id) ? 'check_circle' : 'add_circle_outline'"
-              />
-              <span>{{ t(subcategory.nameKey) }}</span>
-            </button>
-          </div>
+            <header class="group-heading">
+              <span class="group-icon"><q-icon :name="group.icon" /></span>
+              <h3>{{ t(group.nameKey) }}</h3>
+            </header>
+            <div class="setup-options">
+              <button
+                v-for="subcategory in group.subcategories"
+                :key="subcategory.id"
+                type="button"
+                class="subcategory-option"
+                :class="{ selected: selected.includes(subcategory.id) }"
+                :aria-pressed="selected.includes(subcategory.id)"
+                @click="toggle(subcategory.id)"
+              >
+                <q-icon
+                  :name="selected.includes(subcategory.id) ? 'check_circle' : 'add_circle_outline'"
+                />
+                <span>{{ t(subcategory.nameKey) }}</span>
+              </button>
+            </div>
           </section>
         </div>
       </q-card-section>
