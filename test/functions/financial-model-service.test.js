@@ -196,12 +196,14 @@ describe('atomic financial model mutations', () => {
       itemId: existing.id,
       item: {
         ...existing,
+        subcategoryId: 'utilities',
         estimate: { amount: 20, frequency: 'monthly' },
         monthlyAmounts: monthlyAmounts(20),
       },
     })
 
     expect(result.expense.estimate.amount).toBe(20)
+    expect(result.expense.subcategoryId).toBe('mortgage_rent')
     const financialYear = writes.find(({ path }) =>
       path.endsWith(`/financialYears/${currentYear()}`),
     ).data

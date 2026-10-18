@@ -49,7 +49,7 @@ export async function saveExpenseTrackingPreferences(workspaceId, categoryIds) {
   await setDoc(
     modelConfigRef(workspaceId, 'expenseTracking'),
     {
-      schemaVersion: 2,
+      schemaVersion: 1,
       enabledSubcategories,
       updatedAt: serverTimestamp(),
       updatedBy: userId,

@@ -69,7 +69,6 @@ async function mutateFinancialModel(
       ...(configSnapshot.data() || {}),
       categories: { ...(configSnapshot.data()?.categories || {}) },
     }
-    const itemSnapshot = itemReference ? await transaction.get(itemReference) : null
     const reads = [transaction.get(itemsReference)]
     if (section === 'expenses') {
       reads.push(
@@ -83,11 +82,12 @@ async function mutateFinancialModel(
     }
     const [itemsSnapshot, trackingSnapshot] = await Promise.all(reads)
     const existingItems = documents(itemsSnapshot)
+    const existingItem = itemId ? existingItems.find(({ id }) => id === itemId) : null
     let nextItems = existingItems
     let response
 
     if (operation === 'create') {
-      assertCategoryEnabled(config, itemCategoryId(section, requestedItem), section)
+      assertCategoryEnabled(config, requestedItem.categoryId, section)
       assertOwnershipMembers(requestedItem.ownership, workspace.memberIds)
       const itemData = withAuditFields(requestedItem, userId, true)
       nextItems = [...existingItems, { id: itemReference.id, ...itemData }]
@@ -96,9 +96,9 @@ async function mutateFinancialModel(
     }
 
     if (operation === 'update') {
-      if (!itemSnapshot?.exists) throw new Error(`${capitalize(definition.result)} not found`)
-      const previous = itemSnapshot.data()
-      const previousCategoryId = itemCategoryId(section, previous)
+      if (!existingItem) throw new Error(`${capitalize(definition.result)} not found`)
+      const previous = existingItem
+      const previousCategoryId = previous.categoryId
       if (!config.categories?.[previousCategoryId]) {
         throw new Error(`${capitalize(definition.result)} category not found`)
       }
@@ -109,9 +109,6 @@ async function mutateFinancialModel(
         subcategoryId: previous.subcategoryId,
       })
       assertOwnershipMembers(updated.ownership, workspace.memberIds)
-      if (updated.subcategoryId !== previous.subcategoryId) {
-        throw new Error(`A ${section.slice(0, -1)} subcategory cannot be changed after creation`)
-      }
       const itemData = withAuditFields({ ...previous, ...updated }, userId, false)
       nextItems = existingItems.map((candidate) =>
         candidate.id === itemReference.id ? { id: itemReference.id, ...itemData } : candidate,
@@ -121,23 +118,23 @@ async function mutateFinancialModel(
     }
 
     if (operation === 'delete') {
-      if (!itemSnapshot?.exists) throw new Error(`${capitalize(definition.result)} not found`)
-      const deletedItem = itemSnapshot.data()
+      if (!existingItem) throw new Error(`${capitalize(definition.result)} not found`)
+      const deletedItem = existingItem
       nextItems = existingItems.filter((candidate) => candidate.id !== itemReference.id)
       transaction.delete(itemReference)
-      response = { categoryId: itemCategoryId(section, deletedItem) }
+      response = { categoryId: deletedItem.categoryId }
     }
 
     if (operation === 'deleteCategory') {
       assertText(categoryId, `A ${definition.result} category is required`)
       const categoryItems = existingItems.filter(
-        (candidate) => itemCategoryId(section, candidate) === categoryId,
+        (candidate) => candidate.categoryId === categoryId,
       )
       if (categoryItems.length > 498) {
         throw new Error('Categories with more than 498 items cannot be deleted at once')
       }
       nextItems = existingItems.filter(
-        (candidate) => itemCategoryId(section, candidate) !== categoryId,
+        (candidate) => candidate.categoryId !== categoryId,
       )
       categoryItems.forEach((candidate) => transaction.delete(itemsReference.doc(candidate.id)))
       if (section === 'expenses') {
@@ -299,10 +296,6 @@ function resolveItemReference(itemsReference, operation, itemId) {
   }
   assertText(itemId, 'A model item is required')
   return itemsReference.doc(itemId)
-}
-
-function itemCategoryId(section, item) {
-  return item.categoryId
 }
 
 function withAuditFields(item, userId, creating) {

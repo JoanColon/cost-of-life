@@ -46,7 +46,7 @@ export async function saveExpensesSetup(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
-      schemaVersion: 2,
+      schemaVersion: 1,
       setupCompleted: true,
       categories: canonicalExpenseCategories(categories),
       createdAt: serverTimestamp(),
@@ -65,7 +65,7 @@ export async function updateExpensesCategories(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
-      schemaVersion: 2,
+      schemaVersion: 1,
       setupCompleted: true,
       categories: canonicalExpenseCategories(categories),
       updatedAt: serverTimestamp(),

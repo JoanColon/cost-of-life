@@ -89,7 +89,7 @@ describe('financial year persistence', () => {
     expect(writes[0].data.months['01'].income).toBeDefined()
     expect(writes[0].data.months['01'].expenses).toBeDefined()
     expect(writes[0].data.totals).toBeUndefined()
-    expect(writes[0].data.schemaVersion).toBe(2)
+    expect(writes[0].data.schemaVersion).toBe(1)
   })
 
   it('backfills the first known asset value, then preserves closed months', async () => {

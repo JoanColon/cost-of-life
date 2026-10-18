@@ -402,7 +402,7 @@ async function loadPage(force = false) {
     if (requestId !== loadRequestId) return
     await Promise.all(
       expensesStore.enabledCategories.map((categoryId) =>
-        expensesStore.loadCategory(activeWorkspaceId.value, categoryId, force),
+        expensesStore.loadCategory(activeWorkspaceId.value, categoryId),
       ),
     )
   } catch (error) {

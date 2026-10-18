@@ -51,6 +51,7 @@ export async function updatePositionCategories(workspaceId, section, categories)
   batch.set(
     modelConfigRef(workspaceId, section),
     {
+      schemaVersion: 1,
       setupCompleted: true,
       categories: canonicalCategories(categories),
       updatedAt: serverTimestamp(),

@@ -63,16 +63,16 @@ El cliente está conectado directamente al proyecto Firebase `cost-of-life-f23b2
 ### Requisitos
 
 - Node.js `^22.12`, `^24` o `>=26`, tal como exige `package.json` (el runtime desplegado de Functions es Node 24).
-- npm.
-- Google Chrome para el flujo local de Google Auth; `npm run dev` intenta abrirlo automáticamente.
+- Yarn Classic para el frontend. Functions conserva su propio `package-lock.json` y se instala con npm.
+- Google Chrome para el flujo local de Google Auth; `yarn dev` intenta abrirlo automáticamente.
 - Firebase CLI solo para emuladores o despliegue.
 
 Instala por separado las dependencias del frontend y de Functions:
 
 ```bash
-npm ci
+yarn install --frozen-lockfile
 npm --prefix functions ci
-npm run dev
+yarn dev
 ```
 
 La aplicación se sirve en el host local que muestre Quasar. Firebase Auth debe tener ese origen autorizado. El proyecto no conecta actualmente el SDK cliente a los emuladores, por lo que iniciar el emulador de Functions no redirige por sí solo las llamadas de la SPA: añade explícitamente la conexión a emuladores antes de basar un flujo local en ella.
@@ -81,11 +81,11 @@ La aplicación se sirve en el host local que muestre Quasar. Firebase Auth debe 
 
 | Comando                             | Efecto                                                          |
 | ----------------------------------- | --------------------------------------------------------------- |
-| `npm run dev`                       | Arranca Quasar/Vite en desarrollo.                              |
-| `npm test`                          | Ejecuta toda la suite Vitest una vez.                           |
-| `npm run lint:check`                | Comprueba formato y lint del frontend y Functions sin corregir. |
-| `npm run lint`                      | Reescribe formato y aplica autofix; es un comando mutante.      |
-| `npm run build`                     | Genera la SPA de producción en `dist/spa`.                      |
+| `yarn dev`                          | Arranca Quasar/Vite en desarrollo.                              |
+| `yarn test`                         | Ejecuta toda la suite Vitest una vez.                           |
+| `yarn lint:check`                   | Comprueba formato y lint del frontend y Functions sin corregir. |
+| `yarn lint`                         | Reescribe formato y aplica autofix; es un comando mutante.      |
+| `yarn build`                        | Genera la SPA de producción en `dist/spa`.                      |
 | `npm --prefix functions run serve`  | Arranca únicamente el emulador de Functions.                    |
 | `npm --prefix functions run shell`  | Abre Firebase Functions Shell.                                  |
 | `npm --prefix functions run deploy` | Despliega todas las Functions.                                  |
@@ -94,7 +94,7 @@ La aplicación se sirve en el host local que muestre Quasar. Firebase Auth debe 
 Comandos habituales de despliegue que requieren Firebase CLI:
 
 ```bash
-npm run build
+yarn build
 firebase deploy --only hosting
 firebase deploy --only firestore:rules,firestore:indexes
 npm --prefix functions run deploy
@@ -319,7 +319,7 @@ Las categorías e IDs de hitos son persistidos. Renombrarlos no es un cambio cos
 - Al cerrar sesión o cambiar de usuario, cualquier store nuevo con estado por workspace debe integrarse en el reseteo de `AppLayout`.
 - Si una mutación afecta métricas del dashboard, comprueba también la proyección anual y los hitos.
 - Añade tests junto a la capa modificada. La suite usa archivos `test/**/*.test.js`.
-- Ejecuta `npm run lint:check`, no `npm run lint`, cuando solo quieras verificar sin reescribir archivos.
+- Ejecuta `yarn lint:check`, no `yarn lint`, cuando solo quieras verificar sin reescribir archivos.
 
 ## Referencias: solo lectura
 
@@ -335,9 +335,9 @@ Si una idea resulta útil, reimplémentala dentro de `src/` o `functions/` con l
 ## Checklist antes de entregar un cambio
 
 ```bash
-npm test
-npm run lint:check
-npm run build
+yarn test
+yarn lint:check
+yarn build
 ```
 
 Además:

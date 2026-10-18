@@ -112,7 +112,7 @@ function updateFinancialYearProjection(
 
   const result = {
     ...financialYearMetadata(financialYear),
-    schemaVersion: 2,
+    schemaVersion: 1,
     year,
     projectionState,
     months,

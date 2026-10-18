@@ -2,11 +2,11 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 
 const defaults = {
-  assets: { setupCompleted: false, categories: {} },
-  liabilities: { setupCompleted: false, categories: {} },
-  income: { setupCompleted: false, categories: {} },
-  expenses: { setupCompleted: false, categories: {} },
-  expenseTracking: { enabledSubcategories: null },
+  assets: { schemaVersion: 1, setupCompleted: false, categories: {} },
+  liabilities: { schemaVersion: 1, setupCompleted: false, categories: {} },
+  income: { schemaVersion: 1, setupCompleted: false, categories: {} },
+  expenses: { schemaVersion: 1, setupCompleted: false, categories: {} },
+  expenseTracking: { schemaVersion: 1, enabledSubcategories: null },
   whatIf: null,
 }
 

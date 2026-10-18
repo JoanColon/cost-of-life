@@ -75,9 +75,7 @@
               <span class="income-icon"><q-icon :name="category.icon" /></span
               ><span class="income-copy"
                 ><strong>{{ t(`income.subtypes.${item.subcategoryId}`) }}</strong
-                ><small>{{ item.itemName }}</small
-                ><small v-if="item.notes">{{ item.notes }}</small
-                ><small>{{ itemDetails(item) }}</small></span
+                ><small>{{ item.itemName }}</small></span
               >
             </div>
             <span class="avatar-cluster"
@@ -186,7 +184,6 @@ import { useRoute, useRouter } from 'vue-router'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import IncomeForm from '@/components/income/IncomeForm.vue'
 import { getIncomeCategory } from '@/config/income-categories'
-import { incomeCalculationBreakdown } from '@/domain/financial/income-calculations'
 import {
   currentFinancialYear,
   financialYearCategoryValue,
@@ -329,26 +326,6 @@ async function preparePage(force = false) {
   } finally {
     if (current === preparationId) preparing.value = false
   }
-}
-function itemDetails(item) {
-  const breakdown = incomeCalculationBreakdown(item.calculation)
-  const availability = t('income.availablePercentageShort', {
-    percentage: item.disposablePercentage ?? 100,
-  })
-  if (item.calculation.mode === 'annual_salary')
-    return `${item.calculation.paymentsPerYear} ${t('income.form.payments').toLowerCase()} · ${formatCurrency(breakdown.perPayment)} ${t('income.form.perPayment').toLowerCase()} · ${availability}`
-  if (item.calculation.mode === 'monthly_schedule') {
-    const extraMonths = Object.values(item.calculation.extrasByMonth || {}).filter(
-      (value) => Number(value) > 0,
-    ).length
-    const extras = extraMonths
-      ? ` + ${extraMonths} ${t('income.form.extraMonths').toLowerCase()}`
-      : ''
-    return `${formatCurrency(item.calculation.monthlyAmount)} / ${t('dashboard.month')}${extras} · ${availability}`
-  }
-  if (item.calculation.mode === 'recurring')
-    return `${formatCurrency(item.calculation.amount)} / ${t(`income.frequencies.${item.calculation.frequency}`).toLowerCase()} · ${availability}`
-  return `${t('income.calculationModes.one_time')} · ${availability}`
 }
 function incomeDisplayName(item) {
   return item?.itemName?.trim() || (item ? t(`income.subtypes.${item.subcategoryId}`) : '')

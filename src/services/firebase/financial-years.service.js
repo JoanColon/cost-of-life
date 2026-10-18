@@ -10,14 +10,13 @@ export async function getFinancialYear(workspaceId, year, { ensure = false } = {
   assertYear(year)
   const reference = financialYearRef(workspaceId, year)
   let snapshot = await getDoc(reference)
-  if (ensure && (!snapshot.exists() || Number(snapshot.data()?.schemaVersion || 0) < 2)) {
+  if (ensure && !snapshot.exists()) {
     await httpsCallable(
       functions,
       'ensureFinancialYear',
     )({
       workspaceId,
       year,
-      refresh: snapshot.exists(),
     })
     snapshot = await getDoc(reference)
   }

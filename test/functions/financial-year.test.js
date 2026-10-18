@@ -75,7 +75,7 @@ describe('server financial year projection', () => {
 
     expect(Object.keys(result.months)).toHaveLength(12)
     expect(result.totals).toBeUndefined()
-    expect(result.schemaVersion).toBe(2)
+    expect(result.schemaVersion).toBe(1)
     expect(result.months['01'].assets.total).toBeUndefined()
     expect(result.months['01'].assets.categories.cash.total).toBeUndefined()
     expect(financialYearMonthValue(result, '01', 'assets')).toBe(1000)
@@ -198,7 +198,7 @@ describe('server financial year projection', () => {
       updated.months['10'].expenses.categories.food.subcategories.groceries.items.groceries.actual,
     ).toBe(437)
     expect(financialYearValue(original, 'expenses')).toBe(6000)
-    expect(updated.schemaVersion).toBe(2)
+    expect(updated.schemaVersion).toBe(1)
   })
 
   it('keeps the tracked actual when a historical month uses the model', () => {

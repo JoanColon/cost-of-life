@@ -77,7 +77,6 @@
             <span class="expense-copy">
               <strong>{{ subcategoryLabel(item.subcategoryId) }}</strong>
               <small>{{ item.itemName }}</small>
-              <small v-if="item.notes">{{ item.notes }}</small>
             </span>
             <strong class="expense-value">
               {{ formatCurrency(displayedItemValue(item)) }}

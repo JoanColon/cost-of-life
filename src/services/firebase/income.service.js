@@ -41,7 +41,7 @@ export async function saveIncomeSetup(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
-      schemaVersion: 2,
+      schemaVersion: 1,
       setupCompleted: true,
       categories: canonicalCategories(categories),
       createdAt: serverTimestamp(),
@@ -60,6 +60,7 @@ export async function updateIncomeCategories(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
+      schemaVersion: 1,
       setupCompleted: true,
       categories: canonicalCategories(categories),
       updatedAt: serverTimestamp(),
