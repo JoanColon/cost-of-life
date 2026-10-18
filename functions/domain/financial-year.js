@@ -121,34 +121,53 @@ function updateFinancialYearProjection(
 }
 
 function hasPositionValue(config, items) {
-  if (items.some((item) => config?.categories?.[item.category]?.enabled)) return true
+  if (items.some((item) => config?.categories?.[item.categoryId]?.enabled)) return true
   return Object.values(config?.categories || {}).some(
     (category) => category?.enabled && Number(category.manualValue) > 0,
   )
 }
 
 function buildPositionMonth(categoryConfig, items, valueField) {
-  const grouped = groupBy(items, 'category')
+  const grouped = groupBy(items, 'categoryId')
   const categories = {}
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
     if (!category?.enabled) continue
     const categoryItems = grouped[categoryId] || []
     const subcategories = {}
     if (categoryItems.length) {
-      for (const item of categoryItems) {
-        const total = moneyOrZero(item[valueField])
-        subcategories[item.id] = {
-          name: item.name || '',
-          type: item.type || '',
-          total,
-          memberValues: allocate(total, item.ownership),
+      const subcategoryIds = [...new Set(categoryItems.map((item) => item.subcategoryId))]
+      for (const subcategoryId of subcategoryIds) {
+        const subcategoryItems = categoryItems.filter(
+          (item) => item.subcategoryId === subcategoryId,
+        )
+        const projectedItems = Object.fromEntries(
+          subcategoryItems.map((item) => {
+            const total = moneyOrZero(item[valueField])
+            return [
+              item.id,
+              {
+                itemName: item.itemName,
+                notes: item.notes || '',
+                total,
+                memberValues: allocate(total, item.ownership),
+              },
+            ]
+          }),
+        )
+        subcategories[subcategoryId] = {
+          items: projectedItems,
+          total: moneyOrZero(
+            Object.values(projectedItems).reduce((sum, item) => sum + item.total, 0),
+          ),
+          memberValues: Object.values(projectedItems).reduce(
+            (sum, item) => addMaps(sum, item.memberValues),
+            {},
+          ),
         }
       }
     } else {
       const total = moneyOrZero(category.manualValue)
       subcategories[categoryId] = {
-        name: '',
-        type: categoryId,
         total,
         memberValues: allocate(total, category.ownership),
       }

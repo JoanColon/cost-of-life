@@ -7,6 +7,7 @@ export const liabilityCategories = [
     itemNameKey: 'liabilities.categories.mortgage.itemName',
     itemNamePluralKey: 'liabilities.categories.mortgage.itemNamePlural',
     addLabelKey: 'liabilities.categories.mortgage.addLabel',
+    subcategories: ['mortgage'],
   },
   {
     id: 'car_loan',
@@ -16,6 +17,7 @@ export const liabilityCategories = [
     itemNameKey: 'liabilities.categories.car_loan.itemName',
     itemNamePluralKey: 'liabilities.categories.car_loan.itemNamePlural',
     addLabelKey: 'liabilities.categories.car_loan.addLabel',
+    subcategories: ['car_loan'],
   },
   {
     id: 'student_loan',
@@ -25,6 +27,7 @@ export const liabilityCategories = [
     itemNameKey: 'liabilities.categories.student_loan.itemName',
     itemNamePluralKey: 'liabilities.categories.student_loan.itemNamePlural',
     addLabelKey: 'liabilities.categories.student_loan.addLabel',
+    subcategories: ['student_loan'],
   },
   {
     id: 'personal_loan',
@@ -34,6 +37,7 @@ export const liabilityCategories = [
     itemNameKey: 'liabilities.categories.personal_loan.itemName',
     itemNamePluralKey: 'liabilities.categories.personal_loan.itemNamePlural',
     addLabelKey: 'liabilities.categories.personal_loan.addLabel',
+    subcategories: ['personal_loan'],
   },
   {
     id: 'credit_card_debt',
@@ -43,6 +47,7 @@ export const liabilityCategories = [
     itemNameKey: 'liabilities.categories.credit_card_debt.itemName',
     itemNamePluralKey: 'liabilities.categories.credit_card_debt.itemNamePlural',
     addLabelKey: 'liabilities.categories.credit_card_debt.addLabel',
+    subcategories: ['credit_card_debt'],
   },
   {
     id: 'other_debt',
@@ -52,6 +57,7 @@ export const liabilityCategories = [
     itemNameKey: 'liabilities.categories.other_debt.itemName',
     itemNamePluralKey: 'liabilities.categories.other_debt.itemNamePlural',
     addLabelKey: 'liabilities.categories.other_debt.addLabel',
+    subcategories: ['other_debt'],
   },
 ]
 

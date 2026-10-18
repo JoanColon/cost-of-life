@@ -23,8 +23,28 @@ function projection() {
       },
       income: { categories: {} },
     },
-    assets: [{ id: 'account', category: 'cash', name: 'Account', currentValue: 1000, ownership }],
-    liabilities: [{ id: 'home', category: 'mortgage', name: 'Mortgage', balance: 400, ownership }],
+    assets: [
+      {
+        id: 'account',
+        categoryId: 'cash',
+        subcategoryId: 'current_account',
+        itemName: 'Account',
+        notes: '',
+        currentValue: 1000,
+        ownership,
+      },
+    ],
+    liabilities: [
+      {
+        id: 'home',
+        categoryId: 'mortgage',
+        subcategoryId: 'mortgage',
+        itemName: 'Mortgage',
+        notes: '',
+        balance: 400,
+        ownership,
+      },
+    ],
     expenses: [
       {
         id: 'groceries',
@@ -63,6 +83,14 @@ describe('server financial year projection', () => {
     expect(financialYearMonthValue(result, '01', 'netWorth')).toBe(600)
     expect(financialYearMonthValue(result, '12', 'netWorth')).toBe(600)
     expect(financialYearValue(result, 'expenses')).toBe(6000)
+    expect(
+      result.months['01'].assets.categories.cash.subcategories.current_account.items.account
+        .itemName,
+    ).toBe('Account')
+    expect(
+      result.months['01'].liabilities.categories.mortgage.subcategories.mortgage.items.home
+        .itemName,
+    ).toBe('Mortgage')
     expect(result.months['10'].expenses.categories.food.subcategories.groceries.source).toBe(
       'model',
     )
@@ -127,7 +155,17 @@ describe('server financial year projection', () => {
     const updated = updateFinancialYearProjection(original, {
       year: 2026,
       config: { assets: { categories: { cash: { enabled: true } } } },
-      assets: [{ id: 'account', category: 'cash', currentValue: 1200, ownership }],
+      assets: [
+        {
+          id: 'account',
+          categoryId: 'cash',
+          subcategoryId: 'current_account',
+          itemName: 'Account',
+          notes: '',
+          currentValue: 1200,
+          ownership,
+        },
+      ],
       sections: ['assets'],
       positionFromMonths: { assets: '12' },
     })

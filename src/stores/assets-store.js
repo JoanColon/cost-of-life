@@ -114,12 +114,12 @@ export const useAssetsStore = defineStore('assets', () => {
 
   async function addAsset(workspaceId, asset, memberIds) {
     const result = await createAssetDocument(workspaceId, asset, memberIds)
-    const categoryAssets = itemsForCategory(asset.category)
+    const categoryAssets = itemsForCategory(asset.categoryId)
     assetsByCategory.value = {
       ...assetsByCategory.value,
-      [asset.category]: [...categoryAssets, result.asset],
+      [asset.categoryId]: [...categoryAssets, result.asset],
     }
-    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(asset.category)
+    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(asset.categoryId)
     return result.asset
   }
 
@@ -130,7 +130,7 @@ export const useAssetsStore = defineStore('assets', () => {
     const result = await updateAssetDocument(workspaceId, assetId, changes, memberIds)
     assetsByCategory.value = {
       ...assetsByCategory.value,
-      [asset.category]: itemsForCategory(asset.category).map((candidate) =>
+      [asset.categoryId]: itemsForCategory(asset.categoryId).map((candidate) =>
         candidate.id === assetId ? result.asset : candidate,
       ),
     }

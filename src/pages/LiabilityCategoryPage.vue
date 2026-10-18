@@ -59,8 +59,8 @@
             <div class="liability-main">
               <span class="liability-icon"><q-icon :name="category.icon" /></span>
               <span class="liability-copy"
-                ><strong>{{ liability.name }}</strong
-                ><small>{{ t(category.descriptionKey) }}</small></span
+                ><strong>{{ liabilitySubcategoryLabel(liability) }}</strong
+                ><small>{{ liability.itemName }}</small></span
               >
             </div>
             <div class="ownership-display">
@@ -87,7 +87,7 @@
               dense
               icon="more_vert"
               color="grey-7"
-              :aria-label="t('liabilities.moreActions', { name: liability.name })"
+              :aria-label="t('liabilities.moreActions', { name: liability.itemName })"
               @click.stop
             >
               <q-menu anchor="bottom right" self="top right">
@@ -135,7 +135,7 @@
       </template>
     </main>
 
-    <q-dialog v-model="liabilityDialog" persistent>
+    <q-dialog v-model="liabilityDialog" persistent :maximized="$q.screen.lt.sm">
       <LiabilityForm
         :category="category"
         :liability="editingLiability"
@@ -163,7 +163,7 @@
         <q-card-section
           ><h2>{{ t('liabilities.delete.title') }}</h2>
           <p>
-            {{ t('liabilities.delete.description', { name: deletingLiability?.name }) }}
+            {{ t('liabilities.delete.description', { name: deletingLiability?.itemName }) }}
           </p></q-card-section
         >
         <q-card-actions align="between">
@@ -256,7 +256,10 @@ const liabilityDefaults = computed(() => {
       ? createSingleOwnership(authUser.value?.uid)
       : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
-    name: '',
+    categoryId: category.value?.id,
+    subcategoryId: category.value?.subcategories?.[0] || null,
+    itemName: '',
+    notes: '',
     balance: firstItem ? (config.manualValue ?? 0) : 0,
     ownership,
   }
@@ -322,6 +325,10 @@ function edit(liability) {
 function closeLiabilityDialog() {
   liabilityDialog.value = false
   editingLiability.value = null
+}
+
+function liabilitySubcategoryLabel(liability) {
+  return liability?.subcategoryId ? t(`liabilities.categories.${liability.subcategoryId}.name`) : ''
 }
 
 async function saveLiability(payload) {

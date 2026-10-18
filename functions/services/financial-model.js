@@ -105,15 +105,11 @@ async function mutateFinancialModel(
       const updated = validatedCanonicalItem(section, {
         ...previous,
         ...item,
-        ...(['expenses', 'income'].includes(section) ?
-          { categoryId: previousCategoryId, subcategoryId: previous.subcategoryId } :
-          { category: previousCategoryId }),
+        categoryId: previousCategoryId,
+        subcategoryId: previous.subcategoryId,
       })
       assertOwnershipMembers(updated.ownership, workspace.memberIds)
-      if (
-        ['expenses', 'income'].includes(section) &&
-        updated.subcategoryId !== previous.subcategoryId
-      ) {
+      if (updated.subcategoryId !== previous.subcategoryId) {
         throw new Error(`A ${section.slice(0, -1)} subcategory cannot be changed after creation`)
       }
       const itemData = withAuditFields({ ...previous, ...updated }, userId, false)
@@ -198,25 +194,31 @@ async function mutateFinancialModel(
 }
 
 function validatedCanonicalItem(section, item = {}) {
-  const category = ['expenses', 'income'].includes(section) ? item.categoryId : item.category
+  const category = item.categoryId
   assertText(category, `A valid ${section} category is required`)
   if (category !== category.trim()) throw new Error(`A valid ${section} category is required`)
   assertCanonicalOwnership(item.ownership)
 
   if (section === 'assets') {
+    assertCanonicalText(item.subcategoryId, 'A valid asset subcategory is required')
+    assertCanonicalText(item.itemName, 'An asset name is required')
+    assertCanonicalTextField(item.notes, 'Canonical asset notes are required')
     assertNonNegativeMoney(item.currentValue, 'A non-negative numeric value is required')
     if (!isPlainObject(item.detail) || item.valueSource !== 'manual') {
       throw new Error('A canonical asset is required')
     }
     return cleanItem({
       ...item,
-      category,
+      categoryId: category,
     })
   }
 
   if (section === 'liabilities') {
+    assertCanonicalText(item.subcategoryId, 'A valid liability subcategory is required')
+    assertCanonicalText(item.itemName, 'A liability name is required')
+    assertCanonicalTextField(item.notes, 'Canonical liability notes are required')
     assertNonNegativeMoney(item.balance, 'A non-negative balance is required')
-    return cleanItem({ ...item, category })
+    return cleanItem({ ...item, categoryId: category })
   }
 
   if (section === 'income') {
@@ -300,7 +302,7 @@ function resolveItemReference(itemsReference, operation, itemId) {
 }
 
 function itemCategoryId(section, item) {
-  return ['expenses', 'income'].includes(section) ? item.categoryId : item.category
+  return item.categoryId
 }
 
 function withAuditFields(item, userId, creating) {

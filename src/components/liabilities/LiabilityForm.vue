@@ -17,6 +17,21 @@
       <q-card-section class="form-body">
         <div class="liability-form">
           <div class="dialog-field">
+            <label>{{ t('liabilities.form.subcategory') }}</label>
+            <q-select
+              v-model="subcategoryId"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              emit-value
+              map-options
+              :options="subcategoryOptions"
+              :disable="Boolean(liability)"
+            >
+              <template #prepend><q-icon :name="category.icon" /></template>
+            </q-select>
+          </div>
+          <div class="dialog-field">
             <label>{{ t('liabilities.form.name') }}</label>
             <q-input
               v-model.trim="name"
@@ -27,9 +42,19 @@
               maxlength="80"
               lazy-rules
               :rules="[(value) => Boolean(value) || t('liabilities.form.nameRequired')]"
-            >
-              <template #prepend><q-icon :name="category.icon" /></template>
-            </q-input>
+            />
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('liabilities.form.notes') }}</label>
+            <q-input
+              v-model="notes"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              autogrow
+              type="textarea"
+              :placeholder="t('liabilities.form.notesPlaceholder')"
+            />
           </div>
           <div class="dialog-field">
             <label>{{ t('liabilities.form.balance') }}</label>
@@ -93,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
@@ -114,11 +139,20 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
 const form = ref(null)
+const subcategoryId = ref('')
 const name = ref('')
+const notes = ref('')
 const balance = ref('')
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const submitting = ref(false)
+
+const subcategoryOptions = computed(() =>
+  props.category.subcategories.map((value) => ({
+    value,
+    label: t(props.category.nameKey),
+  })),
+)
 
 watch(() => [props.liability, props.defaults, props.category.id], reset, { immediate: true })
 watch(
@@ -130,7 +164,9 @@ watch(
 
 function reset() {
   const initial = props.liability || props.defaults
-  name.value = initial?.name || ''
+  subcategoryId.value = initial?.subcategoryId || props.category.subcategories[0]
+  name.value = initial?.itemName || ''
+  notes.value = initial?.notes || ''
   balance.value = initial?.balance ?? ''
   ownership.value = initial?.ownership
     ? cloneOwnership(initial.ownership)
@@ -149,8 +185,10 @@ async function submit() {
 
   submitting.value = true
   emit('save', {
-    category: props.category.id,
-    name: name.value,
+    categoryId: props.category.id,
+    subcategoryId: subcategoryId.value,
+    itemName: name.value.trim(),
+    notes: notes.value.trim(),
     balance: normalizedBalance,
     ownership: cloneOwnership(ownership.value),
   })

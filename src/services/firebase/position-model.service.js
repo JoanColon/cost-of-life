@@ -26,7 +26,7 @@ export function getPositionConfig(workspaceId, section) {
 export async function getCategoryPositionItems(workspaceId, section, categoryId) {
   const definition = definitionFor(section)
   const reference = collection(db, 'workspaces', workspaceId, definition.collection)
-  const snapshot = await getDocs(query(reference, where('category', '==', categoryId)))
+  const snapshot = await getDocs(query(reference, where('categoryId', '==', categoryId)))
   return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }))
 }
 

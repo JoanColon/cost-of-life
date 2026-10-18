@@ -101,7 +101,7 @@ describe('financial year persistence', () => {
       financialYear: initial.writes[0].data,
       configs: { assets: { categories: { cash: { enabled: true } } } },
       models: {
-        assets: [{ id: 'account', category: 'cash', currentValue: 1200, ownership }],
+        assets: [asset('account', 'current_account', 'Account', 1200, ownership)],
       },
     })
     await rebuildFinancialYear(firstValue.firestore, 'workspace-a', 2026, {
@@ -118,8 +118,8 @@ describe('financial year persistence', () => {
       configs: { assets: { categories: { cash: { enabled: true } } } },
       models: {
         assets: [
-          { id: 'account', category: 'cash', currentValue: 1200, ownership },
-          { id: 'portfolio', category: 'cash', currentValue: 500, ownership },
+          asset('account', 'current_account', 'Account', 1200, ownership),
+          asset('portfolio', 'investment_account', 'Portfolio', 500, ownership),
         ],
       },
     })
@@ -135,8 +135,8 @@ describe('financial year persistence', () => {
       configs: { assets: { categories: { cash: { enabled: true } } } },
       models: {
         assets: [
-          { id: 'account', category: 'cash', currentValue: 1300, ownership },
-          { id: 'portfolio', category: 'cash', currentValue: 500, ownership },
+          asset('account', 'current_account', 'Account', 1300, ownership),
+          asset('portfolio', 'investment_account', 'Portfolio', 500, ownership),
         ],
       },
     })
@@ -159,7 +159,7 @@ describe('financial year persistence', () => {
       financialYear: initial.writes[0].data,
       configs: { assets: { categories: { cash: { enabled: true } } } },
       models: {
-        assets: [{ id: 'account', category: 'cash', currentValue: 0, ownership }],
+        assets: [asset('account', 'current_account', 'Account', 0, ownership)],
       },
     })
     await rebuildFinancialYear(zeroValue.firestore, 'workspace-a', 2026, {
@@ -173,7 +173,7 @@ describe('financial year persistence', () => {
       financialYear: zeroValue.writes[0].data,
       configs: { assets: { categories: { cash: { enabled: true } } } },
       models: {
-        assets: [{ id: 'account', category: 'cash', currentValue: 1000, ownership }],
+        assets: [asset('account', 'current_account', 'Account', 1000, ownership)],
       },
     })
     await rebuildFinancialYear(laterValue.firestore, 'workspace-a', 2026, {
@@ -185,3 +185,15 @@ describe('financial year persistence', () => {
     expect(financialYearMonthValue(laterValue.writes[0].data, '12', 'assets')).toBe(1000)
   })
 })
+
+function asset(id, subcategoryId, itemName, currentValue, ownership) {
+  return {
+    id,
+    categoryId: 'cash',
+    subcategoryId,
+    itemName,
+    notes: '',
+    currentValue,
+    ownership,
+  }
+}

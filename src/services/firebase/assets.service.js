@@ -60,17 +60,20 @@ export async function deleteAssetCategory(workspaceId, categoryId) {
 }
 
 function canonicalAsset(asset, includeDefaultDetail = false) {
-  const category = getAssetCategory(asset.category)
+  const category = getAssetCategory(asset.categoryId)
   if (!category) throw new Error('A valid asset category is required')
-  if (asset.subtype && !category.subtypes.includes(asset.subtype)) {
-    throw new Error('A valid asset type is required')
+  if (!category.subcategories.includes(asset.subcategoryId)) {
+    throw new Error('A valid asset subcategory is required')
   }
   const currentValue = normalizeNonNegativeMoney(asset.currentValue)
   if (currentValue === null) throw new Error('A non-negative numeric value is required')
+  const itemName = String(asset.itemName || '').trim()
+  if (!itemName) throw new Error('An asset name is required')
   const canonical = {
-    category: category.id,
-    subtype: asset.subtype || null,
-    name: String(asset.name || '').trim(),
+    categoryId: category.id,
+    subcategoryId: asset.subcategoryId,
+    itemName,
+    notes: String(asset.notes || '').trim(),
     currentValue,
     ownership: cloneOwnership(asset.ownership),
     valueSource: 'manual',

@@ -61,8 +61,8 @@
             <div class="asset-main">
               <span class="asset-icon"><q-icon :name="category.icon" /></span>
               <span class="asset-copy">
-                <strong>{{ assetDisplayName(asset) }}</strong>
-                <small>{{ assetSubtitle(asset) }}</small>
+                <strong>{{ assetSubcategoryLabel(asset) }}</strong>
+                <small>{{ asset.itemName }}</small>
               </span>
             </div>
 
@@ -141,7 +141,7 @@
       </template>
     </main>
 
-    <q-dialog v-model="assetDialog" persistent>
+    <q-dialog v-model="assetDialog" persistent :maximized="$q.screen.lt.sm">
       <AssetForm
         v-if="category"
         :category="category"
@@ -260,8 +260,10 @@ const assetDefaults = computed(() => {
       ? createSingleOwnership(authUser.value?.uid)
       : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
-    subtype: category.value?.subtypes?.[0] || null,
-    name: '',
+    categoryId: category.value?.id,
+    subcategoryId: category.value?.subcategories?.[0] || null,
+    itemName: '',
+    notes: '',
     currentValue: firstItem ? (config.manualValue ?? 0) : 0,
     ownership,
   }
@@ -321,14 +323,12 @@ async function preparePage(force = false) {
   }
 }
 
-function assetSubtitle(asset) {
-  return asset.subtype ? t(`assets.subtypes.${asset.subtype}`) : t(category.value.descriptionKey)
+function assetDisplayName(asset) {
+  return asset?.itemName || assetSubcategoryLabel(asset)
 }
 
-function assetDisplayName(asset) {
-  if (asset?.name) return asset.name
-  if (asset?.subtype) return t(`assets.subtypes.${asset.subtype}`)
-  return category.value ? t(category.value.itemNameKey) : ''
+function assetSubcategoryLabel(asset) {
+  return asset?.subcategoryId ? t(`assets.subtypes.${asset.subcategoryId}`) : ''
 }
 
 function add() {

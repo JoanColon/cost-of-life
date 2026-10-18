@@ -70,13 +70,20 @@ export async function deleteLiabilityCategory(workspaceId, categoryId) {
 }
 
 function canonicalLiability(liability) {
-  const category = getLiabilityCategory(liability.category)
+  const category = getLiabilityCategory(liability.categoryId)
   if (!category) throw new Error('A valid liability category is required')
+  if (!category.subcategories.includes(liability.subcategoryId)) {
+    throw new Error('A valid liability subcategory is required')
+  }
   const balance = normalizeNonNegativeMoney(liability.balance)
   if (balance === null) throw new Error('A non-negative balance is required')
+  const itemName = String(liability.itemName || '').trim()
+  if (!itemName) throw new Error('A liability name is required')
   return {
-    category: category.id,
-    name: String(liability.name || '').trim(),
+    categoryId: category.id,
+    subcategoryId: liability.subcategoryId,
+    itemName,
+    notes: String(liability.notes || '').trim(),
     balance,
     ownership: cloneOwnership(liability.ownership),
   }

@@ -329,12 +329,26 @@ const liabilities = computed(() => {
   const categories = financialYear.value?.months?.[currentMonth]?.liabilities?.categories || {}
   return Object.entries(categories)
     .flatMap(([categoryId, category]) =>
-      Object.entries(category.subcategories || {}).map(([id, item]) => ({
-        id,
-        categoryId,
-        name: item.name || t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-        balance: Number(item.total || 0),
-      })),
+      Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
+        const items = Object.entries(subcategory.items || {})
+        if (!items.length) {
+          return [
+            {
+              id: subcategoryId,
+              categoryId,
+              name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
+              balance: Number(subcategory.total || 0),
+            },
+          ]
+        }
+        return items.map(([id, item]) => ({
+          id,
+          categoryId,
+          name:
+            item.itemName || t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
+          balance: Number(item.total || 0),
+        }))
+      }),
     )
     .filter(({ balance }) => balance > 0)
     .sort((left, right) => right.balance - left.balance)

@@ -120,9 +120,9 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     const result = await createLiabilityDocument(workspaceId, liability, memberIds)
     liabilitiesByCategory.value = {
       ...liabilitiesByCategory.value,
-      [liability.category]: [...itemsForCategory(liability.category), result.liability],
+      [liability.categoryId]: [...itemsForCategory(liability.categoryId), result.liability],
     }
-    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(liability.category)
+    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(liability.categoryId)
     return result.liability
   }
 
@@ -132,7 +132,7 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     const result = await updateLiabilityDocument(workspaceId, liabilityId, changes, memberIds)
     liabilitiesByCategory.value = {
       ...liabilitiesByCategory.value,
-      [liability.category]: itemsForCategory(liability.category).map((candidate) =>
+      [liability.categoryId]: itemsForCategory(liability.categoryId).map((candidate) =>
         candidate.id === liabilityId ? result.liability : candidate,
       ),
     }

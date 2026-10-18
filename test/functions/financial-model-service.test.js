@@ -20,9 +20,10 @@ describe('atomic financial model mutations', () => {
       collection: 'modelAssets',
       result: 'asset',
       item: {
-        category: 'cash',
-        subtype: 'current_account',
-        name: '',
+        categoryId: 'cash',
+        subcategoryId: 'current_account',
+        itemName: 'Savings',
+        notes: '',
         currentValue: 100,
         ownership,
         detail: {},
@@ -34,7 +35,14 @@ describe('atomic financial model mutations', () => {
       section: 'liabilities',
       collection: 'modelLiabilities',
       result: 'liability',
-      item: { category: 'loan', name: 'Loan', balance: 40, ownership },
+      item: {
+        categoryId: 'loan',
+        subcategoryId: 'loan',
+        itemName: 'Loan',
+        notes: '',
+        balance: 40,
+        ownership,
+      },
       expected: { liabilities: 40, netWorth: -40 },
     },
     {
@@ -73,7 +81,7 @@ describe('atomic financial model mutations', () => {
     const { firestore, writes } = createFirestore({
       section: testCase.section,
       collection: testCase.collection,
-      category: testCase.item.category || testCase.item.categoryId,
+      category: testCase.item.categoryId,
       configCategory:
         testCase.section === 'expenses'
           ? { enabled: true }
@@ -113,7 +121,10 @@ describe('atomic financial model mutations', () => {
         section: 'assets',
         operation: 'create',
         item: {
-          category: 'cash',
+          categoryId: 'cash',
+          subcategoryId: 'current_account',
+          itemName: 'Savings',
+          notes: '',
           currentValue: 100,
           detail: {},
           valueSource: 'manual',
@@ -141,7 +152,10 @@ describe('atomic financial model mutations', () => {
         section: 'assets',
         operation: 'create',
         item: {
-          category: 'cash',
+          categoryId: 'cash',
+          subcategoryId: 'current_account',
+          itemName: 'Savings',
+          notes: '',
           currentValue: 100.126,
           detail: {},
           valueSource: 'manual',

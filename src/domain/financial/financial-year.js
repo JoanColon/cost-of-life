@@ -171,14 +171,10 @@ export function financialYearCategoryItemCount(financialYear, section, categoryI
   const category = month
     ? financialYear?.months?.[month]?.[section]?.categories?.[categoryId]
     : annualCategory(financialYear, section, categoryId)
-  if (['expenses', 'income'].includes(section)) {
-    return Object.values(category?.subcategories || {}).reduce(
-      (count, subcategory) => count + Object.keys(subcategory?.items || {}).length,
-      0,
-    )
-  }
-  const ids = Object.keys(category?.subcategories || {})
-  return ids.filter((id) => id !== categoryId).length
+  return Object.values(category?.subcategories || {}).reduce(
+    (count, subcategory) => count + Object.keys(subcategory?.items || {}).length,
+    0,
+  )
 }
 
 export function financialYearCategoryMemberIds(financialYear, section, categoryId, month = null) {

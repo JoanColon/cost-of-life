@@ -8,7 +8,7 @@ export const assetCategories = [
     itemNamePluralKey: 'assets.categories.real_estate.itemNamePlural',
     defaultNameKey: 'assets.categories.real_estate.defaultName',
     addLabelKey: 'assets.categories.real_estate.addLabel',
-    subtypes: ['primary_home', 'rental_property', 'land', 'real_estate_other'],
+    subcategories: ['primary_home', 'rental_property', 'land', 'real_estate_other'],
   },
   {
     id: 'investment',
@@ -19,7 +19,14 @@ export const assetCategories = [
     itemNamePluralKey: 'assets.categories.investment.itemNamePlural',
     defaultNameKey: 'assets.categories.investment.defaultName',
     addLabelKey: 'assets.categories.investment.addLabel',
-    subtypes: ['brokerage', 'pension', 'bonds', 'crypto', 'precious_metals', 'investment_other'],
+    subcategories: [
+      'brokerage',
+      'pension',
+      'bonds',
+      'crypto',
+      'precious_metals',
+      'investment_other',
+    ],
   },
   {
     id: 'cash',
@@ -30,7 +37,7 @@ export const assetCategories = [
     itemNamePluralKey: 'assets.categories.cash.itemNamePlural',
     defaultNameKey: 'assets.categories.cash.defaultName',
     addLabelKey: 'assets.categories.cash.addLabel',
-    subtypes: [
+    subcategories: [
       'current_account',
       'savings_account',
       'joint_account',
@@ -47,7 +54,7 @@ export const assetCategories = [
     itemNamePluralKey: 'assets.categories.business.itemNamePlural',
     defaultNameKey: 'assets.categories.business.defaultName',
     addLabelKey: 'assets.categories.business.addLabel',
-    subtypes: ['private_business', 'business_other'],
+    subcategories: ['private_business', 'business_other'],
   },
   {
     id: 'vehicle_valuable',
@@ -58,7 +65,7 @@ export const assetCategories = [
     itemNamePluralKey: 'assets.categories.vehicle_valuable.itemNamePlural',
     defaultNameKey: 'assets.categories.vehicle_valuable.defaultName',
     addLabelKey: 'assets.categories.vehicle_valuable.addLabel',
-    subtypes: ['vehicle', 'collectible', 'valuable_property', 'vehicle_valuable_other'],
+    subcategories: ['vehicle', 'collectible', 'valuable_property', 'vehicle_valuable_other'],
   },
   {
     id: 'other',
@@ -69,7 +76,7 @@ export const assetCategories = [
     itemNamePluralKey: 'assets.categories.other.itemNamePlural',
     defaultNameKey: 'assets.categories.other.defaultName',
     addLabelKey: 'assets.categories.other.addLabel',
-    subtypes: ['other'],
+    subcategories: ['other'],
   },
 ]
 

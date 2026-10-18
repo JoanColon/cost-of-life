@@ -16,16 +16,17 @@
 
       <q-card-section class="form-body">
         <div class="asset-form">
-          <div v-if="category.subtypes.length > 1" class="dialog-field">
-            <label>{{ t('assets.form.type') }}</label>
+          <div class="dialog-field">
+            <label>{{ t('assets.form.subcategory') }}</label>
             <q-select
-              v-model="subtype"
+              v-model="subcategoryId"
               outlined
               :dense="$q.screen.lt.sm"
               hide-bottom-space
               emit-value
               map-options
-              :options="subtypeOptions"
+              :options="subcategoryOptions"
+              :disable="Boolean(asset)"
             >
               <template #prepend><q-icon :name="category.icon" /></template>
             </q-select>
@@ -37,7 +38,22 @@
               outlined
               :dense="$q.screen.lt.sm"
               hide-bottom-space
+              autofocus
               maxlength="80"
+              lazy-rules
+              :rules="[(value) => Boolean(value) || t('assets.form.nameRequired')]"
+            />
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('assets.form.notes') }}</label>
+            <q-input
+              v-model="notes"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              autogrow
+              type="textarea"
+              :placeholder="t('assets.form.notesPlaceholder')"
             />
           </div>
           <div class="dialog-field">
@@ -47,7 +63,6 @@
               outlined
               :dense="$q.screen.lt.sm"
               hide-bottom-space
-              autofocus
               type="number"
               min="0"
               step="0.01"
@@ -124,15 +139,16 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
 const form = ref(null)
-const subtype = ref('')
+const subcategoryId = ref('')
 const name = ref('')
+const notes = ref('')
 const currentValue = ref('')
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const submitting = ref(false)
 
-const subtypeOptions = computed(() =>
-  props.category.subtypes.map((value) => ({
+const subcategoryOptions = computed(() =>
+  props.category.subcategories.map((value) => ({
     value,
     label: t(`assets.subtypes.${value}`),
   })),
@@ -148,8 +164,9 @@ watch(
 
 function reset() {
   const initial = props.asset || props.defaults
-  subtype.value = initial?.subtype || props.category.subtypes[0]
-  name.value = initial?.name || ''
+  subcategoryId.value = initial?.subcategoryId || props.category.subcategories[0]
+  name.value = initial?.itemName || ''
+  notes.value = initial?.notes || ''
   currentValue.value = initial?.currentValue ?? ''
   ownership.value = initial?.ownership
     ? cloneOwnership(initial.ownership)
@@ -169,9 +186,10 @@ async function submit() {
 
   submitting.value = true
   emit('save', {
-    category: props.category.id,
-    subtype: subtype.value || null,
-    name: name.value,
+    categoryId: props.category.id,
+    subcategoryId: subcategoryId.value,
+    itemName: name.value.trim(),
+    notes: notes.value.trim(),
     currentValue: value,
     ownership: cloneOwnership(ownership.value),
   })

@@ -40,9 +40,10 @@ describe('financial model service payloads', () => {
       'workspace-a',
       'asset-a',
       {
-        category: 'cash',
-        subtype: 'current_account',
-        name: '  Savings  ',
+        categoryId: 'cash',
+        subcategoryId: 'current_account',
+        itemName: '  Savings  ',
+        notes: '  Main cash reserve  ',
         currentValue: '100.126',
         ownership,
       },
@@ -50,9 +51,10 @@ describe('financial model service payloads', () => {
     )
 
     expect(updateFinancialModelItem).toHaveBeenCalledWith('workspace-a', 'assets', 'asset-a', {
-      category: 'cash',
-      subtype: 'current_account',
-      name: 'Savings',
+      categoryId: 'cash',
+      subcategoryId: 'current_account',
+      itemName: 'Savings',
+      notes: 'Main cash reserve',
       currentValue: 100.13,
       ownership,
       valueSource: 'manual',
@@ -64,8 +66,10 @@ describe('financial model service payloads', () => {
       'workspace-a',
       'liability-a',
       {
-        category: 'mortgage',
-        name: '  Home loan  ',
+        categoryId: 'mortgage',
+        subcategoryId: 'mortgage',
+        itemName: '  Home loan  ',
+        notes: '  Main home  ',
         balance: '999.999',
         ownership,
       },
@@ -77,8 +81,10 @@ describe('financial model service payloads', () => {
       'liabilities',
       'liability-a',
       {
-        category: 'mortgage',
-        name: 'Home loan',
+        categoryId: 'mortgage',
+        subcategoryId: 'mortgage',
+        itemName: 'Home loan',
+        notes: 'Main home',
         balance: 1000,
         ownership,
       },
