@@ -7,6 +7,7 @@ const {
   deleteWorkspaceData,
   getWorkspaceInvite,
   inviteDocumentId,
+  isWorkspaceMember,
   isWorkspaceOwner,
 } = workspaceService
 
@@ -119,21 +120,29 @@ describe('workspace deletion', () => {
     expect(isWorkspaceOwner(workspace, 'member')).toBe(false)
     expect(isWorkspaceOwner(workspace, 'legacy-owner')).toBe(false)
   })
+
+  it('recognizes every user listed as a workspace member', () => {
+    const workspace = { memberIds: ['owner', 'member'] }
+
+    expect(isWorkspaceMember(workspace, 'owner')).toBe(true)
+    expect(isWorkspaceMember(workspace, 'member')).toBe(true)
+    expect(isWorkspaceMember(workspace, 'someone-else')).toBe(false)
+  })
 })
 
 describe('workspace invitations', () => {
-  it('creates a seven-day invite for an owner without storing the raw token', async () => {
+  it('creates a seven-day invite for a member without storing the raw token', async () => {
     const now = Date.UTC(2026, 9, 17)
     const { firestore, records, writes } = createInviteFirestore({
       workspace: {
-        memberIds: ['owner'],
-        members: { owner: { role: 'owner' } },
+        memberIds: ['owner', 'member'],
+        members: { owner: { role: 'owner' }, member: { role: 'member' } },
       },
     })
 
     const result = await createWorkspaceInvite(firestore, {
       workspaceId: 'workspace-a',
-      userId: 'owner',
+      userId: 'member',
       now,
     })
 
@@ -145,7 +154,7 @@ describe('workspace invitations', () => {
     expect(records.get(writes[0].path)).not.toHaveProperty('token')
   })
 
-  it('does not let a non-owner create an invite', async () => {
+  it('does not let a non-member create an invite', async () => {
     const { firestore } = createInviteFirestore({
       workspace: {
         memberIds: ['member'],
@@ -154,7 +163,7 @@ describe('workspace invitations', () => {
     })
 
     await expect(
-      createWorkspaceInvite(firestore, { workspaceId: 'workspace-a', userId: 'member' }),
+      createWorkspaceInvite(firestore, { workspaceId: 'workspace-a', userId: 'someone-else' }),
     ).rejects.toMatchObject({ code: 'permission-denied' })
   })
 

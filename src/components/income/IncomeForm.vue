@@ -221,21 +221,6 @@
             </div>
           </div>
 
-          <div v-if="breakdown" class="calculation-preview">
-            <div>
-              <span>{{ t('income.form.annualTotal') }}</span
-              ><strong>{{ formatCurrency(breakdown.annualValue) }}</strong>
-            </div>
-            <div v-if="breakdown.perPayment != null">
-              <span>{{ t('income.form.perPayment') }}</span
-              ><strong>{{ formatCurrency(breakdown.perPayment) }}</strong>
-            </div>
-            <div>
-              <span>{{ t('income.form.monthlyAverage') }}</span
-              ><strong>{{ formatCurrency(breakdown.monthlyAverage) }}</strong>
-            </div>
-          </div>
-
           <OwnershipEditor
             v-model="ownership"
             :members="members"
@@ -516,32 +501,11 @@ function submit() {
   justify-content: flex-end;
   width: 100%;
 }
-.calculation-preview {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  padding: 1rem;
-  border-radius: 0.8rem;
-  background: var(--color-blue-soft);
-}
-.calculation-preview span,
-.calculation-preview strong {
-  display: block;
-}
-.calculation-preview span {
-  color: var(--color-copy);
-  font-size: 0.72rem;
-}
-.calculation-preview strong {
-  margin-top: 0.2rem;
-  color: var(--color-ink);
-}
 .form-actions {
   @include financial-dialog-actions;
 }
 @media (max-width: 520px) {
-  .amount-frequency,
-  .calculation-preview {
+  .amount-frequency {
     grid-template-columns: 1fr;
   }
 }

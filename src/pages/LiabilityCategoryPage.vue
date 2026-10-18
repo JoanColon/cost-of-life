@@ -38,7 +38,7 @@
 
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
-          <div>
+          <div class="summary-copy">
             <span>{{ t('liabilities.total') }}</span
             ><strong>{{ formatCurrency(categoryTotal) }}</strong
             ><small>{{ itemSummary }}</small>
@@ -46,7 +46,16 @@
         </section>
 
         <section v-if="allCategoryLiabilities.length" class="liability-list">
-          <article v-for="liability in scopedLiabilities" :key="liability.id" class="liability-row">
+          <article
+            v-for="liability in scopedLiabilities"
+            :key="liability.id"
+            class="liability-row"
+            role="button"
+            tabindex="0"
+            @click="edit(liability)"
+            @keydown.enter.self="edit(liability)"
+            @keydown.space.self.prevent="edit(liability)"
+          >
             <div class="liability-main">
               <span class="liability-icon"><q-icon :name="category.icon" /></span>
               <span class="liability-copy"
@@ -79,6 +88,7 @@
               icon="more_vert"
               color="grey-7"
               :aria-label="t('liabilities.moreActions', { name: liability.name })"
+              @click.stop
             >
               <q-menu anchor="bottom right" self="top right">
                 <q-list dense class="liability-menu">
@@ -426,25 +436,7 @@ h1 {
   margin-top: 1.25rem;
 }
 .summary-card {
-  @include financial-total-card(flex);
-  align-items: center;
-  gap: 1.1rem;
-}
-.summary-card > div {
-  display: grid;
-}
-.summary-card span:not(.summary-icon),
-.summary-card small {
-  @include financial-total-secondary;
-}
-.empty-card p {
-  color: var(--color-copy);
-}
-.summary-card strong {
-  @include financial-total-value;
-}
-.summary-card small {
-  @include financial-total-meta;
+  @include financial-category-summary;
 }
 .summary-icon,
 .liability-icon,
@@ -471,6 +463,16 @@ h1 {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.liability-row:hover {
+  background: #f8fafc;
+}
+.liability-row:focus-visible {
+  position: relative;
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 .liability-main {
   display: flex;
@@ -479,11 +481,7 @@ h1 {
   min-width: 0;
 }
 .liability-icon {
-  width: 2.75rem;
-  height: 2.75rem;
-  background: #f0f5f9;
-  color: #334964;
-  font-size: 1.25rem;
+  @include financial-item-icon;
 }
 .liability-copy {
   min-width: 0;
@@ -560,6 +558,7 @@ h1 {
 }
 .empty-card p {
   margin: 0.55rem 0 1.25rem;
+  color: var(--color-copy);
 }
 .confirm-card {
   @include financial-simple-dialog(28rem);
@@ -585,11 +584,6 @@ h1 {
   .liability-row > .q-btn {
     grid-column: 3;
     grid-row: 1;
-  }
-  .liability-icon {
-    width: 2.35rem;
-    height: 2.35rem;
-    font-size: 1.05rem;
   }
   .add-row {
     min-height: 3.5rem;

@@ -10,6 +10,9 @@
           <p v-if="subtitle">{{ subtitle }}</p>
         </div>
       </div>
+      <div v-if="$slots.action" class="card-action">
+        <slot name="action" />
+      </div>
     </header>
     <slot />
   </q-card>
@@ -47,6 +50,10 @@ defineProps({
   align-items: center;
   gap: 1rem;
   min-width: 0;
+}
+
+.card-action {
+  flex: 0 0 auto;
 }
 
 .card-icon {
@@ -95,6 +102,7 @@ p {
   }
 
   .card-header {
+    align-items: center;
     margin-bottom: 1rem;
   }
 

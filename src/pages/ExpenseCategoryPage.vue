@@ -491,8 +491,7 @@ async function persist(operation) {
 }
 
 .expense-icon {
-  color: #e85d65;
-  font-size: 1.4rem;
+  @include financial-item-icon;
 }
 
 .expense-copy strong,
@@ -583,10 +582,6 @@ async function persist(operation) {
     text-align: right;
     font-size: 0.9rem;
     white-space: nowrap;
-  }
-
-  .expense-icon {
-    font-size: 1.15rem;
   }
 
   .add-row {

@@ -143,6 +143,18 @@
             <q-item-section avatar><q-icon name="history" /></q-item-section>
             <q-item-section>{{ t('navigation.historic') }}</q-item-section>
           </q-item>
+          <q-item
+            v-ripple
+            clickable
+            :to="{ name: 'achievements', params: { workspaceId: activeWorkspaceId } }"
+            exact
+            :active="route.name === 'achievements'"
+            active-class="active-nav-item"
+            @click="closeMobileDrawer"
+          >
+            <q-item-section avatar><q-icon name="flag" /></q-item-section>
+            <q-item-section>{{ t('navigation.progress') }}</q-item-section>
+          </q-item>
         </q-list>
       </template>
     </q-drawer>
@@ -191,6 +203,7 @@ import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
+import { useMilestonesStore } from '@/stores/milestones-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const $q = useQuasar()
@@ -202,6 +215,7 @@ const expensesStore = useExpensesStore()
 const expenseTrackingStore = useExpenseTrackingStore()
 const liabilitiesStore = useLiabilitiesStore()
 const incomeStore = useIncomeStore()
+const milestonesStore = useMilestonesStore()
 const scopeStore = useFinancialScopeStore()
 const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
@@ -287,10 +301,12 @@ async function openWorkspace(workspaceId) {
   if (!workspaceId) return
 
   closeMobileDrawer()
-  const destination =
-    route.name === 'expense-tracker'
-      ? { name: 'expense-tracker', params: { workspaceId } }
-      : workspaceRoute(workspaceId)
+  const preservedRoute = ['expense-tracker', 'progress', 'achievements'].includes(route.name)
+    ? route.name
+    : null
+  const destination = preservedRoute
+    ? { name: preservedRoute, params: { workspaceId } }
+    : workspaceRoute(workspaceId)
   await router.push(destination)
 }
 
@@ -324,6 +340,7 @@ function resetApplicationState() {
   expenseTrackingStore.reset()
   liabilitiesStore.reset()
   incomeStore.reset()
+  milestonesStore.reset()
   scopeStore.reset()
   financialYearsStore.reset()
   workspaceStore.reset()

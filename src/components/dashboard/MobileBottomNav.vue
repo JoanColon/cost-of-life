@@ -28,7 +28,7 @@ const items = [
   { key: 'home', icon: 'home', label: 'navigation.home', implemented: true },
   { key: 'expenses', icon: 'credit_card', label: 'navigation.expenses', implemented: true },
   { key: 'plan', icon: 'track_changes', label: 'navigation.plan', implemented: false },
-  { key: 'progress', icon: 'bar_chart', label: 'navigation.progress', implemented: false },
+  { key: 'progress', icon: 'bar_chart', label: 'navigation.progress', implemented: true },
 ]
 const activeItem = computed(() => {
   if (route.name === 'workspace-dashboard') return 'home'
@@ -38,13 +38,21 @@ const activeItem = computed(() => {
     route.name === 'expense-tracker'
   )
     return 'expenses'
+  if (route.name === 'achievements') return 'progress'
   return null
 })
 
 function navigate(key) {
   const workspaceId = route.params.workspaceId
   if (typeof workspaceId !== 'string') return
-  const routeName = key === 'home' ? 'workspace-dashboard' : key === 'expenses' ? 'expenses' : null
+  const routeName =
+    key === 'home'
+      ? 'workspace-dashboard'
+      : key === 'expenses'
+        ? 'expenses'
+        : key === 'progress'
+          ? 'achievements'
+          : null
   if (routeName) router.push({ name: routeName, params: { workspaceId } })
 }
 </script>

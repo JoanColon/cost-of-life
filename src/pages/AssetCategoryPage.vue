@@ -40,7 +40,7 @@
 
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
-          <div>
+          <div class="summary-copy">
             <span>{{ t('assets.total') }}</span>
             <strong>{{ formatCurrency(categoryTotal) }}</strong>
             <small>{{ itemSummary }}</small>
@@ -48,7 +48,16 @@
         </section>
 
         <section v-if="allCategoryAssets.length" class="asset-list">
-          <article v-for="asset in scopedAssets" :key="asset.id" class="asset-row">
+          <article
+            v-for="asset in scopedAssets"
+            :key="asset.id"
+            class="asset-row"
+            role="button"
+            tabindex="0"
+            @click="edit(asset)"
+            @keydown.enter.self="edit(asset)"
+            @keydown.space.self.prevent="edit(asset)"
+          >
             <div class="asset-main">
               <span class="asset-icon"><q-icon :name="category.icon" /></span>
               <span class="asset-copy">
@@ -84,6 +93,7 @@
               icon="more_vert"
               color="grey-7"
               :aria-label="t('assets.moreActions', { name: assetDisplayName(asset) })"
+              @click.stop
             >
               <q-menu anchor="bottom right" self="top right">
                 <q-list dense class="asset-menu">
@@ -455,25 +465,7 @@ h1 {
   margin-top: 1.25rem;
 }
 .summary-card {
-  @include financial-total-card(flex);
-  align-items: center;
-  gap: 1.1rem;
-}
-.summary-card > div {
-  display: grid;
-}
-.summary-card span:not(.summary-icon),
-.summary-card small {
-  @include financial-total-secondary;
-}
-.empty-card p {
-  color: var(--color-copy);
-}
-.summary-card strong {
-  @include financial-total-value;
-}
-.summary-card small {
-  @include financial-total-meta;
+  @include financial-category-summary;
 }
 .summary-icon,
 .asset-icon,
@@ -500,6 +492,16 @@ h1 {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.asset-row:hover {
+  background: #f8fafc;
+}
+.asset-row:focus-visible {
+  position: relative;
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 .asset-main {
   display: flex;
@@ -513,11 +515,7 @@ h1 {
   text-align: left;
 }
 .asset-icon {
-  width: 2.75rem;
-  height: 2.75rem;
-  background: #f0f5f9;
-  color: #334964;
-  font-size: 1.25rem;
+  @include financial-item-icon;
 }
 .asset-copy {
   min-width: 0;
@@ -599,6 +597,7 @@ h1 {
 }
 .empty-card p {
   margin: 0.45rem 0 1.25rem;
+  color: var(--color-copy);
 }
 .confirm-card {
   @include financial-simple-dialog(28rem);
@@ -623,11 +622,6 @@ h1 {
   .asset-row > .q-btn {
     grid-column: 3;
     grid-row: 1;
-  }
-  .asset-icon {
-    width: 2.35rem;
-    height: 2.35rem;
-    font-size: 1.05rem;
   }
   .add-row {
     min-height: 3.5rem;

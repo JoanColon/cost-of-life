@@ -506,9 +506,7 @@ h1 {
   min-width: 0;
 }
 .income-icon {
-  flex: 0 0 2.75rem;
-  width: 2.75rem;
-  height: 2.75rem;
+  @include financial-item-icon;
 }
 .income-copy {
   min-width: 0;
@@ -593,11 +591,6 @@ h1 {
   }
   .income-main {
     gap: 0.6rem;
-  }
-  .income-icon {
-    flex-basis: 2.35rem;
-    width: 2.35rem;
-    height: 2.35rem;
   }
   .income-value {
     font-size: 0.95rem;

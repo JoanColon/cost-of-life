@@ -39,8 +39,8 @@ async function createWorkspaceInvite(firestore, { workspaceId, userId, now = Dat
     if (!workspaceSnapshot.exists || workspace?.deletionPendingAt) {
       throw workspaceError('not-found', 'The workspace does not exist')
     }
-    if (!isWorkspaceOwner(workspace, userId)) {
-      throw workspaceError('permission-denied', 'Workspace ownership is required')
+    if (!isWorkspaceMember(workspace, userId)) {
+      throw workspaceError('permission-denied', 'Workspace membership is required')
     }
 
     transaction.create(inviteReference, {
@@ -175,11 +175,16 @@ function isWorkspaceOwner(workspace, userId) {
   return workspace?.members?.[userId]?.role === 'owner'
 }
 
+function isWorkspaceMember(workspace, userId) {
+  return workspace?.memberIds?.includes(userId) === true
+}
+
 module.exports = {
   acceptWorkspaceInvite,
   createWorkspaceInvite,
   deleteWorkspaceData,
   getWorkspaceInvite,
   inviteDocumentId,
+  isWorkspaceMember,
   isWorkspaceOwner,
 }

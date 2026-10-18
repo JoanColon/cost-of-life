@@ -228,6 +228,25 @@
   }
 }
 
+@mixin financial-item-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: #f0f5f9;
+  color: #334964;
+  font-size: 1.25rem;
+
+  @media (max-width: 760px) {
+    flex-basis: 2.35rem;
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.05rem;
+  }
+}
+
 @mixin mobile-financial-row {
   min-height: 4rem;
   gap: 0.35rem 0.55rem;

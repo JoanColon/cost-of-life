@@ -180,15 +180,6 @@
           </q-markup-table>
         </q-expansion-item>
 
-        <div v-if="breakdown" class="calculation-preview">
-          <q-icon name="bar_chart" />
-          <div>
-            <span>{{ t('expenses.form.normalizedCost') }}</span>
-            <strong>{{ formatCurrency(breakdown.annual) }} / {{ t('dashboard.year') }}</strong>
-            <small>{{ formatCurrency(breakdown.monthly) }} / {{ t('dashboard.month') }}</small>
-          </div>
-        </div>
-
         <div v-if="members.length > 1" class="ownership-section">
           <h3>{{ t('expenses.ownership.label') }}</h3>
           <OwnershipEditor
@@ -243,7 +234,6 @@ import {
   updateMonthlyExpenseAmounts,
 } from '@/domain/financial/expense-calculations'
 import { incomeMonths } from '@/domain/financial/income-calculations'
-import { financialYearExpenseItemValue } from '@/domain/financial/financial-year'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import {
   cloneOwnership,
@@ -302,17 +292,6 @@ const normalizedAttributes = computed(() =>
     necessity: necessity.value,
   }),
 )
-const breakdown = computed(() => {
-  if (!normalizedEstimate.value || !monthlyAmounts.value) return null
-  const annual = normalizeNonNegativeMoney(
-    incomeMonths.reduce(
-      (total, month) =>
-        total + financialYearExpenseItemValue(financialYearMonthExpense(month), monthAmount(month)),
-      0,
-    ),
-  )
-  return { annual, monthly: normalizeNonNegativeMoney(annual / 12) || 0 }
-})
 const formValid = computed(
   () => Boolean(expenseType.value) && Boolean(normalizedEstimate.value) && ownershipValid.value,
 )
@@ -503,36 +482,6 @@ function submit() {
 .actual-amount {
   color: var(--color-primary);
   font-weight: 700;
-}
-
-.calculation-preview {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: var(--color-blue-soft);
-}
-
-.calculation-preview .q-icon {
-  color: var(--color-primary);
-  font-size: 1.75rem;
-}
-
-.calculation-preview > div {
-  display: grid;
-}
-
-.calculation-preview span,
-.calculation-preview small {
-  color: var(--color-copy);
-}
-
-.calculation-preview strong {
-  margin-top: 0.25rem;
-  font-size: 1.2rem;
 }
 
 .ownership-section {

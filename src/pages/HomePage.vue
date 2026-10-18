@@ -39,7 +39,6 @@
           </button>
 
           <q-btn
-            v-if="isWorkspaceOwner(workspace)"
             flat
             round
             dense
@@ -55,6 +54,7 @@
                   <q-item-section>{{ t('workspace.invite.action') }}</q-item-section>
                 </q-item>
                 <q-item
+                  v-if="isWorkspaceOwner(workspace)"
                   clickable
                   v-close-popup
                   class="text-negative"

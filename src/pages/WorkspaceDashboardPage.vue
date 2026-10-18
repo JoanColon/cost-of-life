@@ -25,46 +25,53 @@
           @open-income="openSection('income')"
           @open-tracker="openSection('expense-tracker')"
         />
+        <MilestoneSummaryCard
+          :milestones="milestoneProgress"
+          :loading="milestonesLoading"
+          :error="Boolean(milestoneError)"
+          @open="openSection('achievements')"
+        />
       </section>
     </main>
   </q-page>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import CostOfLifeCard from '@/components/dashboard/CostOfLifeCard.vue'
 import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
+import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import { buildNetWorthSeries } from '@/domain/financial/history'
-import {
-  currentFinancialMonth,
-  currentFinancialYear,
-  financialYearMonthValue,
-  financialYearValue,
-} from '@/domain/financial/financial-year'
+import { financialYearMonthValue, financialYearValue } from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
-import { getFinancialHistory } from '@/services/firebase/history.service'
-import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useMilestonesStore } from '@/stores/milestones-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const financialYearsStore = useFinancialYearsStore()
+const milestonesStore = useMilestonesStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
-const historyDocuments = ref([])
-const historyLoading = ref(false)
-const historyError = ref(null)
-let historyRequestId = 0
-const currentYear = currentFinancialYear()
-const currentMonth = currentFinancialMonth()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
+const {
+  currentMonth,
+  currentYear,
+  financialYear,
+  historyDocuments,
+  historyError,
+  historyLoading,
+  error: milestoneError,
+  loading: milestonesLoading,
+  progress: milestoneProgress,
+} = storeToRefs(milestonesStore)
 const workspace = computed(
   () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
 )
@@ -74,29 +81,27 @@ const selectedMemberId = computed({
   get: () => scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
-const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const historyPoints = computed(() =>
   buildNetWorthSeries(
     [
       ...historyDocuments.value.filter(
-        (document) => Number(document.year || document.id) !== currentYear,
+        (document) => Number(document.year || document.id) !== currentYear.value,
       ),
       ...(financialYear.value ? [financialYear.value] : []),
     ],
-    { throughPeriod: `${currentYear}-${currentMonth}` },
+    { throughPeriod: `${currentYear.value}-${currentMonth.value}` },
   ),
 )
-
 const dashboardData = computed(() => {
   const assets = financialYearMonthValue(
     financialYear.value,
-    currentMonth,
+    currentMonth.value,
     'assets',
     selectedMemberId.value,
   )
   const liabilities = financialYearMonthValue(
     financialYear.value,
-    currentMonth,
+    currentMonth.value,
     'liabilities',
     selectedMemberId.value,
   )
@@ -121,12 +126,14 @@ const dashboardData = computed(() => {
     costRatio: income > 0 ? Math.round((annualCostOfLife / income) * 100) : 0,
     netWorth: financialYearMonthValue(
       financialYear.value,
-      currentMonth,
+      currentMonth.value,
       'netWorth',
       selectedMemberId.value,
     ),
   }
 })
+
+watch(workspaceId, (id) => milestonesStore.load(id), { immediate: true })
 
 const greeting = computed(() => {
   const selectedMember = members.value.find((member) => member.id === selectedMemberId.value)
@@ -140,37 +147,6 @@ const greeting = computed(() => {
 function firstName(name = '') {
   const value = name.trim().split(/\s+/)[0]
   return value ? `${value[0].toUpperCase()}${value.slice(1)}` : ''
-}
-
-watch(
-  workspaceId,
-  (id) => {
-    financialYearsStore.load(id, currentYear).catch(() => {})
-    loadHistory(id)
-  },
-  { immediate: true },
-)
-
-onBeforeUnmount(() => {
-  historyRequestId += 1
-})
-
-async function loadHistory(id) {
-  const requestId = ++historyRequestId
-  historyDocuments.value = []
-  historyError.value = null
-  historyLoading.value = true
-
-  try {
-    const documents = await getFinancialHistory(id)
-    if (requestId !== historyRequestId) return
-    historyDocuments.value = documents
-  } catch (error) {
-    if (requestId !== historyRequestId) return
-    historyError.value = error
-  } finally {
-    if (requestId === historyRequestId) historyLoading.value = false
-  }
 }
 
 function openSection(section) {
@@ -250,8 +226,7 @@ h1 {
   }
 
   .dashboard-heading p {
-    font-size: 0.95rem;
-    white-space: nowrap;
+    display: none;
   }
 
   .dashboard-header :deep(.member-selector) {
