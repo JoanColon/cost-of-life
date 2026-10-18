@@ -12,12 +12,19 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn(),
   query: vi.fn(),
   runTransaction: vi.fn(),
-  serverTimestamp: vi.fn(),
+  serverTimestamp: vi.fn(() => 'timestamp'),
   where: vi.fn(),
   writeBatch: vi.fn(),
 }))
 
 vi.mock('@/firebase/firebase', () => ({ db: {} }))
+
+vi.mock('@/services/firebase/current-user', () => ({ currentUserId: () => 'user-a' }))
+
+vi.mock('@/services/firebase/model-config.service', () => ({
+  getModelConfig: vi.fn(),
+  modelConfigRef: vi.fn(() => ({ id: 'expenses' })),
+}))
 
 vi.mock('@/services/firebase/financial-model-mutations.service', () => ({
   createFinancialModelItem,
@@ -38,9 +45,10 @@ describe('expenses service', () => {
     await createExpense(
       'workspace-a',
       {
-        category: 'housing',
-        type: 'mortgage_rent',
-        name: '',
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: 'Main home',
+        notes: '',
         estimate: { amount: 900, frequency: 'monthly' },
         monthlyAmounts: Object.fromEntries(
           [
@@ -83,9 +91,10 @@ describe('expenses service', () => {
       'workspace-a',
       'expense-a',
       {
-        category: 'housing',
-        type: 'mortgage_rent',
-        name: '  Home  ',
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: '  Home  ',
+        notes: '  Primary residence  ',
         estimate: { amount: '950.126', frequency: 'monthly' },
         variability: 'fixed',
         recurrence: 'recurring',
@@ -100,7 +109,8 @@ describe('expenses service', () => {
       'expenses',
       'expense-a',
       expect.objectContaining({
-        name: 'Home',
+        itemName: 'Home',
+        notes: 'Primary residence',
         estimate: { amount: 950.13, frequency: 'monthly' },
         monthlyAmounts: expect.objectContaining({ january: 950.13, december: 950.13 }),
         ownership,

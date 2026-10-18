@@ -10,11 +10,8 @@ import {
   saveExpensesSetup,
   updateExpense as updateExpenseDocument,
   updateExpensesCategories,
-  updateSimpleExpenseEstimate as updateSimpleExpenseEstimateDocument,
-  updateSimpleExpenseOwnership as updateSimpleExpenseOwnershipDocument,
 } from '@/services/firebase/expenses.service'
 import { buildExpenseModelCategories } from '@/domain/financial/expense-model-categories'
-import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 
 export const useExpensesStore = defineStore('expenses', () => {
   const config = ref(null)
@@ -86,7 +83,6 @@ export const useExpensesStore = defineStore('expenses', () => {
     await saveExpensesSetup(workspaceId, categories)
     config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
-    invalidateTrackingPreferences(workspaceId)
   }
 
   async function saveCategorySelection(workspaceId, selectedCategoryIds, memberIds) {
@@ -98,31 +94,15 @@ export const useExpensesStore = defineStore('expenses', () => {
     )
     await updateExpensesCategories(workspaceId, categories)
     config.value = { ...(config.value || {}), setupCompleted: true, categories }
-    invalidateTrackingPreferences(workspaceId)
-  }
-
-  async function updateSimpleCategoryEstimate(workspaceId, categoryId, estimate) {
-    replaceCategory(
-      categoryId,
-      await updateSimpleExpenseEstimateDocument(workspaceId, categoryId, estimate),
-    )
-  }
-
-  async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, memberIds) {
-    replaceCategory(
-      categoryId,
-      await updateSimpleExpenseOwnershipDocument(workspaceId, categoryId, ownership, memberIds),
-    )
   }
 
   async function addExpense(workspaceId, expense, memberIds) {
     const result = await createExpenseDocument(workspaceId, expense, memberIds)
     expensesByCategory.value = {
       ...expensesByCategory.value,
-      [expense.category]: [...itemsForCategory(expense.category), result.expense],
+      [expense.categoryId]: [...itemsForCategory(expense.categoryId), result.expense],
     }
-    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(expense.category)
-    invalidateTrackingPreferences(workspaceId)
+    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(expense.categoryId)
     return result.expense
   }
 
@@ -132,11 +112,10 @@ export const useExpensesStore = defineStore('expenses', () => {
     const result = await updateExpenseDocument(workspaceId, expenseId, changes, memberIds)
     expensesByCategory.value = {
       ...expensesByCategory.value,
-      [expense.category]: itemsForCategory(expense.category).map((candidate) =>
+      [expense.categoryId]: itemsForCategory(expense.categoryId).map((candidate) =>
         candidate.id === expenseId ? result.expense : candidate,
       ),
     }
-    invalidateTrackingPreferences(workspaceId)
   }
 
   async function deleteExpense(workspaceId, expenseId) {
@@ -148,7 +127,6 @@ export const useExpensesStore = defineStore('expenses', () => {
         (candidate) => candidate.id !== expenseId,
       ),
     }
-    invalidateTrackingPreferences(workspaceId)
   }
 
   async function deleteCategory(workspaceId, categoryId) {
@@ -162,31 +140,16 @@ export const useExpensesStore = defineStore('expenses', () => {
     const nextLoadedIds = new Set(loadedCategoryIds.value)
     nextLoadedIds.delete(categoryId)
     loadedCategoryIds.value = nextLoadedIds
-    invalidateTrackingPreferences(workspaceId)
   }
 
   function itemsForCategory(categoryId) {
     return expensesByCategory.value[categoryId] || []
   }
 
-  function replaceCategory(categoryId, category) {
-    config.value = {
-      ...(config.value || {}),
-      categories: {
-        ...(config.value?.categories || {}),
-        [categoryId]: { ...(config.value?.categories?.[categoryId] || {}), ...category },
-      },
-    }
-  }
-
   function findLoadedExpense(expenseId) {
     return Object.values(expensesByCategory.value)
       .flat()
       .find((expense) => expense.id === expenseId)
-  }
-
-  function invalidateTrackingPreferences(workspaceId) {
-    useExpenseTrackingStore().invalidatePreferences(workspaceId)
   }
 
   function reset() {
@@ -212,8 +175,6 @@ export const useExpensesStore = defineStore('expenses', () => {
     loadCategory,
     completeSetup,
     saveCategorySelection,
-    updateSimpleCategoryEstimate,
-    updateSimpleCategoryOwnership,
     addExpense,
     editExpense,
     deleteExpense,

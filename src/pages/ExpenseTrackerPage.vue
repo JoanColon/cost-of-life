@@ -86,7 +86,7 @@
     <q-dialog v-model="manageDialog" :maximized="$q.screen.lt.sm">
       <ExpenseTrackingCategorySetup
         :initial-selected="trackingStore.enabledSubcategories"
-        :subcategories="expenseTrackingCategories"
+        :subcategories="availableTrackingCategories"
         :saving="trackingStore.saving"
         @save="savePreferences"
         @cancel="manageDialog = false"
@@ -98,6 +98,7 @@
       v-model="entryDialog"
       :subcategory="activeSubcategory"
       :item="editingItem"
+      :expense-items="activeExpenseItems"
       :period="period"
       :members="members"
       :preferred-member-id="authUser?.uid"
@@ -123,6 +124,14 @@
           />
         </q-card-section>
         <q-card-section v-if="activeSubcategory" class="items-list">
+          <div v-if="activeExpenseItems.length" class="item-breakdown">
+            <div v-for="expenseItem in activeExpenseItems" :key="expenseItem.id">
+              <span>{{ expenseItem.itemName }}</span>
+              <strong>{{
+                formatCurrency(trackingStore.totalForItem(activeSubcategory.id, expenseItem.id))
+              }}</strong>
+            </div>
+          </div>
           <article
             v-for="item in trackingStore.itemsFor(activeSubcategory.id)"
             :key="item.id"
@@ -131,6 +140,7 @@
             <div>
               <strong>{{ formatCurrency(item.amount) }}</strong>
               <small
+                ><template v-if="trackedItemName(item)">{{ trackedItemName(item) }} · </template
                 >{{ formatItemDate(item.date)
                 }}<template v-if="item.notes"> · {{ item.notes }}</template></small
               >
@@ -296,10 +306,24 @@ const workspace = computed(
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map(({ id }) => id))
 const trackerWorkspaceName = computed(() => workspace.value?.name || t('navigation.workspaces'))
+const allExpenseItems = computed(() =>
+  expensesStore.enabledCategories.flatMap((categoryId) =>
+    expensesStore.itemsForCategory(categoryId),
+  ),
+)
 const enabledCategories = computed(() => {
   const enabled = new Set(trackingStore.enabledSubcategories)
-  return expenseTrackingCategories.filter(({ id }) => enabled.has(id))
+  return availableTrackingCategories.value.filter(({ id }) => enabled.has(id))
 })
+const availableTrackingCategories = computed(() => {
+  const usedSubcategories = new Set(allExpenseItems.value.map(({ subcategoryId }) => subcategoryId))
+  return expenseTrackingCategories.filter(({ id }) => usedSubcategories.has(id))
+})
+const activeExpenseItems = computed(() =>
+  allExpenseItems.value.filter(
+    ({ subcategoryId }) => subcategoryId === activeSubcategory.value?.id,
+  ),
+)
 const reviewGroups = computed(() =>
   groupedExpenseTrackingCategories(
     reviewExpenseTrackingCategories(
@@ -373,8 +397,14 @@ async function loadPage(force = false) {
       // Always refresh the selected month so entries and decisions stay current.
       trackingStore.load(activeWorkspaceId.value, period.value, true),
       financialYearsStore.load(activeWorkspaceId.value, selectedYear.value, force),
+      expensesStore.loadConfig(activeWorkspaceId.value, force),
     ])
     if (requestId !== loadRequestId) return
+    await Promise.all(
+      expensesStore.enabledCategories.map((categoryId) =>
+        expensesStore.loadCategory(activeWorkspaceId.value, categoryId, force),
+      ),
+    )
   } catch (error) {
     if (requestId === loadRequestId) pageError.value = error
   } finally {
@@ -426,6 +456,7 @@ async function saveEntry(payload) {
           itemId,
           payload,
           memberIds.value,
+          allExpenseItems.value,
         )
       : trackingStore.add(
           activeWorkspaceId.value,
@@ -433,6 +464,7 @@ async function saveEntry(payload) {
           activeSubcategory.value.id,
           payload,
           memberIds.value,
+          allExpenseItems.value,
         ),
   )
   if (!saved) return
@@ -466,7 +498,6 @@ async function savePreferences(selected) {
     trackingStore.savePreferences(activeWorkspaceId.value, selected),
   )
   if (saved) {
-    expensesStore.reset()
     manageDialog.value = false
   }
 }
@@ -551,6 +582,10 @@ function requestApplyAllTracked() {
 function formatItemDate(value) {
   const date = value?.toDate ? value.toDate() : new Date(value)
   return new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(date)
+}
+
+function trackedItemName(entry) {
+  return allExpenseItems.value.find(({ id }) => id === entry.itemId)?.itemName || ''
 }
 
 async function persist(operation, notify = true) {
@@ -693,6 +728,19 @@ h1 {
   @include financial-dialog-body;
   display: grid;
   gap: 0.25rem;
+}
+
+.item-breakdown {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.item-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .items-actions {

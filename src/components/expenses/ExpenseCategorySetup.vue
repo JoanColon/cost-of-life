@@ -181,8 +181,8 @@ p {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
+  background: #ffe9ea;
+  color: #e85d65;
   font-size: 1.4rem;
 }
 

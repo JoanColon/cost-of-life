@@ -7,6 +7,7 @@ const defaults = {
   income: { setupCompleted: false, categories: {} },
   expenses: { setupCompleted: false, categories: {} },
   expenseTracking: { enabledSubcategories: null },
+  whatIf: null,
 }
 
 export function modelConfigRef(workspaceId, model) {
@@ -17,5 +18,5 @@ export function modelConfigRef(workspaceId, model) {
 export async function getModelConfig(workspaceId, model) {
   const reference = modelConfigRef(workspaceId, model)
   const snapshot = await getDoc(reference)
-  return snapshot.exists() ? snapshot.data() : { ...defaults[model] }
+  return snapshot.exists() ? snapshot.data() : defaults[model] ? { ...defaults[model] } : null
 }

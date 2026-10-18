@@ -16,22 +16,43 @@
 
       <q-card-section class="form-body">
         <div class="income-form">
-          <div v-if="category.subtypes.length > 1" class="dialog-field">
-            <label>{{ t('income.form.type') }}</label>
+          <div class="dialog-field">
+            <label>{{ t('income.form.subcategory') }}</label>
             <q-select
-              v-model="subtype"
+              v-model="subcategoryId"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               emit-value
               map-options
-              :options="subtypeOptions"
+              :options="subcategoryOptions"
+              :disable="Boolean(income)"
             >
               <template #prepend><q-icon :name="category.icon" /></template>
             </q-select>
           </div>
           <div class="dialog-field">
-            <label>{{ t('income.form.name') }}</label>
-            <q-input v-model.trim="name" outlined hide-bottom-space autofocus maxlength="80" />
+            <label>{{ t('income.form.itemName') }}</label>
+            <q-input
+              v-model.trim="itemName"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              autofocus
+              maxlength="80"
+            />
+          </div>
+          <div class="dialog-field">
+            <label>{{ t('income.form.notes') }}</label>
+            <q-input
+              v-model="notes"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              autogrow
+              type="textarea"
+              :placeholder="t('income.form.notesPlaceholder')"
+            />
           </div>
           <div class="dialog-field calculation-method">
             <label>{{ t('income.form.calculationMethod') }}</label>
@@ -39,6 +60,7 @@
               v-if="category.id === 'employment'"
               v-model="calculationMode"
               inline
+              :dense="$q.screen.lt.sm"
               type="radio"
               color="primary"
               :options="calculationModeOptions"
@@ -48,6 +70,7 @@
               v-else
               v-model="calculationMode"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               emit-value
               map-options
@@ -63,6 +86,7 @@
                 <q-input
                   v-model="annualAmount"
                   outlined
+                  :dense="$q.screen.lt.sm"
                   hide-bottom-space
                   type="number"
                   min="0"
@@ -76,6 +100,7 @@
                 <q-input
                   v-model="paymentsPerYear"
                   outlined
+                  :dense="$q.screen.lt.sm"
                   hide-bottom-space
                   type="number"
                   min="1"
@@ -92,6 +117,7 @@
               <q-input
                 v-model="monthlyAmount"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 type="number"
                 min="0"
@@ -108,9 +134,15 @@
               <q-markup-table flat bordered dense class="monthly-schedule">
                 <thead>
                   <tr>
-                    <th class="text-left">{{ t('income.form.month') }}</th>
-                    <th class="text-right">{{ t('income.form.monthlyNetSalary') }}</th>
-                    <th class="text-right">{{ t('income.form.extraPayment') }}</th>
+                    <th class="month-column text-left">{{ t('income.form.month') }}</th>
+                    <th class="salary-column text-center">
+                      <span class="header-line">{{ t('income.form.monthlyNet') }}</span>
+                      <span class="header-line">{{ t('income.form.salary') }}</span>
+                    </th>
+                    <th class="extra-column text-center">
+                      <span class="header-line">{{ t('income.form.extra') }}</span>
+                      <span class="header-line">{{ t('income.form.payment') }}</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,6 +204,7 @@
                 <q-input
                   v-model="recurringAmount"
                   outlined
+                  :dense="$q.screen.lt.sm"
                   hide-bottom-space
                   type="number"
                   min="0"
@@ -185,6 +218,7 @@
                 <q-select
                   v-model="frequency"
                   outlined
+                  :dense="$q.screen.lt.sm"
                   hide-bottom-space
                   emit-value
                   map-options
@@ -200,6 +234,7 @@
               <q-input
                 v-model="oneTimeAmount"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 type="number"
                 min="0"
@@ -213,6 +248,7 @@
               <q-select
                 v-model="oneTimeMonth"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 emit-value
                 map-options
@@ -221,11 +257,15 @@
             </div>
           </div>
 
-          <OwnershipEditor
-            v-model="ownership"
-            :members="members"
-            @validity="ownershipValid = $event"
-          />
+          <div v-if="members.length > 1" class="ownership-section">
+            <h3>{{ t('income.ownership.label') }}</h3>
+            <OwnershipEditor
+              v-model="ownership"
+              :members="members"
+              hide-label
+              @validity="ownershipValid = $event"
+            />
+          </div>
         </div>
       </q-card-section>
 
@@ -290,8 +330,9 @@ const props = defineProps({
 })
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
-const subtype = ref('')
-const name = ref('')
+const subcategoryId = ref('')
+const itemName = ref('')
+const notes = ref('')
 const calculationMode = ref('recurring')
 const annualAmount = ref('')
 const paymentsPerYear = ref(12)
@@ -305,8 +346,8 @@ const ownership = ref(createEqualOwnership(props.members.map((member) => member.
 const ownershipValid = ref(true)
 const lastAnnualValue = ref(0)
 
-const subtypeOptions = computed(() =>
-  props.category.subtypes.map((value) => ({ value, label: t(`income.subtypes.${value}`) })),
+const subcategoryOptions = computed(() =>
+  props.category.subcategories.map((value) => ({ value, label: t(`income.subtypes.${value}`) })),
 )
 const calculationModeOptions = computed(() =>
   props.category.calculationModes.map((value) => ({
@@ -340,7 +381,11 @@ const calculation = computed(() => {
 })
 const normalizedCalculation = computed(() => normalizeIncomeCalculation(calculation.value))
 const formValid = computed(
-  () => Boolean(subtype.value) && Boolean(normalizedCalculation.value) && ownershipValid.value,
+  () =>
+    Boolean(subcategoryId.value) &&
+    Boolean(itemName.value.trim()) &&
+    Boolean(normalizedCalculation.value) &&
+    ownershipValid.value,
 )
 const breakdown = computed(() => incomeCalculationBreakdown(calculation.value))
 const normalizedMonthlyAmount = computed(() => normalizeNonNegativeMoney(monthlyAmount.value) || 0)
@@ -352,8 +397,9 @@ watch(() => [props.income, props.defaults, props.category.id], reset, { immediat
 
 function reset() {
   const initial = props.income || props.defaults
-  subtype.value = initial?.subtype || props.category.subtypes[0]
-  name.value = initial?.name || ''
+  subcategoryId.value = initial?.subcategoryId || props.category.subcategories[0]
+  itemName.value = initial?.itemName || ''
+  notes.value = initial?.notes || ''
   ownership.value = initial?.ownership
     ? cloneOwnership(initial.ownership)
     : createEqualOwnership(props.members.map((member) => member.id))
@@ -412,9 +458,10 @@ function createEmptyExtras() {
 function submit() {
   if (!formValid.value) return
   emit('save', {
-    category: props.category.id,
-    subtype: subtype.value,
-    name: name.value.trim(),
+    categoryId: props.category.id,
+    subcategoryId: subcategoryId.value,
+    itemName: itemName.value.trim(),
+    notes: notes.value.trim(),
     calculation: normalizedCalculation.value,
     ownership: cloneOwnership(ownership.value),
   })
@@ -501,12 +548,89 @@ function submit() {
   justify-content: flex-end;
   width: 100%;
 }
+.header-line + .header-line {
+  margin-left: 0.25em;
+}
+.ownership-section {
+  margin-top: 0.4rem;
+}
+.ownership-section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  line-height: 1.2;
+}
 .form-actions {
   @include financial-dialog-actions;
 }
 @media (max-width: 520px) {
+  .calculation-method :deep(.q-option-group) {
+    min-height: 2.75rem;
+    padding: 0.2rem 0.4rem;
+  }
+
   .amount-frequency {
     grid-template-columns: 1fr;
+  }
+
+  .year-breakdown :deep(.q-item) {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .year-breakdown :deep(.q-expansion-item__content) {
+    padding: 0 0.65rem 0.65rem;
+  }
+
+  .monthly-schedule {
+    width: 100%;
+    overflow: hidden;
+    font-size: 0.72rem;
+  }
+
+  .monthly-schedule :deep(table) {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .monthly-schedule :deep(th),
+  .monthly-schedule :deep(td) {
+    height: auto;
+    padding: 0.55rem 0.35rem;
+  }
+
+  .monthly-schedule :deep(th) {
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .header-line {
+    display: block;
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .monthly-schedule :deep(.month-column) {
+    width: 29%;
+  }
+
+  .monthly-schedule :deep(.salary-column) {
+    width: 35%;
+  }
+
+  .monthly-schedule :deep(.extra-column) {
+    width: 36%;
+  }
+
+  .extra-payment-cell {
+    width: auto;
+  }
+
+  .extra-payment-value {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    font-size: 0.72rem;
   }
 }
 </style>

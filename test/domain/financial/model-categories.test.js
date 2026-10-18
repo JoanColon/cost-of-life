@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildModelCategories,
+  buildIncomeModelCategories,
   canonicalCategory,
 } from '../../../src/domain/financial/model-categories'
 
@@ -34,5 +35,15 @@ describe('model category construction', () => {
       ownership: { mode: 'equal' },
       necessity: 'essential',
     })
+  })
+
+  it('keeps income category configuration item-only', () => {
+    const categories = buildIncomeModelCategories(
+      ['employment'],
+      ['employment'],
+      { employment: { enabled: true, manualValue: 100 } },
+      ['a'],
+    )
+    expect(categories.employment).toEqual({ enabled: true })
   })
 })

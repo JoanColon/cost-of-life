@@ -1,16 +1,7 @@
-import {
-  collection,
-  getDocs,
-  query,
-  runTransaction,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from 'firebase/firestore'
+import { collection, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
-import { getIncomeCategory } from '@/config/income-categories'
+import { getIncomeCategory, getIncomeSubcategory } from '@/config/income-categories'
 import { normalizeIncomeCalculation } from '@/domain/financial/income-calculations'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
@@ -36,7 +27,7 @@ export async function getIncomeConfig(workspaceId) {
 
 export async function getCategoryIncome(workspaceId, categoryId) {
   const snapshot = await getDocs(
-    query(modelIncomeRef(workspaceId), where('category', '==', categoryId)),
+    query(modelIncomeRef(workspaceId), where('categoryId', '==', categoryId)),
   )
   return snapshot.docs.map((incomeDocument) => ({
     id: incomeDocument.id,
@@ -50,7 +41,7 @@ export async function saveIncomeSetup(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
-      schemaVersion: 1,
+      schemaVersion: 2,
       setupCompleted: true,
       categories: canonicalCategories(categories),
       createdAt: serverTimestamp(),
@@ -79,53 +70,10 @@ export async function updateIncomeCategories(workspaceId, categories) {
   await batch.commit()
 }
 
-export async function updateSimpleIncomeValue(workspaceId, categoryId, value) {
-  const userId = currentUserId()
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled) {
-      throw new Error('Only simple income categories can be edited directly')
-    }
-
-    const manualValue = normalizeNonNegativeMoney(value)
-    if (manualValue === null) throw new Error('A non-negative annual income is required')
-    const updatedCategory = { ...category, manualValue }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-    return updatedCategory
-  })
-}
-
-export async function updateSimpleIncomeOwnership(workspaceId, categoryId, ownership, memberIds) {
-  const userId = currentUserId()
-  assertValidOwnership(ownership, memberIds)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled) {
-      throw new Error('Only simple income category ownership can be edited')
-    }
-    const updatedCategory = { ...category, ownership: cloneOwnership(ownership) }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-    return updatedCategory
-  })
-}
-
 export async function createIncome(workspaceId, income, memberIds) {
   assertValidOwnership(income.ownership, memberIds)
   const normalized = normalizeIncomeItem(income)
   return createFinancialModelItem(workspaceId, 'income', {
-    ...income,
     ...normalized,
     ownership: cloneOwnership(income.ownership),
   })
@@ -148,19 +96,25 @@ export async function deleteIncomeCategory(workspaceId, categoryId) {
 }
 
 function normalizeIncomeItem(income) {
-  const category = getIncomeCategory(income.category)
+  const category = getIncomeCategory(income.categoryId)
   if (!category) throw new Error('A valid income category is required')
-  if (!category.subtypes.includes(income.subtype))
-    throw new Error('A valid income type is required')
+  const subcategory = getIncomeSubcategory(income.subcategoryId)
+  if (!subcategory || subcategory.categoryId !== category.id) {
+    throw new Error('A valid income subcategory is required')
+  }
+  const itemName = String(income.itemName || '').trim()
+  if (!itemName) throw new Error('An income item name is required')
   const calculation = normalizeIncomeCalculation(income.calculation)
   if (!calculation || !category.calculationModes.includes(calculation.mode)) {
     throw new Error('A valid income calculation is required')
   }
   return {
-    category: category.id,
-    subtype: income.subtype,
-    name: String(income.name || '').trim(),
+    categoryId: category.id,
+    subcategoryId: subcategory.id,
+    itemName,
+    notes: String(income.notes || '').trim(),
     calculation,
+    disposablePercentage: 100,
   }
 }
 

@@ -73,4 +73,24 @@ describe('expense tracking store', () => {
 
     expect(store.month.period).toBe('2026-10')
   })
+
+  it('breaks a subcategory total down by expense item', async () => {
+    getExpenseTrackingMonth.mockResolvedValue({
+      categories: {
+        streaming: {
+          items: [
+            { id: 'entry-a', itemId: 'netflix', amount: 18 },
+            { id: 'entry-b', itemId: 'spotify', amount: 12 },
+            { id: 'entry-c', itemId: 'netflix', amount: 5 },
+          ],
+        },
+      },
+    })
+    const store = useExpenseTrackingStore()
+
+    await store.load('workspace-a', '2026-10', true)
+
+    expect(store.totalForItem('streaming', 'netflix')).toBe(23)
+    expect(store.totalForItem('streaming', 'spotify')).toBe(12)
+  })
 })

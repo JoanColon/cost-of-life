@@ -1,16 +1,7 @@
-import {
-  collection,
-  getDocs,
-  query,
-  runTransaction,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from 'firebase/firestore'
+import { collection, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
-import { getExpenseCategory } from '@/config/expense-categories'
+import { getExpenseCategory, getExpenseSubcategory } from '@/config/expense-categories'
 import {
-  annualExpenseValue,
   generateMonthlyExpenseAmounts,
   normalizeExpenseAttributes,
   normalizeExpenseEstimate,
@@ -41,7 +32,7 @@ export async function getExpensesConfig(workspaceId) {
 
 export async function getCategoryExpenses(workspaceId, categoryId) {
   const snapshot = await getDocs(
-    query(modelExpensesRef(workspaceId), where('category', '==', categoryId)),
+    query(modelExpensesRef(workspaceId), where('categoryId', '==', categoryId)),
   )
   return snapshot.docs.map((expenseDocument) => ({
     id: expenseDocument.id,
@@ -55,7 +46,7 @@ export async function saveExpensesSetup(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
-      schemaVersion: 1,
+      schemaVersion: 2,
       setupCompleted: true,
       categories: canonicalExpenseCategories(categories),
       createdAt: serverTimestamp(),
@@ -74,6 +65,7 @@ export async function updateExpensesCategories(workspaceId, categories) {
   batch.set(
     configRef(workspaceId),
     {
+      schemaVersion: 2,
       setupCompleted: true,
       categories: canonicalExpenseCategories(categories),
       updatedAt: serverTimestamp(),
@@ -82,54 +74,6 @@ export async function updateExpensesCategories(workspaceId, categories) {
     { merge: true },
   )
   await batch.commit()
-}
-
-export async function updateSimpleExpenseEstimate(workspaceId, categoryId, estimate) {
-  const userId = currentUserId()
-  const normalizedEstimate = normalizeExpenseEstimate(estimate)
-  if (!normalizedEstimate) throw new Error('A valid non-negative expense estimate is required')
-  const manualValue = annualExpenseValue(normalizedEstimate)
-  const documentRef = configRef(workspaceId)
-
-  return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled) {
-      throw new Error('Only simple expense categories can be edited directly')
-    }
-    const updatedCategory = {
-      ...category,
-      manualEstimate: normalizedEstimate,
-      manualValue,
-      monthlyAmounts: generateMonthlyExpenseAmounts(normalizedEstimate),
-    }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-    return updatedCategory
-  })
-}
-
-export async function updateSimpleExpenseOwnership(workspaceId, categoryId, ownership, memberIds) {
-  const userId = currentUserId()
-  assertValidOwnership(ownership, memberIds)
-  const documentRef = configRef(workspaceId)
-  return runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(documentRef)
-    const category = snapshot.data()?.categories?.[categoryId]
-    if (!category?.enabled) {
-      throw new Error('Only simple expense category ownership can be edited')
-    }
-    const updatedCategory = { ...category, ownership: cloneOwnership(ownership) }
-    transaction.update(documentRef, {
-      [`categories.${categoryId}`]: updatedCategory,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    })
-    return updatedCategory
-  })
 }
 
 export async function createExpense(workspaceId, expense, memberIds) {
@@ -151,13 +95,15 @@ export async function deleteExpenseCategory(workspaceId, categoryId) {
 }
 
 function normalizeExpenseItem(expense) {
-  const category = getExpenseCategory(expense.category)
+  const category = getExpenseCategory(expense.categoryId)
   if (!category) throw new Error('A valid expense category is required')
-  const type = String(expense.type || '').trim()
-  if (type !== 'other' && !category.suggestions.some((suggestion) => suggestion.id === type)) {
-    throw new Error('A valid expense type is required')
+  const subcategoryId = String(expense.subcategoryId || '').trim()
+  const subcategory = getExpenseSubcategory(subcategoryId)
+  if (!subcategory || subcategory.categoryId !== category.id) {
+    throw new Error('A valid expense subcategory is required')
   }
-  const name = String(expense.name || '').trim()
+  const itemName = String(expense.itemName || '').trim()
+  if (!itemName) throw new Error('An item name is required')
 
   const estimate = normalizeExpenseEstimate(expense.estimate)
   if (!estimate) throw new Error('A valid expense estimate is required')
@@ -168,9 +114,10 @@ function normalizeExpenseItem(expense) {
   if (!attributes) throw new Error('Valid expense behavior is required')
 
   return {
-    category: category.id,
-    type,
-    name,
+    categoryId: category.id,
+    subcategoryId,
+    itemName,
+    notes: String(expense.notes || '').trim(),
     estimate,
     monthlyAmounts,
     ...attributes,

@@ -10,10 +10,8 @@ import {
   saveIncomeSetup,
   updateIncome as updateIncomeDocument,
   updateIncomeCategories,
-  updateSimpleIncomeOwnership as updateSimpleIncomeOwnershipDocument,
-  updateSimpleIncomeValue as updateSimpleIncomeValueDocument,
 } from '@/services/firebase/income.service'
-import { buildModelCategories } from '@/domain/financial/model-categories'
+import { buildIncomeModelCategories } from '@/domain/financial/model-categories'
 
 export const useIncomeStore = defineStore('income', () => {
   const config = ref(null)
@@ -76,14 +74,19 @@ export const useIncomeStore = defineStore('income', () => {
   }
 
   async function completeSetup(workspaceId, selectedCategoryIds, memberIds) {
-    const categories = buildModelCategories(incomeCategoryIds, selectedCategoryIds, {}, memberIds)
+    const categories = buildIncomeModelCategories(
+      incomeCategoryIds,
+      selectedCategoryIds,
+      {},
+      memberIds,
+    )
     await saveIncomeSetup(workspaceId, categories)
     config.value = { setupCompleted: true, categories }
     loadedWorkspaceId.value = workspaceId
   }
 
   async function saveCategorySelection(workspaceId, selectedCategoryIds, memberIds) {
-    const categories = buildModelCategories(
+    const categories = buildIncomeModelCategories(
       incomeCategoryIds,
       selectedCategoryIds,
       config.value?.categories || {},
@@ -93,27 +96,13 @@ export const useIncomeStore = defineStore('income', () => {
     config.value = { ...(config.value || {}), setupCompleted: true, categories }
   }
 
-  async function updateSimpleCategoryValue(workspaceId, categoryId, value) {
-    replaceCategory(
-      categoryId,
-      await updateSimpleIncomeValueDocument(workspaceId, categoryId, value),
-    )
-  }
-
-  async function updateSimpleCategoryOwnership(workspaceId, categoryId, ownership, memberIds) {
-    replaceCategory(
-      categoryId,
-      await updateSimpleIncomeOwnershipDocument(workspaceId, categoryId, ownership, memberIds),
-    )
-  }
-
   async function addIncome(workspaceId, income, memberIds) {
     const result = await createIncomeDocument(workspaceId, income, memberIds)
     incomeByCategory.value = {
       ...incomeByCategory.value,
-      [income.category]: [...itemsForCategory(income.category), result.income],
+      [income.categoryId]: [...itemsForCategory(income.categoryId), result.income],
     }
-    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(income.category)
+    loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(income.categoryId)
     return result.income
   }
 
@@ -123,7 +112,7 @@ export const useIncomeStore = defineStore('income', () => {
     const result = await updateIncomeDocument(workspaceId, incomeId, changes, memberIds)
     incomeByCategory.value = {
       ...incomeByCategory.value,
-      [income.category]: itemsForCategory(income.category).map((candidate) =>
+      [income.categoryId]: itemsForCategory(income.categoryId).map((candidate) =>
         candidate.id === incomeId ? result.income : candidate,
       ),
     }
@@ -157,16 +146,6 @@ export const useIncomeStore = defineStore('income', () => {
     return incomeByCategory.value[categoryId] || []
   }
 
-  function replaceCategory(categoryId, category) {
-    config.value = {
-      ...(config.value || {}),
-      categories: {
-        ...(config.value?.categories || {}),
-        [categoryId]: { ...(config.value?.categories?.[categoryId] || {}), ...category },
-      },
-    }
-  }
-
   function findLoadedIncome(incomeId) {
     return Object.values(incomeByCategory.value)
       .flat()
@@ -196,8 +175,6 @@ export const useIncomeStore = defineStore('income', () => {
     loadCategory,
     completeSetup,
     saveCategorySelection,
-    updateSimpleCategoryValue,
-    updateSimpleCategoryOwnership,
     addIncome,
     editIncome,
     deleteIncome,

@@ -74,8 +74,10 @@
             <div class="income-main">
               <span class="income-icon"><q-icon :name="category.icon" /></span
               ><span class="income-copy"
-                ><strong>{{ incomeDisplayName(item) }}</strong
-                ><small>{{ itemSubtitle(item) }}</small></span
+                ><strong>{{ t(`income.subtypes.${item.subcategoryId}`) }}</strong
+                ><small>{{ item.itemName }}</small
+                ><small v-if="item.notes">{{ item.notes }}</small
+                ><small>{{ itemDetails(item) }}</small></span
               >
             </div>
             <span class="avatar-cluster"
@@ -188,13 +190,9 @@ import { incomeCalculationBreakdown } from '@/domain/financial/income-calculatio
 import {
   currentFinancialYear,
   financialYearCategoryValue,
-  financialYearSubcategoryValue,
+  financialYearIncomeModelItemValue,
 } from '@/domain/financial/financial-year'
-import {
-  cloneOwnership,
-  createEqualOwnership,
-  createSingleOwnership,
-} from '@/domain/financial/ownership'
+import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
@@ -238,19 +236,16 @@ const selectedMemberId = computed({
 const allCategoryIncome = computed(() => incomeStore.itemsForCategory(categoryId.value))
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const incomeDefaults = computed(() => {
-  const config = categoryConfig.value
-  if (!config || !category.value) return null
-  const firstItem = allCategoryIncome.value.length === 0
+  if (!categoryConfig.value || !category.value) return null
   const ownership =
     memberIds.value.length === 1
       ? createSingleOwnership(authUser.value?.uid)
-      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
+      : createEqualOwnership(memberIds.value)
   return {
-    subtype: category.value.subtypes[0],
-    name: '',
-    calculation: firstItem
-      ? defaultCalculation(category.value.calculationModes[0], config.manualValue ?? 0)
-      : defaultCalculation(category.value.calculationModes[0], 0),
+    subcategoryId: category.value.subcategories[0],
+    itemName: '',
+    notes: '',
+    calculation: defaultCalculation(category.value.calculationModes[0], 0),
     ownership,
   }
 })
@@ -258,10 +253,10 @@ const scopedIncome = computed(() =>
   allCategoryIncome.value
     .map((item) => ({
       ...item,
-      scopedValue: financialYearSubcategoryValue(
+      scopedValue: financialYearIncomeModelItemValue(
         financialYear.value,
-        'income',
         categoryId.value,
+        item.subcategoryId,
         item.id,
         selectedMemberId.value,
       ),
@@ -335,11 +330,13 @@ async function preparePage(force = false) {
     if (current === preparationId) preparing.value = false
   }
 }
-function itemSubtitle(item) {
+function itemDetails(item) {
   const breakdown = incomeCalculationBreakdown(item.calculation)
-  const type = t(`income.subtypes.${item.subtype}`)
+  const availability = t('income.availablePercentageShort', {
+    percentage: item.disposablePercentage ?? 100,
+  })
   if (item.calculation.mode === 'annual_salary')
-    return `${type} · ${item.calculation.paymentsPerYear} ${t('income.form.payments').toLowerCase()} · ${formatCurrency(breakdown.perPayment)} ${t('income.form.perPayment').toLowerCase()}`
+    return `${item.calculation.paymentsPerYear} ${t('income.form.payments').toLowerCase()} · ${formatCurrency(breakdown.perPayment)} ${t('income.form.perPayment').toLowerCase()} · ${availability}`
   if (item.calculation.mode === 'monthly_schedule') {
     const extraMonths = Object.values(item.calculation.extrasByMonth || {}).filter(
       (value) => Number(value) > 0,
@@ -347,14 +344,14 @@ function itemSubtitle(item) {
     const extras = extraMonths
       ? ` + ${extraMonths} ${t('income.form.extraMonths').toLowerCase()}`
       : ''
-    return `${type} · ${formatCurrency(item.calculation.monthlyAmount)} / ${t('dashboard.month')}${extras}`
+    return `${formatCurrency(item.calculation.monthlyAmount)} / ${t('dashboard.month')}${extras} · ${availability}`
   }
   if (item.calculation.mode === 'recurring')
-    return `${type} · ${formatCurrency(item.calculation.amount)} / ${t(`income.frequencies.${item.calculation.frequency}`).toLowerCase()}`
-  return `${type} · ${t('income.calculationModes.one_time')}`
+    return `${formatCurrency(item.calculation.amount)} / ${t(`income.frequencies.${item.calculation.frequency}`).toLowerCase()} · ${availability}`
+  return `${t('income.calculationModes.one_time')} · ${availability}`
 }
 function incomeDisplayName(item) {
-  return item?.name?.trim() || (item ? t(`income.subtypes.${item.subtype}`) : '')
+  return item?.itemName?.trim() || (item ? t(`income.subtypes.${item.subcategoryId}`) : '')
 }
 function add() {
   editingIncome.value = null

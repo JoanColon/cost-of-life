@@ -7,7 +7,7 @@ export const incomeCategories = [
     itemNameKey: 'income.categories.employment.itemName',
     itemNamePluralKey: 'income.categories.employment.itemNamePlural',
     addLabelKey: 'income.categories.employment.addLabel',
-    subtypes: ['salary', 'bonus', 'side_job', 'other_employment'],
+    subcategories: ['salary', 'bonus', 'side_job', 'other_employment'],
     calculationModes: ['annual_salary', 'monthly_schedule'],
   },
   {
@@ -18,7 +18,7 @@ export const incomeCategories = [
     itemNameKey: 'income.categories.business.itemName',
     itemNamePluralKey: 'income.categories.business.itemNamePlural',
     addLabelKey: 'income.categories.business.addLabel',
-    subtypes: ['self_employment', 'business_income', 'freelance', 'other_business'],
+    subcategories: ['self_employment', 'business_income', 'freelance', 'other_business'],
     calculationModes: ['recurring', 'one_time'],
   },
   {
@@ -29,7 +29,7 @@ export const incomeCategories = [
     itemNameKey: 'income.categories.rental.itemName',
     itemNamePluralKey: 'income.categories.rental.itemNamePlural',
     addLabelKey: 'income.categories.rental.addLabel',
-    subtypes: ['residential_rent', 'commercial_rent', 'other_rental'],
+    subcategories: ['residential_rent', 'commercial_rent', 'other_rental'],
     calculationModes: ['recurring', 'one_time'],
   },
   {
@@ -40,7 +40,7 @@ export const incomeCategories = [
     itemNameKey: 'income.categories.investments.itemName',
     itemNamePluralKey: 'income.categories.investments.itemNamePlural',
     addLabelKey: 'income.categories.investments.addLabel',
-    subtypes: ['dividends', 'interest', 'bond_income', 'distributions', 'other_investment'],
+    subcategories: ['dividends', 'interest', 'bond_income', 'distributions', 'other_investment'],
     calculationModes: ['recurring', 'one_time'],
   },
   {
@@ -51,7 +51,7 @@ export const incomeCategories = [
     itemNameKey: 'income.categories.pensions_benefits.itemName',
     itemNamePluralKey: 'income.categories.pensions_benefits.itemNamePlural',
     addLabelKey: 'income.categories.pensions_benefits.addLabel',
-    subtypes: ['pension', 'benefits', 'other_pension_benefit'],
+    subcategories: ['pension', 'benefits', 'other_pension_benefit'],
     calculationModes: ['annual_salary', 'monthly_schedule', 'recurring'],
   },
   {
@@ -62,7 +62,7 @@ export const incomeCategories = [
     itemNameKey: 'income.categories.other.itemName',
     itemNamePluralKey: 'income.categories.other.itemNamePlural',
     addLabelKey: 'income.categories.other.addLabel',
-    subtypes: ['other'],
+    subcategories: ['other'],
     calculationModes: ['recurring', 'one_time'],
   },
 ]
@@ -71,4 +71,13 @@ export const incomeCategoryIds = incomeCategories.map((category) => category.id)
 
 export function getIncomeCategory(categoryId) {
   return incomeCategories.find((category) => category.id === categoryId) || null
+}
+
+export function getIncomeSubcategory(subcategoryId) {
+  for (const category of incomeCategories) {
+    if (category.subcategories.includes(subcategoryId)) {
+      return { id: subcategoryId, categoryId: category.id }
+    }
+  }
+  return null
 }

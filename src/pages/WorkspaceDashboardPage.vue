@@ -46,7 +46,11 @@ import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import { buildNetWorthSeries } from '@/domain/financial/history'
-import { financialYearMonthValue, financialYearValue } from '@/domain/financial/financial-year'
+import {
+  financialYearAvailableIncomeValue,
+  financialYearMonthValue,
+  financialYearValue,
+} from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
@@ -106,7 +110,7 @@ const dashboardData = computed(() => {
     selectedMemberId.value,
   )
   const income = financialYear.value
-    ? financialYearValue(financialYear.value, 'income', selectedMemberId.value)
+    ? financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value)
     : 0
   const annualCostOfLife = financialYear.value
     ? financialYearValue(financialYear.value, 'expenses', selectedMemberId.value)

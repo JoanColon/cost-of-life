@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   annualIncomeValue,
   incomeCalculationBreakdown,
+  normalizeDisposablePercentage,
   normalizeIncomeCalculation,
 } from '../../../src/domain/financial/income-calculations'
 
@@ -54,5 +55,11 @@ describe('income calculations', () => {
   ])('rejects invalid calculation %#', (calculation) => {
     expect(normalizeIncomeCalculation(calculation)).toBeNull()
     expect(annualIncomeValue(calculation)).toBeNull()
+  })
+
+  it('normalizes an available-income percentage between zero and one hundred', () => {
+    expect(normalizeDisposablePercentage('72.3456')).toBe(72.346)
+    expect(normalizeDisposablePercentage(101)).toBeNull()
+    expect(normalizeDisposablePercentage(undefined, 100)).toBe(100)
   })
 })

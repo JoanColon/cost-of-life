@@ -86,15 +86,31 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
     }
   }
 
-  async function add(workspaceId, period, subcategoryId, input, memberIds) {
+  async function add(workspaceId, period, subcategoryId, input, memberIds, expenseItems) {
     await mutate(workspaceId, period, () =>
-      createTrackedExpense(workspaceId, period, subcategoryId, input, memberIds),
+      createTrackedExpense(workspaceId, period, subcategoryId, input, memberIds, expenseItems),
     )
   }
 
-  async function edit(workspaceId, period, subcategoryId, itemId, input, memberIds) {
+  async function edit(
+    workspaceId,
+    period,
+    subcategoryId,
+    trackingEntryId,
+    input,
+    memberIds,
+    expenseItems,
+  ) {
     await mutate(workspaceId, period, () =>
-      updateTrackedExpense(workspaceId, period, subcategoryId, itemId, input, memberIds),
+      updateTrackedExpense(
+        workspaceId,
+        period,
+        subcategoryId,
+        trackingEntryId,
+        input,
+        memberIds,
+        expenseItems,
+      ),
     )
   }
 
@@ -122,6 +138,12 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
 
   function totalFor(subcategoryId) {
     return month.value?.categories?.[subcategoryId]?.total || 0
+  }
+
+  function totalForItem(subcategoryId, itemId) {
+    return itemsFor(subcategoryId)
+      .filter((entry) => entry.itemId === itemId)
+      .reduce((total, entry) => total + Number(entry.amount || 0), 0)
   }
 
   async function mutate(workspaceId, period, operation) {
@@ -165,6 +187,7 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
     saveReconciliations,
     itemsFor,
     totalFor,
+    totalForItem,
     reset,
   }
 })

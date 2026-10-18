@@ -23,6 +23,20 @@ const frequencyMultipliers = {
   yearly: 1,
 }
 
+export function normalizeDisposablePercentage(value, fallback = null) {
+  if (value == null || value === '') return fallback
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < 0 || number > 100) return null
+  return Math.round((number + Number.EPSILON) * 1000) / 1000
+}
+
+export function disposableIncomeValue(value, percentage = 100) {
+  const amount = normalizeNonNegativeMoney(value)
+  const normalizedPercentage = normalizeDisposablePercentage(percentage, 100)
+  if (amount === null || normalizedPercentage === null) return null
+  return normalizeNonNegativeMoney((amount * normalizedPercentage) / 100)
+}
+
 export function normalizeIncomeCalculation(calculation) {
   if (!incomeCalculationModes.includes(calculation?.mode)) return null
 

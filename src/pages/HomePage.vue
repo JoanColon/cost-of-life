@@ -132,6 +132,7 @@
             v-else-if="inviteLink"
             :model-value="inviteLink"
             outlined
+            :dense="$q.screen.lt.sm"
             readonly
             :label="t('workspace.invite.linkLabel')"
             class="invite-link"

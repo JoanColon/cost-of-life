@@ -42,9 +42,10 @@ describe('atomic financial model mutations', () => {
       collection: 'modelIncome',
       result: 'income',
       item: {
-        category: 'employment',
-        subtype: 'salary',
-        name: '',
+        categoryId: 'employment',
+        subcategoryId: 'salary',
+        itemName: 'Main salary',
+        notes: '',
         calculation: { mode: 'annual_salary', annualAmount: 1200, paymentsPerYear: 12 },
         ownership,
       },
@@ -55,9 +56,10 @@ describe('atomic financial model mutations', () => {
       collection: 'modelExpenses',
       result: 'expense',
       item: {
-        category: 'housing',
-        type: 'mortgage_rent',
-        name: '',
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: 'Main home',
+        notes: '',
         estimate: { amount: 10, frequency: 'monthly' },
         variability: 'fixed',
         recurrence: 'recurring',
@@ -71,7 +73,11 @@ describe('atomic financial model mutations', () => {
     const { firestore, writes } = createFirestore({
       section: testCase.section,
       collection: testCase.collection,
-      category: testCase.item.category,
+      category: testCase.item.category || testCase.item.categoryId,
+      configCategory:
+        testCase.section === 'expenses'
+          ? { enabled: true }
+          : undefined,
     })
 
     const result = await mutateFinancialModel(firestore, {
@@ -148,10 +154,11 @@ describe('atomic financial model mutations', () => {
 
   it('updates an existing item and its monthly projection in the same transaction', async () => {
     const existing = {
-      id: 'housing--mortgage_rent',
-      category: 'housing',
-      type: 'mortgage_rent',
-      name: '',
+      id: 'mortgage-a',
+      categoryId: 'housing',
+      subcategoryId: 'mortgage_rent',
+      itemName: 'Main home',
+      notes: '',
       estimate: { amount: 10, frequency: 'monthly' },
       variability: 'fixed',
       recurrence: 'recurring',
@@ -164,6 +171,7 @@ describe('atomic financial model mutations', () => {
       collection: 'modelExpenses',
       category: 'housing',
       items: [existing],
+      configCategory: { enabled: true },
     })
 
     const result = await mutateFinancialModel(firestore, {
@@ -187,141 +195,88 @@ describe('atomic financial model mutations', () => {
     expect(financialYearValue(financialYear, 'savings')).toBe(-240)
   })
 
-  it('adds newly tracked expenses and preserves the simple category estimate', async () => {
+  it('allows multiple named items in the same expense subcategory', async () => {
+    const first = {
+      id: 'subscription-a',
+      categoryId: 'leisure',
+      subcategoryId: 'streaming',
+      itemName: 'Netflix',
+      notes: '',
+      estimate: { amount: 18, frequency: 'monthly' },
+      monthlyAmounts: monthlyAmounts(18),
+      variability: 'fixed',
+      recurrence: 'recurring',
+      necessity: 'lifestyle',
+      ownership,
+    }
     const { firestore, writes } = createFirestore({
       section: 'expenses',
       collection: 'modelExpenses',
-      category: 'food',
-      configCategory: {
-        enabled: false,
-        manualEstimate: { amount: 500, frequency: 'monthly' },
-        ownership,
-      },
+      category: 'leisure',
+      items: [first],
+      configCategory: { enabled: true },
     })
 
     const result = await mutateFinancialModel(firestore, {
       workspaceId: 'workspace-a',
       userId: 'member-a',
       section: 'expenses',
-      operation: 'syncTracking',
-      subcategories: [
-        {
-          category: 'food',
-          type: 'groceries',
-          name: '',
-          estimate: { amount: 0, frequency: 'monthly' },
-          monthlyAmounts: monthlyAmounts(0),
-          variability: 'variable',
-          recurrence: 'recurring',
-          necessity: 'essential',
-        },
-      ],
+      operation: 'create',
+      item: {
+        ...first,
+        id: undefined,
+        itemName: 'Spotify',
+        estimate: { amount: 12, frequency: 'monthly' },
+        monthlyAmounts: monthlyAmounts(12),
+      },
     })
 
-    expect(result.enabledSubcategories).toEqual(['groceries'])
-    expect(
-      writes.find(({ path }) => path.endsWith('/modelExpenses/food--groceries')).data,
-    ).toMatchObject({
-      category: 'food',
-      type: 'groceries',
-      estimate: { amount: 500, frequency: 'monthly' },
-      ownership,
-    })
-    expect(
-      writes.find(({ path }) => path.endsWith('/modelConfig/expenses')).data.categories.food.enabled,
-    ).toBe(true)
-    expect(
-      writes.find(({ path }) => path.endsWith('/modelConfig/expenseTracking')).data
-        .enabledSubcategories,
-    ).toEqual(['groceries'])
+    expect(result.expense.itemName).toBe('Spotify')
+    expect(result.expense.id).not.toBe(first.id)
     const financialYear = writes.find(({ path }) =>
       path.endsWith(`/financialYears/${currentYear()}`),
     ).data
-    expect(financialYearValue(financialYear, 'expenses')).toBe(6000)
+    expect(financialYearValue(financialYear, 'expenses')).toBe(360)
   })
 
-  it('uses tracking preferences as the only tracker state', async () => {
-    const existing = {
-      id: 'food--groceries',
-      category: 'food',
-      type: 'groceries',
-      name: '',
-      estimate: { amount: 100, frequency: 'monthly' },
-      monthlyAmounts: monthlyAmounts(100),
-      variability: 'variable',
-      recurrence: 'recurring',
-      necessity: 'essential',
+  it('allows multiple named items in the same income subcategory', async () => {
+    const first = {
+      id: 'salary-a',
+      categoryId: 'employment',
+      subcategoryId: 'salary',
+      itemName: 'Company salary',
+      notes: '',
+      calculation: { mode: 'annual_salary', annualAmount: 1200, paymentsPerYear: 12 },
+      disposablePercentage: 100,
       ownership,
     }
     const { firestore, writes } = createFirestore({
-      section: 'expenses',
-      collection: 'modelExpenses',
-      category: 'food',
-      items: [existing],
+      section: 'income',
+      collection: 'modelIncome',
+      category: 'employment',
+      items: [first],
+      configCategory: { enabled: true },
     })
 
-    await mutateFinancialModel(firestore, {
+    const result = await mutateFinancialModel(firestore, {
       workspaceId: 'workspace-a',
       userId: 'member-a',
-      section: 'expenses',
-      operation: 'syncTracking',
-      subcategories: [
-        {
-          category: 'food',
-          type: 'groceries',
-          name: '',
-          estimate: { amount: 0, frequency: 'monthly' },
-          monthlyAmounts: monthlyAmounts(0),
-          variability: 'variable',
-          recurrence: 'recurring',
-          necessity: 'essential',
-        },
-      ],
+      section: 'income',
+      operation: 'create',
+      item: {
+        ...first,
+        id: undefined,
+        itemName: 'Consulting salary',
+        calculation: { mode: 'annual_salary', annualAmount: 600, paymentsPerYear: 12 },
+      },
     })
 
-    expect(writes.map(({ path }) => path)).toEqual([
-      'workspaces/workspace-a/modelConfig/expenseTracking',
-    ])
-  })
-
-  it('uses the frontend ownership precision when tracking creates a missing category', async () => {
-    const { firestore, writes } = createFirestore({
-      section: 'expenses',
-      collection: 'modelExpenses',
-      category: 'food',
-      configCategory: null,
-      memberIds: ['member-a', 'member-b', 'member-c'],
-    })
-
-    await mutateFinancialModel(firestore, {
-      workspaceId: 'workspace-a',
-      userId: 'member-a',
-      section: 'expenses',
-      operation: 'syncTracking',
-      subcategories: [
-        {
-          category: 'food',
-          type: 'groceries',
-          name: '',
-          estimate: { amount: 0, frequency: 'monthly' },
-          monthlyAmounts: monthlyAmounts(0),
-          variability: 'variable',
-          recurrence: 'recurring',
-          necessity: 'essential',
-        },
-      ],
-    })
-
-    expect(
-      writes.find(({ path }) => path.endsWith('/modelExpenses/food--groceries')).data.ownership,
-    ).toEqual({
-      mode: 'shared',
-      shares: [
-        { memberId: 'member-a', percentage: 33.333 },
-        { memberId: 'member-b', percentage: 33.333 },
-        { memberId: 'member-c', percentage: 33.334 },
-      ],
-    })
+    expect(result.income.itemName).toBe('Consulting salary')
+    expect(result.income.id).not.toBe(first.id)
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'income')).toBe(1800)
   })
 })
 

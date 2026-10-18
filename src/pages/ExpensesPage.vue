@@ -81,37 +81,10 @@
                 </span>
               </button>
 
-              <button
-                type="button"
-                class="category-ownership"
-                :disabled="isItemized(category.id)"
-                :aria-label="t('expenses.ownership.edit')"
-                @click="openOwnership(category.id)"
-              >
-                <q-avatar
-                  v-for="member in categoryMembers(category.id)"
-                  :key="member.id"
-                  size="2.2rem"
-                  class="ownership-avatar"
-                >
-                  <img v-if="member.photoURL" :src="member.photoURL" alt="" />
-                  <span v-else>{{ initials(member.name) }}</span>
-                </q-avatar>
-              </button>
-
-              <div v-if="isItemized(category.id)" class="category-value">
+              <div class="category-value">
                 <strong>{{ formatCurrency(categoryDisplayValue(category.id)) }}</strong>
                 <small>/ {{ categoryPeriodLabel }}</small>
               </div>
-
-              <SimpleExpenseEstimateEditor
-                v-else
-                :estimate="categoryEstimate(category.id)"
-                :display-value="formatCurrency(categoryDisplayValue(category.id))"
-                :display-period="categoryPeriodLabel"
-                :saving="savingCategoryIds.has(category.id)"
-                @save="saveEstimate(category.id, $event)"
-              />
 
               <button type="button" class="category-link" @click="openCategory(category.id)">
                 <q-icon name="chevron_right" />
@@ -207,41 +180,6 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="ownershipDialog">
-      <q-card class="ownership-dialog">
-        <q-btn
-          flat
-          round
-          dense
-          icon="close"
-          class="dialog-close"
-          :aria-label="t('common.cancel')"
-          v-close-popup
-        />
-        <q-card-section>
-          <h2>{{ t('expenses.ownership.label') }}</h2>
-          <OwnershipEditor
-            v-if="editingOwnershipCategoryId"
-            v-model="editingOwnership"
-            :members="members"
-            @validity="ownershipValid = $event"
-          />
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
-          <q-btn
-            unelevated
-            no-caps
-            color="primary"
-            :label="t('common.save')"
-            :loading="saving"
-            :disable="!ownershipValid"
-            @click="saveOwnership"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
     <q-dialog v-model="deleteDialog">
       <q-card class="confirm-card">
         <q-btn
@@ -285,18 +223,13 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ExpenseCategorySetup from '@/components/expenses/ExpenseCategorySetup.vue'
-import SimpleExpenseEstimateEditor from '@/components/expenses/SimpleExpenseEstimateEditor.vue'
-import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { expenseCategories } from '@/config/expense-categories'
-import { annualMonthlyExpenseValue } from '@/domain/financial/expense-calculations'
 import {
   currentFinancialYear,
-  financialYearCategoryItemCount,
   financialYearCategoryValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -317,11 +250,6 @@ const saving = ref(false)
 const editingCategories = ref(false)
 const confirmDisable = ref(false)
 const pendingSelection = ref(null)
-const ownershipDialog = ref(false)
-const editingOwnershipCategoryId = ref(null)
-const editingOwnership = ref({ mode: 'single', shares: [] })
-const ownershipValid = ref(false)
-const savingCategoryIds = ref(new Set())
 const deleteDialog = ref(false)
 const deletingCategory = ref(null)
 const period = ref('annual')
@@ -381,18 +309,6 @@ async function loadPage(force = false) {
   ])
 }
 
-function categoryConfig(categoryId) {
-  return expensesStore.config?.categories?.[categoryId]
-}
-
-function categoryEstimate(categoryId) {
-  return categoryConfig(categoryId)?.manualEstimate || { amount: 0, frequency: 'monthly' }
-}
-
-function isItemized(categoryId) {
-  return categoryItemCount(categoryId) > 0
-}
-
 function categoryDisplayValue(categoryId) {
   const annualValue = categoryAnnualValue(categoryId)
   return period.value === 'annual' ? annualValue : annualValue / 12
@@ -408,31 +324,14 @@ function categoryAnnualValue(categoryId) {
 }
 
 function categoryStatus(categoryId) {
-  const count = categoryItemCount(categoryId)
-  if (count > 0) return t('expenses.itemCount', { count })
-  return t('expenses.simpleEstimate')
-}
-
-function categoryItemCount(categoryId) {
-  return financialYearCategoryItemCount(financialYear.value, 'expenses', categoryId)
-}
-
-function categoryMembers(categoryId) {
-  const ownership = categoryConfig(categoryId)?.ownership
-  return (ownership?.shares || [])
-    .filter((share) => Number(share.percentage) > 0)
-    .map((share) => members.value.find((member) => member.id === share.memberId))
-    .filter(Boolean)
-}
-
-function initials(name = '') {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
+  const subcategories =
+    financialYear.value?.months?.['01']?.expenses?.categories?.[categoryId]?.subcategories || {}
+  const count = Object.values(subcategories).reduce(
+    (total, subcategory) => total + Object.keys(subcategory.items || {}).length,
+    0,
+  )
+  const key = count === 1 ? 'expenses.itemName' : 'expenses.itemNamePlural'
+  return t('expenses.itemSummary', { count, items: t(key) })
 }
 
 function openCategory(categoryId) {
@@ -472,48 +371,7 @@ async function saveCategorySelection(selected) {
 }
 
 function categoryHasData(categoryId) {
-  const category = categoryConfig(categoryId)
-  return (
-    categoryItemCount(categoryId) > 0 ||
-    Number(annualMonthlyExpenseValue(category?.monthlyAmounts, category?.manualEstimate)) > 0
-  )
-}
-
-async function saveEstimate(categoryId, estimate) {
-  savingCategoryIds.value = new Set(savingCategoryIds.value).add(categoryId)
-  try {
-    await expensesStore.updateSimpleCategoryEstimate(workspaceId.value, categoryId, estimate)
-    $q.notify({ type: 'positive', message: t('expenses.saved'), position: 'top' })
-  } catch {
-    $q.notify({ type: 'negative', message: t('expenses.errors.save'), position: 'top' })
-  } finally {
-    const next = new Set(savingCategoryIds.value)
-    next.delete(categoryId)
-    savingCategoryIds.value = next
-  }
-}
-
-function openOwnership(categoryId) {
-  const ownership = categoryConfig(categoryId)?.ownership
-  if (!ownership || isItemized(categoryId)) return
-  editingOwnershipCategoryId.value = categoryId
-  editingOwnership.value = cloneOwnership(ownership)
-  ownershipValid.value = isValidOwnership(ownership, memberIds.value)
-  ownershipDialog.value = true
-}
-
-async function saveOwnership() {
-  const categoryId = editingOwnershipCategoryId.value
-  if (!categoryId || !ownershipValid.value) return
-  const saved = await runSaving(() =>
-    expensesStore.updateSimpleCategoryOwnership(
-      workspaceId.value,
-      categoryId,
-      editingOwnership.value,
-      memberIds.value,
-    ),
-  )
-  if (saved) ownershipDialog.value = false
+  return categoryAnnualValue(categoryId) > 0
 }
 
 function requestDelete(category) {
@@ -620,7 +478,7 @@ async function runSaving(operation) {
 
 .category-row {
   display: grid;
-  grid-template-columns: minmax(13rem, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(13rem, 1fr) auto auto auto;
   align-items: center;
   gap: 0.4rem;
   min-height: 5rem;
@@ -642,8 +500,7 @@ async function runSaving(operation) {
 }
 
 .category-main,
-.category-link,
-.category-ownership {
+.category-link {
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -693,22 +550,8 @@ async function runSaving(operation) {
   color: var(--color-muted);
 }
 
-.category-ownership {
-  display: flex;
-  padding: 0;
-}
-
-.ownership-avatar + .ownership-avatar {
-  margin-left: -0.55rem;
-}
-
-.ownership-dialog,
 .confirm-card {
   @include financial-simple-dialog(34rem);
-}
-
-.ownership-dialog h2 {
-  margin-bottom: 1.25rem;
 }
 
 .category-dialog {
@@ -723,10 +566,6 @@ async function runSaving(operation) {
   .category-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
     @include mobile-financial-row;
-  }
-
-  .category-ownership {
-    display: none;
   }
 
   .category-link {

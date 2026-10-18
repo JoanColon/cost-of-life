@@ -17,14 +17,12 @@ export function buildExpenseModelCategories(
     Object.entries(categories).map(([categoryId, category]) => {
       const config = { ...category }
       delete config.manualValue
-      return [
-        categoryId,
-        {
-          ...config,
-          manualEstimate: category.manualEstimate || { amount: 0, frequency: 'monthly' },
-          necessity: category.necessity ?? null,
-        },
-      ]
+      delete config.manualEstimate
+      delete config.monthlyAmounts
+      delete config.necessity
+      delete config.ownership
+      delete config.subcategories
+      return [categoryId, config]
     }),
   )
 }

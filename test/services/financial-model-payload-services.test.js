@@ -90,9 +90,10 @@ describe('financial model service payloads', () => {
       'workspace-a',
       'income-a',
       {
-        category: 'employment',
-        subtype: 'salary',
-        name: '  Salary  ',
+        categoryId: 'employment',
+        subcategoryId: 'salary',
+        itemName: '  Salary  ',
+        notes: '  Main employment  ',
         calculation: {
           mode: 'annual_salary',
           annualAmount: '42000.126',
@@ -104,10 +105,12 @@ describe('financial model service payloads', () => {
     )
 
     expect(updateFinancialModelItem).toHaveBeenCalledWith('workspace-a', 'income', 'income-a', {
-      category: 'employment',
-      subtype: 'salary',
-      name: 'Salary',
+      categoryId: 'employment',
+      subcategoryId: 'salary',
+      itemName: 'Salary',
+      notes: 'Main employment',
       calculation: { mode: 'annual_salary', annualAmount: 42000.13, paymentsPerYear: 12 },
+      disposablePercentage: 100,
       ownership,
     })
   })

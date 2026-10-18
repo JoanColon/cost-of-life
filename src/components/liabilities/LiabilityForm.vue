@@ -21,6 +21,7 @@
             <q-input
               v-model.trim="name"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               autofocus
               maxlength="80"
@@ -35,6 +36,7 @@
             <q-input
               v-model="balance"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               type="number"
               min="0"

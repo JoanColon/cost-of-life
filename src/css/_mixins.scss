@@ -360,8 +360,11 @@
     font-weight: 700;
   }
 
-  :deep(.q-field__control) {
+  :deep(.q-field:not(.q-field--dense) .q-field__control) {
     min-height: 3.5rem;
+  }
+
+  :deep(.q-field__control) {
     border-radius: 0.55rem;
   }
 
@@ -374,6 +377,17 @@
   :deep(.q-field__prefix) {
     color: var(--color-ink);
     font-size: 1rem;
+  }
+
+  @media (max-width: 599px) {
+    gap: 0.3rem;
+    margin-bottom: 0.7rem;
+
+    :deep(.q-field__native),
+    :deep(.q-field__input),
+    :deep(.q-field__prefix) {
+      font-size: 0.92rem;
+    }
   }
 }
 

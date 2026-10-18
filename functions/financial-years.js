@@ -32,7 +32,11 @@ async function handleFinancialYearRequest(request) {
   ) {
     throw new HttpsError('permission-denied', 'Workspace membership is required')
   }
-  return rebuildFinancialYear(firestore, workspaceId, year, { createOnly: true })
+  const refresh = request.data?.refresh === true
+  return rebuildFinancialYear(firestore, workspaceId, year, {
+    createOnly: !refresh,
+    sections: refresh ? ['income', 'expenses'] : undefined,
+  })
 }
 
 const modelSections = new Set(['assets', 'liabilities', 'income', 'expenses'])

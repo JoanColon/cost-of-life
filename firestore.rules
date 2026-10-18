@@ -59,6 +59,51 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      match /modelConfig/{configId} {
+        allow read: if isWorkspaceMemberById(workspaceId);
+        allow write: if isWorkspaceMemberById(workspaceId)
+          && isWorkspaceActive(
+            get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
+          )
+          && (
+            configId != 'whatIf'
+            || (
+              request.resource.data.keys().hasOnly([
+                'schemaVersion',
+                'discretionaryReductionPercent',
+                'expectedAnnualReturnPercent',
+                'selectedLiabilityId',
+                'strategy',
+                'updatedAt',
+                'updatedBy'
+              ])
+              && request.resource.data.schemaVersion == 1
+              && request.resource.data.discretionaryReductionPercent is number
+              && request.resource.data.discretionaryReductionPercent >= 0
+              && request.resource.data.discretionaryReductionPercent <= 100
+              && request.resource.data.expectedAnnualReturnPercent is number
+              && request.resource.data.expectedAnnualReturnPercent >= 0
+              && request.resource.data.expectedAnnualReturnPercent <= 100
+              && (
+                request.resource.data.selectedLiabilityId == null
+                || request.resource.data.selectedLiabilityId is string
+              )
+              && request.resource.data.strategy.keys().hasOnly(['cash', 'invest', 'debt'])
+              && request.resource.data.strategy.cash is number
+              && request.resource.data.strategy.invest is number
+              && request.resource.data.strategy.debt is number
+              && request.resource.data.strategy.cash >= 0
+              && request.resource.data.strategy.invest >= 0
+              && request.resource.data.strategy.debt >= 0
+              && request.resource.data.strategy.cash
+                + request.resource.data.strategy.invest
+                + request.resource.data.strategy.debt == 100
+              && request.resource.data.updatedAt == request.time
+              && request.resource.data.updatedBy == request.auth.uid
+            )
+          );
+      }
+
       // Model items are read here but mutated through the callable function so
       // each item and its financial-year projection commit atomically.
       match /{collectionId}/{document=**} {
@@ -67,13 +112,11 @@ service cloud.firestore {
           || collectionId == 'modelLiabilities'
           || collectionId == 'modelIncome'
           || collectionId == 'modelExpenses'
-          || collectionId == 'modelConfig'
           || collectionId == 'expenseTracking'
         )
           && isWorkspaceMemberById(workspaceId);
         allow write: if (
-          collectionId == 'modelConfig'
-          || collectionId == 'expenseTracking'
+          collectionId == 'expenseTracking'
         )
           && isWorkspaceMemberById(workspaceId)
           && isWorkspaceActive(

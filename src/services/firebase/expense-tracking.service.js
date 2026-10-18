@@ -4,17 +4,11 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
+  setDoc,
   Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
-import {
-  expenseTrackingCategories,
-  expenseTrackingCategoryIds,
-} from '@/config/expense-tracking-categories'
-import {
-  generateMonthlyExpenseAmounts,
-  normalizeExpenseEstimate,
-} from '@/domain/financial/expense-calculations'
+import { expenseTrackingCategoryIds } from '@/config/expense-tracking-categories'
 import {
   addTrackedItem,
   deleteTrackedItem,
@@ -27,8 +21,7 @@ import {
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { currentUserId } from '@/services/firebase/current-user'
-import { getModelConfig } from '@/services/firebase/model-config.service'
-import { syncExpenseTrackingModel } from '@/services/firebase/financial-model-mutations.service'
+import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
 function trackingRef(workspaceId, period) {
   return doc(db, 'workspaces', workspaceId, 'expenseTracking', period)
@@ -51,33 +44,37 @@ export async function getExpenseTrackingPreferences(workspaceId) {
 }
 
 export async function saveExpenseTrackingPreferences(workspaceId, categoryIds) {
-  const selected = new Set(normalizeEnabledCategories(categoryIds))
-  const subcategories = expenseTrackingCategories
-    .filter(({ id }) => selected.has(id))
-    .map(({ id, categoryId, defaults }) => {
-      const estimate = normalizeExpenseEstimate({ amount: 0, frequency: defaults.frequency })
-      return {
-        category: categoryId,
-        type: id,
-        name: '',
-        estimate,
-        monthlyAmounts: generateMonthlyExpenseAmounts(estimate),
-        variability: defaults.variability,
-        recurrence: defaults.recurrence,
-        necessity: defaults.necessity,
-      }
-    })
-  const result = await syncExpenseTrackingModel(workspaceId, subcategories)
-  return normalizeEnabledCategories(result.enabledSubcategories)
+  const enabledSubcategories = normalizeEnabledCategories(categoryIds)
+  const userId = currentUserId()
+  await setDoc(
+    modelConfigRef(workspaceId, 'expenseTracking'),
+    {
+      schemaVersion: 2,
+      enabledSubcategories,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId,
+    },
+    { merge: true },
+  )
+  return enabledSubcategories
 }
 
-export async function createTrackedExpense(workspaceId, period, subcategoryId, input, memberIds) {
+export async function createTrackedExpense(
+  workspaceId,
+  period,
+  subcategoryId,
+  input,
+  memberIds,
+  expenseItems = [],
+) {
   const userId = currentUserId()
   assertSubcategory(subcategoryId)
   const item = normalizeItem(
     { ...input, id: doc(collection(db, 'workspaces', workspaceId, 'expenseTracking')).id },
     memberIds,
     period,
+    subcategoryId,
+    expenseItems,
   )
   return mutateMonth(workspaceId, period, userId, (month) =>
     addTrackedItem(month, subcategoryId, item),
@@ -91,10 +88,17 @@ export async function updateTrackedExpense(
   itemId,
   input,
   memberIds,
+  expenseItems = [],
 ) {
   const userId = currentUserId()
   assertSubcategory(subcategoryId)
-  const changes = normalizeItem({ ...input, id: itemId }, memberIds, period)
+  const changes = normalizeItem(
+    { ...input, id: itemId },
+    memberIds,
+    period,
+    subcategoryId,
+    expenseItems,
+  )
   return mutateMonth(workspaceId, period, userId, (month) =>
     updateTrackedItem(month, subcategoryId, itemId, changes),
   )
@@ -138,14 +142,20 @@ async function mutateMonth(workspaceId, period, userId, mutation) {
   })
 }
 
-function normalizeItem(input, memberIds, period) {
+function normalizeItem(input, memberIds, period, subcategoryId, expenseItems) {
   const amount = normalizeNonNegativeMoney(input.amount)
   if (amount === null || amount <= 0) throw new Error('A positive amount is required')
   if (!isValidOwnership(input.ownership, memberIds)) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
+  const subcategoryItems = expenseItems.filter((item) => item.subcategoryId === subcategoryId)
+  const itemId = String(input.itemId || '')
+  if (!subcategoryItems.some((item) => item.id === itemId)) {
+    throw new Error('A valid item from the selected subcategory is required')
+  }
   return {
     id: input.id,
+    itemId,
     amount,
     date: dateTimestamp(input.date, period),
     notes: String(input.notes || '').trim(),

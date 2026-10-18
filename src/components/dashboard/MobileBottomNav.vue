@@ -27,7 +27,7 @@ const router = useRouter()
 const items = [
   { key: 'home', icon: 'home', label: 'navigation.home', implemented: true },
   { key: 'expenses', icon: 'credit_card', label: 'navigation.expenses', implemented: true },
-  { key: 'plan', icon: 'track_changes', label: 'navigation.plan', implemented: false },
+  { key: 'plan', icon: 'track_changes', label: 'navigation.plan', implemented: true },
   { key: 'progress', icon: 'bar_chart', label: 'navigation.progress', implemented: true },
 ]
 const activeItem = computed(() => {
@@ -39,6 +39,7 @@ const activeItem = computed(() => {
   )
     return 'expenses'
   if (route.name === 'achievements') return 'progress'
+  if (route.name === 'what-if') return 'plan'
   return null
 })
 
@@ -52,7 +53,9 @@ function navigate(key) {
         ? 'expenses'
         : key === 'progress'
           ? 'achievements'
-          : null
+          : key === 'plan'
+            ? 'what-if'
+            : null
   if (routeName) router.push({ name: routeName, params: { workspaceId } })
 }
 </script>

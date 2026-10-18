@@ -68,6 +68,11 @@ const routes = [
         component: () => import('@/pages/AchievementsPage.vue'),
       },
       {
+        path: 'workspaces/:workspaceId/what-if',
+        name: 'what-if',
+        component: () => import('@/pages/WhatIfPage.vue'),
+      },
+      {
         path: 'workspaces/:workspaceId/income',
         name: 'income',
         component: () => import('@/pages/IncomePage.vue'),

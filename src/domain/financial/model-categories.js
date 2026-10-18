@@ -26,6 +26,26 @@ export function buildModelCategories(
   )
 }
 
+export function buildIncomeModelCategories(
+  categoryIds,
+  selectedCategoryIds,
+  existingCategories,
+  memberIds,
+) {
+  const categories = buildModelCategories(
+    categoryIds,
+    selectedCategoryIds,
+    existingCategories,
+    memberIds,
+  )
+  return Object.fromEntries(
+    Object.entries(categories).map(([categoryId, category]) => [
+      categoryId,
+      { enabled: category.enabled },
+    ]),
+  )
+}
+
 export function canonicalCategory(category = {}) {
   const value = { ...category }
   delete value.itemCount

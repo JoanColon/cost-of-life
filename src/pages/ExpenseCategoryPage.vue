@@ -10,9 +10,9 @@
         <h1>{{ t('expenses.errors.loadTitle') }}</h1>
         <p>{{ t('expenses.errors.load') }}</p>
         <q-btn
+          color="primary"
           unelevated
           no-caps
-          color="primary"
           icon="refresh"
           :label="t('common.retry')"
           @click="preparePage(true)"
@@ -48,7 +48,6 @@
             <button
               type="button"
               :class="{ selected: period === 'annual' }"
-              :aria-pressed="period === 'annual'"
               @click="period = 'annual'"
             >
               {{ t('dashboard.costOfLife.annual') }}
@@ -56,7 +55,6 @@
             <button
               type="button"
               :class="{ selected: period === 'monthly' }"
-              :aria-pressed="period === 'monthly'"
               @click="period = 'monthly'"
             >
               {{ t('dashboard.costOfLife.monthly') }}
@@ -66,7 +64,7 @@
 
         <section v-if="allExpenses.length" class="expense-list">
           <article
-            v-for="item in scopedExpenses"
+            v-for="item in sortedExpenses"
             :key="item.id"
             class="expense-row"
             role="button"
@@ -75,15 +73,14 @@
             @keydown.enter.self="edit(item)"
             @keydown.space.self.prevent="edit(item)"
           >
-            <span class="expense-icon"><q-icon :name="category.icon" /></span>
+            <span class="expense-icon"><q-icon :name="subcategoryIcon(item.subcategoryId)" /></span>
             <span class="expense-copy">
-              <strong>{{ expenseTypeLabel(item) }}</strong>
-            </span>
-            <span class="necessity-badge" :class="item.necessity || 'unclassified'">
-              {{ t(`expenses.necessities.${item.necessity || 'unclassified'}`) }}
+              <strong>{{ subcategoryLabel(item.subcategoryId) }}</strong>
+              <small>{{ item.itemName }}</small>
+              <small v-if="item.notes">{{ item.notes }}</small>
             </span>
             <strong class="expense-value">
-              {{ formatCurrency(displayedItemValue(item.scopedValue)) }}
+              {{ formatCurrency(displayedItemValue(item)) }}
               <small>/ {{ periodLabel }}</small>
             </strong>
             <q-btn flat round dense icon="more_vert" color="grey-7" @click.stop>
@@ -106,7 +103,7 @@
               </q-menu>
             </q-btn>
           </article>
-          <button type="button" class="add-row" @click="add">
+          <button type="button" class="add-row" @click="addExpense">
             <q-icon name="add" />
             <span>{{ t('expenses.addExpense') }}</span>
           </button>
@@ -122,7 +119,7 @@
             color="primary"
             icon="add"
             :label="t('expenses.addExpense')"
-            @click="add"
+            @click="addExpense"
           />
         </section>
       </template>
@@ -136,7 +133,6 @@
         :defaults="expenseDefaults"
         :members="members"
         :financial-year="financialYear"
-        :used-standard-types="usedStandardTypes"
         :saving="formSaving"
         @save="saveExpense"
         @cancel="closeExpenseDialog"
@@ -146,19 +142,14 @@
 
     <q-dialog v-model="deleteDialog">
       <q-card class="confirm-card">
-        <q-btn
-          flat
-          round
-          dense
-          icon="close"
-          class="dialog-close"
-          :aria-label="t('common.cancel')"
-          v-close-popup
-        />
         <q-card-section>
           <h2>{{ t('expenses.delete.title') }}</h2>
           <p>
-            {{ t('expenses.delete.description', { name: expenseDisplayName(deletingExpense) }) }}
+            {{
+              t('expenses.delete.description', {
+                name: deletingExpense?.itemName || '',
+              })
+            }}
           </p>
         </q-card-section>
         <q-card-actions align="right">
@@ -185,16 +176,13 @@ import { useRoute, useRouter } from 'vue-router'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { getExpenseCategory } from '@/config/expense-categories'
+import { expenseTrackingCategories } from '@/config/expense-tracking-categories'
 import {
   currentFinancialYear,
   financialYearCategoryValue,
-  financialYearSubcategoryValue,
+  financialYearExpenseModelItemValue,
 } from '@/domain/financial/financial-year'
-import {
-  cloneOwnership,
-  createEqualOwnership,
-  createSingleOwnership,
-} from '@/domain/financial/ownership'
+import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -240,23 +228,18 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allExpenses = computed(() => expensesStore.itemsForCategory(categoryId.value))
-const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
-const usedStandardTypes = computed(() =>
-  allExpenses.value.filter(({ type }) => type !== 'other').map(({ type }) => type),
+const sortedExpenses = computed(() =>
+  [...allExpenses.value].sort(
+    (left, right) => displayedItemValue(right) - displayedItemValue(left),
+  ),
 )
-const scopedExpenses = computed(() =>
-  allExpenses.value
-    .map((item) => ({
-      ...item,
-      scopedValue: financialYearSubcategoryValue(
-        financialYear.value,
-        'expenses',
-        categoryId.value,
-        item.type === 'other' ? item.id : item.type,
-        selectedMemberId.value,
-      ),
-    }))
-    .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
+const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const pageLoading = computed(
+  () =>
+    preparing.value ||
+    expensesStore.loading ||
+    expensesStore.categoryLoading ||
+    financialYearsStore.loading,
 )
 const categoryTotal = computed(() =>
   financialYearCategoryValue(
@@ -279,39 +262,44 @@ const itemSummary = computed(() => {
   return t('expenses.itemSummary', { count, items: t(key) })
 })
 const expenseDefaults = computed(() => {
-  const config = categoryConfig.value
-  if (!config) return null
-  const firstItem = allExpenses.value.length === 0
-  const ownership =
-    memberIds.value.length === 1
-      ? createSingleOwnership(authUser.value?.uid)
-      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
   return {
-    name: '',
-    type: null,
-    estimate: firstItem ? config.manualEstimate : { amount: 0, frequency: 'monthly' },
-    variability: 'fixed',
-    recurrence: 'recurring',
-    necessity: null,
-    ownership,
+    itemName: '',
+    notes: '',
+    monthlyAmounts: null,
+    ownership:
+      memberIds.value.length === 1
+        ? createSingleOwnership(authUser.value?.uid)
+        : createEqualOwnership(memberIds.value),
   }
 })
-const pageLoading = computed(
-  () =>
-    preparing.value ||
-    expensesStore.loading ||
-    expensesStore.categoryLoading ||
-    financialYearsStore.loading,
-)
 
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
 
-function displayedValue(annualValue) {
-  return period.value === 'annual' ? Number(annualValue || 0) : Number(annualValue || 0) / 12
+function displayedValue(value) {
+  return period.value === 'annual' ? Number(value || 0) : Number(value || 0) / 12
 }
 
-function displayedItemValue(annualValue) {
-  return displayedValue(annualValue)
+function subcategoryIcon(subcategoryId) {
+  return (
+    expenseTrackingCategories.find(({ id }) => id === subcategoryId)?.icon || category.value?.icon
+  )
+}
+
+function subcategoryLabel(subcategoryId) {
+  const subcategory = category.value?.suggestions.find(({ id }) => id === subcategoryId)
+  return subcategory ? t(subcategory.nameKey) : subcategoryId
+}
+
+function displayedItemValue(item) {
+  return displayedValue(
+    financialYearExpenseModelItemValue(
+      financialYear.value,
+      categoryId.value,
+      item.subcategoryId,
+      item.id,
+      selectedMemberId.value,
+    ),
+  )
 }
 
 async function preparePage(force = false) {
@@ -336,16 +324,7 @@ async function preparePage(force = false) {
   }
 }
 
-function expenseTypeLabel(item) {
-  const suggestion = category.value?.suggestions.find((candidate) => candidate.id === item.type)
-  return suggestion ? t(suggestion.nameKey) : t('expenses.suggestions.other')
-}
-
-function expenseDisplayName(item) {
-  return item?.name?.trim() || (item ? expenseTypeLabel(item) : '')
-}
-
-function add() {
+function addExpense() {
   editingExpense.value = null
   expenseDialog.value = true
 }
@@ -399,11 +378,10 @@ async function persist(operation) {
     $q.notify({ type: 'positive', message: t('expenses.saved'), position: 'top' })
     return true
   } catch (error) {
-    console.error('Unable to save expense', error)
     $q.notify({
       type: 'negative',
       message: t('expenses.errors.save'),
-      caption: error?.message || undefined,
+      caption: error?.message,
       position: 'top',
     })
     return false
@@ -457,8 +435,7 @@ async function persist(operation) {
   font-size: 1.4rem;
 }
 
-.expense-list,
-.empty-card {
+.expense-list {
   margin-top: 1.25rem;
   overflow: hidden;
   border: 1px solid var(--color-line);
@@ -469,15 +446,12 @@ async function persist(operation) {
 
 .expense-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.8rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--color-line);
   cursor: pointer;
-  transition:
-    background-color 160ms ease,
-    box-shadow 160ms ease;
 }
 
 .expense-row:hover {
@@ -488,6 +462,27 @@ async function persist(operation) {
   position: relative;
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
+}
+
+.empty-card {
+  display: grid;
+  justify-items: center;
+  margin-top: 1.25rem;
+  padding: 3rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.empty-card h2 {
+  margin: 1rem 0 0.35rem;
+}
+
+.empty-card p {
+  margin: 0 0 1rem;
+  color: var(--color-copy);
 }
 
 .expense-icon {
@@ -509,83 +504,53 @@ async function persist(operation) {
   text-align: right;
 }
 
-.necessity-badge {
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  background: #eef3f7;
-  color: var(--color-copy);
-  font-size: 0.72rem;
-}
-
-.necessity-badge.essential {
-  background: #e5f8f0;
-  color: var(--color-success-dark);
-}
-
-.necessity-badge.lifestyle {
-  background: #f3eaff;
-  color: #7e45bd;
-}
-
 .add-row {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 0.25rem;
   width: 100%;
-  padding: 1rem;
+  padding: 0.85rem 1rem;
   border: 0;
+  border-top: 1px solid var(--color-line);
   background: transparent;
   color: var(--color-primary);
   font-weight: 650;
   cursor: pointer;
 }
 
-.empty-card {
-  display: grid;
-  justify-items: center;
-  padding: 3rem 1rem;
-  text-align: center;
-}
-
-.empty-card h2 {
-  margin: 1rem 0 0.35rem;
-}
-
-.empty-card p {
-  margin: 0 0 1rem;
-  color: var(--color-copy);
-}
-
 .confirm-card {
   @include financial-simple-dialog;
 }
 
-@media (max-width: 699px) {
-  .summary-icon {
-    width: 2.6rem;
-    height: 2.6rem;
-    font-size: 1.2rem;
-  }
-
+@media (max-width: 599px) {
   .expense-row {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
-    @include mobile-financial-row;
+    align-items: start;
+    gap: 0.6rem;
   }
 
-  .necessity-badge {
-    display: none;
+  .expense-icon {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .expense-copy {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .expense-value {
-    grid-column: auto;
+    grid-column: 3;
+    grid-row: 1;
+    padding-top: 0.1rem;
     text-align: right;
-    font-size: 0.9rem;
     white-space: nowrap;
   }
 
-  .add-row {
-    padding: 0.75rem;
+  .expense-row > .q-btn {
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
   }
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div v-if="members.length > 1" class="ownership-editor">
-    <div class="field-label">{{ t('financial.ownership.label') }}</div>
+    <div v-if="!hideLabel" class="field-label">{{ t('financial.ownership.label') }}</div>
 
     <div class="ownership-options">
       <button
@@ -9,17 +9,26 @@
         type="button"
         class="ownership-option"
         :class="{ selected: selection === member.id }"
+        :aria-pressed="selection === member.id"
         @click="selectSingle(member.id)"
       >
-        {{ member.name }}
+        <q-avatar class="ownership-avatar" size="3rem">
+          <img v-if="member.photoURL" :src="member.photoURL" :alt="member.name" />
+          <span v-else>{{ initials(member.name) }}</span>
+        </q-avatar>
+        <span class="ownership-name">{{ member.name }}</span>
       </button>
       <button
         type="button"
         class="ownership-option"
         :class="{ selected: selection === 'shared' }"
+        :aria-pressed="selection === 'shared'"
         @click="selectShared"
       >
-        {{ t('financial.ownership.shared') }}
+        <q-avatar class="ownership-avatar" size="3rem">
+          <q-icon name="group" size="1.55rem" />
+        </q-avatar>
+        <span class="ownership-name">{{ t('financial.ownership.shared') }}</span>
       </button>
     </div>
 
@@ -59,6 +68,7 @@ import {
 const props = defineProps({
   modelValue: { type: Object, required: true },
   members: { type: Array, required: true },
+  hideLabel: Boolean,
 })
 
 const emit = defineEmits(['update:modelValue', 'validity'])
@@ -115,6 +125,16 @@ function update(ownership) {
 function memberName(memberId) {
   return props.members.find((member) => member.id === memberId)?.name || memberId
 }
+
+function initials(name) {
+  return String(name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+}
 </script>
 
 <style scoped lang="scss">
@@ -134,28 +154,59 @@ function memberName(memberId) {
 .ownership-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.75rem;
 }
 
 .ownership-option {
-  min-height: 2.5rem;
-  padding: 0.45rem 0.85rem;
-  border: 1px solid var(--color-line);
-  border-radius: 0.75rem;
-  background: var(--color-surface);
+  display: grid;
+  justify-items: center;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+  min-width: 4rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-copy);
   cursor: pointer;
 }
 
 .ownership-option.selected {
-  border-color: var(--color-primary);
-  background: var(--color-blue-soft);
   color: var(--color-primary);
   font-weight: 700;
 }
 
 .ownership-option:focus-visible {
+  border-radius: 0.75rem;
   @include focus-ring;
+}
+
+.ownership-avatar {
+  border: 2px solid transparent;
+  background: #edf2f6;
+  color: #334964;
+  font-size: 0.86rem;
+  font-weight: 750;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.ownership-option:hover .ownership-avatar {
+  transform: translateY(-1px);
+}
+
+.ownership-option.selected .ownership-avatar {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(22 136 248 / 12%);
+}
+
+.ownership-name {
+  overflow: hidden;
+  max-width: 6rem;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .share-grid {

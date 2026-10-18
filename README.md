@@ -16,6 +16,7 @@ La aplicación permite:
 - registrar gastos reales por mes y reconciliarlos con el modelo estimado;
 - conservar snapshots financieros anuales e historial de patrimonio;
 - calcular y guardar hitos de seguridad, patrimonio, deuda y libertad financiera.
+- simular recortes de gasto discrecional y comparar su uso en efectivo, inversión o deuda.
 
 La implementación actual es una SPA en JavaScript. Aunque la visión de producto menciona TypeScript, Capacitor y funcionalidades futuras, no se debe asumir que estén implementados.
 
@@ -32,7 +33,7 @@ Las magnitudes principales son:
 
 ```text
 patrimonio neto = activos - pasivos
-capacidad de ahorro anual = ingresos anuales - coste de vida anual
+capacidad de ahorro anual = ingresos anuales disponibles - coste de vida anual
 meses de seguridad = efectivo / (coste de vida anual / 12)
 años financiados = activos invertibles / coste de vida anual
 ```
@@ -174,6 +175,7 @@ No construyas URLs de workspace a mano. El mapa funcional es:
 | `expense-tracker`                                                             | `.../expenses/tracker`          | Registro y reconciliación mensual.                     |
 | `historic`                                                                    | `.../historic`                  | Totales de snapshots anuales.                          |
 | `achievements`                                                                | `.../achievements`              | Progreso e hitos alcanzados.                           |
+| `what-if`                                                                     | `.../what-if`                   | Simulación de capacidad de ahorro y estrategia.        |
 
 `progress` es un alias antiguo que redirige a `achievements`. Todo `/home` exige autenticación. El guard espera a que Firebase resuelva el estado de sesión antes de decidir la navegación.
 
@@ -183,7 +185,7 @@ No construyas URLs de workspace a mano. El mapa funcional es:
 
 ```text
 workspaces/{workspaceId}
-├── modelConfig/{assets|liabilities|income|expenses|expenseTracking}
+├── modelConfig/{assets|liabilities|income|expenses|expenseTracking|whatIf}
 ├── modelAssets/{itemId}
 ├── modelLiabilities/{itemId}
 ├── modelIncome/{itemId}
@@ -203,7 +205,7 @@ Una invitación dura siete días, tiene rol `member`, es de un solo uso y guarda
 
 ### `modelConfig/{section}`
 
-Guarda `setupCompleted` y el mapa de categorías activas. Una categoría puede contener un valor manual simple o actuar como contenedor de ítems detallados. `expenseTracking` guarda las subcategorías habilitadas para seguimiento.
+Guarda `setupCompleted` y el mapa de categorías activas. En Expenses e Income, las subcategorías se derivan de los items guardados en `modelExpenses` y `modelIncome`; los catálogos de sugerencias no se persisten ni crean filas automáticamente. Cada item usa `categoryId` y `subcategoryId`, mientras que su `itemId` estable es el ID del documento. `expenseTracking` guarda las subcategorías habilitadas para seguimiento y `whatIf` conserva únicamente las preferencias de simulación, nunca sus resultados derivados.
 
 Cambiar un documento de configuración de `assets`, `liabilities`, `income` o `expenses` dispara `onModelConfigWritten`, que reconstruye esa sección del año actual.
 
@@ -213,10 +215,10 @@ Son la fuente editable de ítems detallados. Todos los ítems contienen categor�
 
 - activos: `currentValue`, `valueSource: 'manual'` y detalle;
 - pasivos: `balance`;
-- ingresos: subtipo y cálculo (`annual_salary`, `monthly_schedule`, `recurring` o `one_time`);
-- gastos: tipo, estimación/frecuencia, importes mensuales, variabilidad, recurrencia y necesidad.
+- ingresos: subtipo, porcentaje disponible y cálculo (`annual_salary`, `monthly_schedule`, `recurring` o `one_time`);
+- gastos: `categoryId`, `subcategoryId`, nombre del ítem, notas, estimación/frecuencia, importes mensuales, variabilidad, recurrencia y necesidad.
 
-Los gastos estándar tienen ID determinista `<category>--<type>` para impedir duplicados; los gastos de tipo `other` pueden repetirse.
+Cada gasto detallado tiene un ID estable generado por Firestore. Varias entradas pueden compartir `subcategoryId`, como Netflix, Spotify y ChatGPT dentro de Subscriptions.
 
 No escribas directamente en estas colecciones desde el cliente. Las reglas permiten leerlas, pero las mutaciones pasan por `mutateFinancialModel` para que el ítem y `financialYears/{añoActual}` cambien en la misma transacción.
 
@@ -226,7 +228,7 @@ No escribas directamente en estas colecciones desde el cliente. Las reglas permi
 
 ### `expenseTracking/{YYYY-MM}`
 
-Contiene gastos reales agrupados por subcategoría y decisiones de reconciliación. Cada decisión resuelve si la proyección mensual utiliza el valor del modelo o el valor registrado. Al escribir un mes, `onExpenseTrackingWritten` actualiza ese mes dentro del snapshot anual correspondiente.
+Contiene gastos reales agrupados por `subcategoryId` y decisiones de reconciliación. Cada movimiento conserva su propio ID y referencia mediante `itemId` uno de los items de Expenses pertenecientes a esa misma subcategoría. Cada decisión resuelve si la proyección mensual utiliza el valor del modelo o el valor registrado. Al escribir un mes, `onExpenseTrackingWritten` actualiza ese mes dentro del snapshot anual correspondiente.
 
 ### `financialYears/{YYYY}`
 

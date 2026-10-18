@@ -16,14 +16,15 @@
 
       <q-card-section class="form-body">
         <div class="dialog-field">
-          <label>{{ t('expenses.form.suggestion') }}</label>
+          <label>{{ t('expenses.form.subcategory') }}</label>
           <q-select
-            v-model="expenseType"
+            v-model="subcategoryId"
             outlined
+            :dense="$q.screen.lt.sm"
             hide-bottom-space
             emit-value
             map-options
-            :options="suggestionOptions"
+            :options="subcategoryOptions"
             :disable="Boolean(expense)"
             :rules="[(value) => Boolean(value) || t('expenses.validation.typeRequired')]"
             @update:model-value="applySuggestion"
@@ -35,12 +36,28 @@
         </div>
 
         <div class="dialog-field">
-          <label>{{ t('expenses.form.name') }}</label>
+          <label>{{ t('expenses.form.itemName') }}</label>
           <q-input
-            v-model="name"
+            v-model="itemName"
             outlined
+            :dense="$q.screen.lt.sm"
             hide-bottom-space
-            :placeholder="t('expenses.form.namePlaceholder')"
+            :rules="[
+              (value) => Boolean(value?.trim()) || t('expenses.validation.itemNameRequired'),
+            ]"
+          />
+        </div>
+
+        <div class="dialog-field">
+          <label>{{ t('expenses.form.notes') }}</label>
+          <q-input
+            v-model="notes"
+            outlined
+            :dense="$q.screen.lt.sm"
+            hide-bottom-space
+            autogrow
+            type="textarea"
+            :placeholder="t('expenses.form.notesPlaceholder')"
           />
         </div>
 
@@ -53,6 +70,7 @@
               min="0"
               step="0.01"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               prefix="€"
               :rules="[(value) => value >= 0 || t('expenses.validation.amount')]"
@@ -63,6 +81,7 @@
             <q-select
               v-model="frequency"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               emit-value
               map-options
@@ -82,6 +101,7 @@
               <q-select
                 v-model="variability"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 emit-value
                 map-options
@@ -93,6 +113,7 @@
               <q-select
                 v-model="recurrence"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 emit-value
                 map-options
@@ -104,6 +125,7 @@
               <q-select
                 v-model="necessity"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 clearable
                 emit-value
@@ -185,6 +207,7 @@
           <OwnershipEditor
             v-model="ownership"
             :members="members"
+            hide-label
             @validity="ownershipValid = $event"
           />
         </div>
@@ -248,13 +271,13 @@ const props = defineProps({
   defaults: { type: Object, default: null },
   members: { type: Array, required: true },
   financialYear: { type: Object, default: null },
-  usedStandardTypes: { type: Array, default: () => [] },
   saving: Boolean,
 })
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
-const expenseType = ref(null)
-const name = ref('')
+const subcategoryId = ref(null)
+const itemName = ref('')
+const notes = ref('')
 const amount = ref(0)
 const frequency = ref('monthly')
 const variability = ref('fixed')
@@ -270,15 +293,12 @@ const frequencyOptions = computed(() => expenseFrequencies.map(option('frequenci
 const variabilityOptions = computed(() => expenseVariabilities.map(option('variabilities')))
 const recurrenceOptions = computed(() => expenseRecurrences.map(option('recurrences')))
 const necessityOptions = computed(() => expenseNecessities.map(option('necessities')))
-const suggestionOptions = computed(() => [
-  ...props.category.suggestions
-    .filter(({ id }) => id === props.expense?.type || !props.usedStandardTypes.includes(id))
-    .map((item) => ({ value: item.id, label: t(item.nameKey) })),
-  { value: 'other', label: t('expenses.suggestions.other') },
-])
+const subcategoryOptions = computed(() =>
+  props.category.suggestions.map((item) => ({ value: item.id, label: t(item.nameKey) })),
+)
 const suggestionIcon = computed(
   () =>
-    expenseTrackingCategories.find(({ id }) => id === expenseType.value)?.icon ||
+    expenseTrackingCategories.find(({ id }) => id === subcategoryId.value)?.icon ||
     props.category.icon ||
     'category',
 )
@@ -293,7 +313,11 @@ const normalizedAttributes = computed(() =>
   }),
 )
 const formValid = computed(
-  () => Boolean(expenseType.value) && Boolean(normalizedEstimate.value) && ownershipValid.value,
+  () =>
+    Boolean(subcategoryId.value) &&
+    Boolean(itemName.value.trim()) &&
+    Boolean(normalizedEstimate.value) &&
+    ownershipValid.value,
 )
 
 watch(
@@ -313,16 +337,18 @@ watch(() => [props.expense, props.defaults], seed, { immediate: true, deep: true
 function seed() {
   seeding = true
   const initial = props.expense || props.defaults || {}
-  expenseType.value = initial.type || (props.expense ? 'other' : null)
-  name.value = initial.name || ''
+  subcategoryId.value = initial.subcategoryId || subcategoryOptions.value[0]?.value || null
+  const suggestion = props.category.suggestions.find(({ id }) => id === subcategoryId.value)
+  itemName.value = initial.itemName || ''
+  notes.value = initial.notes || ''
   amount.value = initial.estimate?.amount ?? 0
-  frequency.value = initial.estimate?.frequency || 'monthly'
+  frequency.value = initial.estimate?.frequency || suggestion?.defaults.frequency || 'monthly'
   monthlyAmounts.value =
     normalizeMonthlyExpenseAmounts(initial.monthlyAmounts) ||
-    generateMonthlyExpenseAmounts(initial.estimate || { amount: 0, frequency: 'monthly' })
-  variability.value = initial.variability || 'fixed'
-  recurrence.value = initial.recurrence || 'recurring'
-  necessity.value = initial.necessity ?? null
+    generateMonthlyExpenseAmounts(initial.estimate || { amount: 0, frequency: frequency.value })
+  variability.value = initial.variability || suggestion?.defaults.variability || 'fixed'
+  recurrence.value = initial.recurrence || suggestion?.defaults.recurrence || 'recurring'
+  necessity.value = initial.necessity ?? suggestion?.defaults.necessity ?? null
   ownership.value = initial.ownership
     ? cloneOwnership(initial.ownership)
     : createEqualOwnership(props.members.map((member) => member.id))
@@ -343,11 +369,11 @@ function actualAmount(month) {
 
 function financialYearMonthExpense(month) {
   const monthNumber = incomeMonths.indexOf(month) + 1
-  if (monthNumber < 1 || expenseType.value === 'other') return null
+  if (monthNumber < 1 || !props.expense?.id) return null
   const monthKey = String(monthNumber).padStart(2, '0')
   return (
     props.financialYear?.months?.[monthKey]?.expenses?.categories?.[props.category.id]
-      ?.subcategories?.[expenseType.value] || null
+      ?.subcategories?.[subcategoryId.value]?.items?.[props.expense.id] || null
   )
 }
 
@@ -378,9 +404,10 @@ function applySuggestion(value) {
 function submit() {
   if (!formValid.value) return
   emit('save', {
-    category: props.category.id,
-    type: expenseType.value,
-    name: name.value.trim(),
+    categoryId: props.category.id,
+    subcategoryId: subcategoryId.value,
+    itemName: itemName.value.trim(),
+    notes: notes.value.trim(),
     estimate: normalizedEstimate.value,
     monthlyAmounts: normalizeMonthlyExpenseAmounts(monthlyAmounts.value),
     ...normalizedAttributes.value,

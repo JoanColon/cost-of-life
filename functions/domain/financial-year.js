@@ -112,6 +112,7 @@ function updateFinancialYearProjection(
 
   const result = {
     ...financialYearMetadata(financialYear),
+    schemaVersion: 2,
     year,
     projectionState,
     months,
@@ -158,42 +159,56 @@ function buildPositionMonth(categoryConfig, items, valueField) {
 }
 
 function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
-  const grouped = groupBy(expenses, 'category')
+  const grouped = groupBy(expenses, 'categoryId')
   const categories = {}
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
     if (!category?.enabled) continue
     const categoryItems = grouped[categoryId] || []
     const subcategories = {}
-    if (categoryItems.length) {
-      for (const expense of categoryItems) {
-        const id = expense.type === 'other' ? expense.id : expense.type
-        const estimated = expenseMonth(expense, monthName)
-        const tracked = expense.type === 'other' ? null : trackedValue(trackingMonth, expense.type)
-        const applied = tracked?.applied === true
-        subcategories[id] = {
-          name: expense.name || '',
-          type: expense.type,
-          estimated,
-          actual: tracked?.actual ?? null,
-          effective: applied ? tracked.total : estimated,
-          source: applied ? 'tracked' : 'model',
-          memberValues: applied ? tracked.memberValues : allocate(estimated, expense.ownership),
-          estimatedMemberValues: allocate(estimated, expense.ownership),
-          actualMemberValues: tracked?.actualMemberValues || {},
-        }
-      }
-    } else {
-      const estimated = simpleExpenseMonth(category, monthName)
-      subcategories[categoryId] = {
-        name: '',
-        type: categoryId,
+    const subcategoryIds = [...new Set(categoryItems.map((item) => item.subcategoryId))]
+    for (const subcategoryId of subcategoryIds) {
+      const modelItems = categoryItems.filter((item) => item.subcategoryId === subcategoryId)
+      const tracked = trackedValue(trackingMonth, subcategoryId)
+      const applied = tracked.applied === true
+      const items = Object.fromEntries(
+        modelItems.map((expense) => {
+          const estimated = expenseMonth(expense, monthName)
+          const actual = tracked.items[expense.id]
+          const estimatedMemberValues = allocate(estimated, expense.ownership)
+          return [
+            expense.id,
+            {
+              itemName: expense.itemName,
+              notes: expense.notes || '',
+              estimated,
+              actual: actual?.total ?? null,
+              effective: applied ? actual?.total || 0 : estimated,
+              source: applied ? 'tracked' : 'model',
+              necessity: expense.necessity ?? null,
+              memberValues: applied ? actual?.memberValues || {} : estimatedMemberValues,
+              estimatedMemberValues,
+              actualMemberValues: actual?.memberValues || {},
+            },
+          ]
+        }),
+      )
+      const estimated = moneyOrZero(
+        Object.values(items).reduce((sum, item) => sum + item.estimated, 0),
+      )
+      const estimatedMemberValues = Object.values(items).reduce(
+        (sum, item) => addMaps(sum, item.estimatedMemberValues),
+        {},
+      )
+      subcategories[subcategoryId] = {
         estimated,
-        actual: null,
-        effective: estimated,
-        source: 'model',
-        memberValues: allocate(estimated, category.ownership),
-        estimatedMemberValues: allocate(estimated, category.ownership),
-        actualMemberValues: {},
+        actual: tracked.actual,
+        effective: applied ? tracked.total : estimated,
+        source: applied ? 'tracked' : 'model',
+        necessity: null,
+        memberValues: applied ? tracked.memberValues : estimatedMemberValues,
+        estimatedMemberValues,
+        actualMemberValues: tracked.actualMemberValues,
+        items,
       }
     }
     categories[categoryId] = { subcategories }
@@ -202,29 +217,38 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
 }
 
 function buildIncomeMonth(categoryConfig, income, monthIndex) {
-  const grouped = groupBy(income, 'category')
+  const grouped = groupBy(income, 'categoryId')
   const categories = {}
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
     if (!category?.enabled) continue
     const categoryItems = grouped[categoryId] || []
     const subcategories = {}
-    if (categoryItems.length) {
-      for (const item of categoryItems) {
-        const total = incomeMonth(item.calculation, monthIndex)
-        subcategories[item.id] = {
-          name: item.name || '',
-          type: item.subtype || '',
-          total,
-          memberValues: allocate(total, item.ownership),
-        }
-      }
-    } else {
-      const total = distributeAnnual(category.manualValue, monthIndex)
-      subcategories[categoryId] = {
-        name: '',
-        type: categoryId,
-        total,
-        memberValues: allocate(total, category.ownership),
+    const subcategoryIds = [...new Set(categoryItems.map((item) => item.subcategoryId))]
+    for (const subcategoryId of subcategoryIds) {
+      const items = Object.fromEntries(
+        categoryItems
+          .filter((item) => item.subcategoryId === subcategoryId)
+          .map((item) => {
+            const total = incomeMonth(item.calculation, monthIndex)
+            return [
+              item.id,
+              {
+                itemName: item.itemName,
+                notes: item.notes || '',
+                total,
+                disposablePercentage: disposablePercentage(item.disposablePercentage),
+                memberValues: allocate(total, item.ownership),
+              },
+            ]
+          }),
+      )
+      subcategories[subcategoryId] = {
+        items,
+        total: moneyOrZero(Object.values(items).reduce((sum, item) => sum + item.total, 0)),
+        memberValues: Object.values(items).reduce(
+          (sum, item) => addMaps(sum, item.memberValues),
+          {},
+        ),
       }
     }
     categories[categoryId] = { subcategories }
@@ -232,18 +256,16 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
   return { categories }
 }
 
+function disposablePercentage(value) {
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0 && number <= 100 ? number : 100
+}
+
 function expenseMonth(expense, monthName) {
   if (expense.monthlyAmounts && Object.hasOwn(expense.monthlyAmounts, monthName)) {
     return moneyOrZero(expense.monthlyAmounts[monthName])
   }
   return estimateMonth(expense.estimate, monthName)
-}
-
-function simpleExpenseMonth(category = {}, monthName) {
-  if (category.monthlyAmounts && Object.hasOwn(category.monthlyAmounts, monthName)) {
-    return moneyOrZero(category.monthlyAmounts[monthName])
-  }
-  return estimateMonth(category.manualEstimate, monthName)
 }
 
 function estimateMonth(estimate, monthName) {
@@ -291,12 +313,20 @@ function trackedValue(month, id) {
     (sum, item) => addMaps(sum, allocate(item.amount, item.ownership)),
     {},
   )
+  const itemValues = {}
+  for (const entry of items) {
+    if (!entry.itemId) continue
+    const target = (itemValues[entry.itemId] ||= { total: 0, memberValues: {} })
+    target.total = moneyOrZero(target.total + (Number(entry.amount) || 0))
+    target.memberValues = addMaps(target.memberValues, allocate(entry.amount, entry.ownership))
+  }
   return {
     applied,
     actual: hasActual ? total : null,
     total,
     memberValues,
     actualMemberValues: hasActual ? memberValues : {},
+    items: itemValues,
   }
 }
 
@@ -307,12 +337,26 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
   for (const [categoryId, category] of Object.entries(previous.expenses?.categories || {})) {
     const subcategories = {}
     for (const [id, item] of Object.entries(category.subcategories || {})) {
-      if (item.type === 'other') {
-        subcategories[id] = item
-        continue
-      }
-      const tracked = trackedValue(trackingMonth, item.type)
+      const tracked = trackedValue(trackingMonth, id)
       const applied = tracked.applied === true
+      const items = Object.fromEntries(
+        Object.entries(item.items || {}).map(([itemId, modelItem]) => {
+          const actual = tracked.items[itemId]
+          return [
+            itemId,
+            {
+              ...modelItem,
+              actual: actual?.total ?? null,
+              effective: applied ? actual?.total || 0 : modelItem.estimated,
+              source: applied ? 'tracked' : 'model',
+              memberValues: applied ?
+                actual?.memberValues || {} :
+                modelItem.estimatedMemberValues || modelItem.memberValues,
+              actualMemberValues: actual?.memberValues || {},
+            },
+          ]
+        }),
+      )
       subcategories[id] = {
         ...item,
         actual: tracked.actual,
@@ -322,6 +366,7 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
           tracked.memberValues :
           item.estimatedMemberValues || item.memberValues,
         actualMemberValues: tracked.actualMemberValues,
+        items,
       }
     }
     categories[categoryId] = { subcategories }
@@ -344,7 +389,7 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
 
 function financialYearMetadata(financialYear) {
   return Object.fromEntries(
-    ['status', 'generatedAt', 'updatedAt']
+    ['schemaVersion', 'status', 'generatedAt', 'updatedAt']
       .filter((field) => financialYear?.[field] != null)
       .map((field) => [field, financialYear[field]]),
   )

@@ -21,6 +21,7 @@
             <q-select
               v-model="subtype"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               emit-value
               map-options
@@ -31,13 +32,20 @@
           </div>
           <div class="dialog-field">
             <label>{{ t('assets.form.name') }}</label>
-            <q-input v-model.trim="name" outlined hide-bottom-space maxlength="80" />
+            <q-input
+              v-model.trim="name"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              maxlength="80"
+            />
           </div>
           <div class="dialog-field">
             <label>{{ t('assets.form.currentValue') }}</label>
             <q-input
               v-model="currentValue"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
               autofocus
               type="number"

@@ -19,12 +19,29 @@
 
         <q-card-section class="entry-fields">
           <div class="dialog-field">
+            <label>{{ t('expenseTracker.entry.item') }}</label>
+            <q-select
+              v-model="itemId"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              lazy-rules="ondemand"
+              emit-value
+              map-options
+              :options="itemOptions"
+              :rules="[(value) => Boolean(value) || t('expenseTracker.validation.item')]"
+            />
+          </div>
+
+          <div class="dialog-field">
             <label>{{ t('expenseTracker.entry.amount') }}</label>
             <q-input
               v-model.number="amount"
               autofocus
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
+              lazy-rules="ondemand"
               type="number"
               inputmode="decimal"
               min="0.01"
@@ -53,7 +70,9 @@
             <q-input
               v-model="date"
               outlined
+              :dense="$q.screen.lt.sm"
               hide-bottom-space
+              lazy-rules="ondemand"
               type="date"
               :min="`${period}-01`"
               :max="lastDate"
@@ -70,7 +89,14 @@
 
           <div class="dialog-field">
             <label>{{ t('expenseTracker.entry.notes') }}</label>
-            <q-input v-model="notes" outlined hide-bottom-space autogrow type="textarea" />
+            <q-input
+              v-model="notes"
+              outlined
+              :dense="$q.screen.lt.sm"
+              hide-bottom-space
+              autogrow
+              type="textarea"
+            />
           </div>
         </q-card-section>
 
@@ -84,7 +110,7 @@
               color="primary"
               :label="t('common.save')"
               :loading="saving"
-              :disable="!valid"
+              :disable="saving"
             />
           </div>
         </q-card-actions>
@@ -109,6 +135,7 @@ const props = defineProps({
   modelValue: Boolean,
   subcategory: { type: Object, required: true },
   item: { type: Object, default: null },
+  expenseItems: { type: Array, default: () => [] },
   period: { type: String, required: true },
   members: { type: Array, required: true },
   preferredMemberId: { type: String, default: '' },
@@ -120,6 +147,7 @@ const { t } = useI18n()
 const amount = ref(null)
 const date = ref('')
 const notes = ref('')
+const itemId = ref(null)
 const ownership = ref(createSingleOwnership(props.preferredMemberId))
 const ownershipValid = ref(false)
 
@@ -131,10 +159,14 @@ const lastDate = computed(() => {
   const [year, month] = props.period.split('-').map(Number)
   return `${props.period}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 })
+const itemOptions = computed(() =>
+  props.expenseItems.map((item) => ({ value: item.id, label: item.itemName })),
+)
 const valid = computed(
   () =>
     Number(amount.value) > 0 &&
     Boolean(date.value) &&
+    Boolean(itemId.value) &&
     (props.members.length === 1 || ownershipValid.value),
 )
 
@@ -150,6 +182,8 @@ function seed() {
   amount.value = props.item?.amount ?? null
   date.value = props.item ? timestampDate(props.item.date) : defaultDate()
   notes.value = props.item?.notes || ''
+  itemId.value =
+    props.item?.itemId || (props.expenseItems.length === 1 ? props.expenseItems[0].id : null)
   ownership.value = props.item?.ownership
     ? cloneOwnership(props.item.ownership)
     : createSingleOwnership(props.preferredMemberId || props.members[0]?.id)
@@ -182,6 +216,7 @@ function submit() {
   if (!valid.value) return
   emit('save', {
     amount: Number(amount.value),
+    itemId: itemId.value,
     date: date.value,
     notes: notes.value,
     ownership: cloneOwnership(ownership.value),

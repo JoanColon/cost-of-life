@@ -16,7 +16,11 @@ function projection() {
     config: {
       assets: { categories: { cash: { enabled: true } } },
       liabilities: { categories: { mortgage: { enabled: true } } },
-      expenses: { categories: { food: { enabled: true } } },
+      expenses: {
+        categories: {
+          food: { enabled: true },
+        },
+      },
       income: { categories: {} },
     },
     assets: [{ id: 'account', category: 'cash', name: 'Account', currentValue: 1000, ownership }],
@@ -24,10 +28,12 @@ function projection() {
     expenses: [
       {
         id: 'groceries',
-        category: 'food',
-        type: 'groceries',
-        name: 'Groceries',
+        categoryId: 'food',
+        subcategoryId: 'groceries',
+        itemName: 'Weekly groceries',
+        notes: '',
         estimate: { amount: 500, frequency: 'monthly' },
+        necessity: 'lifestyle',
         ownership,
       },
     ],
@@ -49,7 +55,7 @@ describe('server financial year projection', () => {
 
     expect(Object.keys(result.months)).toHaveLength(12)
     expect(result.totals).toBeUndefined()
-    expect(result.schemaVersion).toBeUndefined()
+    expect(result.schemaVersion).toBe(2)
     expect(result.months['01'].assets.total).toBeUndefined()
     expect(result.months['01'].assets.categories.cash.total).toBeUndefined()
     expect(financialYearMonthValue(result, '01', 'assets')).toBe(1000)
@@ -60,9 +66,13 @@ describe('server financial year projection', () => {
     expect(result.months['10'].expenses.categories.food.subcategories.groceries.source).toBe(
       'model',
     )
+    expect(
+      result.months['10'].expenses.categories.food.subcategories.groceries.items.groceries
+        .necessity,
+    ).toBe('lifestyle')
   })
 
-  it('uses simple values directly from model configuration', () => {
+  it('uses simple asset values and ignores obsolete income values in model configuration', () => {
     const result = buildFinancialYear({
       year: 2026,
       config: {
@@ -70,11 +80,7 @@ describe('server financial year projection', () => {
         liabilities: { categories: {} },
         expenses: {
           categories: {
-            housing: {
-              enabled: true,
-              manualEstimate: { amount: 600, frequency: 'monthly' },
-              ownership,
-            },
+            housing: { enabled: true },
           },
         },
         income: { categories: { other: { enabled: true, manualValue: 12000, ownership } } },
@@ -82,8 +88,8 @@ describe('server financial year projection', () => {
     })
 
     expect(financialYearMonthValue(result, '01', 'assets')).toBe(2500)
-    expect(financialYearValue(result, 'expenses')).toBe(7200)
-    expect(financialYearValue(result, 'income')).toBe(12000)
+    expect(financialYearValue(result, 'expenses')).toBe(0)
+    expect(financialYearValue(result, 'income')).toBe(0)
   })
 
   it('distributes annual income cents without changing the annual amount', () => {
@@ -93,9 +99,12 @@ describe('server financial year projection', () => {
       income: [
         {
           id: 'salary',
-          category: 'employment',
-          subtype: 'salary',
+          categoryId: 'employment',
+          subcategoryId: 'salary',
+          itemName: 'Main salary',
+          notes: 'Primary employment',
           calculation: { mode: 'annual_salary', annualAmount: 100, paymentsPerYear: 12 },
+          disposablePercentage: 80,
           ownership,
         },
       ],
@@ -104,6 +113,13 @@ describe('server financial year projection', () => {
     expect(financialYearMonthValue(result, '01', 'income')).toBe(8.34)
     expect(financialYearMonthValue(result, '12', 'income')).toBe(8.33)
     expect(financialYearValue(result, 'income')).toBe(100)
+    expect(
+      result.months['01'].income.categories.employment.subcategories.salary.items.salary
+        .disposablePercentage,
+    ).toBe(80)
+    expect(
+      result.months['01'].income.categories.employment.subcategories.salary.items.salary.notes,
+    ).toBe('Primary employment')
   })
 
   it('does not rewrite closed position months when assets change in December', () => {
@@ -127,7 +143,9 @@ describe('server financial year projection', () => {
   it('updates a historical tracked month without changing its stored estimates', () => {
     const original = projection()
     const updated = applyTrackingMonth(original, '10', {
-      categories: { groceries: { items: [{ amount: 437, ownership }] } },
+      categories: {
+        groceries: { items: [{ itemId: 'groceries', amount: 437, ownership }] },
+      },
       reconciliation: { groceries: { decision: 'tracked' } },
     })
 
@@ -138,12 +156,18 @@ describe('server financial year projection', () => {
       source: 'tracked',
     })
     expect(financialYearValue(updated, 'expenses')).toBe(5937)
+    expect(
+      updated.months['10'].expenses.categories.food.subcategories.groceries.items.groceries.actual,
+    ).toBe(437)
     expect(financialYearValue(original, 'expenses')).toBe(6000)
+    expect(updated.schemaVersion).toBe(2)
   })
 
   it('keeps the tracked actual when a historical month uses the model', () => {
     const updated = applyTrackingMonth(projection(), '10', {
-      categories: { groceries: { items: [{ amount: 437, ownership }] } },
+      categories: {
+        groceries: { items: [{ itemId: 'groceries', amount: 437, ownership }] },
+      },
     })
 
     expect(updated.months['10'].expenses.categories.food.subcategories.groceries).toMatchObject({

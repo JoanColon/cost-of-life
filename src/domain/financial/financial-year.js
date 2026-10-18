@@ -28,7 +28,7 @@ export function financialYearValue(financialYear, section, memberId = 'all') {
   }
   if (section === 'savings') {
     return moneyOrZero(
-      financialYearValue(financialYear, 'income', memberId) -
+      financialYearAvailableIncomeValue(financialYear, memberId) -
         financialYearValue(financialYear, 'expenses', memberId),
     )
   }
@@ -43,6 +43,85 @@ export function financialYearValue(financialYear, section, memberId = 'all') {
   )
 }
 
+export function financialYearAvailableIncomeValue(financialYear, memberId = 'all') {
+  return moneyOrZero(
+    Object.values(financialYear?.months || {}).reduce(
+      (annualTotal, month) => annualTotal + monthAvailableIncomeValue(month, memberId),
+      0,
+    ),
+  )
+}
+
+export function financialYearMonthAvailableIncomeValue(financialYear, month, memberId = 'all') {
+  return moneyOrZero(monthAvailableIncomeValue(financialYear?.months?.[month], memberId))
+}
+
+export function financialYearExpenseNecessityValue(financialYear, necessity, memberId = 'all') {
+  return moneyOrZero(
+    Object.values(financialYear?.months || {}).reduce(
+      (annualTotal, month) =>
+        annualTotal +
+        Object.values(month?.expenses?.categories || {}).reduce(
+          (monthTotal, category) =>
+            monthTotal +
+            Object.values(category?.subcategories || {}).reduce((subcategoryTotal, subcategory) => {
+              const items = Object.values(subcategory?.items || {})
+              if (items.length) {
+                return (
+                  subcategoryTotal +
+                  items.reduce(
+                    (itemTotal, item) =>
+                      item?.necessity === necessity
+                        ? itemTotal + itemValue(item, 'expenses', memberId)
+                        : itemTotal,
+                    0,
+                  )
+                )
+              }
+              return subcategory?.necessity === necessity
+                ? subcategoryTotal + itemValue(subcategory, 'expenses', memberId)
+                : subcategoryTotal
+            }, 0),
+          0,
+        ),
+      0,
+    ),
+  )
+}
+
+export function financialYearUnclassifiedExpenseValue(financialYear, memberId = 'all') {
+  return moneyOrZero(
+    Object.values(financialYear?.months || {}).reduce(
+      (annualTotal, month) =>
+        annualTotal +
+        Object.values(month?.expenses?.categories || {}).reduce(
+          (monthTotal, category) =>
+            monthTotal +
+            Object.values(category?.subcategories || {}).reduce((subcategoryTotal, subcategory) => {
+              const items = Object.values(subcategory?.items || {})
+              if (items.length) {
+                return (
+                  subcategoryTotal +
+                  items.reduce(
+                    (itemTotal, item) =>
+                      item?.necessity == null
+                        ? itemTotal + itemValue(item, 'expenses', memberId)
+                        : itemTotal,
+                    0,
+                  )
+                )
+              }
+              return subcategory?.necessity == null
+                ? subcategoryTotal + itemValue(subcategory, 'expenses', memberId)
+                : subcategoryTotal
+            }, 0),
+          0,
+        ),
+      0,
+    ),
+  )
+}
+
 export function financialYearMonthValue(financialYear, month, section, memberId = 'all') {
   if (section === 'netWorth') {
     return moneyOrZero(
@@ -52,7 +131,7 @@ export function financialYearMonthValue(financialYear, month, section, memberId 
   }
   if (section === 'savings') {
     return moneyOrZero(
-      financialYearMonthValue(financialYear, month, 'income', memberId) -
+      financialYearMonthAvailableIncomeValue(financialYear, month, memberId) -
         financialYearMonthValue(financialYear, month, 'expenses', memberId),
     )
   }
@@ -92,7 +171,14 @@ export function financialYearCategoryItemCount(financialYear, section, categoryI
   const category = month
     ? financialYear?.months?.[month]?.[section]?.categories?.[categoryId]
     : annualCategory(financialYear, section, categoryId)
-  return Object.keys(category?.subcategories || {}).filter((id) => id !== categoryId).length
+  if (['expenses', 'income'].includes(section)) {
+    return Object.values(category?.subcategories || {}).reduce(
+      (count, subcategory) => count + Object.keys(subcategory?.items || {}).length,
+      0,
+    )
+  }
+  const ids = Object.keys(category?.subcategories || {})
+  return ids.filter((id) => id !== categoryId).length
 }
 
 export function financialYearCategoryMemberIds(financialYear, section, categoryId, month = null) {
@@ -100,8 +186,8 @@ export function financialYearCategoryMemberIds(financialYear, section, categoryI
     ? financialYear?.months?.[month]?.[section]?.categories?.[categoryId]
     : annualCategory(financialYear, section, categoryId)
   const memberIds = new Set()
-  for (const item of Object.values(category?.subcategories || {})) {
-    for (const [memberId, value] of Object.entries(item.memberValues || {})) {
+  for (const subcategory of Object.values(category?.subcategories || {})) {
+    for (const [memberId, value] of Object.entries(subcategory.memberValues || {})) {
       if (Number(value) !== 0) memberIds.add(memberId)
     }
   }
@@ -133,6 +219,38 @@ export function financialYearSubcategoryValue(
 export function financialYearExpenseItemValue(item, modelValue) {
   if (item?.source === 'tracked') return moneyOrZero(item.effective)
   return modelValue === undefined ? moneyOrZero(item?.effective) : moneyOrZero(modelValue)
+}
+
+export function financialYearExpenseModelItemValue(
+  financialYear,
+  categoryId,
+  subcategoryId,
+  itemId,
+  memberId = 'all',
+) {
+  return moneyOrZero(
+    Object.values(financialYear?.months || {}).reduce((sum, month) => {
+      const item =
+        month?.expenses?.categories?.[categoryId]?.subcategories?.[subcategoryId]?.items?.[itemId]
+      return sum + itemValue(item, 'expenses', memberId)
+    }, 0),
+  )
+}
+
+export function financialYearIncomeModelItemValue(
+  financialYear,
+  categoryId,
+  subcategoryId,
+  itemId,
+  memberId = 'all',
+) {
+  return moneyOrZero(
+    Object.values(financialYear?.months || {}).reduce((sum, month) => {
+      const item =
+        month?.income?.categories?.[categoryId]?.subcategories?.[subcategoryId]?.items?.[itemId]
+      return sum + itemValue(item, 'income', memberId)
+    }, 0),
+  )
 }
 
 function annualCategory(financialYear, section, categoryId) {
@@ -169,7 +287,29 @@ function itemValue(item, section, memberId) {
   return section === 'expenses' ? financialYearExpenseItemValue(item) : moneyOrZero(item.total)
 }
 
+function monthAvailableIncomeValue(month, memberId) {
+  return Object.values(month?.income?.categories || {}).reduce(
+    (monthTotal, category) =>
+      monthTotal +
+      Object.values(category?.subcategories || {}).reduce((subcategoryTotal, subcategory) => {
+        return (
+          subcategoryTotal +
+          Object.values(subcategory?.items || {}).reduce((itemTotal, item) => {
+            const percentage = percentageOrDefault(item?.disposablePercentage)
+            return itemTotal + (itemValue(item, 'income', memberId) * percentage) / 100
+          }, 0)
+        )
+      }, 0),
+    0,
+  )
+}
+
 function moneyOrZero(value) {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : 0
+}
+
+function percentageOrDefault(value) {
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0 && number <= 100 ? number : 100
 }

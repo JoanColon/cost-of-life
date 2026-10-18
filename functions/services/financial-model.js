@@ -34,18 +34,14 @@ async function mutateFinancialModel(
     itemId = null,
     item = null,
     categoryId = null,
-    subcategories = null,
   },
 ) {
   assertText(workspaceId, 'A workspace is required')
   assertText(userId, 'Authentication is required')
   const definition = sectionDefinitions[section]
   if (!definition) throw new Error('A valid financial section is required')
-  if (!['create', 'update', 'delete', 'deleteCategory', 'syncTracking'].includes(operation)) {
+  if (!['create', 'update', 'delete', 'deleteCategory'].includes(operation)) {
     throw new Error('A valid model operation is required')
-  }
-  if (operation === 'syncTracking' && section !== 'expenses') {
-    throw new Error('Tracking can only be synchronized with expenses')
   }
 
   const year = currentYear()
@@ -56,15 +52,7 @@ async function mutateFinancialModel(
   const itemsReference = workspaceReference.collection(definition.collection)
   const financialYearReference = workspaceReference.collection('financialYears').doc(String(year))
   const requestedItem = operation === 'create' ? validatedCanonicalItem(section, item) : null
-  const requestedSubcategories =
-    operation === 'syncTracking' ? canonicalTrackingSubcategories(subcategories) : []
-  const itemReference = resolveItemReference(
-    itemsReference,
-    section,
-    operation,
-    itemId,
-    requestedItem,
-  )
+  const itemReference = resolveItemReference(itemsReference, operation, itemId)
 
   return firestore.runTransaction(async (transaction) => {
     const [workspaceSnapshot, configSnapshot, financialYearSnapshot] = await Promise.all([
@@ -97,15 +85,10 @@ async function mutateFinancialModel(
     const existingItems = documents(itemsSnapshot)
     let nextItems = existingItems
     let response
-    let modelChanged = operation !== 'syncTracking'
-    let configChanged = false
 
     if (operation === 'create') {
-      assertCategoryEnabled(config, requestedItem.category, section)
+      assertCategoryEnabled(config, itemCategoryId(section, requestedItem), section)
       assertOwnershipMembers(requestedItem.ownership, workspace.memberIds)
-      if (itemSnapshot?.exists) {
-        throw new Error('Only one expense is allowed for each standard subcategory')
-      }
       const itemData = withAuditFields(requestedItem, userId, true)
       nextItems = [...existingItems, { id: itemReference.id, ...itemData }]
       transaction.set(itemReference, itemData)
@@ -115,17 +98,23 @@ async function mutateFinancialModel(
     if (operation === 'update') {
       if (!itemSnapshot?.exists) throw new Error(`${capitalize(definition.result)} not found`)
       const previous = itemSnapshot.data()
-      if (!config.categories?.[previous.category]) {
-        throw new Error(`Itemized ${definition.result} category not found`)
+      const previousCategoryId = itemCategoryId(section, previous)
+      if (!config.categories?.[previousCategoryId]) {
+        throw new Error(`${capitalize(definition.result)} category not found`)
       }
       const updated = validatedCanonicalItem(section, {
         ...previous,
         ...item,
-        category: previous.category,
+        ...(['expenses', 'income'].includes(section) ?
+          { categoryId: previousCategoryId, subcategoryId: previous.subcategoryId } :
+          { category: previousCategoryId }),
       })
       assertOwnershipMembers(updated.ownership, workspace.memberIds)
-      if (section === 'expenses' && updated.type !== previous.type) {
-        throw new Error('An expense subcategory cannot be changed after creation')
+      if (
+        ['expenses', 'income'].includes(section) &&
+        updated.subcategoryId !== previous.subcategoryId
+      ) {
+        throw new Error(`A ${section.slice(0, -1)} subcategory cannot be changed after creation`)
       }
       const itemData = withAuditFields({ ...previous, ...updated }, userId, false)
       nextItems = existingItems.map((candidate) =>
@@ -140,25 +129,26 @@ async function mutateFinancialModel(
       const deletedItem = itemSnapshot.data()
       nextItems = existingItems.filter((candidate) => candidate.id !== itemReference.id)
       transaction.delete(itemReference)
-      if (section === 'expenses' && deletedItem.type !== 'other') {
-        removeTrackingPreferences(transaction, trackingConfigReference, [deletedItem.type], userId)
-      }
-      response = { categoryId: deletedItem.category }
+      response = { categoryId: itemCategoryId(section, deletedItem) }
     }
 
     if (operation === 'deleteCategory') {
       assertText(categoryId, `A ${definition.result} category is required`)
-      const categoryItems = existingItems.filter((candidate) => candidate.category === categoryId)
+      const categoryItems = existingItems.filter(
+        (candidate) => itemCategoryId(section, candidate) === categoryId,
+      )
       if (categoryItems.length > 498) {
         throw new Error('Categories with more than 498 items cannot be deleted at once')
       }
-      nextItems = existingItems.filter((candidate) => candidate.category !== categoryId)
+      nextItems = existingItems.filter(
+        (candidate) => itemCategoryId(section, candidate) !== categoryId,
+      )
       categoryItems.forEach((candidate) => transaction.delete(itemsReference.doc(candidate.id)))
       if (section === 'expenses') {
         removeTrackingPreferences(
           transaction,
           trackingConfigReference,
-          categoryItems.filter(({ type }) => type !== 'other').map(({ type }) => type),
+          [...new Set(categoryItems.map(({ subcategoryId }) => subcategoryId))],
           userId,
         )
       }
@@ -176,77 +166,6 @@ async function mutateFinancialModel(
       )
       response = { categoryId }
     }
-
-    if (operation === 'syncTracking') {
-      const selectedIds = requestedSubcategories.map(({ type }) => type)
-
-      for (const requested of requestedSubcategories) {
-        const previousCategory = config.categories[requested.category] || {
-          enabled: false,
-          manualEstimate: { amount: 0, frequency: 'monthly' },
-          necessity: null,
-          ownership: createTrackingOwnership(workspace.memberIds),
-        }
-        if (!previousCategory.enabled) {
-          config.categories[requested.category] = { ...previousCategory, enabled: true }
-          modelChanged = true
-          configChanged = true
-        }
-
-        const existing = nextItems.find(
-          (candidate) =>
-            candidate.category === requested.category && candidate.type === requested.type,
-        )
-        if (existing) {
-          continue
-        }
-
-        const firstItem = !nextItems.some(
-          (candidate) => candidate.category === requested.category,
-        )
-        const category = config.categories[requested.category]
-        const estimate = firstItem ? category.manualEstimate || requested.estimate : requested.estimate
-        const expense = validatedCanonicalItem('expenses', {
-          ...requested,
-          estimate,
-          monthlyAmounts:
-            (firstItem ? category.monthlyAmounts : requested.monthlyAmounts) ||
-            generateTrackingMonthlyAmounts(estimate),
-          ownership: category.ownership || createTrackingOwnership(workspace.memberIds),
-        })
-        assertOwnershipMembers(expense.ownership, workspace.memberIds)
-        const itemData = withAuditFields(expense, userId, true)
-        const reference = itemsReference.doc(`${expense.category}--${expense.type}`)
-        nextItems = [...nextItems, { id: reference.id, ...itemData }]
-        transaction.set(reference, itemData)
-        modelChanged = true
-      }
-
-      if (configChanged) {
-        transaction.set(
-          configReference,
-          {
-            categories: config.categories,
-            updatedAt: FieldValue.serverTimestamp(),
-            updatedBy: userId,
-          },
-          { merge: true },
-        )
-      }
-      transaction.set(
-        trackingConfigReference,
-        {
-          schemaVersion: 1,
-          enabledSubcategories: selectedIds,
-          updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: userId,
-        },
-        { merge: true },
-      )
-      response = { enabledSubcategories: selectedIds }
-    }
-
-    if (!modelChanged) return response
 
     const latest = financialYearSnapshot.data()
     const projectionInput = {
@@ -279,7 +198,7 @@ async function mutateFinancialModel(
 }
 
 function validatedCanonicalItem(section, item = {}) {
-  const category = item.category
+  const category = ['expenses', 'income'].includes(section) ? item.categoryId : item.category
   assertText(category, `A valid ${section} category is required`)
   if (category !== category.trim()) throw new Error(`A valid ${section} category is required`)
   assertCanonicalOwnership(item.ownership)
@@ -301,46 +220,21 @@ function validatedCanonicalItem(section, item = {}) {
   }
 
   if (section === 'income') {
-    assertCanonicalText(item.subtype, 'A valid income type is required')
-    assertCanonicalTextField(item.name, 'A canonical income name is required')
+    assertCanonicalText(item.subcategoryId, 'A valid income subcategory is required')
+    assertCanonicalText(item.itemName, 'An income item name is required')
+    assertCanonicalTextField(item.notes, 'Canonical income notes are required')
     assertCanonicalIncomeCalculation(item.calculation)
-    return cleanItem({ ...item, category })
+    return cleanItem({ ...item, categoryId: category, disposablePercentage: 100 })
   }
 
   return canonicalExpense(item, category)
 }
 
-function canonicalTrackingSubcategories(subcategories) {
-  if (!Array.isArray(subcategories)) {
-    throw new Error('Tracking subcategories are required')
-  }
-  const seen = new Set()
-  return subcategories.map((subcategory) => {
-    const category = subcategory?.category
-    const type = subcategory?.type
-    assertCanonicalText(category, 'A valid expense category is required')
-    assertCanonicalText(type, 'A valid expense type is required')
-    if (type === 'other' || seen.has(type)) {
-      throw new Error('Tracking subcategories must be unique standard expenses')
-    }
-    seen.add(type)
-    const canonical = canonicalExpense(
-      {
-        ...subcategory,
-        category,
-        type,
-        ownership: { mode: 'single', shares: [{ memberId: 'pending', percentage: 100 }] },
-      },
-      category,
-    )
-    delete canonical.ownership
-    return canonical
-  })
-}
-
 function canonicalExpense(item, category) {
-  assertCanonicalText(item.type, 'A valid expense type is required')
-  assertCanonicalTextField(item.name, 'A canonical expense name is required')
+  assertCanonicalText(item.categoryId, 'A valid expense category is required')
+  assertCanonicalText(item.subcategoryId, 'A valid expense subcategory is required')
+  assertCanonicalText(item.itemName, 'An item name is required')
+  assertCanonicalTextField(item.notes, 'Canonical expense notes are required')
   assertNonNegativeMoney(item.estimate?.amount, 'A valid expense estimate is required')
   const frequency = item.estimate?.frequency
   if (
@@ -360,7 +254,7 @@ function canonicalExpense(item, category) {
   assertCanonicalMonthlyAmounts(item.monthlyAmounts)
   return cleanItem({
     ...item,
-    category,
+    categoryId: category,
   })
 }
 
@@ -396,16 +290,17 @@ function assertCanonicalIncomeCalculation(calculation) {
   }
 }
 
-function resolveItemReference(itemsReference, section, operation, itemId, item) {
-  if (operation === 'deleteCategory' || operation === 'syncTracking') return null
+function resolveItemReference(itemsReference, operation, itemId) {
+  if (operation === 'deleteCategory') return null
   if (operation === 'create') {
-    if (section === 'expenses' && item.type !== 'other') {
-      return itemsReference.doc(`${item.category}--${item.type}`)
-    }
     return itemsReference.doc()
   }
   assertText(itemId, 'A model item is required')
   return itemsReference.doc(itemId)
+}
+
+function itemCategoryId(section, item) {
+  return ['expenses', 'income'].includes(section) ? item.categoryId : item.category
 }
 
 function withAuditFields(item, userId, creating) {
@@ -470,20 +365,6 @@ function assertCanonicalOwnership(ownership) {
   }
 }
 
-function createTrackingOwnership(memberIds) {
-  if (!memberIds.length) throw new Error('Workspace membership is required')
-  const percentage = Math.floor(100000 / memberIds.length) / 1000
-  let allocated = 0
-  const shares = memberIds.map((memberId, index) => {
-    const share = index === memberIds.length - 1 ?
-      Math.round((100 - allocated) * 1000) / 1000 :
-      percentage
-    allocated += share
-    return { memberId, percentage: share }
-  })
-  return { mode: memberIds.length > 1 ? 'shared' : 'single', shares }
-}
-
 function assertOwnershipMembers(ownership, memberIds = []) {
   const allowed = new Set(memberIds)
   if (ownership.shares.some((share) => !allowed.has(share.memberId))) {
@@ -496,15 +377,6 @@ function assertCanonicalMonthlyAmounts(amounts) {
   for (const month of MONTHS) {
     assertNonNegativeMoney(amounts[month], 'Canonical monthly expense amounts are required')
   }
-}
-
-function generateTrackingMonthlyAmounts(estimate) {
-  const interval = { monthly: 1, every_two_months: 2, quarterly: 3, yearly: 12 }[
-    estimate.frequency
-  ]
-  return Object.fromEntries(
-    MONTHS.map((month, index) => [month, index % interval === 0 ? estimate.amount : 0]),
-  )
 }
 
 function assertWorkspaceAccess(snapshot, userId) {

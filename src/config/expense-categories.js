@@ -108,7 +108,11 @@ export const expenseCategories = [
       suggestion('activities', 'monthly', 'variable', 'recurring', null),
     ],
   },
-  { id: 'other', icon: 'category', suggestions: [] },
+  {
+    id: 'other',
+    icon: 'category',
+    suggestions: [suggestion('other', 'monthly', 'variable', 'recurring', null)],
+  },
 ].map((category) => ({
   ...category,
   nameKey: `expenses.categories.${category.id}.name`,
@@ -119,4 +123,12 @@ export const expenseCategoryIds = expenseCategories.map((category) => category.i
 
 export function getExpenseCategory(categoryId) {
   return expenseCategories.find((category) => category.id === categoryId) || null
+}
+
+export function getExpenseSubcategory(subcategoryId) {
+  for (const category of expenseCategories) {
+    const subcategory = category.suggestions.find(({ id }) => id === subcategoryId)
+    if (subcategory) return { ...subcategory, categoryId: category.id }
+  }
+  return null
 }

@@ -35,6 +35,7 @@
                 min="0"
                 step="0.01"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 prefix="€"
                 autofocus
@@ -45,6 +46,7 @@
               <q-select
                 v-model="frequency"
                 outlined
+                :dense="$q.screen.lt.sm"
                 hide-bottom-space
                 emit-value
                 map-options
