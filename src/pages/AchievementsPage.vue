@@ -16,7 +16,7 @@
           <h1>{{ t('achievements.title') }}</h1>
           <p v-if="visibleMilestones.length">
             {{
-              t('milestones.reachedSummary', {
+              t(trackingActive ? 'milestones.reachedSummary' : 'milestones.setup.previewSummary', {
                 achieved: achievedCount,
                 total: visibleMilestones.length,
               })
@@ -24,6 +24,26 @@
           </p>
         </div>
       </header>
+
+      <q-banner v-if="!trackingActive && !loading" rounded class="setup-banner">
+        <template #avatar>
+          <q-icon name="flag" />
+        </template>
+        <div class="setup-banner-copy">
+          <strong>{{ t('milestones.setup.title') }}</strong>
+          <p>{{ t('milestones.setup.description') }}</p>
+        </div>
+        <template #action>
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            icon="task_alt"
+            :label="t('milestones.setup.action')"
+            @click="activationDialogOpen = true"
+          />
+        </template>
+      </q-banner>
 
       <div v-if="loading && !progress.length" class="state">
         <q-spinner color="primary" size="2rem" />
@@ -48,20 +68,45 @@
           class="family-card"
           :class="`family--${family.id}`"
         >
-          <button
-            type="button"
+          <div
             class="family-header"
             :class="{ expanded: isExpanded(family.id) }"
-            :aria-expanded="isExpanded(family.id)"
-            :aria-controls="`achievements-${family.id}`"
             @click="toggleFamily(family.id)"
           >
             <span class="family-icon"><q-icon :name="family.icon" /></span>
             <div class="family-copy">
-              <h2>{{ t(`milestones.families.${family.id}.title`) }}</h2>
+              <div class="family-title">
+                <h2>{{ t(`milestones.families.${family.id}.title`) }}</h2>
+                <q-btn
+                  flat
+                  round
+                  dense
+                  size="sm"
+                  icon="info_outline"
+                  class="family-info-button"
+                  :aria-label="
+                    t('milestones.familyInfoAction', {
+                      family: t(`milestones.families.${family.id}.title`),
+                    })
+                  "
+                  @click.stop="showFamilyInfo(family.id)"
+                  @keydown.stop
+                />
+              </div>
               <p>{{ t(`milestones.families.${family.id}.description`) }}</p>
             </div>
-            <span class="family-meta">
+            <button
+              type="button"
+              class="family-meta"
+              :aria-expanded="isExpanded(family.id)"
+              :aria-controls="`achievements-${family.id}`"
+              :aria-label="
+                t('achievements.toggleFamily', {
+                  family: t(`milestones.families.${family.id}.title`),
+                })
+              "
+              @click.stop="toggleFamily(family.id)"
+            >
               <strong>{{
                 t('achievements.familyCount', {
                   achieved: family.achieved,
@@ -69,8 +114,8 @@
                 })
               }}</strong>
               <q-icon name="expand_more" class="expand-icon" />
-            </span>
-          </button>
+            </button>
+          </div>
 
           <q-slide-transition>
             <div
@@ -81,20 +126,30 @@
               <article
                 v-for="milestone in family.milestones"
                 :key="milestone.id"
-                :class="{ unlocked: milestone.previouslyAchieved }"
+                :class="{
+                  unlocked: milestoneIsUnlocked(milestone),
+                  pending: milestone.pending,
+                  preview: !trackingActive && milestone.reached,
+                }"
               >
                 <span class="status-icon">
-                  <q-icon :name="milestone.previouslyAchieved ? 'emoji_events' : 'lock_outline'" />
+                  <q-icon :name="milestoneStatusIcon(milestone)" />
                 </span>
                 <div>
                   <strong>{{ t(`milestones.items.${milestone.id}`) }}</strong>
                   <p>{{ descriptionFor(milestone) }}</p>
-                  <small v-if="milestone.previouslyAchieved">{{
+                  <small v-if="milestone.pending">{{
+                    t('milestones.status.pendingConfirmation')
+                  }}</small>
+                  <small v-else-if="trackingActive && milestone.previouslyAchieved">{{
                     achievedDateLabel(milestone.id)
+                  }}</small>
+                  <small v-else-if="!trackingActive && milestone.reached">{{
+                    t('milestones.setup.previewReached')
                   }}</small>
                 </div>
                 <q-icon
-                  v-if="milestone.previouslyAchieved"
+                  v-if="milestoneIsUnlocked(milestone) && !milestone.pending"
                   class="check-icon"
                   name="check_circle"
                 />
@@ -106,6 +161,49 @@
           </q-slide-transition>
         </section>
       </div>
+
+      <q-dialog v-model="infoDialogOpen">
+        <q-card v-if="selectedInfoFamily" class="family-info-dialog">
+          <q-card-section class="family-info-heading">
+            <span class="family-icon" :class="`family-info-icon--${selectedInfoFamily.id}`">
+              <q-icon :name="selectedInfoFamily.icon" />
+            </span>
+            <h2>{{ t(`milestones.families.${selectedInfoFamily.id}.infoTitle`) }}</h2>
+            <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
+          </q-card-section>
+          <q-card-section class="family-info-copy">
+            <p>{{ t(`milestones.families.${selectedInfoFamily.id}.info`) }}</p>
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+
+      <q-dialog v-model="activationDialogOpen" persistent>
+        <q-card class="activation-dialog">
+          <q-card-section>
+            <div class="activation-icon"><q-icon name="task_alt" /></div>
+            <h2>{{ t('milestones.setup.confirmTitle') }}</h2>
+            <p>{{ t('milestones.setup.confirmDescription') }}</p>
+            <p class="activation-note">{{ t('milestones.setup.confirmNote') }}</p>
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn
+              v-close-popup
+              flat
+              no-caps
+              :label="t('common.cancel')"
+              :disable="activationLoading"
+            />
+            <q-btn
+              unelevated
+              no-caps
+              color="primary"
+              :label="t('milestones.setup.confirmAction')"
+              :loading="activationLoading"
+              @click="activateTracking"
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
     </main>
   </q-page>
 </template>
@@ -113,6 +211,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { milestoneFamilies } from '@/config/milestone-families'
@@ -120,11 +219,16 @@ import { useMilestonesStore } from '@/stores/milestones-store'
 import { formatCurrency } from '@/utils/formatters'
 
 const { t } = useI18n()
+const $q = useQuasar()
 const route = useRoute()
 const milestonesStore = useMilestonesStore()
 const workspaceId = computed(() => String(route.params.workspaceId))
-const { achievements, error, loading, progress } = storeToRefs(milestonesStore)
+const { achievements, activationLoading, error, loading, progress, trackingActive } =
+  storeToRefs(milestonesStore)
 const expandedFamilies = ref(new Set())
+const infoDialogOpen = ref(false)
+const activationDialogOpen = ref(false)
+const selectedInfoFamilyId = ref(null)
 
 watch(
   workspaceId,
@@ -142,7 +246,7 @@ const visibleMilestones = computed(() =>
   ),
 )
 const achievedCount = computed(
-  () => visibleMilestones.value.filter(({ previouslyAchieved }) => previouslyAchieved).length,
+  () => visibleMilestones.value.filter((milestone) => milestoneIsUnlocked(milestone)).length,
 )
 const families = computed(() =>
   milestoneFamilies.map((family) => {
@@ -152,12 +256,15 @@ const families = computed(() =>
     return {
       ...family,
       milestones,
-      achieved: milestones.filter(({ previouslyAchieved }) => previouslyAchieved).length,
+      achieved: milestones.filter((milestone) => milestoneIsUnlocked(milestone)).length,
     }
   }),
 )
 const achievementById = computed(
   () => new Map(achievements.value.map((achievement) => [achievement.milestoneId, achievement])),
+)
+const selectedInfoFamily = computed(() =>
+  milestoneFamilies.find(({ id }) => id === selectedInfoFamilyId.value),
 )
 
 function retry() {
@@ -173,6 +280,31 @@ function toggleFamily(familyId) {
   if (next.has(familyId)) next.delete(familyId)
   else next.add(familyId)
   expandedFamilies.value = next
+}
+
+function showFamilyInfo(familyId) {
+  selectedInfoFamilyId.value = familyId
+  infoDialogOpen.value = true
+}
+
+function milestoneIsUnlocked(milestone) {
+  return trackingActive.value ? milestone.previouslyAchieved : milestone.reached
+}
+
+function milestoneStatusIcon(milestone) {
+  if (milestone.pending) return 'schedule'
+  if (milestoneIsUnlocked(milestone)) return trackingActive.value ? 'emoji_events' : 'visibility'
+  return 'lock_outline'
+}
+
+async function activateTracking() {
+  try {
+    await milestonesStore.activateTracking()
+    activationDialogOpen.value = false
+    $q.notify({ type: 'positive', message: t('milestones.setup.activated') })
+  } catch {
+    $q.notify({ type: 'negative', message: t('milestones.setup.activationError') })
+  }
 }
 
 function descriptionFor(milestone) {
@@ -227,6 +359,28 @@ h1 {
   margin: 0.5rem 0 0;
 }
 
+.setup-banner {
+  margin-top: 1.5rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-blue-soft);
+  color: var(--color-ink);
+}
+.setup-banner :deep(.q-banner__avatar) {
+  color: var(--color-primary);
+  font-size: 1.7rem;
+}
+.setup-banner-copy strong,
+.setup-banner-copy p {
+  display: block;
+}
+.setup-banner-copy p {
+  max-width: 42rem;
+  margin: 0.2rem 0 0;
+  color: var(--color-copy);
+  font-size: 0.84rem;
+}
+
 .family-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -265,6 +419,14 @@ h1 {
   flex: 1;
   min-width: 0;
 }
+.family-title {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.family-info-button {
+  color: var(--color-copy);
+}
 .family-header h2,
 .family-header p {
   margin: 0;
@@ -282,6 +444,16 @@ h1 {
   gap: 0.6rem;
   flex: 0 0 auto;
   margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.family-meta:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
 }
 .family-meta strong {
   color: var(--color-copy);
@@ -321,6 +493,76 @@ h1 {
 .family--freedom .family-icon {
   background: var(--color-purple-soft);
   color: var(--color-purple);
+}
+
+.family-info-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  border-radius: var(--radius-card);
+  color: var(--color-ink);
+}
+.family-info-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding-bottom: 0.75rem;
+}
+.family-info-heading h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.15rem;
+}
+.family-info-icon--safety {
+  background: var(--color-green-soft);
+  color: var(--color-success-dark);
+}
+.family-info-icon--debt {
+  background: var(--color-red-soft);
+  color: var(--color-danger);
+}
+.family-info-icon--freedom {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
+}
+.family-info-copy {
+  padding-top: 0;
+}
+.family-info-copy p {
+  margin: 0;
+  color: var(--color-copy);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.activation-dialog {
+  width: min(31rem, calc(100vw - 2rem));
+  border-radius: var(--radius-card);
+  color: var(--color-ink);
+}
+.activation-dialog h2 {
+  margin: 0.8rem 0 0;
+  font-size: 1.3rem;
+}
+.activation-dialog p {
+  margin: 0.55rem 0 0;
+  color: var(--color-copy);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.activation-icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-green-soft);
+  color: var(--color-success-dark);
+  font-size: 1.45rem;
+}
+.activation-dialog .activation-note {
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  font-size: 0.8rem;
 }
 
 .achievement-list article {
@@ -371,6 +613,17 @@ h1 {
 .unlocked .status-icon {
   background: var(--color-green-soft);
   color: var(--color-success-dark);
+}
+.pending {
+  opacity: 1 !important;
+}
+.pending .status-icon {
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
+}
+.preview .status-icon {
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
 }
 .check-icon {
   margin-left: auto;

@@ -1,12 +1,4 @@
 import { normalizeDisposablePercentage } from './income-calculations'
-import { milestoneDefinitions } from '@/domain/milestones/definitions'
-
-export const emergencyFundMonths = Object.freeze(
-  milestoneDefinitions
-    .filter(({ family }) => family === 'safety')
-    .map(({ target }) => target)
-    .sort((left, right) => left - right),
-)
 export const investmentHorizons = Object.freeze([10, 20, 30])
 
 export const defaultWhatIfConfig = Object.freeze({
@@ -63,9 +55,8 @@ export function calculateCashScenario({
   currentMonthlySavings = 0,
   simulatedMonthlySavings = 0,
 } = {}) {
-  if (!(currentMonthlyCost > 0) || cash >= currentMonthlyCost * 12) return null
-  const targetMonths =
-    emergencyFundMonths.find((months) => cash < currentMonthlyCost * months) || 12
+  if (!(currentMonthlyCost > 0)) return null
+  const targetMonths = 12
   const currentTarget = money(currentMonthlyCost * targetMonths)
   const simulatedTarget = money(simulatedMonthlyCost * targetMonths)
   const currentMonths = monthsToTarget(cash, currentTarget, currentMonthlySavings)
@@ -76,6 +67,7 @@ export function calculateCashScenario({
     simulatedTarget,
     currentMonths,
     simulatedMonths,
+    achieved: cash >= simulatedTarget,
     monthsSooner:
       currentMonths == null || simulatedMonths == null
         ? null

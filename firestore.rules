@@ -21,18 +21,53 @@ service cloud.firestore {
       );
     }
 
+    function isMilestoneTrackingActive(workspace) {
+      return 'milestoneTracking' in workspace
+        && workspace.milestoneTracking.status == 'active';
+    }
+
+    function isMilestoneActivation(workspaceId) {
+      let before = get(
+        /databases/$(database)/documents/workspaces/$(workspaceId)
+      ).data;
+      let after = getAfter(
+        /databases/$(database)/documents/workspaces/$(workspaceId)
+      ).data;
+      return !isMilestoneTrackingActive(before)
+        && isMilestoneTrackingActive(after)
+        && after.milestoneTracking.activatedAt == request.time;
+    }
+
     match /workspaces/{workspaceId} {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.auth.uid in request.resource.data.memberIds
         && request.resource.data.members[request.auth.uid].role == 'owner'
-        && isWorkspaceActive(request.resource.data);
+        && isWorkspaceActive(request.resource.data)
+        && (
+          !('milestoneTracking' in request.resource.data)
+          || (
+            request.resource.data.milestoneTracking.keys().hasOnly(['status'])
+            && request.resource.data.milestoneTracking.status == 'setup'
+          )
+        );
       allow read: if isWorkspaceMember(resource.data);
       allow update: if isWorkspaceMember(resource.data)
         && isWorkspaceActive(resource.data)
         && isWorkspaceActive(request.resource.data)
         && !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['memberIds', 'members']);
+          .hasAny(['memberIds', 'members'])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['milestoneTracking'])
+          || (
+            !isMilestoneTrackingActive(resource.data)
+            && request.resource.data.milestoneTracking.keys()
+              .hasOnly(['status', 'activatedAt'])
+            && request.resource.data.milestoneTracking.status == 'active'
+            && request.resource.data.milestoneTracking.activatedAt == request.time
+          )
+        );
       allow delete: if false;
 
       match /financialYears/{year} {
@@ -46,17 +81,96 @@ service cloud.firestore {
           && isWorkspaceActive(
             get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
           )
-          && request.resource.data.keys().hasOnly([
-            'milestoneId',
-            'family',
-            'achievedAt',
-            'achievedValue'
-          ])
           && request.resource.data.milestoneId == milestoneId
-          && request.resource.data.achievedAt == request.time
-          && request.resource.data.achievedValue is number
-          && request.resource.data.family in ['safety', 'netWorth', 'debt', 'freedom'];
-        allow update, delete: if false;
+          && request.resource.data.family in ['safety', 'netWorth', 'debt', 'freedom']
+          && (
+            (
+              isMilestoneTrackingActive(
+                get(
+                  /databases/$(database)/documents/workspaces/$(workspaceId)
+                ).data
+              )
+              && request.resource.data.keys().hasOnly([
+                'milestoneId',
+                'family',
+                'status',
+                'qualifiedAt',
+                'qualifiedValue'
+              ])
+              && request.resource.data.status == 'pending'
+              && request.resource.data.qualifiedAt == request.time
+              && request.resource.data.qualifiedValue is number
+            )
+            || (
+              isMilestoneActivation(workspaceId)
+              && request.resource.data.keys().hasOnly([
+                'milestoneId',
+                'family',
+                'status',
+                'achievedAt',
+                'achievedValue'
+              ])
+              && request.resource.data.status == 'achieved'
+              && request.resource.data.achievedAt == request.time
+              && request.resource.data.achievedValue is number
+            )
+          );
+        allow update: if isWorkspaceMemberById(workspaceId)
+          && isWorkspaceActive(
+            get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
+          )
+          && (
+            (
+              isMilestoneTrackingActive(
+                get(
+                  /databases/$(database)/documents/workspaces/$(workspaceId)
+                ).data
+              )
+              && resource.data.status == 'pending'
+              && request.resource.data.keys().hasOnly([
+                'milestoneId',
+                'family',
+                'status',
+                'qualifiedAt',
+                'qualifiedValue',
+                'achievedAt',
+                'achievedValue'
+              ])
+              && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'achievedAt', 'achievedValue'])
+              && request.resource.data.status == 'achieved'
+              && request.resource.data.achievedAt == request.time
+              && request.resource.data.achievedValue is number
+              && resource.data.qualifiedAt <= request.time - duration.value(24, 'h')
+            )
+            || (
+              isMilestoneActivation(workspaceId)
+              && request.resource.data.keys().hasOnly([
+                'milestoneId',
+                'family',
+                'status',
+                'achievedAt',
+                'achievedValue'
+              ])
+              && request.resource.data.milestoneId == milestoneId
+              && request.resource.data.family in ['safety', 'netWorth', 'debt', 'freedom']
+              && request.resource.data.status == 'achieved'
+              && request.resource.data.achievedAt == request.time
+              && request.resource.data.achievedValue is number
+            )
+          );
+        allow delete: if isWorkspaceMemberById(workspaceId)
+          && (
+            (
+              resource.data.status == 'pending'
+              && isMilestoneTrackingActive(
+                get(
+                  /databases/$(database)/documents/workspaces/$(workspaceId)
+                ).data
+              )
+            )
+            || isMilestoneActivation(workspaceId)
+          );
       }
 
       match /modelConfig/{configId} {

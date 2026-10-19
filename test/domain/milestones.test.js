@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 
 describe('milestones', () => {
+  it('uses the simplified net worth and freedom milestone sets', () => {
+    const progress = calculateMilestoneProgress({
+      financialYear: financialYear({ annualCost: 12_000 }),
+      month: '10',
+    })
+
+    expect(
+      progress.filter(({ family }) => family === 'netWorth').map(({ target }) => target),
+    ).toEqual([0, 100_000, 250_000, 500_000, 1_000_000])
+    expect(
+      progress.filter(({ family }) => family === 'freedom').map(({ target }) => target),
+    ).toEqual([5, 10, 15, 20, 25])
+  })
+
   it('calculates safety, net worth and freedom from the current workspace totals', () => {
     const progress = calculateMilestoneProgress({
       financialYear: financialYear({
@@ -15,11 +29,6 @@ describe('milestones', () => {
 
     expect(milestone(progress, 'safety_12_months')).toMatchObject({
       currentValue: 30,
-      progress: 1,
-      reached: true,
-    })
-    expect(milestone(progress, 'net_worth_50000')).toMatchObject({
-      currentValue: 70_000,
       progress: 1,
       reached: true,
     })
@@ -46,7 +55,7 @@ describe('milestones', () => {
       progress: 0,
       reached: false,
     })
-    expect(milestone(progress, 'freedom_1_year')).toMatchObject({
+    expect(milestone(progress, 'freedom_5_years')).toMatchObject({
       currentValue: 0,
       progress: 0,
       reached: false,
@@ -65,6 +74,28 @@ describe('milestones', () => {
     expect(safety.progress).toBeCloseTo(1 / 6)
     expect(safety.reached).toBe(false)
     expect(safety.previouslyAchieved).toBe(true)
+  })
+
+  it('distinguishes pending milestones from permanent achievements', () => {
+    const qualifiedAt = new Date('2026-10-18T10:00:00Z')
+    const progress = calculateMilestoneProgress({
+      financialYear: financialYear({ cash: 6_000, annualCost: 12_000 }),
+      achievements: [
+        { milestoneId: 'safety_6_months', status: 'pending', qualifiedAt },
+        { milestoneId: 'safety_3_months', status: 'achieved' },
+      ],
+      month: '10',
+    })
+
+    expect(milestone(progress, 'safety_6_months')).toMatchObject({
+      pending: true,
+      previouslyAchieved: false,
+      qualifiedAt,
+    })
+    expect(milestone(progress, 'safety_3_months')).toMatchObject({
+      pending: false,
+      previouslyAchieved: true,
+    })
   })
 
   it('only makes debt milestones relevant after a positive historical balance', () => {

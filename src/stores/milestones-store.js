@@ -3,14 +3,17 @@ import { defineStore } from 'pinia'
 import { currentFinancialMonth, currentFinancialYear } from '@/domain/financial/financial-year'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {
-  createMissingAchievements,
+  activateMilestoneTracking as activateMilestoneTrackingDocuments,
   getAchievements,
+  syncMilestoneAchievements,
 } from '@/services/firebase/achievements.service'
 import { getFinancialHistory } from '@/services/firebase/history.service'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 
 export const useMilestonesStore = defineStore('milestones', () => {
   const financialYearsStore = useFinancialYearsStore()
+  const workspaceStore = useWorkspaceStore()
   const workspaceId = ref(null)
   const loadedKey = ref(null)
   const currentYear = ref(currentFinancialYear())
@@ -23,18 +26,23 @@ export const useMilestonesStore = defineStore('milestones', () => {
   const achievementsError = ref(null)
   const achievementsReady = ref(false)
   const achievementSyncing = ref(false)
+  const activationLoading = ref(false)
   let requestId = 0
   let achievementSyncPending = false
 
   const financialYear = computed(() =>
     workspaceId.value ? financialYearsStore.get(workspaceId.value, currentYear.value) : null,
   )
+  const workspace = computed(
+    () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
+  )
+  const trackingActive = computed(() => workspace.value?.milestoneTracking?.status === 'active')
   const progress = computed(() => {
     if (!financialYear.value || !achievementsReady.value) return []
     return calculateMilestoneProgress({
       financialYear: financialYear.value,
       financialHistory: historyDocuments.value,
-      achievements: achievements.value,
+      achievements: trackingActive.value ? achievements.value : [],
       month: currentMonth.value,
     })
   })
@@ -48,7 +56,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
       achievementsError.value,
   )
 
-  watch(financialYear, () => syncAchievements(progress.value))
+  watch([financialYear, trackingActive], () => syncAchievements(progress.value))
 
   async function load(id, force = false) {
     if (!id) return
@@ -96,8 +104,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
   }
 
   async function syncAchievements(currentProgress) {
-    if (!currentProgress.some(({ reached, previouslyAchieved }) => reached && !previouslyAchieved))
-      return
+    if (!trackingActive.value || !currentProgress.length) return
     if (achievementSyncing.value) {
       achievementSyncPending = true
       return
@@ -106,13 +113,13 @@ export const useMilestonesStore = defineStore('milestones', () => {
     const activeWorkspaceId = workspaceId.value
     achievementSyncing.value = true
     try {
-      const resolved = await createMissingAchievements(activeWorkspaceId, currentProgress)
-      if (workspaceId.value !== activeWorkspaceId || !resolved.length) return
-      const resolvedIds = new Set(resolved.map(({ milestoneId }) => milestoneId))
-      achievements.value = [
-        ...achievements.value.filter(({ milestoneId }) => !resolvedIds.has(milestoneId)),
-        ...resolved,
-      ]
+      const resolved = await syncMilestoneAchievements(
+        activeWorkspaceId,
+        currentProgress,
+        achievements.value,
+      )
+      if (workspaceId.value !== activeWorkspaceId) return
+      achievements.value = resolved
     } catch (syncError) {
       achievementsError.value = syncError
     } finally {
@@ -121,6 +128,29 @@ export const useMilestonesStore = defineStore('milestones', () => {
         achievementSyncPending = false
         syncAchievements(progress.value)
       }
+    }
+  }
+
+  async function activateTracking() {
+    if (!workspaceId.value || trackingActive.value || activationLoading.value) return
+
+    const activeWorkspaceId = workspaceId.value
+    activationLoading.value = true
+    achievementsError.value = null
+    try {
+      const result = await activateMilestoneTrackingDocuments(
+        activeWorkspaceId,
+        progress.value,
+        achievements.value,
+      )
+      if (workspaceId.value !== activeWorkspaceId) return
+      achievements.value = result.achievements
+      workspaceStore.setMilestoneTracking(activeWorkspaceId, result.milestoneTracking)
+    } catch (activationError) {
+      achievementsError.value = activationError
+      throw activationError
+    } finally {
+      activationLoading.value = false
     }
   }
 
@@ -139,10 +169,13 @@ export const useMilestonesStore = defineStore('milestones', () => {
     achievementsError.value = null
     achievementsReady.value = false
     achievementSyncing.value = false
+    activationLoading.value = false
   }
 
   return {
     achievements,
+    activateTracking,
+    activationLoading,
     currentMonth,
     currentYear,
     error,
@@ -154,5 +187,6 @@ export const useMilestonesStore = defineStore('milestones', () => {
     loading,
     progress,
     reset,
+    trackingActive,
   }
 })

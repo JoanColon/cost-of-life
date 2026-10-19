@@ -36,6 +36,21 @@ describe('expense tracking month', () => {
     ).toBe(true)
   })
 
+  it('exposes the additional expense subcategories to the tracker', () => {
+    expect(
+      expenseTrackingCategories
+        .filter(({ id }) =>
+          ['coffee_snacks', 'taxi_ride_sharing', 'subscriptions', 'pets'].includes(id),
+        )
+        .map(({ id, categoryId }) => ({ id, categoryId })),
+    ).toEqual([
+      { id: 'taxi_ride_sharing', categoryId: 'transportation' },
+      { id: 'coffee_snacks', categoryId: 'food' },
+      { id: 'subscriptions', categoryId: 'personal' },
+      { id: 'pets', categoryId: 'personal' },
+    ])
+  })
+
   it('keeps stored historical categories visible after they leave the current model', () => {
     const categories = reviewExpenseTrackingCategories(['groceries'], {
       categories: {

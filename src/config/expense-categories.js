@@ -28,6 +28,7 @@ export const expenseCategories = [
       suggestion('parking', 'monthly', 'variable', 'recurring', null),
       suggestion('vehicle_taxes', 'yearly', 'fixed', 'recurring', 'essential'),
       suggestion('public_transport', 'monthly', 'variable', 'recurring', 'essential'),
+      suggestion('taxi_ride_sharing', 'monthly', 'variable', 'recurring', null),
     ],
   },
   {
@@ -36,6 +37,7 @@ export const expenseCategories = [
     suggestions: [
       suggestion('groceries', 'monthly', 'variable', 'recurring', 'essential'),
       suggestion('restaurants_takeaway', 'monthly', 'variable', 'recurring', 'lifestyle'),
+      suggestion('coffee_snacks', 'monthly', 'variable', 'recurring', 'lifestyle'),
     ],
   },
   {
@@ -78,6 +80,8 @@ export const expenseCategories = [
       suggestion('personal_care', 'monthly', 'variable', 'recurring', null),
       suggestion('gym_fitness', 'monthly', 'fixed', 'recurring', 'lifestyle'),
       suggestion('gifts', 'yearly', 'variable', 'occasional', 'lifestyle'),
+      suggestion('subscriptions', 'monthly', 'fixed', 'recurring', 'lifestyle'),
+      suggestion('pets', 'monthly', 'variable', 'recurring', 'essential'),
     ],
   },
   {

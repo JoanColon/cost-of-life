@@ -34,6 +34,15 @@
       />
     </div>
     <template v-else>
+      <button v-if="!trackingActive" type="button" class="tracking-setup" @click="$emit('open')">
+        <q-icon name="visibility" />
+        <span>
+          <strong>{{ t('milestones.setup.dashboardTitle') }}</strong>
+          <small>{{ t('milestones.setup.dashboardDescription') }}</small>
+        </span>
+        <q-icon name="arrow_forward" />
+      </button>
+
       <div class="family-grid desktop-families">
         <MilestoneFamilyCard v-for="family in familySummaries" :key="family.id" :family="family" />
       </div>
@@ -63,6 +72,7 @@ import MilestoneFamilyCard from './MilestoneFamilyCard.vue'
 
 const props = defineProps({
   milestones: { type: Array, required: true },
+  trackingActive: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
   error: { type: Boolean, default: false },
 })
@@ -81,7 +91,9 @@ const familySummaries = computed(() =>
     const milestones = visibleMilestones.value.filter(
       ({ family: familyId }) => familyId === family.id,
     )
-    const nextMilestone = milestones.find(({ previouslyAchieved }) => !previouslyAchieved)
+    const nextMilestone = milestones.find((milestone) =>
+      props.trackingActive ? !milestone.previouslyAchieved : !milestone.reached,
+    )
     const completed = milestones.length > 0 && !nextMilestone
     return {
       ...family,
@@ -104,6 +116,32 @@ const familySummaries = computed(() =>
 
 .milestone-error .q-btn {
   margin-left: auto;
+}
+
+.tracking-setup {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tracking-setup span {
+  display: grid;
+  flex: 1;
+}
+
+.tracking-setup small {
+  margin-top: 0.1rem;
+  color: var(--color-copy);
 }
 
 .family-grid {

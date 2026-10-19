@@ -34,7 +34,7 @@ describe('What If calculations', () => {
     ).toBe(40)
   })
 
-  it('compares the same emergency-fund milestone on both paths', () => {
+  it('always compares the one-year emergency-fund milestone on both paths', () => {
     expect(
       calculateCashScenario({
         cash: 5_000,
@@ -43,7 +43,25 @@ describe('What If calculations', () => {
         currentMonthlySavings: 500,
         simulatedMonthlySavings: 700,
       }),
-    ).toMatchObject({ targetMonths: 3, currentMonths: 2, simulatedMonths: 1, monthsSooner: 1 })
+    ).toMatchObject({
+      targetMonths: 12,
+      currentMonths: 38,
+      simulatedMonths: 24,
+      monthsSooner: 14,
+      achieved: false,
+    })
+  })
+
+  it('keeps the cash scenario visible when the one-year milestone is achieved', () => {
+    expect(
+      calculateCashScenario({
+        cash: 25_000,
+        currentMonthlyCost: 2_000,
+        simulatedMonthlyCost: 2_000,
+        currentMonthlySavings: 500,
+        simulatedMonthlySavings: 700,
+      }),
+    ).toMatchObject({ targetMonths: 12, simulatedMonths: 0, achieved: true })
   })
 
   it('projects monthly investing and compares it with the current path', () => {

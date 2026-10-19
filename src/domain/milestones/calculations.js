@@ -12,7 +12,16 @@ export function calculateMilestoneProgress({
   achievements = [],
   month = currentFinancialMonth(),
 } = {}) {
-  const achievedIds = new Set(achievements.map(({ milestoneId }) => milestoneId))
+  const achievedIds = new Set(
+    achievements
+      .filter(({ status }) => !status || status === 'achieved')
+      .map(({ milestoneId }) => milestoneId),
+  )
+  const pendingById = new Map(
+    achievements
+      .filter(({ status }) => status === 'pending')
+      .map((achievement) => [achievement.milestoneId, achievement]),
+  )
   const history = withCurrentFinancialYear(financialHistory, financialYear)
   const annualCostOfLife = financialYearValue(financialYear, 'expenses')
   const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash')
@@ -44,6 +53,8 @@ export function calculateMilestoneProgress({
       progress: result.progress,
       reached: result.reached,
       previouslyAchieved: achievedIds.has(definition.id),
+      pending: pendingById.has(definition.id),
+      qualifiedAt: pendingById.get(definition.id)?.qualifiedAt || null,
       relevant: result.relevant,
     }
   })

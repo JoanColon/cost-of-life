@@ -44,6 +44,12 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     workspaces.value = workspaces.value.filter((workspace) => workspace.id !== workspaceId)
   }
 
+  function setMilestoneTracking(workspaceId, milestoneTracking) {
+    const index = workspaces.value.findIndex((workspace) => workspace.id === workspaceId)
+    if (index < 0) return
+    workspaces.value[index] = { ...workspaces.value[index], milestoneTracking }
+  }
+
   function reset() {
     workspaces.value = []
     error.value = null
@@ -59,6 +65,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     load,
     create,
     deleteWorkspace,
+    setMilestoneTracking,
     reset,
   }
 })

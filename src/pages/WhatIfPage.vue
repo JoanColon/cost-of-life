@@ -20,38 +20,39 @@
       </section>
       <template v-else>
         <header class="page-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('navigation.backToWorkspaceHome')"
-              :to="{ name: 'workspace-dashboard', params: { workspaceId } }"
-              class="back-button"
-            />
+          <div class="page-heading">
+            <div class="page-nav">
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="grey-7"
+                icon="arrow_back"
+                :label="t('navigation.backToWorkspaceHome')"
+                :to="{ name: 'workspace-dashboard', params: { workspaceId } }"
+                class="back-button"
+              />
+              <strong class="mobile-section-title">{{ t('navigation.whatIf') }}</strong>
+            </div>
             <h1>{{ t('whatIf.title') }}</h1>
             <p>{{ t('whatIf.subtitle') }}</p>
           </div>
         </header>
 
         <section class="simulator-card">
-          <div class="spending-summary">
-            <div>
-              <div class="spending-line">
-                <span>{{ t('whatIf.discretionary.title') }}</span>
-                <strong
-                  >{{ formatCurrency(simulation.monthlyDiscretionary)
-                  }}{{ t('whatIf.perMonth') }}</strong
-                >
+          <div class="simulator-controls">
+            <div class="spending-summary">
+              <div class="spending-label">
+                <span class="desktop-label">{{ t('whatIf.discretionary.reduceTitle') }}</span>
+                <span class="mobile-label">{{ t('whatIf.discretionary.title') }}</span>
+                <q-icon name="info_outline" />
               </div>
+              <strong
+                >{{ formatCurrency(simulation.monthlyDiscretionary)
+                }}{{ t('whatIf.perMonth') }}</strong
+              >
               <small>{{ t('whatIf.discretionary.description') }}</small>
             </div>
-          </div>
-
-          <div class="reduction-section">
-            <span>{{ t('whatIf.reduction.title') }}</span>
             <div class="reduction-options" role="group" :aria-label="t('whatIf.reduction.title')">
               <button
                 v-for="percentage in reductionOptions"
@@ -90,7 +91,9 @@
               }}</b>
             </div>
             <q-icon
-              :name="simulation.simulatedSavingsCapacity < 0 ? 'trending_down' : 'trending_up'"
+              :name="
+                simulation.simulatedSavingsCapacity < 0 ? 'trending_down' : 'signal_cellular_alt'
+              "
             />
           </div>
 
@@ -118,82 +121,103 @@
           <div class="comparison-heading">
             <div>
               <h2>
-                {{
-                  t('whatIf.compare.title', {
-                    amount: formatCurrency(simulation.simulatedSavingsCapacity),
-                  })
-                }}
+                {{ t('whatIf.compare.title') }}
               </h2>
               <p>{{ t('whatIf.compare.description') }}</p>
             </div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              icon="tune"
-              :label="t('whatIf.details.action')"
-              @click="detailsOpen = true"
-            />
           </div>
 
-          <article v-if="cashScenario" class="scenario-row">
-            <span class="scenario-icon cash"><q-icon name="account_balance" /></span>
-            <div class="scenario-copy">
-              <strong>{{ t('whatIf.cash.title') }}</strong>
-              <span>{{ cashSummary }}</span>
-            </div>
-            <div class="scenario-value">
-              <strong>{{ t('whatIf.cash.target', { months: cashScenario.targetMonths }) }}</strong>
-              <small>{{ cashComparison }}</small>
-            </div>
-          </article>
+          <div class="scenario-grid">
+            <article v-if="cashScenario" class="scenario-card cash-card">
+              <span class="scenario-heading">
+                <span class="scenario-icon cash"><q-icon name="paid" /></span>
+                <span class="scenario-copy">
+                  <strong>{{ t('whatIf.cash.cardTitle') }}</strong>
+                  <span>{{
+                    t('whatIf.cash.cardDescription', { months: cashScenario.targetMonths })
+                  }}</span>
+                </span>
+              </span>
+              <span class="scenario-outcome cash-outcome">
+                <q-linear-progress
+                  rounded
+                  size="0.7rem"
+                  color="positive"
+                  track-color="blue-grey-1"
+                  :value="cashProgress"
+                />
+                <strong>{{ cashProgressLabel }}</strong>
+                <small>{{ cashProgressDetail }}</small>
+              </span>
+            </article>
 
-          <article class="scenario-row investment-row">
-            <span class="scenario-icon invest"><q-icon name="show_chart" /></span>
-            <div class="scenario-copy">
-              <strong>{{ t('whatIf.invest.title') }}</strong>
-              <span>{{
-                t('whatIf.invest.description', { return: config.expectedAnnualReturnPercent })
-              }}</span>
-            </div>
-            <div class="projection-list">
-              <div v-for="projection in investmentScenario" :key="projection.years">
-                <span>{{ projection.years }} {{ t('whatIf.years') }}</span>
-                <strong>{{ formatCurrency(projection.projectedValue) }}</strong>
-                <small>{{
+            <article class="scenario-card investment-card">
+              <span class="scenario-heading">
+                <span class="scenario-icon invest"><q-icon name="trending_up" /></span>
+                <span class="scenario-copy">
+                  <strong>{{ t('whatIf.invest.cardTitle') }}</strong>
+                  <span>{{
+                    t('whatIf.invest.description', { return: config.expectedAnnualReturnPercent })
+                  }}</span>
+                </span>
+              </span>
+              <span class="scenario-outcome investment-outcome">
+                <span class="investment-value">
+                  <strong>{{ formatCurrency(featuredInvestment.projectedValue) }}</strong>
+                  <small>{{
+                    t('whatIf.invest.inYears', { years: featuredInvestment.years })
+                  }}</small>
+                </span>
+                <svg class="investment-chart" viewBox="0 0 150 72" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="what-if-chart-fill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.28" />
+                      <stop offset="1" stop-color="#3b82f6" stop-opacity="0.03" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M4 66 C42 61 72 49 96 36 C118 24 133 13 146 5 L146 68 L4 68 Z" />
+                  <path d="M4 66 C42 61 72 49 96 36 C118 24 133 13 146 5" />
+                  <circle cx="146" cy="5" r="4" />
+                </svg>
+                <small class="positive-comparison">{{
                   t('whatIf.invest.difference', {
-                    amount: formatCurrency(projection.difference),
+                    amount: formatCurrency(featuredInvestment.difference),
                   })
                 }}</small>
-              </div>
-            </div>
-          </article>
+              </span>
+            </article>
 
-          <article v-if="selectedDebt" class="scenario-row">
-            <span class="scenario-icon debt"><q-icon name="credit_score" /></span>
-            <div class="scenario-copy">
-              <strong>{{ t('whatIf.debt.title') }}</strong>
-              <span>{{ selectedDebt.name }}</span>
-            </div>
-            <div class="scenario-value">
-              <strong>{{
-                t('whatIf.debt.perMonthExtra', {
-                  amount: formatCurrency(debtScenario.monthly),
-                })
-              }}</strong>
-              <small>{{
-                t('whatIf.debt.perYear', { amount: formatCurrency(debtScenario.annual) })
-              }}</small>
-            </div>
-          </article>
+            <article v-if="selectedDebt" class="scenario-card debt-card">
+              <span class="scenario-heading">
+                <span class="scenario-icon debt"><q-icon name="home" /></span>
+                <span class="scenario-copy">
+                  <strong>{{ t('whatIf.debt.title') }}</strong>
+                  <span>{{ selectedDebt.name }}</span>
+                </span>
+              </span>
+              <span class="scenario-outcome debt-outcome">
+                <strong>
+                  <span>{{ formatCurrency(debtScenario.annual) }}</span
+                  >{{ t('whatIf.debt.perYearSuffix') }}
+                </strong>
+                <small>{{ t('whatIf.debt.additionalRepayments') }}</small>
+              </span>
+            </article>
+          </div>
 
           <button type="button" class="strategy-row" @click="strategyOpen = true">
-            <span class="scenario-icon strategy"><q-icon name="donut_small" /></span>
-            <span class="scenario-copy">
-              <strong>{{ t('whatIf.strategy.title') }}</strong>
-              <span>{{ strategySummary }}</span>
+            <span class="strategy-heading">
+              <span class="scenario-icon strategy"><q-icon name="tune" /></span>
+              <span class="scenario-copy">
+                <strong>{{ t('whatIf.strategy.title') }}</strong>
+                <span class="strategy-description">{{ t('whatIf.strategy.cardDescription') }}</span>
+                <span class="mobile-strategy-summary">{{ strategySummary }}</span>
+              </span>
             </span>
-            <q-icon name="chevron_right" />
+            <span class="strategy-selection">
+              <span>{{ strategySummary }}</span>
+              <q-icon name="chevron_right" />
+            </span>
           </button>
         </section>
       </template>
@@ -229,15 +253,6 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog v-model="detailsOpen">
-      <ScenarioDetailsDialog
-        :expected-annual-return-percent="config.expectedAnnualReturnPercent"
-        :selected-liability-id="selectedDebt?.id || null"
-        :liabilities="liabilities"
-        @save="saveDetails"
-        @cancel="detailsOpen = false"
-      />
-    </q-dialog>
     <q-dialog v-model="strategyOpen">
       <StrategyDialog
         :strategy="strategy"
@@ -260,7 +275,6 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import ScenarioDetailsDialog from '@/components/what-if/ScenarioDetailsDialog.vue'
 import StrategyDialog from '@/components/what-if/StrategyDialog.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import {
@@ -290,7 +304,6 @@ const financialYearsStore = useFinancialYearsStore()
 const whatIfStore = useWhatIfStore()
 const customReductionOpen = ref(false)
 const customReduction = ref(0)
-const detailsOpen = ref(false)
 const strategyOpen = ref(false)
 const pageError = ref(null)
 const reductionOptions = [0, 10, 25, 50]
@@ -380,6 +393,15 @@ const investmentScenario = computed(() =>
     annualReturnPercent: config.value.expectedAnnualReturnPercent,
   }),
 )
+const featuredInvestment = computed(
+  () => investmentScenario.value.find(({ years }) => years === 20) || investmentScenario.value[0],
+)
+const cashProgress = computed(() => {
+  if (!cashScenario.value) return 0
+  if (cashScenario.value.achieved) return 1
+  if (!(cashScenario.value.simulatedMonths > 0)) return 0
+  return Math.min(1, 1 / cashScenario.value.simulatedMonths)
+})
 const debtScenario = computed(() =>
   calculateDebtScenario(simulation.value.simulatedSavingsCapacity),
 )
@@ -407,17 +429,14 @@ const strategySummary = computed(() =>
     .filter(Boolean)
     .join(' · '),
 )
-const cashSummary = computed(() => {
-  if (cashScenario.value.simulatedMonths === 0) return t('whatIf.cash.alreadyReached')
-  return t('whatIf.cash.reachIn', {
-    months: cashScenario.value.simulatedMonths,
-    target: cashScenario.value.targetMonths,
-  })
-})
-const cashComparison = computed(() => {
-  if (cashScenario.value.currentMonths == null) return t('whatIf.cash.unreachableToday')
-  return t('whatIf.cash.sooner', { months: cashScenario.value.monthsSooner })
-})
+const cashProgressLabel = computed(() =>
+  cashScenario.value.achieved
+    ? t('whatIf.cash.milestoneAchieved')
+    : t('whatIf.cash.monthsToMilestone', { months: cashScenario.value.simulatedMonths }),
+)
+const cashProgressDetail = computed(() =>
+  cashScenario.value.achieved ? t('whatIf.cash.yearCovered') : t('whatIf.cash.monthlyStep'),
+)
 
 watch(workspaceId, () => prepare(), { immediate: true })
 
@@ -461,9 +480,6 @@ async function saveCustomReduction() {
   if (await persist({ discretionaryReductionPercent: Number(customReduction.value) }))
     customReductionOpen.value = false
 }
-async function saveDetails(value) {
-  if (await persist(value)) detailsOpen.value = false
-}
 async function saveStrategy(value) {
   if (await persist({ strategy: value })) strategyOpen.value = false
 }
@@ -471,27 +487,51 @@ async function saveStrategy(value) {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
+
 .what-if-page {
   @include financial-page;
 }
+
 .what-if-shell {
   @include financial-shell;
-  max-width: 52rem;
+  max-width: 68rem;
 }
+
 .page-header {
   @include financial-header;
 }
+
+.page-heading {
+  width: 100%;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+}
+
 .back-button {
   @include financial-back-button;
 }
+
+.mobile-section-title,
+.mobile-label,
+.mobile-strategy-summary {
+  display: none;
+}
+
 h1 {
   @include financial-title;
+  max-width: 44rem;
 }
+
 .page-header p,
 .comparison-heading p {
   margin: 0.45rem 0 0;
   color: var(--color-copy);
+  font-size: 1rem;
 }
+
 .state {
   display: grid;
   place-items: center;
@@ -504,84 +544,107 @@ h1 {
 .state p {
   margin: 0;
 }
+
 .simulator-card,
 .comparison-card {
-  margin-top: 1.25rem;
+  margin-top: 1.75rem;
 }
+
 .simulator-card {
-  padding: clamp(1rem, 3vw, 1.6rem);
+  padding: 1.5rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
 }
-.spending-summary {
-  display: block;
-}
-.spending-summary div {
-  display: grid;
-}
-.spending-summary .spending-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.spending-summary span,
-.spending-summary small,
-.reduction-section > span {
-  color: var(--color-copy);
-}
-.spending-summary strong {
-  color: var(--color-ink);
-  font-size: 1.05rem;
-  white-space: nowrap;
-}
-.reduction-section {
+
+.simulator-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--color-line);
+  gap: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-line);
 }
-.reduction-options {
+
+.spending-summary {
+  display: grid;
+  min-width: 0;
+}
+
+.spending-label {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-ink);
 }
+
+.spending-label .q-icon,
+.spending-summary small {
+  color: var(--color-copy);
+}
+
+.spending-summary strong {
+  margin: 0.15rem 0;
+  color: var(--color-ink);
+  font-size: 1.65rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.spending-summary small {
+  font-size: 0.88rem;
+}
+
+.reduction-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(4.4rem, 1fr));
+  gap: 0.6rem;
+  flex: 0 1 31rem;
+}
+
 .reduction-options button {
-  min-width: 3.75rem;
-  padding: 0.45rem 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.8rem;
   border: 1px solid var(--color-line);
-  border-radius: 0.65rem;
+  border-radius: 0.7rem;
   background: white;
   color: var(--color-ink);
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
 }
+
 .reduction-options button.selected {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: white;
   box-shadow: 0 0.3rem 0.75rem rgb(31 111 235 / 20%);
 }
+
+.reduction-options button:focus-visible,
+.strategy-row:focus-visible {
+  @include focus-ring;
+}
+
 .main-result {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-top: 1.25rem;
-  padding: 1.25rem;
+  margin-top: 1rem;
+  padding: 1.25rem 1.35rem;
   border-radius: var(--radius-md);
-  background: linear-gradient(120deg, var(--color-green-soft), rgb(240 251 246));
+  background: linear-gradient(105deg, var(--color-green-soft), #eefbf6);
   color: var(--color-success-dark);
 }
+
 .main-result.negative {
   background: var(--color-red-soft);
   color: var(--color-danger);
 }
+
 .main-result strong {
   display: block;
   margin: 0.1rem 0;
@@ -589,19 +652,23 @@ h1 {
   line-height: 1;
   letter-spacing: -0.045em;
 }
+
 .main-result strong small {
   margin-left: 0.2rem;
   font-size: 0.42em;
   letter-spacing: -0.01em;
 }
+
 .main-result b {
   display: block;
   font-size: 0.9rem;
 }
+
 .main-result > .q-icon {
   flex: 0 0 auto;
-  font-size: 2.25rem;
+  font-size: 2.7rem;
 }
+
 .notice,
 .break-even {
   display: flex;
@@ -611,47 +678,67 @@ h1 {
   color: var(--color-copy);
   font-size: 0.85rem;
 }
+
 .break-even {
   color: var(--color-danger);
   font-weight: 650;
 }
+
 .comparison-card {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.9rem;
 }
+
 .comparison-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0 0.15rem 0.2rem;
+  padding: 0 0.05rem;
 }
+
 .comparison-heading h2,
 .comparison-heading p {
   margin-top: 0;
   margin-bottom: 0;
 }
+
 .comparison-heading h2 {
-  font-size: clamp(1.35rem, 4vw, 1.75rem);
+  font-size: clamp(1.45rem, 3vw, 1.8rem);
   line-height: 1.15;
   letter-spacing: -0.025em;
 }
-.scenario-row,
-.strategy-row {
+
+.scenario-grid {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.scenario-card {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  min-height: 5.25rem;
+  min-width: 0;
+  min-height: 11.25rem;
   padding: 0.9rem 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: white;
   color: var(--color-ink);
+  font: inherit;
   text-align: left;
   box-shadow: 0 0.15rem 0.6rem rgb(15 23 42 / 3%);
 }
+
+.scenario-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .scenario-icon {
   display: grid;
   place-items: center;
@@ -660,115 +747,397 @@ h1 {
   border-radius: 50%;
   font-size: 1.25rem;
 }
+
 .scenario-icon.cash {
   background: var(--color-green-soft);
   color: var(--color-success-dark);
 }
+
 .scenario-icon.invest {
   background: var(--color-blue-soft);
   color: var(--color-primary);
 }
+
 .scenario-icon.debt {
-  background: var(--color-red-soft);
-  color: var(--color-danger);
+  background: #fff2e8;
+  color: #f97316;
 }
+
 .scenario-icon.strategy {
   background: var(--color-purple-soft);
   color: var(--color-purple);
 }
+
 .scenario-copy {
   display: grid;
   min-width: 0;
 }
+
+.scenario-copy strong {
+  line-height: 1.2;
+}
+
 .scenario-copy span,
-.scenario-value small,
-.projection-list span,
-.projection-list small {
+.scenario-outcome small {
   color: var(--color-copy);
   font-size: 0.78rem;
 }
-.scenario-value {
+
+.scenario-outcome {
   display: grid;
-  justify-items: end;
-  text-align: right;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.7rem;
 }
-.projection-list {
-  display: flex;
-  gap: 1rem;
-}
-.projection-list div {
-  display: grid;
-  justify-items: end;
-}
-.projection-list small {
+
+.cash-outcome > strong,
+.positive-comparison {
   color: var(--color-success-dark);
 }
+
+.cash-outcome .q-linear-progress {
+  margin-bottom: 0.4rem;
+}
+
+.cash-outcome {
+  margin-top: 0.85rem;
+}
+
+.investment-outcome {
+  grid-template-columns: minmax(0, 1fr) 7.5rem;
+  align-items: center;
+  column-gap: 0.6rem;
+}
+
+.investment-value {
+  display: grid;
+  justify-items: start;
+}
+
+.investment-value strong,
+.debt-outcome strong {
+  color: var(--color-ink);
+  font-size: 1.55rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.investment-chart {
+  width: 100%;
+  height: 3.75rem;
+  overflow: visible;
+}
+
+.investment-chart path:first-of-type {
+  fill: url('#what-if-chart-fill');
+}
+
+.investment-chart path:nth-of-type(2) {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.investment-chart circle {
+  fill: var(--color-primary);
+}
+
+.investment-outcome .positive-comparison {
+  grid-column: 1 / -1;
+  color: var(--color-success-dark);
+}
+
+.debt-outcome {
+  place-content: center;
+  flex: 1;
+  gap: 0.45rem;
+  padding: 0.9rem 0.25rem 0.35rem;
+  text-align: center;
+}
+
+.debt-outcome strong {
+  color: #c75d12;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.debt-outcome strong span {
+  font-size: 1.75rem;
+  letter-spacing: -0.045em;
+}
+
+.debt-outcome small {
+  font-size: 0.86rem;
+}
+
 .strategy-row {
-  margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  width: 100%;
+  min-height: 5.25rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--color-purple) 22%, var(--color-line));
+  border-radius: var(--radius-md);
+  background: linear-gradient(100deg, #faf7ff, #fff);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
   border-color: color-mix(in srgb, var(--color-purple) 22%, var(--color-line));
   cursor: pointer;
 }
+
 .strategy-row:hover {
-  background: var(--color-surface-soft);
+  border-color: color-mix(in srgb, var(--color-purple) 42%, var(--color-line));
 }
+
+.strategy-heading,
+.strategy-selection {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.strategy-selection {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-purple) 16%, var(--color-line));
+  border-radius: 0.7rem;
+  background: white;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 .custom-card {
   @include financial-simple-dialog;
   width: min(26rem, calc(100vw - 2rem));
 }
+
 .custom-card h2 {
   margin: 0 0 1rem;
 }
-@media (max-width: 650px) {
+
+@media (max-width: 760px) {
   .what-if-shell {
-    max-width: 34rem;
+    max-width: 32rem;
   }
+
+  .page-nav {
+    position: relative;
+    justify-content: center;
+    min-height: 2.25rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .back-button {
+    position: absolute;
+    left: -0.5rem;
+    margin: 0;
+  }
+
+  .back-button :deep(.block) {
+    display: none;
+  }
+
+  .mobile-section-title {
+    display: block;
+    font-size: 1rem;
+  }
+
+  h1 {
+    max-width: 22rem;
+    font-size: 2rem;
+    line-height: 1.05;
+  }
+
+  .page-header p,
+  .comparison-heading p {
+    font-size: 0.82rem;
+  }
+
   .page-header p {
-    max-width: 28rem;
+    max-width: 24rem;
   }
+
   .simulator-card,
   .comparison-card {
-    margin-top: 1rem;
+    margin-top: 0.9rem;
   }
-  .reduction-section {
+
+  .simulator-card {
+    padding: 0.75rem;
+    border-radius: 0.9rem;
+  }
+
+  .simulator-controls {
     display: grid;
-    gap: 0.55rem;
+    gap: 0.8rem;
+    padding-bottom: 0;
+    border-bottom: 0;
   }
+
+  .desktop-label {
+    display: none;
+  }
+
+  .mobile-label {
+    display: inline;
+  }
+
+  .spending-summary strong {
+    font-size: 1.45rem;
+  }
+
+  .spending-summary small {
+    max-width: 20rem;
+    font-size: 0.76rem;
+  }
+
   .reduction-options {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.35rem;
+    gap: 0.3rem;
   }
+
   .reduction-options button {
     min-width: 0;
-    padding: 0.45rem 0.25rem;
-    font-size: 0.78rem;
+    min-height: 2.15rem;
+    padding: 0.35rem 0.15rem;
+    border-radius: 0.55rem;
+    font-size: 0.72rem;
   }
+
   .main-result {
-    padding: 1rem;
+    margin-top: 0.8rem;
+    padding: 0.85rem;
+    border-radius: 0.65rem;
   }
-  .scenario-row,
-  .strategy-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    padding: 0.75rem;
+
+  .main-result strong {
+    font-size: 2.15rem;
   }
-  .scenario-value,
-  .projection-list {
-    grid-column: 2 / -1;
-    justify-self: stretch;
+
+  .main-result > .q-icon {
+    font-size: 2.25rem;
   }
-  .projection-list {
-    justify-content: space-between;
-    gap: 0.35rem;
-  }
-  .investment-row .scenario-copy {
-    grid-column: 2 / -1;
-  }
+
   .comparison-heading {
     align-items: center;
-    padding: 0 0.1rem 0.15rem;
+    padding: 0 0.25rem;
   }
-  .comparison-heading p {
+
+  .comparison-heading h2 {
+    font-size: 1.25rem;
+  }
+
+  .scenario-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 0.8rem;
+    background: white;
+  }
+
+  .scenario-card {
+    min-height: auto;
+    padding: 0.8rem;
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .scenario-card:last-child {
+    border-bottom: 0;
+  }
+
+  .scenario-heading {
+    gap: 0.7rem;
+  }
+
+  .scenario-icon {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .scenario-outcome {
+    margin-top: 0.2rem;
+    margin-left: 3.3rem;
+    padding-top: 0;
+  }
+
+  .investment-chart {
     display: none;
+  }
+
+  .investment-outcome {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .investment-value strong {
+    font-size: 1.05rem;
+  }
+
+  .investment-value {
+    display: flex;
+    align-items: baseline;
+    justify-items: initial;
+    gap: 0.25rem;
+  }
+
+  .investment-outcome .positive-comparison {
+    grid-column: auto;
+  }
+
+  .debt-outcome {
+    place-content: initial;
+    gap: 0.2rem;
+    padding: 0;
+    text-align: left;
+  }
+
+  .debt-outcome strong {
+    font-size: 0.78rem;
+  }
+
+  .debt-outcome strong span {
+    font-size: 1.05rem;
+  }
+
+  .strategy-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 4.2rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 0.75rem;
+  }
+
+  .strategy-heading {
+    gap: 0.7rem;
+  }
+
+  .strategy-description,
+  .strategy-selection > span {
+    display: none;
+  }
+
+  .mobile-strategy-summary {
+    display: block;
+  }
+
+  .strategy-selection {
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 }
 </style>

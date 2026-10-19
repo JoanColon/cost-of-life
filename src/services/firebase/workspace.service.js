@@ -29,6 +29,9 @@ export async function createWorkspace({ name }) {
     createdBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    milestoneTracking: {
+      status: 'setup',
+    },
     memberIds: [user.uid],
     members: {
       [user.uid]: {
@@ -44,6 +47,9 @@ export async function createWorkspace({ name }) {
     name: name.trim(),
     type: 'personal',
     createdBy: user.uid,
+    milestoneTracking: {
+      status: 'setup',
+    },
     memberIds: [user.uid],
     members: {
       [user.uid]: {

@@ -2,23 +2,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 const {
+  activateMilestoneTracking,
   calculateMilestoneProgress,
-  createMissingAchievements,
   getAchievements,
   getFinancialHistory,
   getFinancialYear,
+  syncMilestoneAchievements,
 } = vi.hoisted(() => ({
+  activateMilestoneTracking: vi.fn(),
   calculateMilestoneProgress: vi.fn(),
-  createMissingAchievements: vi.fn(),
   getAchievements: vi.fn(),
   getFinancialHistory: vi.fn(),
   getFinancialYear: vi.fn(),
+  syncMilestoneAchievements: vi.fn(),
 }))
 
 vi.mock('@/domain/milestones/calculations', () => ({ calculateMilestoneProgress }))
 vi.mock('@/services/firebase/achievements.service', () => ({
-  createMissingAchievements,
+  activateMilestoneTracking,
   getAchievements,
+  syncMilestoneAchievements,
 }))
 vi.mock('@/services/firebase/history.service', () => ({ getFinancialHistory }))
 vi.mock('@/services/firebase/financial-years.service', () => ({
@@ -27,6 +30,7 @@ vi.mock('@/services/firebase/financial-years.service', () => ({
 }))
 
 import { useMilestonesStore } from '../../src/stores/milestones-store'
+import { useWorkspaceStore } from '../../src/stores/workspace-store'
 
 describe('milestones store', () => {
   beforeEach(() => {
@@ -34,7 +38,11 @@ describe('milestones store', () => {
     getFinancialYear.mockReset().mockResolvedValue({ year: 2026, months: {} })
     getFinancialHistory.mockReset().mockResolvedValue([{ year: 2025, months: {} }])
     getAchievements.mockReset().mockResolvedValue([])
-    createMissingAchievements.mockReset().mockResolvedValue([])
+    activateMilestoneTracking.mockReset().mockResolvedValue({
+      achievements: [],
+      milestoneTracking: { status: 'active', activatedAt: new Date() },
+    })
+    syncMilestoneAchievements.mockReset().mockResolvedValue([])
     calculateMilestoneProgress.mockReset().mockReturnValue([
       {
         id: 'safety_1_month',
@@ -66,5 +74,34 @@ describe('milestones store', () => {
     expect(store.achievements).toEqual([])
     expect(store.historyDocuments).toEqual([])
     expect(store.progress).toEqual([])
+  })
+
+  it('keeps setup progress as a preview until tracking is explicitly activated', async () => {
+    const workspaceStore = useWorkspaceStore()
+    workspaceStore.workspaces = [{ id: 'workspace-a', milestoneTracking: { status: 'setup' } }]
+    calculateMilestoneProgress.mockReturnValue([
+      {
+        id: 'safety_1_month',
+        family: 'safety',
+        reached: true,
+        currentValue: 2,
+        previouslyAchieved: false,
+      },
+    ])
+    const store = useMilestonesStore()
+
+    await store.load('workspace-a')
+
+    expect(store.trackingActive).toBe(false)
+    expect(syncMilestoneAchievements).not.toHaveBeenCalled()
+
+    await store.activateTracking()
+
+    expect(activateMilestoneTracking).toHaveBeenCalledWith(
+      'workspace-a',
+      expect.arrayContaining([expect.objectContaining({ id: 'safety_1_month', reached: true })]),
+      [],
+    )
+    expect(store.trackingActive).toBe(true)
   })
 })

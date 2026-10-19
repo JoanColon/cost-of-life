@@ -27,6 +27,7 @@
         />
         <MilestoneSummaryCard
           :milestones="milestoneProgress"
+          :tracking-active="milestoneTrackingActive"
           :loading="milestonesLoading"
           :error="Boolean(milestoneError)"
           @open="openSection('achievements')"
@@ -75,6 +76,7 @@ const {
   error: milestoneError,
   loading: milestonesLoading,
   progress: milestoneProgress,
+  trackingActive: milestoneTrackingActive,
 } = storeToRefs(milestonesStore)
 const workspace = computed(
   () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,

@@ -11,7 +11,7 @@ export const milestoneDefinitions = Object.freeze([
     target,
   })),
   { id: 'net_worth_positive', family: 'netWorth', target: 0, positive: true },
-  ...[10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000].map((target) => ({
+  ...[100_000, 250_000, 500_000, 1_000_000].map((target) => ({
     id: `net_worth_${target}`,
     family: 'netWorth',
     target,
@@ -46,7 +46,7 @@ export const milestoneDefinitions = Object.freeze([
     target: 0,
     liabilityCategoryIds: Object.freeze([...liabilityCategoryIds]),
   },
-  ...[1, 3, 5, 10, 15, 20, 25].map((target) => ({
+  ...[5, 10, 15, 20, 25].map((target) => ({
     id: `freedom_${target}_year${target === 1 ? '' : 's'}`,
     family: 'freedom',
     target,

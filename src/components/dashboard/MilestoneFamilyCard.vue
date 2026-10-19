@@ -11,9 +11,10 @@
     <template v-if="family.milestone">
       <div class="target-heading">
         <strong>{{ t(`milestones.items.${family.milestone.id}`) }}</strong>
-        <b :class="{ completed: family.completed }">
+        <b :class="{ completed: family.completed, pending: family.milestone.pending }">
+          <q-icon v-if="family.milestone.pending" name="schedule" />
           <q-icon v-if="family.completed" name="check_circle" />
-          {{ percentage }}%
+          {{ family.milestone.pending ? t('milestones.status.pending') : `${percentage}%` }}
         </b>
       </div>
       <p>{{ description }}</p>
@@ -176,6 +177,11 @@ function formatDecimal(value) {
 
 .target-heading b.completed {
   color: var(--color-success-dark);
+}
+
+.target-heading b.pending {
+  color: var(--color-primary);
+  font-size: 0.82rem;
 }
 
 .family-card p {
