@@ -73,6 +73,11 @@ const routes = [
         component: () => import('@/pages/WhatIfPage.vue'),
       },
       {
+        path: 'workspaces/:workspaceId/what-if/strategy',
+        name: 'what-if-strategy',
+        component: () => import('@/pages/WhatIfStrategyPage.vue'),
+      },
+      {
         path: 'workspaces/:workspaceId/income',
         name: 'income',
         component: () => import('@/pages/IncomePage.vue'),

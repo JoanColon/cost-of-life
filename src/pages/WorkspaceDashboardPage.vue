@@ -25,13 +25,6 @@
           @open-income="openSection('income')"
           @open-tracker="openSection('expense-tracker')"
         />
-        <MilestoneSummaryCard
-          :milestones="milestoneProgress"
-          :tracking-active="milestoneTrackingActive"
-          :loading="milestonesLoading"
-          :error="Boolean(milestoneError)"
-          @open="openSection('achievements')"
-        />
       </section>
     </main>
   </q-page>
@@ -45,7 +38,6 @@ import { useRoute, useRouter } from 'vue-router'
 import CostOfLifeCard from '@/components/dashboard/CostOfLifeCard.vue'
 import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
-import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import { buildNetWorthSeries } from '@/domain/financial/history'
 import {
   financialYearAvailableIncomeValue,
@@ -66,18 +58,8 @@ const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 
 const workspaceId = computed(() => String(route.params.workspaceId))
-const {
-  currentMonth,
-  currentYear,
-  financialYear,
-  historyDocuments,
-  historyError,
-  historyLoading,
-  error: milestoneError,
-  loading: milestonesLoading,
-  progress: milestoneProgress,
-  trackingActive: milestoneTrackingActive,
-} = storeToRefs(milestonesStore)
+const { currentMonth, currentYear, financialYear, historyDocuments, historyError, historyLoading } =
+  storeToRefs(milestonesStore)
 const workspace = computed(
   () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
 )

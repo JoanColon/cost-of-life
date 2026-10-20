@@ -157,7 +157,9 @@
                 <span class="scenario-copy">
                   <strong>{{ t('whatIf.invest.cardTitle') }}</strong>
                   <span>{{
-                    t('whatIf.invest.description', { return: config.expectedAnnualReturnPercent })
+                    t('whatIf.invest.description', {
+                      return: activeScenario.investmentMix.stockMarket?.annualReturnPercent || 7,
+                    })
                   }}</span>
                 </span>
               </span>
@@ -205,7 +207,10 @@
             </article>
           </div>
 
-          <button type="button" class="strategy-row" @click="strategyOpen = true">
+          <router-link
+            class="strategy-row"
+            :to="{ name: 'what-if-strategy', params: { workspaceId } }"
+          >
             <span class="strategy-heading">
               <span class="scenario-icon strategy"><q-icon name="tune" /></span>
               <span class="scenario-copy">
@@ -218,7 +223,7 @@
               <span>{{ strategySummary }}</span>
               <q-icon name="chevron_right" />
             </span>
-          </button>
+          </router-link>
         </section>
       </template>
     </main>
@@ -253,20 +258,6 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog v-model="strategyOpen">
-      <StrategyDialog
-        :strategy="strategy"
-        :simulated-savings-capacity="simulation.simulatedSavingsCapacity"
-        :cash="cash"
-        :current-monthly-cost="simulation.monthlyCostOfLife"
-        :simulated-monthly-cost="simulation.simulatedCostOfLife"
-        :expected-annual-return-percent="config.expectedAnnualReturnPercent"
-        :cash-available="Boolean(cashScenario)"
-        :debt-available="Boolean(selectedDebt)"
-        @save="saveStrategy"
-        @cancel="strategyOpen = false"
-      />
-    </q-dialog>
   </q-page>
 </template>
 
@@ -275,10 +266,8 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import StrategyDialog from '@/components/what-if/StrategyDialog.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import {
-  currentFinancialMonth,
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
@@ -286,6 +275,7 @@ import {
   financialYearUnclassifiedExpenseValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
+import { latestPositionMonth } from '@/domain/financial/strategy-simulation'
 import {
   calculateCashScenario,
   calculateDebtScenario,
@@ -304,14 +294,18 @@ const financialYearsStore = useFinancialYearsStore()
 const whatIfStore = useWhatIfStore()
 const customReductionOpen = ref(false)
 const customReduction = ref(0)
-const strategyOpen = ref(false)
 const pageError = ref(null)
 const reductionOptions = [0, 10, 25, 50]
-const currentMonth = currentFinancialMonth()
 const currentYear = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
 const config = computed(() => whatIfStore.config)
+const activeScenario = computed(
+  () =>
+    config.value.scenarios.find(({ id }) => id === config.value.activeScenarioId) ||
+    config.value.scenarios[0],
+)
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
+const positionMonth = computed(() => latestPositionMonth(financialYear.value))
 const loading = computed(() => whatIfStore.loading || financialYearsStore.loading)
 const error = computed(
   () =>
@@ -336,10 +330,11 @@ const simulation = computed(() =>
   }),
 )
 const cash = computed(() =>
-  financialYearMonthCategoryValue(financialYear.value, currentMonth, 'assets', 'cash'),
+  financialYearMonthCategoryValue(financialYear.value, positionMonth.value, 'assets', 'cash'),
 )
 const liabilities = computed(() => {
-  const categories = financialYear.value?.months?.[currentMonth]?.liabilities?.categories || {}
+  const categories =
+    financialYear.value?.months?.[positionMonth.value]?.liabilities?.categories || {}
   return Object.entries(categories)
     .flatMap(([categoryId, category]) =>
       Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
@@ -374,7 +369,7 @@ const recommendedDebt = computed(
 )
 const selectedDebt = computed(
   () =>
-    liabilities.value.find(({ id }) => id === config.value.selectedLiabilityId) ||
+    liabilities.value.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
     recommendedDebt.value,
 )
 const cashScenario = computed(() =>
@@ -390,7 +385,7 @@ const investmentScenario = computed(() =>
   calculateInvestmentScenario({
     monthlyContribution: simulation.value.simulatedSavingsCapacity,
     currentMonthlyContribution: simulation.value.currentSavingsCapacity,
-    annualReturnPercent: config.value.expectedAnnualReturnPercent,
+    annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,
   }),
 )
 const featuredInvestment = computed(
@@ -415,7 +410,7 @@ const customReductionSelected = computed(
   () => !reductionOptions.includes(config.value.discretionaryReductionPercent),
 )
 const strategy = computed(() =>
-  normalizeStrategyForOptions(config.value.strategy, {
+  normalizeStrategyForOptions(activeScenario.value.allocation, {
     cash: Boolean(cashScenario.value),
     debt: Boolean(selectedDebt.value),
   }),
@@ -479,9 +474,6 @@ async function saveCustomReduction() {
   if (percentageRule(customReduction.value) !== true) return
   if (await persist({ discretionaryReductionPercent: Number(customReduction.value) }))
     customReductionOpen.value = false
-}
-async function saveStrategy(value) {
-  if (await persist({ strategy: value })) strategyOpen.value = false
 }
 </script>
 
@@ -889,6 +881,7 @@ h1 {
   text-align: left;
   border-color: color-mix(in srgb, var(--color-purple) 22%, var(--color-line));
   cursor: pointer;
+  text-decoration: none;
 }
 
 .strategy-row:hover {

@@ -13,6 +13,9 @@ export const useWhatIfStore = defineStore('what-if', () => {
   const error = ref(null)
   const loadedWorkspaceId = ref(null)
   let requestId = 0
+  let pendingSaves = 0
+  let saveQueue = Promise.resolve()
+  let saveRevision = 0
 
   async function load(workspaceId, force = false) {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return config.value
@@ -34,18 +37,28 @@ export const useWhatIfStore = defineStore('what-if', () => {
   }
 
   async function save(workspaceId, changes) {
+    const previous = config.value
+    const next = normalizeWhatIfConfig({ ...config.value, ...changes })
+    const revision = ++saveRevision
+    config.value = next
+    pendingSaves += 1
     saving.value = true
     error.value = null
     try {
-      const next = normalizeWhatIfConfig({ ...config.value, ...changes })
-      config.value = await saveWhatIfConfigDocument(workspaceId, next)
+      const request = saveQueue
+        .catch(() => null)
+        .then(() => saveWhatIfConfigDocument(workspaceId, next))
+      saveQueue = request
+      await request
       loadedWorkspaceId.value = workspaceId
       return config.value
     } catch (saveError) {
       error.value = saveError
+      if (revision === saveRevision) config.value = previous
       throw saveError
     } finally {
-      saving.value = false
+      pendingSaves -= 1
+      saving.value = pendingSaves > 0
     }
   }
 
@@ -54,6 +67,9 @@ export const useWhatIfStore = defineStore('what-if', () => {
     config.value = normalizeWhatIfConfig(defaultWhatIfConfig)
     loading.value = false
     saving.value = false
+    pendingSaves = 0
+    saveQueue = Promise.resolve()
+    saveRevision += 1
     error.value = null
     loadedWorkspaceId.value = null
   }

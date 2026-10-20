@@ -18,9 +18,20 @@ describe('What If store', () => {
     setActivePinia(createPinia())
     getWhatIfConfig.mockReset().mockResolvedValue({
       discretionaryReductionPercent: 25,
-      expectedAnnualReturnPercent: 7,
-      selectedLiabilityId: null,
-      strategy: { cash: 20, invest: 60, debt: 20 },
+      activeScenarioId: 'default',
+      scenarios: [
+        {
+          id: 'default',
+          name: 'Balanced strategy',
+          allocation: { cash: 20, invest: 60, debt: 20 },
+          investmentMix: {
+            stockMarket: { allocation: 100, annualReturnPercent: 7 },
+          },
+          horizonYears: 20,
+          cashTargetMonths: 12,
+          selectedLiabilityId: null,
+        },
+      ],
     })
     saveWhatIfConfig.mockReset().mockImplementation(async (_workspaceId, config) => config)
   })
@@ -36,13 +47,21 @@ describe('What If store', () => {
   it('persists assumptions but not calculated results', async () => {
     const store = useWhatIfStore()
     await store.load('workspace-a')
-    await store.save('workspace-a', { expectedAnnualReturnPercent: 6 })
+    const scenarios = JSON.parse(JSON.stringify(store.config.scenarios))
+    scenarios[0].investmentMix.stockMarket.annualReturnPercent = 6
+    await store.save('workspace-a', { scenarios })
 
     expect(saveWhatIfConfig).toHaveBeenCalledWith(
       'workspace-a',
       expect.objectContaining({
         discretionaryReductionPercent: 25,
-        expectedAnnualReturnPercent: 6,
+        scenarios: expect.arrayContaining([
+          expect.objectContaining({
+            investmentMix: expect.objectContaining({
+              stockMarket: expect.objectContaining({ annualReturnPercent: 6 }),
+            }),
+          }),
+        ]),
       }),
     )
     expect(saveWhatIfConfig.mock.calls[0][1]).not.toHaveProperty('results')

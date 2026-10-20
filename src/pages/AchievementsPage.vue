@@ -61,106 +61,118 @@
           @click="retry"
         />
       </section>
-      <div v-else class="family-grid">
-        <section
-          v-for="family in families"
-          :key="family.id"
-          class="family-card"
-          :class="`family--${family.id}`"
-        >
-          <div
-            class="family-header"
-            :class="{ expanded: isExpanded(family.id) }"
-            @click="toggleFamily(family.id)"
-          >
-            <span class="family-icon"><q-icon :name="family.icon" /></span>
-            <div class="family-copy">
-              <div class="family-title">
-                <h2>{{ t(`milestones.families.${family.id}.title`) }}</h2>
-                <q-btn
-                  flat
-                  round
-                  dense
-                  size="sm"
-                  icon="info_outline"
-                  class="family-info-button"
-                  :aria-label="
-                    t('milestones.familyInfoAction', {
-                      family: t(`milestones.families.${family.id}.title`),
-                    })
-                  "
-                  @click.stop="showFamilyInfo(family.id)"
-                  @keydown.stop
-                />
-              </div>
-              <p>{{ t(`milestones.families.${family.id}.description`) }}</p>
-            </div>
-            <button
-              type="button"
-              class="family-meta"
-              :aria-expanded="isExpanded(family.id)"
-              :aria-controls="`achievements-${family.id}`"
-              :aria-label="
-                t('achievements.toggleFamily', {
-                  family: t(`milestones.families.${family.id}.title`),
-                })
-              "
-              @click.stop="toggleFamily(family.id)"
-            >
-              <strong>{{
-                t('achievements.familyCount', {
-                  achieved: family.achieved,
-                  total: family.milestones.length,
-                })
-              }}</strong>
-              <q-icon name="expand_more" class="expand-icon" />
-            </button>
-          </div>
+      <template v-else>
+        <MilestoneSummaryCard
+          class="milestone-summary"
+          :milestones="progress"
+          :tracking-active="trackingActive"
+          :loading="loading"
+          :error="Boolean(error)"
+          :show-action="false"
+          :show-tracking-setup="false"
+        />
 
-          <q-slide-transition>
+        <div class="family-grid">
+          <section
+            v-for="family in families"
+            :key="family.id"
+            class="family-card"
+            :class="`family--${family.id}`"
+          >
             <div
-              v-show="isExpanded(family.id)"
-              :id="`achievements-${family.id}`"
-              class="achievement-list"
+              class="family-header"
+              :class="{ expanded: isExpanded(family.id) }"
+              @click="toggleFamily(family.id)"
             >
-              <article
-                v-for="milestone in family.milestones"
-                :key="milestone.id"
-                :class="{
-                  unlocked: milestoneIsUnlocked(milestone),
-                  pending: milestone.pending,
-                  preview: !trackingActive && milestone.reached,
-                }"
-              >
-                <span class="status-icon">
-                  <q-icon :name="milestoneStatusIcon(milestone)" />
-                </span>
-                <div>
-                  <strong>{{ t(`milestones.items.${milestone.id}`) }}</strong>
-                  <p>{{ descriptionFor(milestone) }}</p>
-                  <small v-if="milestone.pending">{{
-                    t('milestones.status.pendingConfirmation')
-                  }}</small>
-                  <small v-else-if="trackingActive && milestone.previouslyAchieved">{{
-                    achievedDateLabel(milestone.id)
-                  }}</small>
-                  <small v-else-if="!trackingActive && milestone.reached">{{
-                    t('milestones.setup.previewReached')
-                  }}</small>
+              <span class="family-icon"><q-icon :name="family.icon" /></span>
+              <div class="family-copy">
+                <div class="family-title">
+                  <h2>{{ t(`milestones.families.${family.id}.title`) }}</h2>
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    size="sm"
+                    icon="info_outline"
+                    class="family-info-button"
+                    :aria-label="
+                      t('milestones.familyInfoAction', {
+                        family: t(`milestones.families.${family.id}.title`),
+                      })
+                    "
+                    @click.stop="showFamilyInfo(family.id)"
+                    @keydown.stop
+                  />
                 </div>
-                <q-icon
-                  v-if="milestoneIsUnlocked(milestone) && !milestone.pending"
-                  class="check-icon"
-                  name="check_circle"
-                />
-              </article>
-              <p v-if="!family.milestones.length" class="empty-family">
-                {{ t('achievements.noRelevantDebt') }}
-              </p>
+                <p>{{ t(`milestones.families.${family.id}.description`) }}</p>
+              </div>
+              <button
+                type="button"
+                class="family-meta"
+                :aria-expanded="isExpanded(family.id)"
+                :aria-controls="`achievements-${family.id}`"
+                :aria-label="
+                  t('achievements.toggleFamily', {
+                    family: t(`milestones.families.${family.id}.title`),
+                  })
+                "
+                @click.stop="toggleFamily(family.id)"
+              >
+                <strong>{{
+                  t('achievements.familyCount', {
+                    achieved: family.achieved,
+                    total: family.milestones.length,
+                  })
+                }}</strong>
+                <q-icon name="expand_more" class="expand-icon" />
+              </button>
             </div>
-          </q-slide-transition>
-        </section>
-      </div>
+
+            <q-slide-transition>
+              <div
+                v-show="isExpanded(family.id)"
+                :id="`achievements-${family.id}`"
+                class="achievement-list"
+              >
+                <article
+                  v-for="milestone in family.milestones"
+                  :key="milestone.id"
+                  :class="{
+                    unlocked: milestoneIsUnlocked(milestone),
+                    pending: milestone.pending,
+                    preview: !trackingActive && milestone.reached,
+                  }"
+                >
+                  <span class="status-icon">
+                    <q-icon :name="milestoneStatusIcon(milestone)" />
+                  </span>
+                  <div>
+                    <strong>{{ t(`milestones.items.${milestone.id}`) }}</strong>
+                    <p>{{ descriptionFor(milestone) }}</p>
+                    <small v-if="milestone.pending">{{
+                      t('milestones.status.pendingConfirmation')
+                    }}</small>
+                    <small v-else-if="trackingActive && milestone.previouslyAchieved">{{
+                      achievedDateLabel(milestone.id)
+                    }}</small>
+                    <small v-else-if="!trackingActive && milestone.reached">{{
+                      t('milestones.setup.previewReached')
+                    }}</small>
+                  </div>
+                  <q-icon
+                    v-if="milestoneIsUnlocked(milestone) && !milestone.pending"
+                    class="check-icon"
+                    name="check_circle"
+                  />
+                </article>
+                <p v-if="!family.milestones.length" class="empty-family">
+                  {{ t('achievements.noRelevantDebt') }}
+                </p>
+              </div>
+            </q-slide-transition>
+          </section>
+        </div>
+      </template>
 
       <q-dialog v-model="infoDialogOpen">
         <q-card v-if="selectedInfoFamily" class="family-info-dialog">
@@ -214,6 +226,7 @@ import { storeToRefs } from 'pinia'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import { milestoneFamilies } from '@/config/milestone-families'
 import { useMilestonesStore } from '@/stores/milestones-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -379,6 +392,10 @@ h1 {
   margin: 0.2rem 0 0;
   color: var(--color-copy);
   font-size: 0.84rem;
+}
+
+.milestone-summary {
+  margin-top: 2rem;
 }
 
 .family-grid {

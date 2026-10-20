@@ -5,7 +5,7 @@
     icon="flag"
     icon-tone="purple"
   >
-    <template #action>
+    <template v-if="showAction" #action>
       <q-btn
         flat
         no-caps
@@ -25,6 +25,7 @@
       <q-icon name="cloud_off" size="1.5rem" />
       <span>{{ t('milestones.error') }}</span>
       <q-btn
+        v-if="showAction"
         flat
         dense
         no-caps
@@ -34,7 +35,12 @@
       />
     </div>
     <template v-else>
-      <button v-if="!trackingActive" type="button" class="tracking-setup" @click="$emit('open')">
+      <button
+        v-if="showTrackingSetup && !trackingActive"
+        type="button"
+        class="tracking-setup"
+        @click="$emit('open')"
+      >
         <q-icon name="visibility" />
         <span>
           <strong>{{ t('milestones.setup.dashboardTitle') }}</strong>
@@ -75,6 +81,8 @@ const props = defineProps({
   trackingActive: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
   error: { type: Boolean, default: false },
+  showAction: { type: Boolean, default: true },
+  showTrackingSetup: { type: Boolean, default: true },
 })
 defineEmits(['open'])
 const { t } = useI18n()

@@ -1,26 +1,105 @@
 import { normalizeDisposablePercentage } from './income-calculations'
 export const investmentHorizons = Object.freeze([10, 20, 30])
 
+export const investmentTypeDefinitions = Object.freeze([
+  { id: 'stockMarket', returnPercent: 7 },
+  { id: 'realEstate', returnPercent: 5 },
+  { id: 'fixedIncome', returnPercent: 3 },
+  { id: 'crypto', returnPercent: 8 },
+  { id: 'businessEquity', returnPercent: 6 },
+  { id: 'other', returnPercent: 4 },
+])
+
+export const defaultStrategyScenario = Object.freeze({
+  id: 'default',
+  name: 'Balanced strategy',
+  allocation: Object.freeze({ cash: 20, invest: 60, debt: 20 }),
+  investmentMix: Object.freeze({
+    stockMarket: Object.freeze({ allocation: 100, annualReturnPercent: 7 }),
+  }),
+  horizonYears: 20,
+  cashTargetMonths: 12,
+  selectedLiabilityId: null,
+})
+
 export const defaultWhatIfConfig = Object.freeze({
   discretionaryReductionPercent: 0,
-  expectedAnnualReturnPercent: 7,
-  selectedLiabilityId: null,
-  strategy: Object.freeze({ cash: 20, invest: 60, debt: 20 }),
+  activeScenarioId: defaultStrategyScenario.id,
+  scenarios: Object.freeze([defaultStrategyScenario]),
 })
 
 export function normalizeWhatIfConfig(config = {}) {
   const reduction = normalizeDisposablePercentage(config.discretionaryReductionPercent, 0)
-  const annualReturn = normalizeReturn(config.expectedAnnualReturnPercent)
-  const strategy = normalizeStrategy(config.strategy)
+  const legacyScenario = {
+    ...defaultStrategyScenario,
+    allocation: normalizeStrategy(config.strategy) || defaultStrategyScenario.allocation,
+    investmentMix: {
+      stockMarket: {
+        allocation: 100,
+        annualReturnPercent: normalizeReturn(config.expectedAnnualReturnPercent) ?? 7,
+      },
+    },
+    selectedLiabilityId:
+      typeof config.selectedLiabilityId === 'string' ? config.selectedLiabilityId : null,
+  }
+  const sourceScenarios = Array.isArray(config.scenarios) ? config.scenarios : [legacyScenario]
+  const scenarios = sourceScenarios.slice(0, 10).map(normalizeStrategyScenario).filter(Boolean)
+  if (!scenarios.length) scenarios.push(normalizeStrategyScenario(defaultStrategyScenario))
+  const activeScenarioId = scenarios.some(({ id }) => id === config.activeScenarioId)
+    ? config.activeScenarioId
+    : scenarios[0].id
   return {
     discretionaryReductionPercent: reduction ?? 0,
-    expectedAnnualReturnPercent: annualReturn ?? 7,
-    selectedLiabilityId:
-      typeof config.selectedLiabilityId === 'string' && config.selectedLiabilityId
-        ? config.selectedLiabilityId
-        : null,
-    strategy: strategy || { ...defaultWhatIfConfig.strategy },
+    activeScenarioId,
+    scenarios,
   }
+}
+
+export function normalizeStrategyScenario(scenario = {}) {
+  if (!scenario || typeof scenario !== 'object') return null
+  const id = String(scenario.id || '')
+    .trim()
+    .slice(0, 80)
+  if (!id) return null
+  const allocation = normalizeStrategy(scenario.allocation || scenario.strategy)
+  const investmentMix = normalizeInvestmentMix(scenario.investmentMix)
+  const horizon = Number(scenario.horizonYears)
+  const cashTarget = Number(scenario.cashTargetMonths)
+  return {
+    id,
+    name:
+      String(scenario.name || 'Strategy')
+        .trim()
+        .slice(0, 80) || 'Strategy',
+    allocation: allocation || { ...defaultStrategyScenario.allocation },
+    investmentMix,
+    horizonYears: Number.isFinite(horizon) ? Math.min(50, Math.max(1, Math.round(horizon))) : 20,
+    cashTargetMonths: [3, 6, 12].includes(cashTarget) ? cashTarget : 12,
+    selectedLiabilityId:
+      typeof scenario.selectedLiabilityId === 'string' && scenario.selectedLiabilityId
+        ? scenario.selectedLiabilityId
+        : null,
+  }
+}
+
+export function normalizeInvestmentMix(mix = {}) {
+  const entries = investmentTypeDefinitions.map((definition) => {
+    const input = mix?.[definition.id] || {}
+    return [
+      definition.id,
+      {
+        allocation: Number(input.allocation) || 0,
+        annualReturnPercent: normalizeReturn(input.annualReturnPercent) ?? definition.returnPercent,
+      },
+    ]
+  })
+  const total = entries.reduce((sum, [, value]) => sum + value.allocation, 0)
+  if (Math.abs(total - 100) >= 0.001 || entries.some(([, value]) => value.allocation < 0)) {
+    return {
+      stockMarket: { allocation: 100, annualReturnPercent: 7 },
+    }
+  }
+  return Object.fromEntries(entries.filter(([, value]) => value.allocation > 0))
 }
 
 export function calculateWhatIf({
@@ -112,7 +191,7 @@ export function calculateDebtScenario(monthlyAmount = 0) {
 }
 
 export function normalizeStrategyForOptions(strategy, { cash = true, debt = true } = {}) {
-  const normalized = normalizeStrategy(strategy) || { ...defaultWhatIfConfig.strategy }
+  const normalized = normalizeStrategy(strategy) || { ...defaultStrategyScenario.allocation }
   const result = {
     cash: cash ? normalized.cash : 0,
     invest: normalized.invest,

@@ -8,6 +8,7 @@ const defaults = {
   expenses: { schemaVersion: 1, setupCompleted: false, categories: {} },
   expenseTracking: { schemaVersion: 1, enabledSubcategories: null },
   whatIf: null,
+  whatIfStrategies: null,
 }
 
 export function modelConfigRef(workspaceId, model) {

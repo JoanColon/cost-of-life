@@ -107,66 +107,19 @@
 
       <template v-if="activeWorkspaceId">
         <q-separator class="q-my-sm" />
-        <div class="workspace-list-label">{{ t('navigation.financialWorkspace') }}</div>
-        <q-list dense class="q-px-sm">
-          <q-item
-            v-ripple
-            clickable
-            :to="{ name: 'expenses', params: { workspaceId: activeWorkspaceId } }"
-            exact
-            active-class="active-nav-item"
-            @click="closeMobileDrawer"
-          >
-            <q-item-section avatar><q-icon name="credit_card" /></q-item-section>
-            <q-item-section>{{ t('navigation.expenses') }}</q-item-section>
-          </q-item>
-          <q-item
-            v-ripple
-            clickable
-            :to="{ name: 'expense-tracker', params: { workspaceId: activeWorkspaceId } }"
-            exact
-            active-class="active-nav-item"
-            class="tracker-nav-item"
-            @click="closeMobileDrawer"
-          >
-            <q-item-section avatar><q-icon name="receipt_long" /></q-item-section>
-            <q-item-section>{{ t('navigation.expenseTracker') }}</q-item-section>
-          </q-item>
-          <q-item
-            v-ripple
-            clickable
-            :to="{ name: 'historic', params: { workspaceId: activeWorkspaceId } }"
-            exact
-            active-class="active-nav-item"
-            @click="closeMobileDrawer"
-          >
-            <q-item-section avatar><q-icon name="history" /></q-item-section>
-            <q-item-section>{{ t('navigation.historic') }}</q-item-section>
-          </q-item>
-          <q-item
-            v-ripple
-            clickable
-            :to="{ name: 'achievements', params: { workspaceId: activeWorkspaceId } }"
-            exact
-            :active="route.name === 'achievements'"
-            active-class="active-nav-item"
-            @click="closeMobileDrawer"
-          >
-            <q-item-section avatar><q-icon name="flag" /></q-item-section>
-            <q-item-section>{{ t('navigation.progress') }}</q-item-section>
-          </q-item>
-          <q-item
-            v-ripple
-            clickable
-            :to="{ name: 'what-if', params: { workspaceId: activeWorkspaceId } }"
-            exact
-            active-class="active-nav-item"
-            @click="closeMobileDrawer"
-          >
-            <q-item-section avatar><q-icon name="track_changes" /></q-item-section>
-            <q-item-section>{{ t('navigation.whatIf') }}</q-item-section>
-          </q-item>
-        </q-list>
+        <div class="workspace-list-label">{{ activeWorkspace?.name }}</div>
+        <nav class="workspace-navigation" :aria-label="t('navigation.financialWorkspace')">
+          <q-tree
+            v-model:expanded="expandedNavigationNodes"
+            :nodes="workspaceNavigationNodes"
+            :selected="activeNavigationNode"
+            node-key="key"
+            no-connectors
+            no-selection-unset
+            selected-color="primary"
+            class="workspace-navigation-tree"
+          />
+        </nav>
       </template>
     </q-drawer>
 
@@ -236,6 +189,7 @@ const whatIfStore = useWhatIfStore()
 const drawerOpen = ref($q.screen.gt.sm)
 const loggingOut = ref(false)
 const financialPeriodKey = ref(currentPeriodKey())
+const expandedNavigationNodes = ref(['financial-position', 'cash-flow', 'what-if'])
 let periodTimer = null
 const workspaceOptions = computed(() =>
   workspaceStore.workspaces.map((workspace) => ({
@@ -256,6 +210,72 @@ const activeWorkspace = computed(
     workspaceStore.workspaces.find((workspace) => workspace.id === activeWorkspaceId.value) || null,
 )
 const showMobileNavigation = computed(() => $q.screen.lt.md && Boolean(activeWorkspaceId.value))
+const activeNavigationNode = computed(() => {
+  const routeNodes = {
+    'workspace-dashboard': 'savings',
+    assets: 'assets',
+    'asset-category': 'assets',
+    liabilities: 'liabilities',
+    'liability-category': 'liabilities',
+    income: 'income',
+    'income-category': 'income',
+    expenses: 'expenses',
+    'expense-category': 'expenses',
+    'expense-tracker': 'expense-tracker',
+    progress: 'milestones',
+    achievements: 'milestones',
+    'what-if': 'what-if-general',
+    'what-if-strategy': 'what-if-strategy',
+    historic: 'historic',
+  }
+
+  return routeNodes[route.name] || null
+})
+const workspaceNavigationNodes = computed(() => {
+  if (!activeWorkspaceId.value) return []
+
+  return [
+    {
+      key: 'financial-position',
+      label: t('navigation.financialPosition'),
+      icon: 'account_balance',
+      selectable: false,
+      children: [
+        navigationLeaf('assets', 'navigation.assets', 'inventory_2', 'assets'),
+        navigationLeaf('liabilities', 'navigation.liabilities', 'request_quote', 'liabilities'),
+      ],
+    },
+    {
+      key: 'cash-flow',
+      label: t('navigation.cashFlow'),
+      icon: 'swap_vert',
+      selectable: false,
+      children: [
+        navigationLeaf('income', 'navigation.income', 'payments', 'income'),
+        navigationLeaf('expenses', 'navigation.expenses', 'credit_card', 'expenses'),
+        navigationLeaf('savings', 'navigation.savings', 'savings', 'workspace-dashboard'),
+        navigationLeaf(
+          'expense-tracker',
+          'navigation.expenseTracker',
+          'receipt_long',
+          'expense-tracker',
+        ),
+      ],
+    },
+    navigationLeaf('milestones', 'navigation.milestones', 'flag', 'achievements'),
+    {
+      key: 'what-if',
+      label: t('navigation.whatIf'),
+      icon: 'track_changes',
+      selectable: false,
+      children: [
+        navigationLeaf('what-if-general', 'navigation.general', 'tune', 'what-if'),
+        navigationLeaf('what-if-strategy', 'navigation.yourStrategy', 'route', 'what-if-strategy'),
+      ],
+    },
+    navigationLeaf('historic', 'navigation.historic', 'history', 'historic'),
+  ]
+})
 
 onMounted(async () => {
   periodTimer = setInterval(refreshFinancialPeriod, 60_000)
@@ -327,6 +347,20 @@ async function openWorkspace(workspaceId) {
 
 function workspaceRoute(workspaceId) {
   return { name: 'workspace-dashboard', params: { workspaceId } }
+}
+
+function navigationLeaf(key, labelKey, icon, routeName) {
+  return {
+    key,
+    label: t(labelKey),
+    icon,
+    handler: () => openNavigationRoute(routeName),
+  }
+}
+
+async function openNavigationRoute(routeName) {
+  closeMobileDrawer()
+  await router.push({ name: routeName, params: { workspaceId: activeWorkspaceId.value } })
 }
 
 function closeMobileDrawer() {
@@ -473,6 +507,39 @@ function currentPeriodKey() {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.workspace-navigation {
+  padding: 0 0.75rem 0.75rem;
+}
+
+.workspace-navigation-tree {
+  color: var(--color-ink);
+}
+
+.workspace-navigation-tree :deep(.q-tree__node-header) {
+  min-height: 2.65rem;
+  margin-bottom: 0.15rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.8rem;
+}
+
+.workspace-navigation-tree :deep(.q-tree__node-header-content) {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.workspace-navigation-tree :deep(.q-tree__children .q-tree__node-header-content) {
+  font-weight: 500;
+}
+
+.workspace-navigation-tree :deep(.q-tree__node-header.q-tree__node--selected) {
+  background: #e4eee8;
+  color: #214c3c;
+}
+
+.workspace-navigation-tree :deep(.q-tree__arrow) {
+  color: #829089;
 }
 
 .loading-state {

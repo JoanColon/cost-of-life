@@ -180,8 +180,8 @@ service cloud.firestore {
             get(/databases/$(database)/documents/workspaces/$(workspaceId)).data
           )
           && (
-            configId != 'whatIf'
-            || (
+            (configId != 'whatIf' && configId != 'whatIfStrategies')
+            || (configId == 'whatIf' && (
               request.resource.data.keys().hasOnly([
                 'schemaVersion',
                 'discretionaryReductionPercent',
@@ -214,7 +214,25 @@ service cloud.firestore {
                 + request.resource.data.strategy.debt == 100
               && request.resource.data.updatedAt == request.time
               && request.resource.data.updatedBy == request.auth.uid
-            )
+            ))
+            || (configId == 'whatIfStrategies' && (
+              request.resource.data.keys().hasOnly([
+                'schemaVersion',
+                'activeScenarioId',
+                'scenarios',
+                'updatedAt',
+                'updatedBy'
+              ])
+              && request.resource.data.schemaVersion == 1
+              && request.resource.data.activeScenarioId is string
+              && request.resource.data.activeScenarioId.size() > 0
+              && request.resource.data.activeScenarioId.size() <= 80
+              && request.resource.data.scenarios is list
+              && request.resource.data.scenarios.size() > 0
+              && request.resource.data.scenarios.size() <= 10
+              && request.resource.data.updatedAt == request.time
+              && request.resource.data.updatedBy == request.auth.uid
+            ))
           );
       }
 

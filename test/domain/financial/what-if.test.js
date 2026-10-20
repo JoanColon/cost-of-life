@@ -3,6 +3,7 @@ import {
   calculateCashScenario,
   calculateInvestmentScenario,
   calculateWhatIf,
+  normalizeWhatIfConfig,
   normalizeStrategyForOptions,
 } from '../../../src/domain/financial/what-if'
 
@@ -78,5 +79,27 @@ describe('What If calculations', () => {
     expect(
       normalizeStrategyForOptions({ cash: 20, invest: 60, debt: 20 }, { cash: false, debt: true }),
     ).toEqual({ cash: 0, invest: 80, debt: 20 })
+  })
+
+  it('migrates the original single strategy into a saved scenario configuration', () => {
+    const config = normalizeWhatIfConfig({
+      discretionaryReductionPercent: 25,
+      expectedAnnualReturnPercent: 6,
+      selectedLiabilityId: 'mortgage-a',
+      strategy: { cash: 10, invest: 70, debt: 20 },
+    })
+
+    expect(config).toMatchObject({
+      activeScenarioId: 'default',
+      scenarios: [
+        {
+          allocation: { cash: 10, invest: 70, debt: 20 },
+          investmentMix: {
+            stockMarket: { allocation: 100, annualReturnPercent: 6 },
+          },
+          selectedLiabilityId: 'mortgage-a',
+        },
+      ],
+    })
   })
 })

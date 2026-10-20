@@ -39,7 +39,7 @@ const activeItem = computed(() => {
   )
     return 'expenses'
   if (route.name === 'achievements') return 'progress'
-  if (route.name === 'what-if') return 'plan'
+  if (route.name === 'what-if' || route.name === 'what-if-strategy') return 'plan'
   return null
 })
 
