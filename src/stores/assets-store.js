@@ -14,6 +14,10 @@ import {
   updateSimpleCategoryValue as updateSimpleCategoryValueDocument,
 } from '@/services/firebase/assets.service'
 import { buildModelCategories } from '@/domain/financial/model-categories'
+import {
+  disconnectInvestmentPortfolio as disconnectInvestmentPortfolioDocument,
+  saveInvestmentPortfolio as saveInvestmentPortfolioDocument,
+} from '@/services/firebase/investment-portfolios.service'
 
 export const useAssetsStore = defineStore('assets', () => {
   const config = ref(null)
@@ -149,6 +153,27 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
+  async function saveInvestmentPortfolio(workspaceId, assetId, spreadsheetUrl) {
+    const asset = findLoadedAsset(assetId)
+    if (!asset || asset.categoryId !== 'investment') throw new Error('Investment not found')
+
+    const result = await saveInvestmentPortfolioDocument(workspaceId, assetId, spreadsheetUrl)
+    replaceAsset(assetId, {
+      ...asset,
+      detail: { ...(asset.detail || {}), portfolio: result.portfolio },
+    })
+  }
+
+  async function disconnectInvestmentPortfolio(workspaceId, assetId) {
+    const asset = findLoadedAsset(assetId)
+    if (!asset || asset.categoryId !== 'investment') throw new Error('Investment not found')
+
+    await disconnectInvestmentPortfolioDocument(workspaceId, assetId)
+    const detail = { ...(asset.detail || {}) }
+    delete detail.portfolio
+    replaceAsset(assetId, { ...asset, detail })
+  }
+
   async function deleteCategory(workspaceId, categoryId) {
     await deleteAssetCategoryDocuments(workspaceId, categoryId)
 
@@ -184,6 +209,15 @@ export const useAssetsStore = defineStore('assets', () => {
       .find((asset) => asset.id === assetId)
   }
 
+  function replaceAsset(assetId, nextAsset) {
+    assetsByCategory.value = Object.fromEntries(
+      Object.entries(assetsByCategory.value).map(([categoryId, assets]) => [
+        categoryId,
+        assets.map((asset) => (asset.id === assetId ? nextAsset : asset)),
+      ]),
+    )
+  }
+
   function reset() {
     configRequestId += 1
     categoryRequestId += 1
@@ -214,6 +248,8 @@ export const useAssetsStore = defineStore('assets', () => {
     addAsset,
     editAsset,
     deleteAsset,
+    saveInvestmentPortfolio,
+    disconnectInvestmentPortfolio,
     deleteCategory,
     itemsForCategory,
     reset,

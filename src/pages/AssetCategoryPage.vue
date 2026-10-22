@@ -101,7 +101,12 @@
                     <q-item-section avatar><q-icon name="edit" /></q-item-section>
                     <q-item-section>{{ t('assets.editDetails') }}</q-item-section>
                   </q-item>
-                  <q-item clickable>
+                  <q-item
+                    v-if="categoryId === 'investment'"
+                    clickable
+                    v-close-popup
+                    @click="openModel(asset)"
+                  >
                     <q-item-section avatar><q-icon name="account_tree" /></q-item-section>
                     <q-item-section>{{ t('assets.model') }}</q-item-section>
                   </q-item>
@@ -339,6 +344,13 @@ function add() {
 function edit(asset) {
   editingAsset.value = asset
   assetDialog.value = true
+}
+
+function openModel(asset) {
+  router.push({
+    name: 'investment-portfolio',
+    params: { workspaceId: workspaceId.value, assetId: asset.id },
+  })
 }
 
 function closeAssetDialog() {
