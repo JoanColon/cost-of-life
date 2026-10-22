@@ -34,31 +34,14 @@
               class="back-button"
             />
             <h1>{{ t('expenseTracker.title') }}</h1>
-            <p class="workspace-name">
-              <template v-if="periodLabel">{{ periodLabel }} · </template>{{ trackerWorkspaceName }}
-            </p>
-          </div>
-          <div class="tracker-tabs" role="tablist" :aria-label="t('expenseTracker.title')">
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="tab === 'track'"
-              :class="{ selected: tab === 'track' }"
-              @click="tab = 'track'"
-            >
-              {{ t('expenseTracker.tabs.track') }}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="tab === 'review'"
-              :class="{ selected: tab === 'review' }"
-              @click="tab = 'review'"
-            >
-              {{ t('expenseTracker.tabs.review') }}
-            </button>
           </div>
         </header>
+
+        <ExpensesSectionNav
+          :workspace-id="activeWorkspaceId"
+          :active="tab"
+          :context="trackerContext"
+        />
 
         <ExpenseTrackingPanel
           v-if="tab === 'track'"
@@ -260,6 +243,7 @@ import ExpenseTrackingCategorySetup from '@/components/expenses/ExpenseTrackingC
 import ExpenseTrackingEntryDialog from '@/components/expenses/ExpenseTrackingEntryDialog.vue'
 import ExpenseTrackingPanel from '@/components/expenses/ExpenseTrackingPanel.vue'
 import ExpenseReviewPanel from '@/components/expenses/ExpenseReviewPanel.vue'
+import ExpensesSectionNav from '@/components/expenses/ExpensesSectionNav.vue'
 import {
   expenseTrackingCategories,
   groupedExpenseTrackingCategories,
@@ -283,7 +267,7 @@ const trackingStore = useExpenseTrackingStore()
 const expensesStore = useExpensesStore()
 const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
-const tab = ref('track')
+const tab = computed(() => (route.query.view === 'review' ? 'review' : 'track'))
 const period = ref(currentPeriod())
 const pageError = ref(null)
 const preparing = ref(false)
@@ -306,10 +290,15 @@ const workspace = computed(
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map(({ id }) => id))
 const trackerWorkspaceName = computed(() => workspace.value?.name || t('navigation.workspaces'))
+const trackerContext = computed(() =>
+  periodLabel.value
+    ? `${periodLabel.value} · ${trackerWorkspaceName.value}`
+    : trackerWorkspaceName.value,
+)
 const allExpenseItems = computed(() =>
-  expensesStore.enabledCategories.flatMap((categoryId) =>
-    expensesStore.itemsForCategory(categoryId),
-  ),
+  expensesStore.enabledCategories
+    .flatMap((categoryId) => expensesStore.itemsForCategory(categoryId))
+    .filter(({ entryMode }) => entryMode !== 'simple'),
 )
 const enabledCategories = computed(() => {
   const enabled = new Set(trackingStore.enabledSubcategories)
@@ -645,50 +634,6 @@ h1 {
   @include financial-title;
 }
 
-.workspace-name {
-  margin: 0.5rem 0 0;
-  color: var(--color-copy);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.tracker-tabs {
-  display: flex;
-  flex: 0 0 13.5rem;
-  align-self: center;
-  padding: 0.16rem;
-  overflow: hidden;
-  border: 1px solid var(--color-ink);
-  border-radius: 999px;
-  background: var(--color-ink);
-  box-shadow: 0 6px 18px rgb(11 22 51 / 10%);
-}
-
-.tracker-tabs button {
-  flex: 1;
-  min-height: 2.35rem;
-  padding: 0.4rem 1rem;
-  border: 0;
-  border-radius: 999px !important;
-  background: transparent;
-  color: rgb(255 255 255 / 78%);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.tracker-tabs button.selected {
-  background: var(--color-surface);
-  color: var(--color-ink);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 16%);
-}
-
-.tracker-tabs button:focus-visible {
-  @include focus-ring;
-}
-
 .state {
   display: grid;
   min-height: 18rem;
@@ -772,26 +717,6 @@ h1 {
   .tracker-header {
     align-items: flex-end;
     gap: 0.75rem;
-  }
-
-  .tracker-tabs {
-    width: 8.5rem;
-    flex-basis: auto;
-  }
-
-  .tracker-header h1 {
-    font-size: 1.55rem;
-  }
-
-  .tracker-tabs button {
-    min-height: 2rem;
-    padding: 0.3rem 0.55rem;
-    font-size: 0.72rem;
-  }
-
-  .workspace-name {
-    margin-top: 0.2rem;
-    font-size: 0.75rem;
   }
 }
 </style>

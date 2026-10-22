@@ -1,7 +1,7 @@
 <template>
   <q-page class="income-page">
     <main class="income-shell">
-      <div v-if="incomeStore.loading || financialYearsStore.loading" class="state">
+      <div v-if="pageLoading" class="state">
         <q-spinner color="primary" size="2rem" /><span>{{ t('income.loading') }}</span>
       </div>
       <section v-else-if="incomeStore.error || financialYearError" class="state">
@@ -73,10 +73,24 @@
                 ><small>{{ categoryStatus(category.id) }}</small></span
               >
             </button>
-            <div class="category-value">
-              <strong>{{ categoryValue(category.id) }}</strong>
-              <small>/ {{ categoryPeriodLabel }}</small>
-            </div>
+            <SimpleValueEditor
+              :value="categoryEditorValue(category.id)"
+              :formatted-value="categoryValue(category.id)"
+              :formatted-period="categoryPeriodLabel"
+              :saving="isCategorySaving(category.id)"
+              :disabled="!canQuickEdit(category.id)"
+              :aria-label="
+                t('income.quickEdit.editLabel', {
+                  category: t(category.nameKey),
+                  value: categoryValue(category.id),
+                })
+              "
+              :title="t('income.quickEdit.title', { category: t(category.nameKey) })"
+              :input-label="t('income.quickEdit.inputLabel')"
+              :input-suffix="`/ ${categoryPeriodLabel}`"
+              :invalid-message="t('income.quickEdit.invalid')"
+              @save="saveSimpleIncome(category, $event)"
+            />
             <button
               type="button"
               class="category-link"
@@ -194,6 +208,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
+import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import IncomeCategorySetup from '@/components/income/IncomeCategorySetup.vue'
 import { incomeCategories } from '@/config/income-categories'
 import {
@@ -201,6 +216,7 @@ import {
   financialYearCategoryValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
+import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
@@ -218,6 +234,8 @@ const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
+const loadingItems = ref(false)
+const savingCategoryIds = ref(new Set())
 const editingCategories = ref(false)
 const confirmDisable = ref(false)
 const confirmCategoryDelete = ref(false)
@@ -248,6 +266,13 @@ const enabledCategories = computed(() =>
 const financialYearError = computed(() =>
   financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
+const pageLoading = computed(
+  () =>
+    loadingItems.value ||
+    incomeStore.loading ||
+    incomeStore.categoryLoading ||
+    financialYearsStore.loading,
+)
 const total = computed(() =>
   financialYearValue(financialYear.value, 'income', selectedMemberId.value),
 )
@@ -268,10 +293,18 @@ const scopeLabel = computed(() =>
 watch(workspaceId, () => loadPage(), { immediate: true })
 
 async function loadPage(force = false) {
-  await Promise.allSettled([
-    incomeStore.loadConfig(workspaceId.value, force),
-    financialYearsStore.load(workspaceId.value, currentYear, force),
-  ])
+  loadingItems.value = true
+  try {
+    await Promise.allSettled([
+      incomeStore.loadConfig(workspaceId.value, force),
+      financialYearsStore.load(workspaceId.value, currentYear, force),
+    ])
+    for (const categoryId of incomeStore.enabledCategories) {
+      await incomeStore.loadCategory(workspaceId.value, categoryId, force)
+    }
+  } finally {
+    loadingItems.value = false
+  }
 }
 
 async function completeSetup(selected) {
@@ -315,6 +348,7 @@ function categoryHasData(id) {
   return categoryAnnualValue(id) > 0
 }
 function categoryStatus(id) {
+  if (simpleIncome(id)) return t('income.simpleTotal')
   const subcategories =
     financialYear.value?.months?.['01']?.income?.categories?.[id]?.subcategories || {}
   const count = Object.values(subcategories).reduce(
@@ -326,6 +360,68 @@ function categoryStatus(id) {
 function categoryValue(id) {
   const annualValue = categoryAnnualValue(id)
   return formatCurrency(period.value === 'annual' ? annualValue : annualValue / 12)
+}
+function categoryEditorValue(id) {
+  const annualValue = categoryAnnualValue(id)
+  return period.value === 'annual' ? annualValue : annualValue / 12
+}
+function categoryItems(id) {
+  return incomeStore.itemsForCategory(id)
+}
+function simpleIncome(id) {
+  const items = categoryItems(id)
+  return items.length === 1 && items[0].entryMode === 'simple' ? items[0] : null
+}
+function canQuickEdit(id) {
+  const items = categoryItems(id)
+  const editableScope = selectedMemberId.value === 'all' || memberIds.value.length === 1
+  return editableScope && (items.length === 0 || Boolean(simpleIncome(id)))
+}
+function isCategorySaving(id) {
+  return savingCategoryIds.value.has(id)
+}
+async function saveSimpleIncome(category, displayedValue) {
+  if (isCategorySaving(category.id) || !canQuickEdit(category.id)) return
+
+  const annualValue = period.value === 'annual' ? displayedValue : displayedValue * 12
+  const existing = simpleIncome(category.id)
+  const payload = {
+    ...(existing || {}),
+    categoryId: category.id,
+    subcategoryId: existing?.subcategoryId || category.subcategories[0],
+    itemName: existing?.itemName || t(category.nameKey),
+    notes: existing?.notes || '',
+    calculation: simpleCalculation(category.calculationModes[0], annualValue),
+    ownership:
+      existing?.ownership ||
+      (memberIds.value.length === 1
+        ? createSingleOwnership(memberIds.value[0])
+        : createEqualOwnership(memberIds.value)),
+    entryMode: 'simple',
+  }
+
+  savingCategoryIds.value = new Set(savingCategoryIds.value).add(category.id)
+  try {
+    if (existing) {
+      await incomeStore.editIncome(workspaceId.value, existing.id, payload, memberIds.value)
+    } else {
+      await incomeStore.addIncome(workspaceId.value, payload, memberIds.value)
+    }
+  } catch {
+    $q.notify({ type: 'negative', message: t('income.errors.save'), position: 'top' })
+  } finally {
+    const next = new Set(savingCategoryIds.value)
+    next.delete(category.id)
+    savingCategoryIds.value = next
+  }
+}
+function simpleCalculation(mode, annualValue) {
+  if (mode === 'annual_salary') return { mode, annualAmount: annualValue, paymentsPerYear: 12 }
+  if (mode === 'monthly_schedule') {
+    return { mode, monthlyAmount: annualValue / 12, extrasByMonth: {} }
+  }
+  if (mode === 'one_time') return { mode, amount: annualValue, month: 'january' }
+  return { mode: 'recurring', amount: annualValue, frequency: 'yearly' }
 }
 function categoryAnnualValue(id) {
   return financialYearCategoryValue(financialYear.value, 'income', id, selectedMemberId.value)

@@ -75,7 +75,7 @@
           >
             <span class="expense-icon"><q-icon :name="subcategoryIcon(item.subcategoryId)" /></span>
             <span class="expense-copy">
-              <strong>{{ subcategoryLabel(item.subcategoryId) }}</strong>
+              <strong>{{ subcategoryLabel(item) }}</strong>
               <small>{{ item.itemName }}</small>
             </span>
             <strong class="expense-value">
@@ -284,9 +284,10 @@ function subcategoryIcon(subcategoryId) {
   )
 }
 
-function subcategoryLabel(subcategoryId) {
-  const subcategory = category.value?.suggestions.find(({ id }) => id === subcategoryId)
-  return subcategory ? t(subcategory.nameKey) : subcategoryId
+function subcategoryLabel(item) {
+  if (item.entryMode === 'simple') return t('expenses.simpleTotal')
+  const subcategory = category.value?.suggestions.find(({ id }) => id === item.subcategoryId)
+  return subcategory ? t(subcategory.nameKey) : item.subcategoryId
 }
 
 function displayedItemValue(item) {
@@ -344,8 +345,17 @@ async function saveExpense(payload) {
   const id = editingExpense.value?.id
   const saved = await persist(() =>
     id
-      ? expensesStore.editExpense(workspaceId.value, id, payload, memberIds.value)
-      : expensesStore.addExpense(workspaceId.value, payload, memberIds.value),
+      ? expensesStore.editExpense(
+          workspaceId.value,
+          id,
+          { ...payload, entryMode: 'detailed' },
+          memberIds.value,
+        )
+      : expensesStore.addExpense(
+          workspaceId.value,
+          { ...payload, entryMode: 'detailed' },
+          memberIds.value,
+        ),
   )
   formSaving.value = false
   if (saved) closeExpenseDialog()

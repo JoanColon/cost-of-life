@@ -294,6 +294,74 @@ describe('atomic financial model mutations', () => {
     ).data
     expect(financialYearValue(financialYear, 'income')).toBe(1800)
   })
+
+  it('preserves a simple income entry while rebuilding the financial year', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'income',
+      collection: 'modelIncome',
+      category: 'employment',
+      configCategory: { enabled: true },
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'income',
+      operation: 'create',
+      item: {
+        categoryId: 'employment',
+        subcategoryId: 'salary',
+        itemName: 'Employment',
+        notes: '',
+        calculation: { mode: 'annual_salary', annualAmount: 42000, paymentsPerYear: 12 },
+        disposablePercentage: 100,
+        entryMode: 'simple',
+        ownership,
+      },
+    })
+
+    expect(result.income.entryMode).toBe('simple')
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'income')).toBe(42000)
+  })
+
+  it('preserves a simple expense entry while rebuilding the financial year', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'expenses',
+      collection: 'modelExpenses',
+      category: 'housing',
+      configCategory: { enabled: true },
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'expenses',
+      operation: 'create',
+      item: {
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: 'Housing',
+        notes: '',
+        estimate: { amount: 1000, frequency: 'monthly' },
+        monthlyAmounts: monthlyAmounts(1000),
+        variability: 'variable',
+        recurrence: 'recurring',
+        necessity: null,
+        entryMode: 'simple',
+        ownership,
+      },
+    })
+
+    expect(result.expense.entryMode).toBe('simple')
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'expenses')).toBe(12000)
+    expect(financialYearValue(financialYear, 'savings')).toBe(-12000)
+  })
 })
 
 function createFirestore({

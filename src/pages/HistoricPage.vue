@@ -9,8 +9,8 @@
             no-caps
             color="grey-7"
             icon="arrow_back"
-            :label="t('navigation.backToWorkspaceHome')"
-            :to="{ name: 'workspace-dashboard', params: { workspaceId } }"
+            :label="t('navigation.progress')"
+            :to="{ name: 'progress', params: { workspaceId } }"
             class="back-button"
           />
           <h1>{{ t('historic.title') }}</h1>

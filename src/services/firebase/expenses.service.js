@@ -113,7 +113,7 @@ function normalizeExpenseItem(expense) {
   const attributes = normalizeExpenseAttributes(expense)
   if (!attributes) throw new Error('Valid expense behavior is required')
 
-  return {
+  const normalized = {
     categoryId: category.id,
     subcategoryId,
     itemName,
@@ -123,6 +123,12 @@ function normalizeExpenseItem(expense) {
     ...attributes,
     ownership: cloneOwnership(expense.ownership),
   }
+
+  if (expense.entryMode === 'simple' || expense.entryMode === 'detailed') {
+    normalized.entryMode = expense.entryMode
+  }
+
+  return normalized
 }
 
 function canonicalExpenseCategories(categories) {

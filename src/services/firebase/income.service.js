@@ -109,7 +109,7 @@ function normalizeIncomeItem(income) {
   if (!calculation || !category.calculationModes.includes(calculation.mode)) {
     throw new Error('A valid income calculation is required')
   }
-  return {
+  const normalized = {
     categoryId: category.id,
     subcategoryId: subcategory.id,
     itemName,
@@ -117,6 +117,10 @@ function normalizeIncomeItem(income) {
     calculation,
     disposablePercentage: 100,
   }
+  if (income.entryMode === 'simple' || income.entryMode === 'detailed') {
+    normalized.entryMode = income.entryMode
+  }
+  return normalized
 }
 
 function assertValidOwnership(ownership, memberIds) {

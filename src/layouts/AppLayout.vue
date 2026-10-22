@@ -62,7 +62,7 @@
           @click="closeMobileDrawer"
         >
           <q-item-section avatar><q-icon name="space_dashboard" /></q-item-section>
-          <q-item-section>{{ t('navigation.home') }}</q-item-section>
+          <q-item-section>{{ t('navigation.workspaces') }}</q-item-section>
         </q-item>
 
         <q-item
@@ -189,7 +189,7 @@ const whatIfStore = useWhatIfStore()
 const drawerOpen = ref($q.screen.gt.sm)
 const loggingOut = ref(false)
 const financialPeriodKey = ref(currentPeriodKey())
-const expandedNavigationNodes = ref(['financial-position', 'cash-flow', 'what-if'])
+const expandedNavigationNodes = ref(['your-money'])
 let periodTimer = null
 const workspaceOptions = computed(() =>
   workspaceStore.workspaces.map((workspace) => ({
@@ -212,21 +212,23 @@ const activeWorkspace = computed(
 const showMobileNavigation = computed(() => $q.screen.lt.md && Boolean(activeWorkspaceId.value))
 const activeNavigationNode = computed(() => {
   const routeNodes = {
-    'workspace-dashboard': 'savings',
+    'workspace-dashboard': 'workspace-home',
     assets: 'assets',
     'asset-category': 'assets',
+    'investment-portfolio': 'assets',
     liabilities: 'liabilities',
     'liability-category': 'liabilities',
     income: 'income',
     'income-category': 'income',
     expenses: 'expenses',
     'expense-category': 'expenses',
-    'expense-tracker': 'expense-tracker',
-    progress: 'milestones',
-    achievements: 'milestones',
-    'what-if': 'what-if-general',
-    'what-if-strategy': 'what-if-strategy',
-    historic: 'historic',
+    'expense-tracker': 'expenses',
+    plan: 'plan',
+    'what-if': 'plan',
+    'what-if-strategy': 'plan',
+    progress: 'progress',
+    achievements: 'progress',
+    historic: 'progress',
   }
 
   return routeNodes[route.name] || null
@@ -235,45 +237,21 @@ const workspaceNavigationNodes = computed(() => {
   if (!activeWorkspaceId.value) return []
 
   return [
+    navigationLeaf('workspace-home', 'navigation.home', 'home', 'workspace-dashboard'),
     {
-      key: 'financial-position',
-      label: t('navigation.financialPosition'),
+      key: 'your-money',
+      label: t('navigation.yourMoney'),
       icon: 'account_balance',
       selectable: false,
       children: [
         navigationLeaf('assets', 'navigation.assets', 'inventory_2', 'assets'),
         navigationLeaf('liabilities', 'navigation.liabilities', 'request_quote', 'liabilities'),
-      ],
-    },
-    {
-      key: 'cash-flow',
-      label: t('navigation.cashFlow'),
-      icon: 'swap_vert',
-      selectable: false,
-      children: [
         navigationLeaf('income', 'navigation.income', 'payments', 'income'),
         navigationLeaf('expenses', 'navigation.expenses', 'credit_card', 'expenses'),
-        navigationLeaf('savings', 'navigation.savings', 'savings', 'workspace-dashboard'),
-        navigationLeaf(
-          'expense-tracker',
-          'navigation.expenseTracker',
-          'receipt_long',
-          'expense-tracker',
-        ),
       ],
     },
-    navigationLeaf('milestones', 'navigation.milestones', 'flag', 'achievements'),
-    {
-      key: 'what-if',
-      label: t('navigation.whatIf'),
-      icon: 'track_changes',
-      selectable: false,
-      children: [
-        navigationLeaf('what-if-general', 'navigation.general', 'tune', 'what-if'),
-        navigationLeaf('what-if-strategy', 'navigation.yourStrategy', 'route', 'what-if-strategy'),
-      ],
-    },
-    navigationLeaf('historic', 'navigation.historic', 'history', 'historic'),
+    navigationLeaf('plan', 'navigation.plan', 'route', 'plan'),
+    navigationLeaf('progress', 'navigation.progress', 'bar_chart', 'progress'),
   ]
 })
 
@@ -334,9 +312,16 @@ async function openWorkspace(workspaceId) {
   if (!workspaceId) return
 
   closeMobileDrawer()
-  const preservedRoute = ['expense-tracker', 'progress', 'achievements', 'what-if'].includes(
-    route.name,
-  )
+  const preservedRoute = [
+    'expenses',
+    'expense-tracker',
+    'plan',
+    'progress',
+    'achievements',
+    'historic',
+    'what-if',
+    'what-if-strategy',
+  ].includes(route.name)
     ? route.name
     : null
   const destination = preservedRoute

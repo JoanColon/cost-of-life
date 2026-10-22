@@ -19,8 +19,8 @@
               no-caps
               color="grey-7"
               icon="arrow_back"
-              :label="t('navigation.whatIf')"
-              :to="{ name: 'what-if', params: { workspaceId } }"
+              :label="t('navigation.plan')"
+              :to="{ name: 'plan', params: { workspaceId } }"
               class="back-button"
             />
             <h1>{{ t('whatIf.strategy.title') }}</h1>
@@ -219,8 +219,8 @@
                     ><strong>{{ formatCurrency(projection.strategy.cashTarget) }}</strong></span
                   >
                   <span
-                    ><small>{{ t('whatIf.strategy.reachIn') }}</small
-                    ><strong class="positive">{{ cashReachLabel }}</strong></span
+                    ><small>{{ t('whatIf.strategy.allocatedMonthly') }}</small
+                    ><strong>{{ formatCurrency(monthlyFor(allocation.cash)) }}</strong></span
                   >
                 </div>
                 <q-select
@@ -339,25 +339,55 @@
                 <h2>{{ t('whatIf.strategy.milestonesImpacted') }}</h2>
                 <p>{{ t('whatIf.strategy.milestonesDescription') }}</p>
               </div>
-              <div
-                v-for="milestone in impactedMilestones"
-                :key="milestone.id"
-                class="milestone-card"
-              >
-                <span :class="['mini-icon', milestone.tone]"
-                  ><q-icon :name="milestone.icon"
-                /></span>
-                <div>
-                  <strong>{{ milestone.title }}</strong
-                  ><small>{{ milestone.description }}</small>
+              <div v-for="outcome in strategyOutcomes" :key="outcome.id" class="milestone-card">
+                <span :class="['mini-icon', outcome.tone]">
+                  <q-icon :name="outcome.icon" />
+                </span>
+                <div class="outcome-copy">
+                  <span class="outcome-title">
+                    <strong>{{ outcome.title }}</strong>
+                    <q-btn
+                      v-if="outcome.showInfo"
+                      flat
+                      round
+                      dense
+                      size="sm"
+                      icon="info_outline"
+                      class="outcome-info-button"
+                      :aria-label="t('whatIf.strategy.freedomInfoAction')"
+                      @click="freedomInfoDialogOpen = true"
+                    />
+                  </span>
+                  <small>{{ outcome.description }}</small>
                 </div>
-                <b class="positive">{{ milestone.result }}</b>
+                <b :class="outcome.status">{{ outcome.result }}</b>
               </div>
             </section>
           </div>
         </div>
       </template>
     </main>
+
+    <q-dialog v-model="freedomInfoDialogOpen">
+      <q-card class="freedom-info-dialog">
+        <q-card-section class="freedom-info-heading">
+          <span class="mini-icon freedom"><q-icon name="flight_takeoff" /></span>
+          <h2>{{ t('whatIf.strategy.freedomInfoTitle') }}</h2>
+          <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
+        </q-card-section>
+        <q-card-section class="freedom-info-copy">
+          <p>{{ t('whatIf.strategy.freedomInfoDescription') }}</p>
+          <div>
+            <strong>{{ t('whatIf.strategy.freedomInfoIncludedTitle') }}</strong>
+            <p>{{ t('whatIf.strategy.freedomInfoIncluded') }}</p>
+          </div>
+          <div>
+            <strong>{{ t('whatIf.strategy.freedomInfoExcludedTitle') }}</strong>
+            <p>{{ t('whatIf.strategy.freedomInfoExcluded') }}</p>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
 
     <q-dialog v-model="investmentTypeDialogOpen">
       <q-card class="investment-type-dialog">
@@ -451,11 +481,13 @@ import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
+  financialYearMonthValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
 import {
   latestPositionMonth,
   simulateStrategy,
+  strategyNetWorthPoints,
   strategyStartingPosition,
 } from '@/domain/financial/strategy-simulation'
 import {
@@ -506,6 +538,7 @@ const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
 const whatIfStore = useWhatIfStore()
 const pageError = ref(null)
+const freedomInfoDialogOpen = ref(false)
 const investmentTypeDialogOpen = ref(false)
 const pendingInvestmentType = ref(null)
 const initialScenarioDialogOpen = ref(false)
@@ -607,84 +640,150 @@ const availableMixOptions = computed(() =>
       returnPercent,
     })),
 )
-const cashReachLabel = computed(() => {
-  const month = projection.value.strategy.cashTargetMonth
-  return month === 0 ? t('whatIf.cash.milestoneAchieved') : month == null ? '—' : `${month} months`
-})
-const cashOutcome = computed(() =>
-  projection.value.strategy.cashTargetMonth === 0
-    ? t('whatIf.cash.milestoneAchieved')
-    : `Reach ${activeScenario.value.cashTargetMonths} months of expenses in ${projection.value.strategy.cashTargetMonth ?? '—'} months`,
-)
 const currentMilestones = computed(() =>
   calculateMilestoneProgress({
     financialYear: financialYear.value,
     month: positionMonth.value,
   }),
 )
-const impactedMilestones = computed(() => {
-  const milestones = []
+const netWorthPoints = computed(() =>
+  strategyNetWorthPoints({
+    currentNetWorth: financialYearMonthValue(financialYear.value, positionMonth.value, 'netWorth'),
+    strategy: projection.value.strategy,
+    monthlyDebtContribution: monthlyFor(allocation.value.debt),
+    debtBalance: selectedDebt.value?.balance || 0,
+  }),
+)
+const strategyOutcomes = computed(() => {
+  const outcomes = []
+  const horizonMonths = activeScenario.value.horizonYears * 12
 
-  if (allocation.value.cash > 0) {
-    const id = `safety_${activeScenario.value.cashTargetMonths}_months`
-    milestones.push({
-      id,
-      icon: 'health_and_safety',
-      tone: 'cash',
-      title: t(`milestones.items.${id}`),
-      description: cashOutcome.value,
-      result: cashReachLabel.value,
+  const safetyId = `safety_${activeScenario.value.cashTargetMonths}_months`
+  const cashTargetMonth = projection.value.strategy.cashTargetMonth
+  outcomes.push({
+    id: safetyId,
+    icon: 'health_and_safety',
+    tone: 'cash',
+    title: t(`milestones.items.${safetyId}`),
+    description: t('whatIf.strategy.projectedCashAgainstTarget', {
+      value: formatCurrency(projection.value.strategy.cash),
+      target: formatCurrency(projection.value.strategy.cashTarget),
+    }),
+    result:
+      cashTargetMonth === 0
+        ? t('whatIf.cash.milestoneAchieved')
+        : cashTargetMonth != null
+          ? reachEstimate(cashTargetMonth)
+          : allocation.value.cash <= 0
+            ? t('whatIf.strategy.noExtraSavingsAllocated')
+            : t('whatIf.strategy.notReachedInHorizon', {
+                years: activeScenario.value.horizonYears,
+              }),
+    status:
+      cashTargetMonth != null ? 'positive' : allocation.value.cash > 0 ? 'progress' : 'negative',
+  })
+
+  const freedom =
+    currentMilestones.value.find(({ family, reached }) => family === 'freedom' && !reached) ||
+    currentMilestones.value.findLast(({ family }) => family === 'freedom')
+  if (freedom) {
+    const annualCost = simulation.value.simulatedCostOfLife * 12
+    const targetValue = freedom.target * annualCost
+    const reachedAt = projection.value.strategy.points.find(
+      ({ investableValue }) => investableValue >= targetValue,
+    )
+    const finalPoint = projection.value.strategy.points.at(-1)
+    const fundedYears = annualCost > 0 ? finalPoint.investableValue / annualCost : 0
+    outcomes.push({
+      id: freedom.id,
+      icon: 'flight_takeoff',
+      tone: 'freedom',
+      showInfo: true,
+      title: t(`milestones.items.${freedom.id}`),
+      description: t('whatIf.strategy.freedomProjected', { years: formatNumber(fundedYears) }),
+      result: reachedAt
+        ? reachedAt.month === 0
+          ? t('whatIf.cash.milestoneAchieved')
+          : reachEstimate(reachedAt.month)
+        : t('whatIf.strategy.notReachedInHorizon', {
+            years: activeScenario.value.horizonYears,
+          }),
+      status: reachedAt ? 'positive' : allocation.value.invest > 0 ? 'progress' : 'negative',
     })
   }
 
-  if (allocation.value.invest > 0) {
-    const freedom =
-      currentMilestones.value.find(({ family, reached }) => family === 'freedom' && !reached) ||
-      currentMilestones.value.findLast(({ family }) => family === 'freedom')
-    if (freedom) {
-      const annualCost = simulation.value.simulatedCostOfLife * 12
-      const targetValue = freedom.target * annualCost
-      const reachedAt = projection.value.strategy.points.find(
-        ({ investableValue }) => investableValue >= targetValue,
-      )
-      const finalPoint = projection.value.strategy.points.at(-1)
-      const fundedYears = annualCost > 0 ? finalPoint.investableValue / annualCost : 0
-      milestones.push({
-        id: freedom.id,
-        icon: 'flight_takeoff',
-        tone: 'freedom',
-        title: t(`milestones.items.${freedom.id}`),
-        description: reachedAt
-          ? reachedAt.month === 0
-            ? t('whatIf.cash.milestoneAchieved')
-            : t('whatIf.strategy.estimatedReachYears', {
-                years: Math.max(1, Math.ceil(reachedAt.month / 12)),
-              })
-          : t('whatIf.strategy.notReachedInHorizon', {
-              years: activeScenario.value.horizonYears,
-            }),
-        result: reachedAt
-          ? t('whatIf.strategy.freedomFunded', { years: freedom.target })
-          : t('whatIf.strategy.freedomProjected', { years: formatNumber(fundedYears) }),
-      })
-    }
+  const netWorth =
+    currentMilestones.value.find(({ family, reached }) => family === 'netWorth' && !reached) ||
+    currentMilestones.value.findLast(({ family }) => family === 'netWorth')
+  if (netWorth) {
+    const reachedAt = netWorthPoints.value.find(({ value }) =>
+      netWorth.id === 'net_worth_positive' ? value > 0 : value >= netWorth.target,
+    )
+    const finalNetWorth = netWorthPoints.value.at(-1)?.value || 0
+    outcomes.push({
+      id: netWorth.id,
+      icon: 'trending_up',
+      tone: 'net-worth',
+      title: t(`milestones.items.${netWorth.id}`),
+      description: t('whatIf.strategy.projectedNetWorth', {
+        value: formatCurrency(finalNetWorth),
+      }),
+      result: reachedAt
+        ? reachedAt.month === 0
+          ? t('whatIf.cash.milestoneAchieved')
+          : reachEstimate(reachedAt.month)
+        : t('whatIf.strategy.notReachedInHorizon', {
+            years: activeScenario.value.horizonYears,
+          }),
+      status:
+        reachedAt || finalNetWorth > netWorth.currentValue
+          ? reachedAt
+            ? 'positive'
+            : 'progress'
+          : 'negative',
+    })
   }
 
-  if (selectedDebt.value && allocation.value.debt > 0) {
+  if (selectedDebt.value) {
     const id = debtMilestoneId(selectedDebt.value.categoryId)
-    milestones.push({
+    const monthlyDebtContribution = monthlyFor(allocation.value.debt)
+    const payoffMonth =
+      monthlyDebtContribution > 0
+        ? Math.ceil(selectedDebt.value.balance / monthlyDebtContribution)
+        : null
+    const projectedReduction = Math.min(
+      selectedDebt.value.balance,
+      monthlyDebtContribution * horizonMonths,
+    )
+    const projectedBalance = Math.max(0, selectedDebt.value.balance - projectedReduction)
+    outcomes.push({
       id,
       icon: 'credit_score',
       tone: 'debt',
       title: t(`milestones.items.${id}`),
-      description: selectedDebt.value.name,
-      result: t('whatIf.debt.perYear', {
-        amount: formatCurrency(projection.value.strategy.annualDebtContribution),
+      description: t('whatIf.strategy.projectedDebtBalance', {
+        name: selectedDebt.value.name,
+        value: formatCurrency(projectedBalance),
       }),
+      result:
+        monthlyDebtContribution <= 0
+          ? t('whatIf.strategy.noExtraDebtReduction')
+          : payoffMonth <= horizonMonths
+            ? reachEstimate(payoffMonth)
+            : t('whatIf.strategy.extraDebtReduction', {
+                value: formatCurrency(projectedReduction),
+                years: activeScenario.value.horizonYears,
+              }),
+      status:
+        monthlyDebtContribution <= 0
+          ? 'negative'
+          : payoffMonth <= horizonMonths
+            ? 'positive'
+            : 'progress',
     })
   }
 
-  return milestones
+  return outcomes
 })
 watch(workspaceId, () => prepare(), { immediate: true })
 
@@ -875,6 +974,14 @@ function cloneMix() {
 
 function monthlyFor(percent) {
   return (monthlySavings.value * percent) / 100
+}
+
+function reachEstimate(months) {
+  if (months < 12)
+    return t('whatIf.strategy.estimatedReachMonths', { months: Math.max(1, Math.ceil(months)) })
+  return t('whatIf.strategy.estimatedReachYears', {
+    years: Math.max(1, Math.ceil(months / 12)),
+  })
 }
 
 function debtMilestoneId(categoryId) {
@@ -1094,11 +1201,20 @@ h1 {
   font-size: 0.78rem;
 }
 :deep(.mini-icon) {
-  display: grid;
-  place-items: center;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.1rem;
   width: 2.1rem;
   height: 2.1rem;
   border-radius: 50%;
+  overflow: hidden;
+}
+:deep(.mini-icon > .q-icon) {
+  position: static !important;
+  margin: 0 !important;
+  transform: none !important;
+  line-height: 1;
 }
 :deep(.mini-icon.cash) {
   background: var(--color-green-soft);
@@ -1115,6 +1231,10 @@ h1 {
 :deep(.mini-icon.freedom) {
   background: #f1eaff;
   color: #8b5cf6;
+}
+:deep(.mini-icon.net-worth) {
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
 }
 :deep(.stepper) {
   display: grid;
@@ -1303,6 +1423,12 @@ h1 {
 .positive {
   color: var(--color-success-dark);
 }
+.negative {
+  color: var(--color-danger);
+}
+.progress {
+  color: var(--color-primary);
+}
 .redirect-note {
   padding-top: 0.6rem;
   border-top: 1px solid var(--color-line);
@@ -1432,6 +1558,16 @@ h1 {
 .milestone-card div {
   display: grid;
 }
+.outcome-title {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.outcome-info-button {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  color: var(--color-copy);
+}
 .milestone-card small {
   color: var(--color-copy);
   font-size: 0.68rem;
@@ -1439,12 +1575,44 @@ h1 {
 .milestone-card b {
   text-align: right;
   font-size: 0.78rem;
+  max-width: 15rem;
 }
 .milestone-card {
   margin-top: 0.7rem;
   padding: 0.75rem;
   border: 1px solid var(--color-line);
   border-radius: 0.75rem;
+}
+.freedom-info-dialog {
+  width: min(31rem, calc(100vw - 2rem));
+  border-radius: var(--radius-card);
+  color: var(--color-ink);
+}
+.freedom-info-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+.freedom-info-heading h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.15rem;
+}
+.freedom-info-copy {
+  display: grid;
+  gap: 1rem;
+  padding-top: 0;
+}
+.freedom-info-copy div {
+  display: grid;
+  gap: 0.2rem;
+}
+.freedom-info-copy p {
+  margin: 0;
+  color: var(--color-copy);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 @media (min-width: 1001px) {

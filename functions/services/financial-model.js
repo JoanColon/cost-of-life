@@ -223,6 +223,9 @@ function validatedCanonicalItem(section, item = {}) {
     assertCanonicalText(item.itemName, 'An income item name is required')
     assertCanonicalTextField(item.notes, 'Canonical income notes are required')
     assertCanonicalIncomeCalculation(item.calculation)
+    if (item.entryMode != null && !['simple', 'detailed'].includes(item.entryMode)) {
+      throw new Error('A valid income entry mode is required')
+    }
     return cleanItem({ ...item, categoryId: category, disposablePercentage: 100 })
   }
 
@@ -249,6 +252,9 @@ function canonicalExpense(item, category) {
   }
   if (item.necessity != null && !['essential', 'lifestyle'].includes(item.necessity)) {
     throw new Error('A valid expense necessity is required')
+  }
+  if (item.entryMode != null && !['simple', 'detailed'].includes(item.entryMode)) {
+    throw new Error('A valid expense entry mode is required')
   }
   assertCanonicalMonthlyAmounts(item.monthlyAmounts)
   return cleanItem({

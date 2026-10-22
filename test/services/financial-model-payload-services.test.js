@@ -24,6 +24,7 @@ vi.mock('@/services/firebase/financial-model-mutations.service', () => ({
 }))
 
 import { updateAsset } from '../../src/services/firebase/assets.service.js'
+import { updateExpense } from '../../src/services/firebase/expenses.service.js'
 import { updateIncome } from '../../src/services/firebase/income.service.js'
 import { updateLiability } from '../../src/services/firebase/liabilities.service.js'
 
@@ -105,6 +106,7 @@ describe('financial model service payloads', () => {
           annualAmount: '42000.126',
           paymentsPerYear: '12',
         },
+        entryMode: 'simple',
         ownership,
       },
       ['member-a'],
@@ -117,7 +119,43 @@ describe('financial model service payloads', () => {
       notes: 'Main employment',
       calculation: { mode: 'annual_salary', annualAmount: 42000.13, paymentsPerYear: 12 },
       disposablePercentage: 100,
+      entryMode: 'simple',
       ownership,
     })
+  })
+
+  it('preserves the simple entry mode when updating an expense', async () => {
+    await updateExpense(
+      'workspace-a',
+      'expense-a',
+      {
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: '  Housing  ',
+        notes: '',
+        estimate: { amount: '1000', frequency: 'monthly' },
+        monthlyAmounts: null,
+        variability: 'variable',
+        recurrence: 'recurring',
+        necessity: null,
+        entryMode: 'simple',
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'expenses',
+      'expense-a',
+      expect.objectContaining({
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: 'Housing',
+        estimate: { amount: 1000, frequency: 'monthly' },
+        entryMode: 'simple',
+        ownership,
+      }),
+    )
   })
 })

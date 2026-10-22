@@ -1,10 +1,15 @@
 import {
   currentFinancialMonth,
   financialYearMonthCategoryValue,
+  financialYearMonthSubcategoryValue,
   financialYearMonthValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
-import { INVESTABLE_ASSET_CATEGORY_IDS, milestoneDefinitions } from './definitions'
+import {
+  FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS,
+  INVESTABLE_ASSET_CATEGORY_IDS,
+  milestoneDefinitions,
+} from './definitions'
 
 export function calculateMilestoneProgress({
   financialYear,
@@ -25,15 +30,23 @@ export function calculateMilestoneProgress({
   const history = withCurrentFinancialYear(financialHistory, financialYear)
   const annualCostOfLife = financialYearValue(financialYear, 'expenses')
   const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash')
-  const investableAssets = categoryTotal(
-    financialYear,
-    month,
-    'assets',
-    INVESTABLE_ASSET_CATEGORY_IDS,
-  )
+  const freedomAssets =
+    categoryTotal(financialYear, month, 'assets', INVESTABLE_ASSET_CATEGORY_IDS) +
+    FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS.reduce(
+      (total, subcategoryId) =>
+        total +
+        financialYearMonthSubcategoryValue(
+          financialYear,
+          month,
+          'assets',
+          'real_estate',
+          subcategoryId,
+        ),
+      0,
+    )
   const netWorth = financialYearMonthValue(financialYear, month, 'netWorth')
   const safetyMonths = annualCostOfLife > 0 ? cash / (annualCostOfLife / 12) : 0
-  const fundedYears = annualCostOfLife > 0 ? investableAssets / annualCostOfLife : 0
+  const fundedYears = annualCostOfLife > 0 ? freedomAssets / annualCostOfLife : 0
 
   return milestoneDefinitions.map((definition) => {
     const result = calculateDefinition(definition, {

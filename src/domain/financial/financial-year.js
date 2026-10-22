@@ -167,6 +167,21 @@ export function financialYearMonthCategoryValue(
   return categoryValue(category, section, memberId)
 }
 
+export function financialYearMonthSubcategoryValue(
+  financialYear,
+  month,
+  section,
+  categoryId,
+  subcategoryId,
+  memberId = 'all',
+) {
+  const item =
+    financialYear?.months?.[month]?.[section]?.categories?.[categoryId]?.subcategories?.[
+      subcategoryId
+    ]
+  return itemValue(item, section, memberId)
+}
+
 export function financialYearCategoryItemCount(financialYear, section, categoryId, month = null) {
   const category = month
     ? financialYear?.months?.[month]?.[section]?.categories?.[categoryId]
@@ -198,11 +213,14 @@ export function financialYearSubcategoryValue(
   memberId = 'all',
 ) {
   if (POSITION_SECTIONS.has(section)) {
-    const item =
-      financialYear?.months?.['12']?.[section]?.categories?.[categoryId]?.subcategories?.[
-        subcategoryId
-      ]
-    return itemValue(item, section, memberId)
+    return financialYearMonthSubcategoryValue(
+      financialYear,
+      '12',
+      section,
+      categoryId,
+      subcategoryId,
+      memberId,
+    )
   }
   return moneyOrZero(
     Object.values(financialYear?.months || {}).reduce((sum, month) => {

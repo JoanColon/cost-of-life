@@ -348,8 +348,17 @@ async function saveIncome(payload) {
   formSaving.value = true
   const saved = await persist(() =>
     id
-      ? incomeStore.editIncome(workspaceId.value, id, payload, memberIds.value)
-      : incomeStore.addIncome(workspaceId.value, payload, memberIds.value),
+      ? incomeStore.editIncome(
+          workspaceId.value,
+          id,
+          { ...payload, entryMode: 'detailed' },
+          memberIds.value,
+        )
+      : incomeStore.addIncome(
+          workspaceId.value,
+          { ...payload, entryMode: 'detailed' },
+          memberIds.value,
+        ),
   )
   formSaving.value = false
   if (saved) closeIncomeDialog()

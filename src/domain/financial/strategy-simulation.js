@@ -21,7 +21,13 @@ const BUSINESS_ASSET_TYPES = Object.freeze({
   business_other: 'businessEquity',
 })
 
-const FREEDOM_INVESTMENT_TYPES = Object.freeze(['stockMarket', 'fixedIncome', 'crypto', 'other'])
+const FREEDOM_INVESTMENT_TYPES = Object.freeze([
+  'stockMarket',
+  'realEstate',
+  'fixedIncome',
+  'crypto',
+  'other',
+])
 
 export function latestPositionMonth(financialYear, preferredMonth = currentFinancialMonth()) {
   const months = financialYear?.months || {}
@@ -35,6 +41,7 @@ export function latestPositionMonth(financialYear, preferredMonth = currentFinan
 export function strategyStartingPosition(
   financialYear,
   month = latestPositionMonth(financialYear),
+  memberId = 'all',
 ) {
   const investmentBalances = {
     stockMarket: 0,
@@ -44,18 +51,33 @@ export function strategyStartingPosition(
     businessEquity: 0,
     other: 0,
   }
-  addMappedCategory(financialYear, month, 'investment', INVESTMENT_ASSET_TYPES, investmentBalances)
+  addMappedCategory(
+    financialYear,
+    month,
+    'investment',
+    INVESTMENT_ASSET_TYPES,
+    investmentBalances,
+    memberId,
+  )
   addMappedCategory(
     financialYear,
     month,
     'real_estate',
     REAL_ESTATE_ASSET_TYPES,
     investmentBalances,
+    memberId,
   )
-  addMappedCategory(financialYear, month, 'business', BUSINESS_ASSET_TYPES, investmentBalances)
+  addMappedCategory(
+    financialYear,
+    month,
+    'business',
+    BUSINESS_ASSET_TYPES,
+    investmentBalances,
+    memberId,
+  )
   return {
     month,
-    cash: financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash'),
+    cash: financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash', memberId),
     investmentBalances,
     investmentTotal: money(
       Object.values(investmentBalances).reduce((sum, value) => sum + value, 0),
@@ -90,6 +112,26 @@ export function simulateStrategy({
     strategy,
     allocation,
   }
+}
+
+export function strategyNetWorthPoints({
+  currentNetWorth = 0,
+  strategy,
+  monthlyDebtContribution = 0,
+  debtBalance = 0,
+} = {}) {
+  const startingValue = Number(strategy?.startingValue) || 0
+  const monthlyDebt = Math.max(0, Number(monthlyDebtContribution) || 0)
+  const maximumDebtReduction = Math.max(0, Number(debtBalance) || 0)
+
+  return (strategy?.points || []).map((point) => {
+    const assetChange = (Number(point.value) || 0) - startingValue
+    const debtReduction = Math.min(maximumDebtReduction, monthlyDebt * Number(point.month || 0))
+    return {
+      month: Number(point.month || 0),
+      value: money(Number(currentNetWorth || 0) + assetChange + debtReduction),
+    }
+  })
 }
 
 export function projectPath({
@@ -180,12 +222,16 @@ function projectionPoint(month, cash, balances) {
   }
 }
 
-function addMappedCategory(financialYear, month, categoryId, mapping, target) {
+function addMappedCategory(financialYear, month, categoryId, mapping, target, memberId) {
   const subcategories =
     financialYear?.months?.[month]?.assets?.categories?.[categoryId]?.subcategories || {}
   for (const [subcategoryId, subcategory] of Object.entries(subcategories)) {
     const type = mapping[subcategoryId]
-    if (type) target[type] += Number(subcategory?.total) || 0
+    if (type) {
+      const value =
+        memberId && memberId !== 'all' ? subcategory?.memberValues?.[memberId] : subcategory?.total
+      target[type] += Number(value) || 0
+    }
   }
 }
 

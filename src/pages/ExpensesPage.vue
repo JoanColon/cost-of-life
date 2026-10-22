@@ -44,6 +44,8 @@
           <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
 
+        <ExpensesSectionNav :workspace-id="workspaceId" active="plan" :context="planContext" />
+
         <section class="total-card">
           <div class="total-copy">
             <span>{{ t('expenses.totalCostOfLife') }}</span>
@@ -81,10 +83,24 @@
                 </span>
               </button>
 
-              <div class="category-value">
-                <strong>{{ formatCurrency(categoryDisplayValue(category.id)) }}</strong>
-                <small>/ {{ categoryPeriodLabel }}</small>
-              </div>
+              <SimpleValueEditor
+                :value="categoryDisplayValue(category.id)"
+                :formatted-value="formatCurrency(categoryDisplayValue(category.id))"
+                :formatted-period="categoryPeriodLabel"
+                :saving="isCategorySaving(category.id)"
+                :disabled="!canQuickEdit(category.id)"
+                :aria-label="
+                  t('expenses.quickEdit.editLabel', {
+                    category: t(category.nameKey),
+                    value: formatCurrency(categoryDisplayValue(category.id)),
+                  })
+                "
+                :title="t('expenses.quickEdit.simpleTitle', { category: t(category.nameKey) })"
+                :input-label="t('expenses.quickEdit.inputLabel')"
+                :input-suffix="`/ ${categoryPeriodLabel}`"
+                :invalid-message="t('expenses.quickEdit.invalid')"
+                @save="saveSimpleExpense(category, $event)"
+              />
 
               <button type="button" class="category-link" @click="openCategory(category.id)">
                 <q-icon name="chevron_right" />
@@ -109,14 +125,6 @@
           </div>
 
           <div class="category-actions">
-            <q-btn
-              flat
-              no-caps
-              icon="receipt_long"
-              color="primary"
-              :label="t('expenseTracker.open')"
-              :to="{ name: 'expense-tracker', params: { workspaceId } }"
-            />
             <q-btn
               flat
               no-caps
@@ -223,13 +231,16 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ExpenseCategorySetup from '@/components/expenses/ExpenseCategorySetup.vue'
+import ExpensesSectionNav from '@/components/expenses/ExpensesSectionNav.vue'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
+import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import { expenseCategories } from '@/config/expense-categories'
 import {
   currentFinancialYear,
   financialYearCategoryValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
+import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -247,6 +258,8 @@ const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
+const loadingItems = ref(false)
+const savingCategoryIds = ref(new Set())
 const editingCategories = ref(false)
 const confirmDisable = ref(false)
 const pendingSelection = ref(null)
@@ -262,6 +275,9 @@ const workspaceHomeRoute = computed(() => ({
 }))
 const workspace = computed(
   () => workspaceStore.workspaces.find((item) => item.id === workspaceId.value) || null,
+)
+const planContext = computed(
+  () => `${currentYear} · ${workspace.value?.name || t('navigation.workspaces')}`,
 )
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map((member) => member.id))
@@ -283,7 +299,13 @@ const totals = computed(() => ({
   monthlyCostOfLife:
     financialYearValue(financialYear.value, 'expenses', selectedMemberId.value) / 12,
 }))
-const pageLoading = computed(() => expensesStore.loading || financialYearsStore.loading)
+const pageLoading = computed(
+  () =>
+    loadingItems.value ||
+    expensesStore.loading ||
+    expensesStore.categoryLoading ||
+    financialYearsStore.loading,
+)
 const displayedTotal = computed(() =>
   period.value === 'annual' ? totals.value.annualCostOfLife : totals.value.monthlyCostOfLife,
 )
@@ -303,10 +325,20 @@ const scopeLabel = computed(() => {
 watch(workspaceId, () => loadPage(), { immediate: true })
 
 async function loadPage(force = false) {
-  await Promise.allSettled([
-    expensesStore.loadConfig(workspaceId.value, force),
-    financialYearsStore.load(workspaceId.value, currentYear, force),
-  ])
+  loadingItems.value = true
+  try {
+    await Promise.allSettled([
+      expensesStore.loadConfig(workspaceId.value, force),
+      financialYearsStore.load(workspaceId.value, currentYear, force),
+    ])
+    await Promise.allSettled(
+      expensesStore.enabledCategories.map((categoryId) =>
+        expensesStore.loadCategory(workspaceId.value, categoryId, force),
+      ),
+    )
+  } finally {
+    loadingItems.value = false
+  }
 }
 
 function categoryDisplayValue(categoryId) {
@@ -324,6 +356,7 @@ function categoryAnnualValue(categoryId) {
 }
 
 function categoryStatus(categoryId) {
+  if (simpleExpense(categoryId)) return t('expenses.simpleTotal')
   const subcategories =
     financialYear.value?.months?.['01']?.expenses?.categories?.[categoryId]?.subcategories || {}
   const count = Object.values(subcategories).reduce(
@@ -332,6 +365,66 @@ function categoryStatus(categoryId) {
   )
   const key = count === 1 ? 'expenses.itemName' : 'expenses.itemNamePlural'
   return t('expenses.itemSummary', { count, items: t(key) })
+}
+
+function categoryItems(categoryId) {
+  return expensesStore.itemsForCategory(categoryId)
+}
+
+function simpleExpense(categoryId) {
+  const items = categoryItems(categoryId)
+  return items.length === 1 && items[0].entryMode === 'simple' ? items[0] : null
+}
+
+function canQuickEdit(categoryId) {
+  const items = categoryItems(categoryId)
+  const editableScope = selectedMemberId.value === 'all' || memberIds.value.length === 1
+  return editableScope && (items.length === 0 || Boolean(simpleExpense(categoryId)))
+}
+
+function isCategorySaving(categoryId) {
+  return savingCategoryIds.value.has(categoryId)
+}
+
+async function saveSimpleExpense(category, displayedValue) {
+  if (isCategorySaving(category.id) || !canQuickEdit(category.id)) return
+
+  const annualValue = period.value === 'annual' ? displayedValue : displayedValue * 12
+  const existing = simpleExpense(category.id)
+  const defaultSubcategory = category.suggestions[0]
+  const payload = {
+    ...(existing || {}),
+    categoryId: category.id,
+    subcategoryId: existing?.subcategoryId || defaultSubcategory.id,
+    itemName: existing?.itemName || t(category.nameKey),
+    notes: existing?.notes || '',
+    estimate: { amount: annualValue / 12, frequency: 'monthly' },
+    monthlyAmounts: null,
+    variability: 'variable',
+    recurrence: 'recurring',
+    necessity: null,
+    ownership:
+      existing?.ownership ||
+      (memberIds.value.length === 1
+        ? createSingleOwnership(memberIds.value[0])
+        : createEqualOwnership(memberIds.value)),
+    entryMode: 'simple',
+  }
+
+  savingCategoryIds.value = new Set(savingCategoryIds.value).add(category.id)
+  try {
+    if (existing) {
+      await expensesStore.editExpense(workspaceId.value, existing.id, payload, memberIds.value)
+    } else {
+      await expensesStore.addExpense(workspaceId.value, payload, memberIds.value)
+    }
+  } catch {
+    $q.notify({ type: 'negative', message: t('expenses.errors.save'), position: 'top' })
+  } finally {
+    const next = new Set(savingCategoryIds.value)
+    next.delete(category.id)
+    savingCategoryIds.value = next
+  }
 }
 
 function openCategory(categoryId) {
@@ -493,7 +586,7 @@ async function runSaving(operation) {
 .category-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   padding: 0.8rem 0.75rem;
   border-top: 1px solid var(--color-line);
@@ -532,21 +625,6 @@ async function runSaving(operation) {
 }
 
 .category-copy small {
-  color: var(--color-muted);
-}
-
-.category-value {
-  display: grid;
-  justify-items: end;
-  min-width: 8.5rem;
-  padding: 0.45rem 0.65rem;
-}
-
-.category-value strong {
-  font-size: 1rem;
-}
-
-.category-value small {
   color: var(--color-muted);
 }
 
@@ -599,11 +677,6 @@ async function runSaving(operation) {
 
   .category-main {
     gap: 0.6rem;
-  }
-
-  .category-value {
-    min-width: 5.5rem;
-    padding: 0.25rem;
   }
 
   .category-actions :deep(.q-btn) {

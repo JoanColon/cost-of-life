@@ -37,10 +37,10 @@
           <span class="review-group-copy">
             <strong>{{ t(group.nameKey) }}</strong>
             <small>
-              {{ formatCurrency(groupTrackedTotal(group)) }}
-              {{ t('expenseTracker.review.tracked').toLowerCase() }} ·
               {{ formatCurrency(groupModelTotal(group)) }}
-              {{ t('expenseTracker.review.model').toLowerCase() }}
+              {{ t('expenseTracker.review.model').toLowerCase() }} ·
+              {{ formatCurrency(groupTrackedTotal(group)) }}
+              {{ t('expenseTracker.review.tracked').toLowerCase() }}
             </small>
           </span>
           <q-icon name="expand_more" class="review-chevron" :class="{ open: isOpen(group.id) }" />

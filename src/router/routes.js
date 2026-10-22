@@ -62,15 +62,17 @@ const routes = [
       {
         path: 'workspaces/:workspaceId/progress',
         name: 'progress',
-        redirect: (to) => ({
-          name: 'achievements',
-          params: { workspaceId: to.params.workspaceId },
-        }),
+        component: () => import('@/pages/ProgressPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/achievements',
         name: 'achievements',
         component: () => import('@/pages/AchievementsPage.vue'),
+      },
+      {
+        path: 'workspaces/:workspaceId/plan',
+        name: 'plan',
+        component: () => import('@/pages/PlanPage.vue'),
       },
       {
         path: 'workspaces/:workspaceId/what-if',

@@ -62,6 +62,27 @@ describe('milestones', () => {
     })
   })
 
+  it('counts non-primary real estate toward freedom but excludes the primary home', () => {
+    const progress = calculateMilestoneProgress({
+      financialYear: financialYear({
+        investments: 12_000,
+        rentalProperty: 48_000,
+        primaryHome: 500_000,
+        annualCost: 12_000,
+      }),
+      month: '10',
+    })
+
+    expect(milestone(progress, 'freedom_5_years')).toMatchObject({
+      currentValue: 5,
+      reached: true,
+    })
+    expect(milestone(progress, 'freedom_10_years')).toMatchObject({
+      currentValue: 5,
+      reached: false,
+    })
+  })
+
   it('keeps an achievement while reporting lower current progress', () => {
     const progress = calculateMilestoneProgress({
       financialYear: financialYear({ cash: 1_000, annualCost: 12_000 }),
@@ -164,6 +185,8 @@ function financialYear({
   year = 2026,
   cash = 0,
   investments = 0,
+  rentalProperty = 0,
+  primaryHome = 0,
   liabilities = {},
   annualCost = 0,
 } = {}) {
@@ -177,6 +200,16 @@ function financialYear({
             categories: {
               ...(cash ? { cash: positionCategory('cash', cash) } : {}),
               ...(investments ? { investment: positionCategory('investment', investments) } : {}),
+              ...(rentalProperty || primaryHome
+                ? {
+                    real_estate: {
+                      subcategories: {
+                        ...(rentalProperty ? { rental_property: { total: rentalProperty } } : {}),
+                        ...(primaryHome ? { primary_home: { total: primaryHome } } : {}),
+                      },
+                    },
+                  }
+                : {}),
             },
           },
           liabilities: {

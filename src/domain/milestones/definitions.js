@@ -1,6 +1,11 @@
 import { liabilityCategoryIds } from '@/config/liability-categories'
 
 export const INVESTABLE_ASSET_CATEGORY_IDS = Object.freeze(['investment'])
+export const FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS = Object.freeze([
+  'rental_property',
+  'land',
+  'real_estate_other',
+])
 
 const consumerDebtCategoryIds = Object.freeze(['personal_loan', 'credit_card_debt', 'other_debt'])
 
