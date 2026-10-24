@@ -138,9 +138,13 @@ describe('strategy simulation', () => {
       value: 95_000,
       cash: 5_000,
       investmentValue: 90_000,
+      investmentBalances: { stockMarket: 10_000, realEstate: 80_000 },
       investableValue: 90_000,
     })
-    expect(result.points.at(-1).investableValue).toBe(102_000)
+    expect(result.points.at(-1)).toMatchObject({
+      investmentBalances: { stockMarket: 22_000, realEstate: 80_000 },
+      investableValue: 102_000,
+    })
   })
 
   it('projects only the user-defined scenario from the current financial position', () => {

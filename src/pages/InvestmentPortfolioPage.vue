@@ -99,67 +99,103 @@
         </section>
 
         <template v-else>
-          <section class="source-card">
-            <div class="source-main">
-              <span class="source-icon"><q-icon name="table_view" /></span>
+          <section class="portfolio-table-card">
+            <header class="portfolio-table-header">
+              <span class="placeholder-icon"><q-icon name="query_stats" /></span>
               <div>
-                <span class="connected-label">
-                  <q-icon name="check_circle" />
-                  {{ t('assets.portfolio.connected') }}
-                </span>
-                <h2>{{ t('assets.portfolio.sourceTitle') }}</h2>
-                <p>{{ sheetDisplayUrl }}</p>
+                <h2>{{ t('assets.portfolio.portfolioTitle') }}</h2>
+                <p>{{ t('assets.portfolio.tableDescription') }}</p>
               </div>
+              <q-btn
+                outline
+                no-caps
+                color="primary"
+                icon="sync"
+                :label="t('assets.portfolio.readSheet')"
+                :loading="readingSheet"
+                @click="readSheet"
+              />
+            </header>
+
+            <q-table
+              v-if="portfolioRows !== null"
+              v-model:pagination="tablePagination"
+              class="portfolio-table"
+              flat
+              dense
+              row-key="id"
+              :rows="tableRows"
+              :columns="tableColumns"
+              :filter="tableFilter"
+              :rows-per-page-options="[10, 25, 50, 0]"
+              :no-data-label="t('assets.portfolio.emptyPortfolio')"
+            >
+              <template #top-right>
+                <q-input
+                  v-model="tableFilter"
+                  borderless
+                  dense
+                  debounce="250"
+                  :placeholder="t('assets.portfolio.search')"
+                >
+                  <template #append><q-icon name="search" /></template>
+                </q-input>
+              </template>
+
+              <template #body-cell-ticker="props">
+                <q-td :props="props"
+                  ><strong>{{ props.value }}</strong></q-td
+                >
+              </template>
+
+              <template #body-cell-dayChange="props">
+                <q-td :props="props">
+                  <span class="daily-change" :class="`daily-change--${changeTone(props.value)}`">
+                    {{ props.value || '—' }}
+                  </span>
+                </q-td>
+              </template>
+            </q-table>
+
+            <div v-else class="portfolio-table-empty">
+              <q-icon name="table_view" />
+              <p>{{ t('assets.portfolio.loadTablePrompt') }}</p>
             </div>
+
+            <p v-if="sheetError" class="sheet-error">
+              {{ t('assets.portfolio.errors.readSheet') }}
+            </p>
+          </section>
+
+          <div class="portfolio-actions">
             <q-btn
-              unelevated
+              flat
               no-caps
               color="primary"
+              icon="open_in_new"
               :label="t('assets.portfolio.openSheet')"
               :href="portfolio.spreadsheetUrl"
               target="_blank"
               rel="noopener noreferrer"
             />
-          </section>
-
-          <section class="portfolio-placeholder">
-            <span class="placeholder-icon"><q-icon name="query_stats" /></span>
-            <h2>{{ t('assets.portfolio.portfolioTitle') }}</h2>
-            <p>{{ t('assets.portfolio.comingSoon') }}</p>
-            <q-btn
-              outline
-              no-caps
-              color="primary"
-              icon="grid_on"
-              :label="t('assets.portfolio.readA1')"
-              :loading="readingA1"
-              class="read-cell-button"
-              @click="readA1"
-            />
-            <output v-if="cellA1 !== null" class="cell-result">
-              <small>{{ t('assets.portfolio.cellA1') }}</small>
-              <strong>{{ cellA1 || t('assets.portfolio.emptyCell') }}</strong>
-            </output>
-            <p v-if="cellError" class="cell-error">{{ t('assets.portfolio.errors.readCell') }}</p>
-          </section>
-
-          <div class="secondary-actions">
-            <q-btn
-              flat
-              no-caps
-              color="primary"
-              icon="edit"
-              :label="t('assets.portfolio.changeSheet')"
-              @click="startEditing"
-            />
-            <q-btn
-              flat
-              no-caps
-              color="negative"
-              icon="link_off"
-              :label="t('assets.portfolio.disconnect')"
-              @click="confirmDisconnect = true"
-            />
+            <div class="portfolio-management-actions">
+              <q-btn
+                flat
+                no-caps
+                color="primary"
+                icon="edit"
+                :label="t('assets.portfolio.changeSheet')"
+                @click="startEditing"
+              />
+              <q-btn
+                flat
+                no-caps
+                color="negative"
+                icon="link_off"
+                :label="t('assets.portfolio.disconnect')"
+                @click="confirmDisconnect = true"
+              />
+            </div>
           </div>
         </template>
       </template>
@@ -194,8 +230,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   isGoogleSheetsUrl,
-  readInvestmentPortfolioA1,
+  readInvestmentPortfolioSheet,
 } from '@/services/firebase/investment-portfolios.service'
+import { changeTone, portfolioTableRows } from '@/domain/financial/investment-portfolio'
 import { useAssetsStore } from '@/stores/assets-store'
 
 const templateCopyUrl =
@@ -212,9 +249,11 @@ const saving = ref(false)
 const editing = ref(false)
 const spreadsheetUrl = ref('')
 const confirmDisconnect = ref(false)
-const readingA1 = ref(false)
-const cellA1 = ref(null)
-const cellError = ref(false)
+const readingSheet = ref(false)
+const portfolioRows = ref(null)
+const sheetError = ref(false)
+const tableFilter = ref('')
+const tablePagination = ref({ sortBy: 'ticker', descending: false, page: 1, rowsPerPage: 25 })
 let preparationId = 0
 
 const workspaceId = computed(() => String(route.params.workspaceId))
@@ -232,14 +271,19 @@ const loading = computed(
   () => preparing.value || assetsStore.loading || assetsStore.categoryLoading,
 )
 const error = computed(() => pageError.value || assetsStore.error)
-const sheetDisplayUrl = computed(() => {
-  try {
-    const url = new URL(portfolio.value.spreadsheetUrl)
-    return `${url.hostname}${url.pathname}`
-  } catch {
-    return portfolio.value?.spreadsheetUrl || ''
-  }
-})
+const tableRows = computed(() => portfolioTableRows(portfolioRows.value))
+const tableColumns = computed(() => [
+  tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left'),
+  tableColumn('country', t('assets.portfolio.columns.country'), 'left'),
+  tableColumn('shares', t('assets.portfolio.columns.shares')),
+  tableColumn('priceLocal', t('assets.portfolio.columns.priceLocal')),
+  tableColumn('dayChange', t('assets.portfolio.columns.dayChange')),
+  tableColumn('dividendYield', t('assets.portfolio.columns.dividendYield')),
+  tableColumn('marketValueBase', t('assets.portfolio.columns.marketValueBase')),
+  tableColumn('portfolioWeight', t('assets.portfolio.columns.portfolioWeight')),
+  tableColumn('annualDividendBase', t('assets.portfolio.columns.annualDividendBase')),
+  tableColumn('incomeWeight', t('assets.portfolio.columns.incomeWeight')),
+])
 const sheetUrlRules = [
   (value) => Boolean(String(value || '').trim()) || t('assets.portfolio.errors.urlRequired'),
   (value) => isGoogleSheetsUrl(value) || t('assets.portfolio.errors.urlInvalid'),
@@ -273,7 +317,7 @@ async function prepare(force = false) {
 }
 
 function startEditing() {
-  clearCellResult()
+  clearSheetResult()
   spreadsheetUrl.value = portfolio.value?.spreadsheetUrl || ''
   editing.value = true
 }
@@ -307,7 +351,7 @@ async function disconnect() {
   saving.value = true
   try {
     await assetsStore.disconnectInvestmentPortfolio(workspaceId.value, assetId.value)
-    clearCellResult()
+    clearSheetResult()
     confirmDisconnect.value = false
     spreadsheetUrl.value = ''
     $q.notify({ type: 'positive', message: t('assets.portfolio.disconnected'), position: 'top' })
@@ -318,24 +362,29 @@ async function disconnect() {
   }
 }
 
-async function readA1() {
-  if (readingA1.value) return
-  readingA1.value = true
-  cellError.value = false
+async function readSheet() {
+  if (readingSheet.value) return
+  readingSheet.value = true
+  sheetError.value = false
   try {
-    const result = await readInvestmentPortfolioA1(workspaceId.value, assetId.value)
-    cellA1.value = String(result.value ?? '')
+    const result = await readInvestmentPortfolioSheet(workspaceId.value, assetId.value)
+    portfolioRows.value = Array.isArray(result.rows) ? result.rows : []
   } catch {
-    cellA1.value = null
-    cellError.value = true
+    portfolioRows.value = null
+    sheetError.value = true
   } finally {
-    readingA1.value = false
+    readingSheet.value = false
   }
 }
 
-function clearCellResult() {
-  cellA1.value = null
-  cellError.value = false
+function clearSheetResult() {
+  portfolioRows.value = null
+  sheetError.value = false
+  tableFilter.value = ''
+}
+
+function tableColumn(name, label, align = 'right') {
+  return { name, label, field: name, align, sortable: true }
 }
 </script>
 
@@ -347,7 +396,7 @@ function clearCellResult() {
 }
 .portfolio-shell {
   @include financial-shell;
-  max-width: 64rem;
+  max-width: 76rem;
 }
 .page-state {
   display: grid;
@@ -384,8 +433,7 @@ h1 {
   @include financial-title;
 }
 .setup-card,
-.source-card,
-.portfolio-placeholder {
+.portfolio-table-card {
   @include dashboard-card;
   margin-top: 1.5rem;
 }
@@ -397,7 +445,6 @@ h1 {
   padding: clamp(1.4rem, 4vw, 2.5rem);
 }
 .setup-icon,
-.source-icon,
 .placeholder-icon {
   display: grid;
   place-items: center;
@@ -411,8 +458,7 @@ h1 {
   font-size: 1.65rem;
 }
 .setup-copy h2,
-.source-card h2,
-.portfolio-placeholder h2,
+.portfolio-table-card h2,
 .confirm-card h2 {
   margin: 0;
   color: var(--color-ink);
@@ -422,8 +468,7 @@ h1 {
   font-size: 1.65rem;
 }
 .setup-copy p,
-.source-card p,
-.portfolio-placeholder p,
+.portfolio-table-card p,
 .confirm-card p {
   color: var(--color-copy);
 }
@@ -455,99 +500,109 @@ h1 {
   justify-content: flex-end;
   gap: 0.5rem;
 }
-.source-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-  padding: 1.5rem;
-}
-.source-main {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  min-width: 0;
-}
-.source-icon {
-  width: 3.25rem;
-  height: 3.25rem;
-  flex: 0 0 auto;
-  font-size: 1.5rem;
-}
-.connected-label {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--color-success-dark);
-  font-size: 0.74rem;
-  font-weight: 750;
-  text-transform: uppercase;
-}
-.source-card h2 {
-  margin-top: 0.2rem;
-  font-size: 1.2rem;
-}
-.source-card p {
-  max-width: 32rem;
-  margin: 0.2rem 0 0;
+.portfolio-table-card {
   overflow: hidden;
-  font-size: 0.82rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.portfolio-placeholder {
-  display: grid;
-  min-height: 19rem;
-  padding: 2rem;
-  place-content: center;
-  justify-items: center;
-  text-align: center;
 }
 .placeholder-icon {
-  width: 4.5rem;
-  height: 4.5rem;
-  margin-bottom: 1rem;
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 1rem;
   background: var(--color-blue-soft);
   color: var(--color-primary);
-  font-size: 2rem;
+  font-size: 1.65rem;
 }
-.portfolio-placeholder p {
-  max-width: 28rem;
-  margin: 0.5rem 0 0;
-}
-.read-cell-button {
-  margin-top: 1.25rem;
-}
-.cell-result {
+.portfolio-table-header {
   display: grid;
-  min-width: min(24rem, 100%);
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-soft);
-  text-align: left;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.4rem 1.5rem;
+  border-bottom: 1px solid var(--color-line);
 }
-.cell-result small {
+.portfolio-table-header h2 {
+  font-size: 1.25rem;
+}
+.portfolio-table-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.86rem;
+}
+.portfolio-table {
+  color: var(--color-ink);
+}
+.portfolio-table :deep(.q-table__top) {
+  min-height: 3.5rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.portfolio-table :deep(.q-table__middle) {
+  max-width: 100%;
+}
+.portfolio-table :deep(table) {
+  min-width: 76rem;
+}
+.portfolio-table :deep(th) {
+  background: var(--color-surface-soft);
   color: var(--color-copy);
   font-size: 0.72rem;
   font-weight: 750;
-  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  white-space: normal;
 }
-.cell-result strong {
-  margin-top: 0.25rem;
-  overflow-wrap: anywhere;
-  color: var(--color-ink);
-  font-size: 1.15rem;
+.portfolio-table :deep(td) {
+  height: 2.8rem;
+  border-color: var(--color-line);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.portfolio-placeholder .cell-error {
-  margin-top: 0.75rem;
+.portfolio-table :deep(tbody tr:hover td) {
+  background: var(--color-surface-soft);
+}
+.daily-change {
+  font-weight: 700;
+}
+.daily-change--positive {
+  color: var(--color-success-dark);
+}
+.daily-change--negative {
   color: var(--color-danger);
 }
-.secondary-actions {
+.daily-change--neutral {
+  color: var(--color-copy);
+}
+.portfolio-table-empty {
+  display: grid;
+  min-height: 13rem;
+  padding: 2rem;
+  place-content: center;
+  justify-items: center;
+  color: var(--color-copy);
+  text-align: center;
+}
+.portfolio-table-empty .q-icon {
+  color: var(--color-muted);
+  font-size: 2.4rem;
+}
+.portfolio-table-empty p {
+  margin: 0.65rem 0 0;
+}
+.portfolio-table-card .sheet-error {
+  margin: 0;
+  padding: 0.8rem 1.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 7%, white);
+  color: var(--color-danger);
+}
+.portfolio-actions,
+.portfolio-management-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
+}
+.portfolio-actions {
+  justify-content: space-between;
   margin-top: 0.75rem;
 }
 .confirm-card {
@@ -555,16 +610,22 @@ h1 {
 }
 
 @media (max-width: 760px) {
-  .source-card {
-    align-items: stretch;
-    flex-direction: column;
+  .portfolio-table-header {
+    grid-template-columns: auto minmax(0, 1fr);
   }
-  .source-card > .q-btn {
+  .portfolio-table-header > .q-btn {
+    grid-column: 1 / -1;
     width: 100%;
   }
-  .secondary-actions {
+  .portfolio-actions,
+  .portfolio-management-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+  .portfolio-actions > .q-btn,
+  .portfolio-management-actions,
+  .portfolio-management-actions > .q-btn {
+    width: 100%;
   }
 }
 </style>

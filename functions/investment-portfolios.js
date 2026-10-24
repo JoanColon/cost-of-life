@@ -1,7 +1,7 @@
 const { getFirestore } = require('firebase-admin/firestore')
 const { HttpsError, onCall } = require('firebase-functions/https')
 const {
-  readInvestmentPortfolioA1: readInvestmentPortfolioA1Data,
+  readInvestmentPortfolioSheet: readInvestmentPortfolioSheetData,
   updateInvestmentPortfolio: updateInvestmentPortfolioData,
 } = require('./services/investment-portfolios')
 
@@ -21,11 +21,11 @@ const updateInvestmentPortfolio = onCall({ region: 'europe-west1' }, async (requ
   }
 })
 
-const readInvestmentPortfolioA1 = onCall({ region: 'europe-west1' }, async (request) => {
+const readInvestmentPortfolioSheet = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 
   try {
-    return await readInvestmentPortfolioA1Data(getFirestore(), {
+    return await readInvestmentPortfolioSheetData(getFirestore(), {
       workspaceId: String(request.data?.workspaceId || '').trim(),
       userId: request.auth.uid,
       assetId: String(request.data?.assetId || '').trim(),
@@ -36,4 +36,4 @@ const readInvestmentPortfolioA1 = onCall({ region: 'europe-west1' }, async (requ
   }
 })
 
-module.exports = { readInvestmentPortfolioA1, updateInvestmentPortfolio }
+module.exports = { readInvestmentPortfolioSheet, updateInvestmentPortfolio }

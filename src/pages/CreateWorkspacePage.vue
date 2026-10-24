@@ -3,7 +3,7 @@
     <WorkspaceForm
       show-cancel
       @created="workspaceCreated"
-      @cancel="router.push({ name: 'home' })"
+      @cancel="router.push({ name: 'home', query: { manage: '1' } })"
     />
   </q-page>
 </template>

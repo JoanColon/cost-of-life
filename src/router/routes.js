@@ -55,11 +55,6 @@ const routes = [
         component: () => import('@/pages/LiabilityCategoryPage.vue'),
       },
       {
-        path: 'workspaces/:workspaceId/historic',
-        name: 'historic',
-        component: () => import('@/pages/HistoricPage.vue'),
-      },
-      {
         path: 'workspaces/:workspaceId/progress',
         name: 'progress',
         component: () => import('@/pages/ProgressPage.vue'),

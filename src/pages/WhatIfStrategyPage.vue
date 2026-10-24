@@ -279,27 +279,51 @@
                   <h2>{{ t('whatIf.strategy.investmentStrategy') }}</h2>
                   <p>{{ t('whatIf.strategy.projectedValueDescription') }}</p>
                 </div>
-                <div class="horizon-options">
-                  <button
-                    v-for="years in [10, 20, 30]"
-                    :key="years"
-                    type="button"
-                    :class="{ selected: activeScenario.horizonYears === years }"
-                    @click="updateScenario({ horizonYears: years })"
+                <div class="projection-controls">
+                  <div class="horizon-options">
+                    <button
+                      v-for="years in [10, 20, 30]"
+                      :key="years"
+                      type="button"
+                      :class="{ selected: activeScenario.horizonYears === years }"
+                      @click="updateScenario({ horizonYears: years })"
+                    >
+                      {{ years }} years
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                      @click="setCustomHorizon"
+                    >
+                      {{
+                        [10, 20, 30].includes(activeScenario.horizonYears)
+                          ? t('whatIf.reduction.custom')
+                          : `${activeScenario.horizonYears} years`
+                      }}
+                    </button>
+                  </div>
+                  <div
+                    class="projection-view-switch"
+                    role="group"
+                    :aria-label="t('whatIf.strategy.chartView.label')"
                   >
-                    {{ years }} years
-                  </button>
-                  <button
-                    type="button"
-                    :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
-                    @click="setCustomHorizon"
-                  >
-                    {{
-                      [10, 20, 30].includes(activeScenario.horizonYears)
-                        ? t('whatIf.reduction.custom')
-                        : `${activeScenario.horizonYears} years`
-                    }}
-                  </button>
+                    <button
+                      type="button"
+                      :class="{ selected: projectionChartMode === 'total' }"
+                      :aria-pressed="projectionChartMode === 'total'"
+                      @click="projectionChartMode = 'total'"
+                    >
+                      {{ t('whatIf.strategy.chartView.total') }}
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ selected: projectionChartMode === 'breakdown' }"
+                      :aria-pressed="projectionChartMode === 'breakdown'"
+                      @click="projectionChartMode = 'breakdown'"
+                    >
+                      {{ t('whatIf.strategy.chartView.breakdown') }}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="projected-total">
@@ -311,6 +335,7 @@
               <StrategyProjectionChart
                 :strategy-points="investmentProjectionPoints"
                 :series-name="activeScenario.name"
+                :mode="projectionChartMode"
               />
               <div class="result-breakdown">
                 <span
@@ -543,6 +568,7 @@ const investmentTypeDialogOpen = ref(false)
 const pendingInvestmentType = ref(null)
 const initialScenarioDialogOpen = ref(false)
 const initialScenarioName = ref('')
+const projectionChartMode = ref('total')
 const year = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
 const config = computed(() => whatIfStore.config)
@@ -594,9 +620,10 @@ const projection = computed(() =>
   }),
 )
 const investmentProjectionPoints = computed(() =>
-  projection.value.strategy.points.map(({ month, investmentValue }) => ({
+  projection.value.strategy.points.map(({ month, investmentBalances, investmentValue }) => ({
     month,
     value: investmentValue,
+    breakdown: investmentBalances,
   })),
 )
 
@@ -1457,32 +1484,64 @@ h1 {
   justify-content: space-between;
   gap: 1rem;
 }
-.horizon-options {
+.projection-controls {
   display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.horizon-options,
+.projection-view-switch {
+  display: flex;
   align-items: center;
   gap: 0.25rem;
   padding: 0.2rem;
   border: 1px solid var(--color-line);
-  border-radius: 0.55rem;
   background: var(--color-surface-soft);
+}
+.horizon-options {
+  border-radius: 0.55rem;
+}
+.projection-view-switch {
+  border-radius: 999px;
+}
+.horizon-options button,
+.projection-view-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--color-copy);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
 }
 .horizon-options button {
   min-width: 3rem;
   height: 1.75rem;
   padding: 0.2rem 0.45rem;
-  border: 0;
-  background: transparent;
-  color: var(--color-copy);
   font-size: 0.61rem;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
 }
 .horizon-options button.selected {
   background: white;
   color: var(--color-primary);
   box-shadow: 0 1px 4px rgb(15 23 42 / 10%);
+}
+.projection-view-switch button {
+  min-width: 5.5rem;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px !important;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.projection-view-switch button.selected {
+  background: var(--color-ink);
+  color: white;
+  box-shadow: 0 2px 8px rgb(24 43 68 / 12%);
+}
+.horizon-options button:focus-visible,
+.projection-view-switch button:focus-visible {
+  @include focus-ring;
 }
 .projected-total {
   display: grid;
@@ -1683,8 +1742,9 @@ h1 {
   .projection-heading {
     display: grid;
   }
-  .horizon-options {
+  .projection-controls {
     justify-self: start;
+    justify-content: flex-start;
   }
   .projected-total {
     justify-content: start;

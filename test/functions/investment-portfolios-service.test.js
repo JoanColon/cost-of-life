@@ -3,8 +3,8 @@ import investmentPortfolioService from '../../functions/services/investment-port
 
 const {
   canonicalGoogleSheetsUrl,
-  firstCsvCell,
-  readInvestmentPortfolioA1,
+  parseCsv,
+  readInvestmentPortfolioSheet,
   updateInvestmentPortfolio,
 } = investmentPortfolioService
 
@@ -88,7 +88,7 @@ describe('investment portfolio service', () => {
     ).rejects.toThrow('Investment not found')
   })
 
-  it('reads A1 from the configured Google Sheet', async () => {
+  it('reads the Portfolio tab from the configured Google Sheet', async () => {
     const { firestore } = createFirestore({
       portfolio: {
         source: 'google_sheets',
@@ -97,27 +97,35 @@ describe('investment portfolio service', () => {
     })
     const fetchSpreadsheet = vi.fn(async () => ({
       ok: true,
-      text: async () => '"Portfolio, October"',
+      text: async () => 'Ticker,Value\r\nVWCE,"1,250"',
     }))
 
     await expect(
-      readInvestmentPortfolioA1(
+      readInvestmentPortfolioSheet(
         firestore,
         { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
         fetchSpreadsheet,
       ),
-    ).resolves.toEqual({ cell: 'A1', value: 'Portfolio, October' })
+    ).resolves.toEqual({
+      sheet: 'Portfolio',
+      rows: [
+        ['Ticker', 'Value'],
+        ['VWCE', '1,250'],
+      ],
+    })
 
     const requestedUrl = fetchSpreadsheet.mock.calls[0][0]
     expect(requestedUrl.hostname).toBe('docs.google.com')
     expect(requestedUrl.pathname).toBe('/spreadsheets/d/sheet_123/gviz/tq')
-    expect(requestedUrl.searchParams.get('range')).toBe('A1')
+    expect(requestedUrl.searchParams.get('sheet')).toBe('Portfolio')
   })
 
-  it('parses quoted, escaped and empty CSV cells', () => {
-    expect(firstCsvCell('"A ""quoted"" value"')).toBe('A "quoted" value')
-    expect(firstCsvCell('plain value')).toBe('plain value')
-    expect(firstCsvCell('')).toBe('')
+  it('parses a CSV sheet with quotes, commas, line breaks and empty cells', () => {
+    expect(parseCsv('Name,Notes,Value\r\nFund,"A ""quoted""\nvalue",""')).toEqual([
+      ['Name', 'Notes', 'Value'],
+      ['Fund', 'A "quoted"\nvalue', ''],
+    ])
+    expect(parseCsv('')).toEqual([])
   })
 
   it('reports an inaccessible configured Sheet', async () => {
@@ -129,7 +137,7 @@ describe('investment portfolio service', () => {
     })
 
     await expect(
-      readInvestmentPortfolioA1(
+      readInvestmentPortfolioSheet(
         firestore,
         { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
         async () => ({ ok: false }),

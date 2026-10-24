@@ -196,8 +196,9 @@ const inviteLink = ref('')
 const inviteError = ref(null)
 const canShare = computed(() => typeof navigator.share === 'function')
 
-function openWorkspace(workspaceId) {
-  router.push({ name: 'workspace-dashboard', params: { workspaceId } })
+async function openWorkspace(workspaceId) {
+  await workspaceStore.setActiveWorkspace(workspaceId)
+  await router.push({ name: 'workspace-dashboard', params: { workspaceId } })
 }
 
 function workspaceDescription(workspace) {

@@ -22,15 +22,19 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { LineChart } from 'echarts/charts'
-import { AriaComponent, GridComponent, TooltipComponent } from 'echarts/components'
+import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { assetCategories } from '@/config/asset-categories'
+import { liabilityCategories } from '@/config/liability-categories'
 import { formatCurrency } from '@/utils/formatters'
 
-use([LineChart, GridComponent, TooltipComponent, AriaComponent, CanvasRenderer])
+use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent, CanvasRenderer])
 
 const props = defineProps({
   points: { type: Array, required: true },
+  breakdownPoints: { type: Array, default: () => [] },
+  mode: { type: String, default: 'netWorth' },
   loading: { type: Boolean, default: false },
   error: { type: Boolean, default: false },
 })
@@ -38,8 +42,15 @@ const props = defineProps({
 const { t, locale } = useI18n()
 const chartElement = ref(null)
 const periods = computed(() => props.points.map((point) => point.period))
+const categorySeries = computed(() => [
+  ...activeCategorySeries(assetCategories, 'assets', ASSET_COLORS),
+  ...activeCategorySeries(liabilityCategories, 'liabilities', LIABILITY_COLORS),
+])
 let chart = null
 let resizeObserver = null
+
+const ASSET_COLORS = ['#159f73', '#1688f8', '#39a8a3', '#8754ed', '#4f7cac', '#73bfb8']
+const LIABILITY_COLORS = ['#f27177', '#e58b43', '#d95568', '#b66d57', '#a85567', '#ef6c57']
 
 onMounted(() => {
   chart = init(chartElement.value)
@@ -54,7 +65,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.points, locale.value],
+  () => [props.points, props.breakdownPoints, props.mode, locale.value],
   () => nextTick(renderChart),
   { deep: true },
 )
@@ -72,17 +83,37 @@ function renderChart() {
       aria: {
         enabled: true,
         decal: { show: false },
-        label: { description: t('dashboard.financialPosition.chartAria') },
+        label: {
+          description: t(
+            props.mode === 'breakdown'
+              ? 'progress.chartBreakdownAria'
+              : 'dashboard.financialPosition.chartAria',
+          ),
+        },
       },
-      grid: { top: 20, right: 12, bottom: 38, left: 66 },
+      color: categorySeries.value.map(({ color }) => color),
+      grid: { top: props.mode === 'breakdown' ? 64 : 20, right: 12, bottom: 38, left: 66 },
+      legend:
+        props.mode === 'breakdown'
+          ? {
+              show: true,
+              type: 'scroll',
+              top: 4,
+              left: 8,
+              right: 8,
+              itemWidth: 18,
+              itemHeight: 8,
+              textStyle: { color: '#526987', fontSize: 11 },
+              pageTextStyle: { color: '#526987' },
+            }
+          : { show: false },
       tooltip: {
         trigger: 'axis',
         backgroundColor: '#0b1633',
         borderWidth: 0,
         padding: [9, 12],
         textStyle: { color: '#fff', fontSize: 12 },
-        formatter: ([point]) =>
-          `<strong>${formatPeriod(point.axisValue)}</strong><br/>${formatCurrency(point.data)}`,
+        formatter: formatTooltip,
       },
       xAxis: {
         type: 'category',
@@ -104,36 +135,79 @@ function renderChart() {
         axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
         splitLine: { lineStyle: { color: '#edf2f5' } },
       },
-      series: [
-        {
-          name: t('dashboard.financialPosition.netWorth'),
-          type: 'line',
-          data: props.points.map((point) => point.value),
-          smooth: 0.25,
-          symbol: 'circle',
-          symbolSize: props.points.length === 1 ? 9 : 6,
-          showSymbol: props.points.length < 18,
-          lineStyle: { width: 3, color: '#18b981' },
-          itemStyle: { color: '#18b981', borderColor: '#fff', borderWidth: 2 },
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [
-                { offset: 0, color: 'rgba(24, 185, 129, 0.24)' },
-                { offset: 1, color: 'rgba(24, 185, 129, 0.02)' },
-              ],
-            },
-          },
-          emphasis: { focus: 'series' },
-        },
-      ],
+      series: props.mode === 'breakdown' ? breakdownChartSeries() : netWorthChartSeries(),
     },
     true,
   )
+}
+
+function netWorthChartSeries() {
+  return [
+    {
+      name: t('dashboard.financialPosition.netWorth'),
+      type: 'line',
+      data: props.points.map((point) => point.value),
+      smooth: 0.25,
+      symbol: 'circle',
+      symbolSize: props.points.length === 1 ? 9 : 6,
+      showSymbol: props.points.length < 18,
+      lineStyle: { width: 3, color: '#18b981' },
+      itemStyle: { color: '#18b981', borderColor: '#fff', borderWidth: 2 },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(24, 185, 129, 0.24)' },
+            { offset: 1, color: 'rgba(24, 185, 129, 0.02)' },
+          ],
+        },
+      },
+      emphasis: { focus: 'series' },
+    },
+  ]
+}
+
+function breakdownChartSeries() {
+  return categorySeries.value.map(({ categoryId, color, name, section }) => ({
+    name,
+    type: 'line',
+    data: props.breakdownPoints.map((point) => point[section]?.[categoryId] || 0),
+    smooth: 0.2,
+    symbol: 'circle',
+    symbolSize: 5,
+    showSymbol: props.breakdownPoints.length < 18,
+    lineStyle: { width: 2, color },
+    itemStyle: { color, borderColor: '#fff', borderWidth: 1 },
+    emphasis: { focus: 'series', lineStyle: { width: 3 } },
+  }))
+}
+
+function activeCategorySeries(categories, section, colors) {
+  return categories
+    .filter(({ id }) =>
+      props.breakdownPoints.some((point) => Number(point[section]?.[id] || 0) !== 0),
+    )
+    .map((category, index) => ({
+      categoryId: category.id,
+      color: colors[index % colors.length],
+      name: t(category.nameKey),
+      section,
+    }))
+}
+
+function formatTooltip(points) {
+  const values = Array.isArray(points) ? points : [points]
+  const lines = values
+    .filter((point) => Number(point.data) !== 0 || props.mode !== 'breakdown')
+    .map(
+      (point) =>
+        `${point.marker}<span style="display:inline-block;min-width:8rem">${point.seriesName}</span> <strong>${formatCurrency(point.data)}</strong>`,
+    )
+  return `<strong>${formatPeriod(values[0]?.axisValue)}</strong><br/>${lines.join('<br/>')}`
 }
 
 function axisLabel(period, index) {

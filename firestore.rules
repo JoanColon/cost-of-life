@@ -38,6 +38,33 @@ service cloud.firestore {
         && after.milestoneTracking.activatedAt == request.time;
     }
 
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'activeWorkspaceId',
+          'updatedAt'
+        ])
+        && (
+          request.resource.data.activeWorkspaceId == null
+          || request.resource.data.activeWorkspaceId is string
+        )
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'activeWorkspaceId',
+          'updatedAt'
+        ])
+        && (
+          request.resource.data.activeWorkspaceId == null
+          || request.resource.data.activeWorkspaceId is string
+        )
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     match /workspaces/{workspaceId} {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid

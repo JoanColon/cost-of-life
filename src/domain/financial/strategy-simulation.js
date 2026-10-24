@@ -218,6 +218,9 @@ function projectionPoint(month, cash, balances) {
     value: money(cash + investmentValue),
     cash: money(cash),
     investmentValue: money(investmentValue),
+    investmentBalances: Object.fromEntries(
+      Object.entries(balances).map(([type, value]) => [type, money(value)]),
+    ),
     investableValue: money(investableValue),
   }
 }

@@ -2,6 +2,7 @@ const { FieldValue } = require('firebase-admin/firestore')
 
 const GOOGLE_SHEETS_HOST = 'docs.google.com'
 const SPREADSHEET_PATH = /^\/spreadsheets(?:\/u\/\d+)?\/d\/([A-Za-z0-9_-]+)(?:\/|$)/
+const PORTFOLIO_SHEET_NAME = 'Portfolio'
 
 async function updateInvestmentPortfolio(
   firestore,
@@ -51,7 +52,7 @@ async function updateInvestmentPortfolio(
   })
 }
 
-async function readInvestmentPortfolioA1(
+async function readInvestmentPortfolioSheet(
   firestore,
   { workspaceId, userId, assetId },
   fetchImpl = fetch,
@@ -86,7 +87,7 @@ async function readInvestmentPortfolioA1(
     `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq`,
   )
   readUrl.searchParams.set('tqx', 'out:csv')
-  readUrl.searchParams.set('range', 'A1')
+  readUrl.searchParams.set('sheet', PORTFOLIO_SHEET_NAME)
 
   let response
   try {
@@ -97,8 +98,9 @@ async function readInvestmentPortfolioA1(
   if (!response.ok) throw new Error('The Google Sheet could not be read')
 
   const body = await response.text()
-  if (body.length > 100_000) throw new Error('The Google Sheet returned an invalid response')
-  return { cell: 'A1', value: firstCsvCell(body) }
+  if (body.length > 1_000_000) throw new Error('The Google Sheet returned an invalid response')
+
+  return { sheet: PORTFOLIO_SHEET_NAME, rows: parseCsv(body) }
 }
 
 function canonicalGoogleSheetsUrl(value) {
@@ -131,24 +133,50 @@ function spreadsheetIdFromUrl(value) {
   return match[1]
 }
 
-function firstCsvCell(value) {
+function parseCsv(value) {
   const csv = String(value || '').replace(/^\uFEFF/, '')
-  if (!csv.startsWith('"')) return csv.split(/[,\r\n]/, 1)[0]
+  if (!csv) return []
 
-  let result = ''
-  for (let index = 1; index < csv.length; index += 1) {
-    if (csv[index] !== '"') {
-      result += csv[index]
-      continue
+  const rows = []
+  let row = []
+  let field = ''
+  let quoted = false
+
+  for (let index = 0; index < csv.length; index += 1) {
+    const character = csv[index]
+
+    if (quoted) {
+      if (character === '"' && csv[index + 1] === '"') {
+        field += '"'
+        index += 1
+      } else if (character === '"') {
+        quoted = false
+      } else {
+        field += character
+      }
+    } else if (character === '"' && field === '') {
+      quoted = true
+    } else if (character === ',') {
+      row.push(field)
+      field = ''
+    } else if (character === '\n' || character === '\r') {
+      row.push(field)
+      rows.push(row)
+      row = []
+      field = ''
+      if (character === '\r' && csv[index + 1] === '\n') index += 1
+    } else {
+      field += character
     }
-    if (csv[index + 1] === '"') {
-      result += '"'
-      index += 1
-      continue
-    }
-    return result
   }
-  throw new Error('The Google Sheet returned an invalid response')
+
+  if (quoted) throw new Error('The Google Sheet returned an invalid response')
+  if (field || row.length) {
+    row.push(field)
+    rows.push(row)
+  }
+
+  return rows
 }
 
 function isPlainObject(value) {
@@ -161,7 +189,7 @@ function assertText(value, message) {
 
 module.exports = {
   canonicalGoogleSheetsUrl,
-  firstCsvCell,
-  readInvestmentPortfolioA1,
+  parseCsv,
+  readInvestmentPortfolioSheet,
   updateInvestmentPortfolio,
 }

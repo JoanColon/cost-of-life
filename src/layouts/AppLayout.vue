@@ -17,17 +17,23 @@
           v-if="workspaceStore.hasWorkspaces"
           :model-value="activeWorkspaceId"
           :options="workspaceOptions"
-          :display-value="activeWorkspace?.name || t('navigation.workspaces')"
+          :display-value="activeWorkspace?.name || t('navigation.selectWorkspace')"
           emit-value
           map-options
           dense
           borderless
           options-dense
           class="workspace-selector"
-          :aria-label="t('home.activeWorkspace')"
-          @update:model-value="openWorkspace"
+          :aria-label="t('navigation.switchWorkspace')"
+          @update:model-value="handleWorkspaceSelection"
         >
           <template #prepend><q-icon name="workspaces_outline" size="1.15rem" /></template>
+          <template #option="scope">
+            <q-item v-bind="scope.itemProps">
+              <q-item-section avatar><q-icon :name="scope.opt.icon" /></q-item-section>
+              <q-item-section>{{ scope.opt.label }}</q-item-section>
+            </q-item>
+          </template>
         </q-select>
 
         <q-btn
@@ -56,13 +62,13 @@
         <q-item
           v-ripple
           clickable
-          :to="{ name: 'home' }"
+          :to="{ name: 'home', query: { manage: '1' } }"
           exact
           active-class="active-nav-item"
           @click="closeMobileDrawer"
         >
           <q-item-section avatar><q-icon name="space_dashboard" /></q-item-section>
-          <q-item-section>{{ t('navigation.workspaces') }}</q-item-section>
+          <q-item-section>{{ t('navigation.manageWorkspaces') }}</q-item-section>
         </q-item>
 
         <q-item
@@ -81,18 +87,17 @@
       <q-separator class="q-my-sm" />
 
       <div v-if="workspaceStore.hasWorkspaces" class="workspace-list">
-        <div class="workspace-list-label">{{ t('navigation.workspaces') }}</div>
+        <div class="workspace-list-label">{{ t('navigation.switchWorkspace') }}</div>
         <q-list dense>
           <q-item
             v-for="workspace in workspaceStore.workspaces"
             :key="workspace.id"
             v-ripple
             clickable
-            :to="workspaceRoute(workspace.id)"
             exact
             :active="workspace.id === activeWorkspaceId"
             active-class="active-workspace"
-            @click="closeMobileDrawer"
+            @click="switchWorkspace(workspace.id)"
           >
             <q-item-section avatar>
               <q-icon :name="isSharedWorkspace(workspace) ? 'group' : 'person_outline'" />
@@ -171,6 +176,9 @@ import { useMilestonesStore } from '@/stores/milestones-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 
+const MANAGE_WORKSPACES_OPTION = '__manage-workspaces__'
+const CREATE_WORKSPACE_OPTION = '__create-workspace__'
+
 const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
@@ -191,13 +199,26 @@ const loggingOut = ref(false)
 const financialPeriodKey = ref(currentPeriodKey())
 const expandedNavigationNodes = ref(['your-money'])
 let periodTimer = null
-const workspaceOptions = computed(() =>
-  workspaceStore.workspaces.map((workspace) => ({
+const workspaceOptions = computed(() => [
+  ...workspaceStore.workspaces.map((workspace) => ({
     label: workspace.name,
     value: workspace.id,
+    icon: isSharedWorkspace(workspace) ? 'group' : 'person_outline',
   })),
-)
-const activeWorkspaceId = computed(() => {
+  {
+    label: t('navigation.manageWorkspaces'),
+    value: MANAGE_WORKSPACES_OPTION,
+    icon: 'settings',
+  },
+  {
+    label: t('navigation.createWorkspace'),
+    value: CREATE_WORKSPACE_OPTION,
+    icon: 'add_business',
+  },
+])
+const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+const activeWorkspace = computed(() => workspaceStore.activeWorkspace)
+const routeWorkspaceId = computed(() => {
   const workspaceId = route.params.workspaceId
   if (typeof workspaceId !== 'string') return null
 
@@ -205,11 +226,7 @@ const activeWorkspaceId = computed(() => {
     ? workspaceId
     : null
 })
-const activeWorkspace = computed(
-  () =>
-    workspaceStore.workspaces.find((workspace) => workspace.id === activeWorkspaceId.value) || null,
-)
-const showMobileNavigation = computed(() => $q.screen.lt.md && Boolean(activeWorkspaceId.value))
+const showMobileNavigation = computed(() => $q.screen.lt.md && Boolean(routeWorkspaceId.value))
 const activeNavigationNode = computed(() => {
   const routeNodes = {
     'workspace-dashboard': 'workspace-home',
@@ -228,7 +245,6 @@ const activeNavigationNode = computed(() => {
     'what-if-strategy': 'plan',
     progress: 'progress',
     achievements: 'progress',
-    historic: 'progress',
   }
 
   return routeNodes[route.name] || null
@@ -280,54 +296,55 @@ async function handleAuthChange(user, previousUser) {
   }
 }
 
-function syncWorkspaceFromRoute() {
+async function syncWorkspaceFromRoute() {
   if (!workspaceStore.ready) return
 
   const workspaceId = route.params.workspaceId
   if (typeof workspaceId !== 'string') {
     financialYearsStore.stopWatching()
+    if (route.name === 'home' && route.query.manage !== '1' && workspaceStore.activeWorkspaceId) {
+      await router.replace(workspaceRoute(workspaceStore.activeWorkspaceId))
+    }
     return
   }
 
-  const workspaceExists = workspaceStore.workspaces.some(
-    (workspace) => workspace.id === workspaceId,
-  )
-  if (!workspaceExists) {
-    financialYearsStore.stopWatching()
-    router.replace({ name: 'home' })
-  }
+  if (await workspaceStore.setActiveWorkspace(workspaceId)) return
+
+  financialYearsStore.stopWatching()
+  await router.replace({ name: 'home' })
 }
 
 async function loadWorkspaces(force = false) {
   if (!authUser.value) return
   try {
     await workspaceStore.load(authUser.value, force)
-    syncWorkspaceFromRoute()
+    await syncWorkspaceFromRoute()
   } catch {
     return
   }
 }
 
-async function openWorkspace(workspaceId) {
-  if (!workspaceId) return
+async function handleWorkspaceSelection(value) {
+  if (value === MANAGE_WORKSPACES_OPTION) {
+    closeMobileDrawer()
+    await router.push({ name: 'home', query: { manage: '1' } })
+    return
+  }
+
+  if (value === CREATE_WORKSPACE_OPTION) {
+    closeMobileDrawer()
+    await router.push({ name: 'create-workspace' })
+    return
+  }
+
+  await switchWorkspace(value)
+}
+
+async function switchWorkspace(workspaceId) {
+  if (!(await workspaceStore.setActiveWorkspace(workspaceId))) return
 
   closeMobileDrawer()
-  const preservedRoute = [
-    'expenses',
-    'expense-tracker',
-    'plan',
-    'progress',
-    'achievements',
-    'historic',
-    'what-if',
-    'what-if-strategy',
-  ].includes(route.name)
-    ? route.name
-    : null
-  const destination = preservedRoute
-    ? { name: preservedRoute, params: { workspaceId } }
-    : workspaceRoute(workspaceId)
-  await router.push(destination)
+  await router.push(workspaceRoute(workspaceId))
 }
 
 function workspaceRoute(workspaceId) {

@@ -104,6 +104,7 @@ async function continueInvite() {
   try {
     const result = await acceptWorkspaceInvite(token.value)
     await workspaceStore.load(authUser.value, true)
+    await workspaceStore.setActiveWorkspace(result.workspaceId)
     await router.replace({
       name: 'workspace-dashboard',
       params: { workspaceId: result.workspaceId },

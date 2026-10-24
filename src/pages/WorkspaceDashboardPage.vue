@@ -53,7 +53,7 @@
           <b>{{ t('dashboard.insights.explore') }} <q-icon name="arrow_forward" /></b>
         </router-link>
 
-        <router-link :to="{ name: 'historic', params: { workspaceId } }" class="insight-card">
+        <router-link :to="{ name: 'progress', params: { workspaceId } }" class="insight-card">
           <span>{{ t('dashboard.insights.thisYear') }}</span>
           <strong v-if="yearChange !== null" :class="{ negative: yearChange < 0 }">
             {{ yearChange >= 0 ? '+' : '−' }}{{ formatCurrency(Math.abs(yearChange)) }}
@@ -66,7 +66,7 @@
                 : t('dashboard.insights.netWorthChange')
             }}
           </p>
-          <b>{{ t('dashboard.insights.history') }} <q-icon name="arrow_forward" /></b>
+          <b>{{ t('dashboard.insights.progress') }} <q-icon name="arrow_forward" /></b>
         </router-link>
       </section>
     </main>

@@ -56,6 +56,7 @@ export const expenseCategories = [
     icon: 'health_and_safety',
     suggestions: [
       suggestion('health_insurance', 'monthly', 'fixed', 'recurring', 'essential'),
+      suggestion('life_insurance', 'yearly', 'fixed', 'recurring', 'essential'),
       suggestion('medical_care', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('dental_vision', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('medication', 'monthly', 'variable', 'recurring', 'essential'),
@@ -109,6 +110,7 @@ export const expenseCategories = [
     suggestions: [
       suggestion('school_education', 'monthly', 'fixed', 'recurring', 'essential'),
       suggestion('daycare', 'monthly', 'fixed', 'recurring', 'essential'),
+      suggestion('kids_clothes', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('activities', 'monthly', 'variable', 'recurring', null),
     ],
   },

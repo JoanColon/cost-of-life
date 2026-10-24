@@ -173,7 +173,6 @@ No construyas URLs de workspace a mano. El mapa funcional es:
 | `assets`, `liabilities`, `income`, `expenses`                                 | `.../:section`                  | Configuración y resumen por categorías.                |
 | `asset-category`, `liability-category`, `income-category`, `expense-category` | `.../:section/:category`        | Edición detallada de una categoría.                    |
 | `expense-tracker`                                                             | `.../expenses/tracker`          | Registro y reconciliación mensual.                     |
-| `historic`                                                                    | `.../historic`                  | Totales de snapshots anuales.                          |
 | `achievements`                                                                | `.../achievements`              | Progreso e hitos alcanzados.                           |
 | `what-if`                                                                     | `.../what-if`                   | Simulación de capacidad de ahorro y estrategia.        |
 

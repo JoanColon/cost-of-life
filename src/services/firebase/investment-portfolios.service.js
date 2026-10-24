@@ -2,7 +2,7 @@ import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase/firebase'
 
 const updatePortfolio = httpsCallable(functions, 'updateInvestmentPortfolio')
-const readPortfolioA1 = httpsCallable(functions, 'readInvestmentPortfolioA1')
+const readPortfolioSheet = httpsCallable(functions, 'readInvestmentPortfolioSheet')
 const spreadsheetPath = /^\/spreadsheets(?:\/u\/\d+)?\/d\/[A-Za-z0-9_-]+(?:\/|$)/
 
 export function isGoogleSheetsUrl(value) {
@@ -31,7 +31,7 @@ export async function disconnectInvestmentPortfolio(workspaceId, assetId) {
   return result.data
 }
 
-export async function readInvestmentPortfolioA1(workspaceId, assetId) {
-  const result = await readPortfolioA1({ workspaceId, assetId })
+export async function readInvestmentPortfolioSheet(workspaceId, assetId) {
+  const result = await readPortfolioSheet({ workspaceId, assetId })
   return result.data
 }

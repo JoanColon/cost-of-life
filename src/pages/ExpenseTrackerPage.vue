@@ -120,13 +120,55 @@
             :key="item.id"
             class="item-row"
           >
-            <div>
+            <div class="item-copy">
               <strong>{{ formatCurrency(item.amount) }}</strong>
               <small
                 ><template v-if="trackedItemName(item)">{{ trackedItemName(item) }} · </template
                 >{{ formatItemDate(item.date)
                 }}<template v-if="item.notes"> · {{ item.notes }}</template></small
               >
+            </div>
+            <div
+              v-if="members.length > 1"
+              class="item-ownership"
+              role="group"
+              :aria-label="t('expenses.ownership.label')"
+            >
+              <button
+                v-for="member in members"
+                :key="member.id"
+                type="button"
+                class="ownership-option"
+                :class="{ selected: itemOwnershipSelection(item) === member.id }"
+                :aria-label="member.name"
+                :aria-pressed="itemOwnershipSelection(item) === member.id"
+                :disabled="!canMutateActiveSubcategory || ownershipSavingIds.has(item.id)"
+                @click="setItemOwnership(item, member.id)"
+              >
+                <q-avatar size="2.25rem">
+                  <img v-if="member.photoURL" :src="member.photoURL" :alt="member.name" />
+                  <span v-else>{{ initials(member.name) }}</span>
+                </q-avatar>
+                <q-tooltip>{{ member.name }}</q-tooltip>
+              </button>
+              <button
+                type="button"
+                class="ownership-option"
+                :class="{ selected: itemOwnershipSelection(item) === 'shared' }"
+                :aria-label="t('financial.ownership.shared')"
+                :aria-pressed="itemOwnershipSelection(item) === 'shared'"
+                :disabled="!canMutateActiveSubcategory || ownershipSavingIds.has(item.id)"
+                @click="setItemOwnership(item, 'shared')"
+              >
+                <q-avatar size="2.25rem"><q-icon name="group" size="1.2rem" /></q-avatar>
+                <q-tooltip>{{ t('financial.ownership.shared') }}</q-tooltip>
+              </button>
+              <q-spinner
+                v-if="ownershipSavingIds.has(item.id)"
+                color="primary"
+                size="1.1rem"
+                class="ownership-spinner"
+              />
             </div>
             <div v-if="canMutateActiveSubcategory" class="item-actions">
               <q-btn
@@ -252,6 +294,7 @@ import {
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
 import { FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -281,6 +324,7 @@ const editingItem = ref(null)
 const deletingItem = ref(null)
 const decisionSaving = ref(false)
 const decisionSavingIds = ref(new Set())
+const ownershipSavingIds = ref(new Set())
 let loadRequestId = 0
 
 const activeWorkspaceId = computed(() => String(route.params.workspaceId))
@@ -577,6 +621,57 @@ function trackedItemName(entry) {
   return allExpenseItems.value.find(({ id }) => id === entry.itemId)?.itemName || ''
 }
 
+function itemOwnershipSelection(item) {
+  return item.ownership?.mode === 'shared' || item.ownership?.shares?.length > 1
+    ? 'shared'
+    : item.ownership?.shares?.[0]?.memberId
+}
+
+async function setItemOwnership(item, selection) {
+  if (
+    !activeSubcategory.value ||
+    !canMutateActiveSubcategory.value ||
+    ownershipSavingIds.value.has(item.id) ||
+    itemOwnershipSelection(item) === selection
+  ) {
+    return
+  }
+
+  const ownership =
+    selection === 'shared'
+      ? createEqualOwnership(memberIds.value)
+      : createSingleOwnership(selection)
+  ownershipSavingIds.value = new Set(ownershipSavingIds.value).add(item.id)
+  try {
+    await trackingStore.edit(
+      activeWorkspaceId.value,
+      period.value,
+      activeSubcategory.value.id,
+      item.id,
+      { ...item, ownership },
+      memberIds.value,
+      allExpenseItems.value,
+    )
+    $q.notify({ type: 'positive', message: t('expenseTracker.saved'), position: 'top' })
+  } catch {
+    $q.notify({ type: 'negative', message: t('expenseTracker.errors.save'), position: 'top' })
+  } finally {
+    const next = new Set(ownershipSavingIds.value)
+    next.delete(item.id)
+    ownershipSavingIds.value = next
+  }
+}
+
+function initials(name) {
+  return String(name || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+}
+
 async function persist(operation, notify = true) {
   try {
     await operation()
@@ -702,6 +797,61 @@ h1 {
   display: grid;
 }
 
+.item-copy {
+  min-width: 0;
+}
+
+.item-ownership {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ownership-option {
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #334964;
+  cursor: pointer;
+}
+
+.ownership-option .q-avatar {
+  border: 2px solid transparent;
+  background: #edf2f6;
+  font-size: 0.72rem;
+  font-weight: 750;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.ownership-option:hover:not(:disabled) .q-avatar {
+  transform: translateY(-1px);
+}
+
+.ownership-option.selected .q-avatar {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(22 136 248 / 12%);
+  color: var(--color-primary);
+}
+
+.ownership-option:focus-visible {
+  @include focus-ring;
+}
+
+.ownership-option:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.ownership-spinner {
+  margin-left: 0.15rem;
+}
+
 .item-row small,
 .items-empty {
   color: var(--color-copy);
@@ -717,6 +867,21 @@ h1 {
   .tracker-header {
     align-items: flex-end;
     gap: 0.75rem;
+  }
+
+  .item-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .item-ownership {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .item-actions {
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 </style>

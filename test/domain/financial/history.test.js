@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildNetWorthSeries } from '../../../src/domain/financial/history'
+import {
+  buildNetWorthBreakdownSeries,
+  buildNetWorthSeries,
+} from '../../../src/domain/financial/history'
 
 function positionMonth(assets, liabilities = 0) {
   const memberValues = { member: assets }
@@ -84,6 +87,30 @@ describe('financial history series', () => {
     ).toEqual([
       { period: '2026-09', value: 90 },
       { period: '2026-10', value: 100 },
+    ])
+  })
+
+  it('builds category series with liabilities below zero', () => {
+    const month = {
+      assets: {
+        categories: {
+          cash: { subcategories: { cash: { total: 15_000 } } },
+          investment: { subcategories: { investment: { total: 25_000 } } },
+        },
+      },
+      liabilities: {
+        categories: {
+          mortgage: { subcategories: { mortgage: { total: 12_000 } } },
+        },
+      },
+    }
+
+    expect(buildNetWorthBreakdownSeries([{ year: 2026, months: { '03': month } }])).toEqual([
+      {
+        period: '2026-03',
+        assets: { cash: 15_000, investment: 25_000 },
+        liabilities: { mortgage: -12_000 },
+      },
     ])
   })
 })
