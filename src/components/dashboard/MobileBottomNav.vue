@@ -69,7 +69,7 @@ function navigate(key) {
   padding: 0.35rem max(0.65rem, env(safe-area-inset-right)) env(safe-area-inset-bottom)
     max(0.65rem, env(safe-area-inset-left));
   border-top: 1px solid var(--color-line);
-  background: rgb(255 255 255 / 96%);
+  background: var(--color-surface-raised);
   backdrop-filter: blur(16px);
 }
 

@@ -44,7 +44,6 @@
             />
             <h1>{{ t('liabilities.title') }}</h1>
           </div>
-          <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
 
         <section class="total-card">
@@ -61,24 +60,6 @@
                 <strong>{{ t(category.nameKey) }}</strong>
                 <small>{{ categoryStatus(category.id) }}</small>
               </span>
-            </button>
-
-            <button
-              type="button"
-              class="category-ownership"
-              :disabled="isItemizedCategory(category.id)"
-              :aria-label="categoryOwnershipLabel(category.id)"
-              @click="openOwnershipEditor(category.id)"
-            >
-              <q-avatar
-                v-for="member in categoryMembers(category.id)"
-                :key="member.id"
-                size="2.35rem"
-                class="ownership-avatar"
-              >
-                <img v-if="member.photoURL" :src="member.photoURL" alt="" />
-                <span v-else>{{ initials(member.name) }}</span>
-              </q-avatar>
             </button>
 
             <SimpleValueEditor
@@ -111,6 +92,15 @@
             >
               <q-menu anchor="bottom right" self="top right">
                 <q-list dense class="category-menu">
+                  <q-item
+                    v-if="!isItemizedCategory(category.id)"
+                    clickable
+                    v-close-popup
+                    @click="openOwnershipEditor(category.id)"
+                  >
+                    <q-item-section avatar><q-icon name="group" /></q-item-section>
+                    <q-item-section>{{ t('liabilities.ownership.label') }}</q-item-section>
+                  </q-item>
                   <q-item
                     clickable
                     v-close-popup
@@ -270,13 +260,11 @@ import { useRoute, useRouter } from 'vue-router'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import PositionCategorySetup from '@/components/financial/PositionCategorySetup.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import { liabilityCategories } from '@/config/liability-categories'
 import {
   currentFinancialMonth,
   currentFinancialYear,
   financialYearCategoryItemCount,
-  financialYearCategoryMemberIds,
   financialYearMonthCategoryValue,
   financialYearMonthValue,
 } from '@/domain/financial/financial-year'
@@ -421,32 +409,6 @@ function categoryNumericValue(categoryId) {
   )
 }
 
-function categoryMembers(categoryId) {
-  const category = liabilitiesStore.config?.categories?.[categoryId]
-  const ownerIds = new Set(
-    isItemizedCategory(categoryId)
-      ? financialYearCategoryMemberIds(financialYear.value, 'liabilities', categoryId, currentMonth)
-      : (category?.ownership?.shares || [])
-          .filter((share) => Number(share.percentage) > 0)
-          .map((share) => share.memberId),
-  )
-  return members.value.filter((member) => ownerIds.has(member.id))
-}
-
-function categoryOwnershipLabel(categoryId) {
-  return categoryMembers(categoryId)
-    .map((member) => member.name)
-    .join(', ')
-}
-function initials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-}
 function isItemizedCategory(categoryId) {
   return categoryItemCount(categoryId) > 0
 }
@@ -593,7 +555,7 @@ h1 {
 }
 .category-row {
   display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(14rem, 1fr) auto auto auto;
   align-items: center;
   gap: 1rem;
   min-height: 5.6rem;
@@ -623,7 +585,7 @@ h1 {
   width: 2.9rem;
   height: 2.9rem;
   border-radius: 50%;
-  background: var(--color-red-soft, #fdebed);
+  background: var(--color-red-soft);
   color: var(--color-danger);
   font-size: 1.3rem;
 }
@@ -634,24 +596,6 @@ h1 {
 .category-copy small {
   margin-top: 0.25rem;
   color: var(--color-copy);
-}
-.category-ownership {
-  display: flex;
-  padding-left: 0.45rem;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-.category-ownership:disabled {
-  cursor: default;
-}
-.ownership-avatar {
-  margin-left: -0.45rem;
-  border: 2px solid var(--color-surface);
-  background: #edf2f6;
-  color: #334964;
-  font-size: 0.75rem;
-  font-weight: 750;
 }
 .category-link {
   display: grid;
@@ -665,8 +609,7 @@ h1 {
   cursor: pointer;
 }
 .category-main:focus-visible,
-.category-link:focus-visible,
-.category-ownership:not(:disabled):focus-visible {
+.category-link:focus-visible {
   @include focus-ring;
 }
 .chevron {
@@ -704,9 +647,6 @@ h1 {
   .category-row :deep(.simple-value) {
     grid-column: 2;
     grid-row: 1;
-  }
-  .category-ownership {
-    display: none;
   }
   .category-link {
     display: none;

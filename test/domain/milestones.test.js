@@ -175,6 +175,59 @@ describe('milestones', () => {
       relevant: true,
     })
   })
+
+  it('calculates milestone values for the selected member scope', () => {
+    const financialYear = {
+      id: '2026',
+      year: 2026,
+      months: {
+        10: {
+          assets: {
+            categories: {
+              cash: {
+                subcategories: {
+                  cash: { total: 1_000, memberValues: { alice: 400, bob: 600 } },
+                },
+              },
+            },
+          },
+          liabilities: {
+            categories: {
+              mortgage: {
+                subcategories: {
+                  mortgage: { total: 300, memberValues: { alice: 100, bob: 200 } },
+                },
+              },
+            },
+          },
+          income: { categories: {} },
+          expenses: {
+            categories: {
+              other: {
+                subcategories: {
+                  expense: { effective: 100, memberValues: { alice: 40, bob: 60 } },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    const progress = calculateMilestoneProgress({
+      financialYear,
+      month: '10',
+      memberId: 'alice',
+    })
+
+    expect(milestone(progress, 'net_worth_positive')).toMatchObject({
+      currentValue: 300,
+      reached: true,
+    })
+    expect(milestone(progress, 'debt_mortgage_free')).toMatchObject({
+      currentValue: 100,
+    })
+  })
 })
 
 function milestone(progress, id) {

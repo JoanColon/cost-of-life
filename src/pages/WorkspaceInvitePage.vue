@@ -132,7 +132,8 @@ function inviteErrorMessage(error) {
 <style scoped lang="scss">
 .invite-layout {
   background:
-    radial-gradient(circle at 12% 12%, rgba(66, 121, 99, 0.18), transparent 34rem), #f5f3ec;
+    radial-gradient(circle at 12% 12%, var(--color-primary-focus), transparent 34rem),
+    var(--color-page);
 }
 
 .invite-page {
@@ -147,10 +148,10 @@ function inviteErrorMessage(error) {
 .invite-card {
   width: min(100%, 34rem);
   padding: clamp(1.75rem, 6vw, 3.25rem);
-  border: 1px solid rgba(40, 91, 72, 0.1);
+  border: 1px solid var(--color-line);
   border-radius: 1.5rem;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 24px 70px rgba(31, 48, 42, 0.1);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-dialog);
   text-align: center;
 }
 
@@ -162,8 +163,8 @@ function inviteErrorMessage(error) {
   margin: 0 auto 2rem;
   border-radius: 0.85rem;
   background: var(--color-primary);
-  color: white;
-  font-family: Georgia, serif;
+  color: var(--color-inverse);
+  font-family: var(--font-family-display);
   font-size: 1.5rem;
 }
 
@@ -179,7 +180,7 @@ function inviteErrorMessage(error) {
 h1 {
   margin: 0;
   color: var(--color-ink);
-  font-family: Georgia, serif;
+  font-family: var(--font-family-display);
   font-size: clamp(2rem, 7vw, 3rem);
   font-weight: 500;
   line-height: 1.08;
@@ -208,8 +209,8 @@ h1 {
 
 .error-banner {
   margin-bottom: 1rem;
-  background: #fff0ef;
-  color: #7d2823;
+  background: var(--color-red-soft);
+  color: var(--color-danger-dark);
   text-align: left;
 }
 

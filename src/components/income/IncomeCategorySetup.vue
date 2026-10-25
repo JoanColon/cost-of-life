@@ -118,7 +118,7 @@ p {
 }
 .category-choice.selected {
   border-color: var(--color-primary);
-  box-shadow: 0 12px 38px rgb(22 136 248 / 12%);
+  box-shadow: 0 12px 38px var(--color-primary-glow);
 }
 .category-choice:focus-visible {
   @include focus-ring;

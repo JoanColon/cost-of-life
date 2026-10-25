@@ -89,12 +89,23 @@
       @save="saveEntry"
     />
 
-    <q-dialog v-model="itemsDialog" :maximized="$q.screen.lt.sm">
-      <q-card class="items-card">
+    <q-dialog v-model="itemsDialog" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card
+        class="items-card"
+        :class="activeSubcategory ? `tracking-category--${activeSubcategory.categoryId}` : ''"
+      >
+        <span class="sheet-handle" aria-hidden="true" />
         <q-card-section class="items-heading">
-          <div>
+          <span class="items-category-icon">
+            <q-icon :name="activeSubcategory?.icon" />
+          </span>
+          <div class="items-title">
             <span>{{ periodLabel }}</span>
             <h2>{{ activeSubcategory ? t(activeSubcategory.nameKey) : '' }}</h2>
+            <strong>{{ formatCurrency(activeTrackedTotal) }}</strong>
+            <small>{{
+              t('expenseTracker.review.itemCount', { count: activeTrackedItems.length })
+            }}</small>
           </div>
           <q-btn
             flat
@@ -107,6 +118,22 @@
           />
         </q-card-section>
         <q-card-section v-if="activeSubcategory" class="items-list">
+          <div class="items-summary">
+            <div>
+              <q-icon name="monitoring" />
+              <span>
+                <strong>{{ formatCurrency(averageTrackedAmount) }}</strong>
+                <small>{{ t('expenseTracker.detail.average') }}</small>
+              </span>
+            </div>
+            <div>
+              <q-icon name="receipt_long" />
+              <span>
+                <strong>{{ activeTrackedItems.length }}</strong>
+                <small>{{ t('expenseTracker.detail.transactions') }}</small>
+              </span>
+            </div>
+          </div>
           <div v-if="activeExpenseItems.length" class="item-breakdown">
             <div v-for="expenseItem in activeExpenseItems" :key="expenseItem.id">
               <span>{{ expenseItem.itemName }}</span>
@@ -115,61 +142,22 @@
               }}</strong>
             </div>
           </div>
-          <article
-            v-for="item in trackingStore.itemsFor(activeSubcategory.id)"
-            :key="item.id"
-            class="item-row"
-          >
+          <article v-for="item in activeTrackedItems" :key="item.id" class="item-row">
+            <time class="item-date" :datetime="itemDateIso(item.date)">
+              <strong>{{ itemDateDay(item.date) }}</strong>
+              <span>{{ itemDateMonth(item.date) }}</span>
+            </time>
             <div class="item-copy">
               <strong>{{ formatCurrency(item.amount) }}</strong>
-              <small
-                ><template v-if="trackedItemName(item)">{{ trackedItemName(item) }} · </template
-                >{{ formatItemDate(item.date)
-                }}<template v-if="item.notes"> · {{ item.notes }}</template></small
-              >
+              <span v-if="trackedItemName(item)">{{ trackedItemName(item) }}</span>
+              <small v-if="item.notes">{{ item.notes }}</small>
             </div>
-            <div
-              v-if="members.length > 1"
+            <OwnershipAvatar
               class="item-ownership"
-              role="group"
-              :aria-label="t('expenses.ownership.label')"
-            >
-              <button
-                v-for="member in members"
-                :key="member.id"
-                type="button"
-                class="ownership-option"
-                :class="{ selected: itemOwnershipSelection(item) === member.id }"
-                :aria-label="member.name"
-                :aria-pressed="itemOwnershipSelection(item) === member.id"
-                :disabled="!canMutateActiveSubcategory || ownershipSavingIds.has(item.id)"
-                @click="setItemOwnership(item, member.id)"
-              >
-                <q-avatar size="2.25rem">
-                  <img v-if="member.photoURL" :src="member.photoURL" :alt="member.name" />
-                  <span v-else>{{ initials(member.name) }}</span>
-                </q-avatar>
-                <q-tooltip>{{ member.name }}</q-tooltip>
-              </button>
-              <button
-                type="button"
-                class="ownership-option"
-                :class="{ selected: itemOwnershipSelection(item) === 'shared' }"
-                :aria-label="t('financial.ownership.shared')"
-                :aria-pressed="itemOwnershipSelection(item) === 'shared'"
-                :disabled="!canMutateActiveSubcategory || ownershipSavingIds.has(item.id)"
-                @click="setItemOwnership(item, 'shared')"
-              >
-                <q-avatar size="2.25rem"><q-icon name="group" size="1.2rem" /></q-avatar>
-                <q-tooltip>{{ t('financial.ownership.shared') }}</q-tooltip>
-              </button>
-              <q-spinner
-                v-if="ownershipSavingIds.has(item.id)"
-                color="primary"
-                size="1.1rem"
-                class="ownership-spinner"
-              />
-            </div>
+              :ownership="item.ownership"
+              :members="members"
+              size="2.4rem"
+            />
             <div v-if="canMutateActiveSubcategory" class="item-actions">
               <q-btn
                 flat
@@ -191,7 +179,7 @@
               />
             </div>
           </article>
-          <div v-if="!trackingStore.itemsFor(activeSubcategory.id).length" class="items-empty">
+          <div v-if="!activeTrackedItems.length" class="items-empty">
             {{ t('expenseTracker.review.noItems') }}
           </div>
         </q-card-section>
@@ -201,7 +189,7 @@
             no-caps
             color="primary"
             icon="add"
-            :label="t('common.add')"
+            :label="t('expenseTracker.detail.addTransaction')"
             @click="openAdd(activeSubcategory, true)"
           />
         </q-card-actions>
@@ -286,6 +274,7 @@ import ExpenseTrackingEntryDialog from '@/components/expenses/ExpenseTrackingEnt
 import ExpenseTrackingPanel from '@/components/expenses/ExpenseTrackingPanel.vue'
 import ExpenseReviewPanel from '@/components/expenses/ExpenseReviewPanel.vue'
 import ExpensesSectionNav from '@/components/expenses/ExpensesSectionNav.vue'
+import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
 import {
   expenseTrackingCategories,
   groupedExpenseTrackingCategories,
@@ -294,7 +283,6 @@ import {
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
 import { FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -324,7 +312,6 @@ const editingItem = ref(null)
 const deletingItem = ref(null)
 const decisionSaving = ref(false)
 const decisionSavingIds = ref(new Set())
-const ownershipSavingIds = ref(new Set())
 let loadRequestId = 0
 
 const activeWorkspaceId = computed(() => String(route.params.workspaceId))
@@ -356,6 +343,15 @@ const activeExpenseItems = computed(() =>
   allExpenseItems.value.filter(
     ({ subcategoryId }) => subcategoryId === activeSubcategory.value?.id,
   ),
+)
+const activeTrackedItems = computed(() =>
+  activeSubcategory.value ? trackingStore.itemsFor(activeSubcategory.value.id) : [],
+)
+const activeTrackedTotal = computed(() =>
+  activeSubcategory.value ? trackingStore.totalFor(activeSubcategory.value.id) : 0,
+)
+const averageTrackedAmount = computed(() =>
+  activeTrackedItems.value.length ? activeTrackedTotal.value / activeTrackedItems.value.length : 0,
 )
 const reviewGroups = computed(() =>
   groupedExpenseTrackingCategories(
@@ -612,64 +608,28 @@ function requestApplyAllTracked() {
   applyAllDialog.value = true
 }
 
-function formatItemDate(value) {
-  const date = value?.toDate ? value.toDate() : new Date(value)
-  return new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(date)
+function itemDate(value) {
+  return value?.toDate ? value.toDate() : new Date(value)
+}
+
+function itemDateDay(value) {
+  return new Intl.DateTimeFormat(locale.value, { day: '2-digit' }).format(itemDate(value))
+}
+
+function itemDateMonth(value) {
+  return new Intl.DateTimeFormat(locale.value, { month: 'short' })
+    .format(itemDate(value))
+    .replace('.', '')
+    .toUpperCase()
+}
+
+function itemDateIso(value) {
+  const date = itemDate(value)
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
 }
 
 function trackedItemName(entry) {
   return allExpenseItems.value.find(({ id }) => id === entry.itemId)?.itemName || ''
-}
-
-function itemOwnershipSelection(item) {
-  return item.ownership?.mode === 'shared' || item.ownership?.shares?.length > 1
-    ? 'shared'
-    : item.ownership?.shares?.[0]?.memberId
-}
-
-async function setItemOwnership(item, selection) {
-  if (
-    !activeSubcategory.value ||
-    !canMutateActiveSubcategory.value ||
-    ownershipSavingIds.value.has(item.id) ||
-    itemOwnershipSelection(item) === selection
-  ) {
-    return
-  }
-
-  const ownership =
-    selection === 'shared'
-      ? createEqualOwnership(memberIds.value)
-      : createSingleOwnership(selection)
-  ownershipSavingIds.value = new Set(ownershipSavingIds.value).add(item.id)
-  try {
-    await trackingStore.edit(
-      activeWorkspaceId.value,
-      period.value,
-      activeSubcategory.value.id,
-      item.id,
-      { ...item, ownership },
-      memberIds.value,
-      allExpenseItems.value,
-    )
-    $q.notify({ type: 'positive', message: t('expenseTracker.saved'), position: 'top' })
-  } catch {
-    $q.notify({ type: 'negative', message: t('expenseTracker.errors.save'), position: 'top' })
-  } finally {
-    const next = new Set(ownershipSavingIds.value)
-    next.delete(item.id)
-    ownershipSavingIds.value = next
-  }
-}
-
-function initials(name) {
-  return String(name || '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
 }
 
 async function persist(operation, notify = true) {
@@ -698,6 +658,9 @@ function currentPeriod() {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
+@use '@/css/expense-tracking' as tracking;
+
+@include tracking.category-colors;
 
 .tracker-page {
   @include financial-page;
@@ -745,36 +708,121 @@ h1 {
   @include financial-dialog-card(40rem);
   display: flex;
   flex-direction: column;
+  --tracking-color: var(--color-primary);
+  --tracking-soft: var(--color-blue-soft);
 }
 
 .confirm-card {
   @include financial-simple-dialog;
 }
 
-.items-heading span {
+.sheet-handle {
+  display: none;
+}
+
+.items-title > span {
   color: var(--color-copy);
   text-transform: capitalize;
 }
 
 .items-heading {
   @include financial-dialog-header;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .items-heading h2 {
   margin: 0.2rem 0 0;
 }
 
+.items-category-icon {
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--tracking-soft);
+  color: var(--tracking-color);
+  font-size: 2rem;
+}
+
+.items-title {
+  display: grid;
+  min-width: 0;
+}
+
+.items-title > strong {
+  margin-top: 0.65rem;
+  color: var(--color-ink);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.items-title > small {
+  margin-top: 0.3rem;
+  color: var(--color-copy);
+}
+
 .items-list {
   @include financial-dialog-body;
   display: grid;
-  gap: 0.25rem;
+  gap: 1rem;
+}
+
+.items-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--tracking-soft) 55%, var(--color-surface));
+}
+
+.items-summary > div {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.items-summary > div + div {
+  border-left: 1px solid color-mix(in srgb, var(--tracking-color) 18%, transparent);
+}
+
+.items-summary .q-icon {
+  flex: 0 0 auto;
+  color: var(--tracking-color);
+  font-size: 1.65rem;
+}
+
+.items-summary span {
+  display: grid;
+  min-width: 0;
+}
+
+.items-summary strong {
+  color: var(--color-ink);
+  font-size: 1.15rem;
+}
+
+.items-summary small {
+  overflow: hidden;
+  color: var(--color-copy);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .item-breakdown {
   display: grid;
   gap: 0.45rem;
-  padding: 0 0 1rem;
-  border-bottom: 1px solid var(--color-line);
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.8rem;
+  background: var(--color-surface-soft);
 }
 
 .item-breakdown > div {
@@ -788,68 +836,67 @@ h1 {
   justify-content: flex-end;
 }
 
-.item-row {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--color-line);
+.items-actions .q-btn {
+  min-height: 2.75rem;
+  padding-inline: 1.2rem;
 }
 
-.item-row > div:first-child {
+.item-row {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  background: var(--color-surface);
 }
 
 .item-copy {
+  display: grid;
   min-width: 0;
 }
 
-.item-ownership {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+.item-copy > strong {
+  color: var(--color-ink);
+  font-size: 1.15rem;
 }
 
-.ownership-option {
+.item-copy > span {
+  margin-top: 0.15rem;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.item-copy > small {
+  overflow: hidden;
+  margin-top: 0.12rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-date {
   display: grid;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: #334964;
-  cursor: pointer;
+  width: 4rem;
+  min-height: 4.4rem;
+  place-content: center;
+  justify-items: center;
+  border-radius: 0.85rem;
+  background: var(--color-surface-muted);
+  color: var(--color-ink);
+  font-style: normal;
 }
 
-.ownership-option .q-avatar {
-  border: 2px solid transparent;
-  background: #edf2f6;
+.item-date strong {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.item-date span {
+  margin-top: 0.3rem;
+  color: var(--color-copy);
   font-size: 0.72rem;
-  font-weight: 750;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
-}
-
-.ownership-option:hover:not(:disabled) .q-avatar {
-  transform: translateY(-1px);
-}
-
-.ownership-option.selected .q-avatar {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgb(22 136 248 / 12%);
-  color: var(--color-primary);
-}
-
-.ownership-option:focus-visible {
-  @include focus-ring;
-}
-
-.ownership-option:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-
-.ownership-spinner {
-  margin-left: 0.15rem;
+  font-weight: 700;
 }
 
 .item-row small,
@@ -869,19 +916,90 @@ h1 {
     gap: 0.75rem;
   }
 
+  .items-card {
+    width: 100vw;
+    max-width: none;
+    max-height: min(92dvh, 52rem);
+    border-width: 1px 0 0;
+    border-radius: 1.8rem 1.8rem 0 0;
+  }
+
+  .sheet-handle {
+    display: block;
+    flex: 0 0 auto;
+    width: 3.25rem;
+    height: 0.32rem;
+    margin: 0.75rem auto 0;
+    border-radius: 999px;
+    background: var(--color-line-strong);
+  }
+
+  .items-heading {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 1rem;
+    padding: 1rem 1.25rem 0.8rem;
+  }
+
+  .items-category-icon {
+    width: 3.75rem;
+    height: 3.75rem;
+    font-size: 1.65rem;
+  }
+
+  .items-title h2 {
+    font-size: 1.65rem;
+  }
+
+  .items-title > strong {
+    font-size: 1.8rem;
+  }
+
+  .items-list {
+    gap: 0.8rem;
+    padding: 0.6rem 1rem 1rem;
+  }
+
+  .items-summary > div {
+    gap: 0.6rem;
+    padding: 0.85rem;
+  }
+
+  .items-summary .q-icon {
+    font-size: 1.4rem;
+  }
+
   .item-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.7rem;
+    padding: 0.8rem;
   }
 
   .item-ownership {
-    grid-column: 1 / -1;
+    grid-column: 2;
     grid-row: 2;
+    justify-self: start;
   }
 
   .item-actions {
-    grid-column: 2;
-    grid-row: 1;
+    display: flex;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-items: center;
+  }
+
+  .item-date {
+    grid-row: 1 / span 2;
+  }
+
+  .items-actions {
+    padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom))
+      max(1rem, env(safe-area-inset-left));
+  }
+
+  .items-actions .q-btn {
+    width: 100%;
+    min-height: 3.5rem;
+    border-radius: 0.85rem;
   }
 }
 </style>

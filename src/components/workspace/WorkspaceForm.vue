@@ -102,16 +102,16 @@ async function submit() {
   width: 100%;
   max-width: 36rem;
   padding: clamp(1.75rem, 5vw, 3rem);
-  border: 1px solid rgba(40, 91, 72, 0.1);
+  border: 1px solid var(--color-line);
   border-radius: 1.5rem;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24px 70px rgba(31, 48, 42, 0.1);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-dialog);
 }
 
 h1 {
   margin: 0;
-  color: #1c2c26;
-  font-family: Georgia, serif;
+  color: var(--color-ink);
+  font-family: var(--font-family-display);
   font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 500;
   line-height: 1.08;
@@ -120,14 +120,14 @@ h1 {
 
 .description {
   margin: 1rem 0 0;
-  color: #68736f;
+  color: var(--color-copy);
   font-size: 1rem;
   line-height: 1.65;
 }
 
 .error-banner {
-  background: #fff0ef;
-  color: #7d2823;
+  background: var(--color-red-soft);
+  color: var(--color-danger-dark);
 }
 
 .form-actions {

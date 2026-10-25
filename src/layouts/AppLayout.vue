@@ -36,6 +36,14 @@
           </template>
         </q-select>
 
+        <MemberScopeSelector
+          v-if="routeWorkspaceId && members.length"
+          v-model="selectedMemberId"
+          :members="members"
+          compact
+          class="layout-member-selector"
+        />
+
         <q-btn
           flat
           round
@@ -162,6 +170,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
 import { currentFinancialMonth, currentFinancialYear } from '@/domain/financial/financial-year'
 import { authUser, signOut } from '@/services/auth'
@@ -175,6 +184,7 @@ import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
+import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const MANAGE_WORKSPACES_OPTION = '__manage-workspaces__'
 const CREATE_WORKSPACE_OPTION = '__create-workspace__'
@@ -218,6 +228,12 @@ const workspaceOptions = computed(() => [
 ])
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace)
+const members = computed(() => getWorkspaceMembers(activeWorkspace.value, authUser.value))
+const memberIds = computed(() => members.value.map(({ id }) => id))
+const selectedMemberId = computed({
+  get: () => scopeStore.get(activeWorkspaceId.value, memberIds.value, authUser.value?.uid),
+  set: (memberId) => scopeStore.select(activeWorkspaceId.value, memberId),
+})
 const routeWorkspaceId = computed(() => {
   const workspaceId = route.params.workspaceId
   if (typeof workspaceId !== 'string') return null
@@ -413,7 +429,7 @@ function currentPeriodKey() {
 }
 
 .app-header {
-  background: rgb(255 255 255 / 92%);
+  background: var(--color-surface-raised);
   color: var(--color-ink);
   border-bottom: 1px solid var(--color-line);
   backdrop-filter: blur(12px);
@@ -431,9 +447,9 @@ function currentPeriodKey() {
   display: grid;
   place-items: center;
   border-radius: 0.7rem;
-  background: #285b48;
-  color: white;
-  font-family: Georgia, serif;
+  background: var(--color-primary);
+  color: var(--color-inverse);
+  font-family: var(--font-family-display);
 }
 
 .mini-mark {
@@ -444,7 +460,7 @@ function currentPeriodKey() {
 }
 
 .app-title {
-  font-family: Georgia, serif;
+  font-family: var(--font-family-display);
   font-size: 1.2rem;
 }
 
@@ -453,6 +469,10 @@ function currentPeriodKey() {
   min-width: 0;
   max-width: 15rem;
   margin-right: 0.5rem;
+}
+
+.layout-member-selector {
+  flex: 0 0 auto;
 }
 
 .app-drawer {
@@ -481,7 +501,7 @@ function currentPeriodKey() {
 .drawer-caption {
   overflow: hidden;
   max-width: 11rem;
-  color: #7a8681;
+  color: var(--color-muted);
   font-size: 0.75rem;
   text-overflow: ellipsis;
 }
@@ -489,8 +509,8 @@ function currentPeriodKey() {
 .active-nav-item,
 .active-workspace {
   border-radius: 0.8rem;
-  background: #e4eee8;
-  color: #214c3c;
+  background: var(--color-blue-soft);
+  color: var(--color-primary-dark);
 }
 
 .mobile-footer {
@@ -504,7 +524,7 @@ function currentPeriodKey() {
 
 .workspace-list-label {
   padding: 0.5rem 0.75rem;
-  color: #829089;
+  color: var(--color-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -536,12 +556,12 @@ function currentPeriodKey() {
 }
 
 .workspace-navigation-tree :deep(.q-tree__node-header.q-tree__node--selected) {
-  background: #e4eee8;
-  color: #214c3c;
+  background: var(--color-blue-soft);
+  color: var(--color-primary-dark);
 }
 
 .workspace-navigation-tree :deep(.q-tree__arrow) {
-  color: #829089;
+  color: var(--color-muted);
 }
 
 .loading-state {
@@ -551,7 +571,7 @@ function currentPeriodKey() {
   gap: 0.8rem;
   min-height: calc(100vh - 64px);
   min-height: calc(100dvh - 64px);
-  color: #62716b;
+  color: var(--color-copy);
 }
 
 @media (max-width: 700px) {
@@ -570,6 +590,10 @@ function currentPeriodKey() {
     width: auto;
     max-width: none;
     margin: 0;
+  }
+
+  .layout-member-selector {
+    max-width: 42vw;
   }
 
   .loading-state {

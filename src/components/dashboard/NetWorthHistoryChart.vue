@@ -49,8 +49,8 @@ const categorySeries = computed(() => [
 let chart = null
 let resizeObserver = null
 
-const ASSET_COLORS = ['#159f73', '#1688f8', '#39a8a3', '#8754ed', '#4f7cac', '#73bfb8']
-const LIABILITY_COLORS = ['#f27177', '#e58b43', '#d95568', '#b66d57', '#a85567', '#ef6c57']
+const ASSET_COLORS = ['#0c6b4d', '#0870d8', '#39a8a3', '#8754ed', '#4f7cac', '#73bfb8']
+const LIABILITY_COLORS = ['#c44750', '#e58b43', '#d95568', '#b66d57', '#a85567', '#ef6c57']
 
 onMounted(() => {
   chart = init(chartElement.value)
@@ -151,8 +151,8 @@ function netWorthChartSeries() {
       symbol: 'circle',
       symbolSize: props.points.length === 1 ? 9 : 6,
       showSymbol: props.points.length < 18,
-      lineStyle: { width: 3, color: '#18b981' },
-      itemStyle: { color: '#18b981', borderColor: '#fff', borderWidth: 2 },
+      lineStyle: { width: 3, color: '#16815f' },
+      itemStyle: { color: '#16815f', borderColor: '#fff', borderWidth: 2 },
       areaStyle: {
         color: {
           type: 'linear',
@@ -161,8 +161,8 @@ function netWorthChartSeries() {
           x2: 0,
           y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(24, 185, 129, 0.24)' },
-            { offset: 1, color: 'rgba(24, 185, 129, 0.02)' },
+            { offset: 0, color: 'rgba(22, 129, 95, 0.24)' },
+            { offset: 1, color: 'rgba(22, 129, 95, 0.02)' },
           ],
         },
       },

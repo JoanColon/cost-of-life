@@ -182,8 +182,8 @@ function initials(name) {
 
 .ownership-avatar {
   border: 2px solid transparent;
-  background: #edf2f6;
-  color: #334964;
+  background: var(--color-surface-muted);
+  color: var(--color-ink-soft);
   font-size: 0.86rem;
   font-weight: 750;
   transition:
@@ -198,7 +198,7 @@ function initials(name) {
 
 .ownership-option.selected .ownership-avatar {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgb(22 136 248 / 12%);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
 .ownership-name {

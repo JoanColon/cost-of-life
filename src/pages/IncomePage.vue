@@ -37,7 +37,6 @@
             />
             <h1>{{ t('income.title') }}</h1>
           </div>
-          <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
         <section class="total-card">
           <div class="total-copy">
@@ -207,7 +206,6 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import IncomeCategorySetup from '@/components/income/IncomeCategorySetup.vue'
 import { incomeCategories } from '@/config/income-categories'

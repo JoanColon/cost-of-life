@@ -33,7 +33,6 @@
             />
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
-          <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
 
         <section class="summary-card">
@@ -63,23 +62,7 @@
                 ><small>{{ liability.itemName }}</small></span
               >
             </div>
-            <div class="ownership-display">
-              <span class="avatar-cluster" aria-hidden="true">
-                <q-avatar
-                  v-for="share in visibleOwnershipShares(liability.ownership)"
-                  :key="share.memberId"
-                  size="2.35rem"
-                  class="ownership-avatar"
-                >
-                  <img
-                    v-if="memberFor(share.memberId)?.photoURL"
-                    :src="memberFor(share.memberId).photoURL"
-                    alt=""
-                  />
-                  <span v-else>{{ initials(memberFor(share.memberId)?.name || '') }}</span>
-                </q-avatar>
-              </span>
-            </div>
+            <OwnershipAvatar :ownership="liability.ownership" :members="members" />
             <strong class="liability-value">{{ formatCurrency(liability.scopedValue) }}</strong>
             <q-btn
               flat
@@ -187,8 +170,8 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import LiabilityForm from '@/components/liabilities/LiabilityForm.vue'
+import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import {
   currentFinancialMonth,
@@ -364,22 +347,6 @@ async function deleteLiability() {
   }
 }
 
-function visibleOwnershipShares(ownership) {
-  return (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
-}
-function memberFor(memberId) {
-  return members.value.find((member) => member.id === memberId)
-}
-function initials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-}
-
 async function persist(action) {
   try {
     await action()
@@ -452,7 +419,7 @@ h1 {
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--color-red-soft, #fdebed);
+  background: var(--color-red-soft);
   color: var(--color-danger);
 }
 .summary-icon {
@@ -474,7 +441,7 @@ h1 {
   transition: background-color 160ms ease;
 }
 .liability-row:hover {
-  background: #f8fafc;
+  background: var(--color-surface-soft);
 }
 .liability-row:focus-visible {
   position: relative;
@@ -503,22 +470,6 @@ h1 {
 .liability-copy small {
   margin-top: 0.2rem;
   color: var(--color-copy);
-}
-.ownership-display {
-  min-height: 2.75rem;
-  padding: 0.2rem;
-}
-.avatar-cluster {
-  display: flex;
-  padding-left: 0.45rem;
-}
-.ownership-avatar {
-  margin-left: -0.45rem;
-  border: 2px solid var(--color-surface);
-  background: #edf2f6;
-  color: #334964;
-  font-size: 0.75rem;
-  font-weight: 750;
 }
 .liability-value {
   min-width: 7rem;
@@ -572,24 +523,21 @@ h1 {
 }
 @media (max-width: 699px) {
   .liability-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     @include mobile-financial-row;
   }
   .liability-main {
     grid-column: 1;
     gap: 0.6rem;
   }
-  .ownership-display {
-    display: none;
-  }
   .liability-value {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     min-width: 0;
     font-size: 0.95rem;
   }
   .liability-row > .q-btn {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
   }
   .add-row {

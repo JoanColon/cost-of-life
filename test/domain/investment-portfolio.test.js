@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   changeTone,
+  countryFlag,
   formatCurrencyValue,
   formatPercentageValue,
   portfolioKpis,
@@ -8,6 +9,12 @@ import {
 } from '../../src/domain/financial/investment-portfolio.js'
 
 describe('investment portfolio table', () => {
+  it('derives flags from ISO country codes without a country map', () => {
+    expect(countryFlag('ES')).toBe('🇪🇸')
+    expect(countryFlag('us')).toBe('🇺🇸')
+    expect(countryFlag('Spain')).toBe('')
+  })
+
   it('maps the requested columns from a Google Sheets response', () => {
     const rows = portfolioTableRows(
       [

@@ -1,5 +1,10 @@
 <template>
-  <div class="member-selector" role="group" :aria-label="t('dashboard.memberScope')">
+  <div
+    class="member-selector"
+    :class="{ compact }"
+    role="group"
+    :aria-label="t('dashboard.memberScope')"
+  >
     <button
       v-for="member in options"
       :key="member.id"
@@ -15,6 +20,7 @@
         <span v-else>{{ initials(member.name) }}</span>
       </q-avatar>
       <span class="member-name">{{ member.name }}</span>
+      <q-tooltip v-if="compact">{{ member.name }}</q-tooltip>
     </button>
   </div>
 </template>
@@ -26,6 +32,7 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps({
   members: { type: Array, required: true },
   modelValue: { type: String, required: true },
+  compact: { type: Boolean, default: false },
 })
 
 defineEmits(['update:modelValue'])
@@ -79,8 +86,8 @@ function initials(name) {
 
 .member-avatar {
   border: 2px solid transparent;
-  background: #edf2f6;
-  color: #334964;
+  background: var(--color-surface-muted);
+  color: var(--color-ink-soft);
   font-size: 0.86rem;
   font-weight: 750;
   transition:
@@ -99,7 +106,7 @@ function initials(name) {
 
 .member-option.selected .member-avatar {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgb(22 136 248 / 12%);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
 .member-name {
@@ -108,6 +115,33 @@ function initials(name) {
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.member-selector.compact {
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem;
+}
+
+.compact .member-option {
+  min-width: 2.5rem;
+}
+
+.compact .member-avatar {
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+  font-size: 0.72rem;
+}
+
+.compact .member-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 760px) {
@@ -152,7 +186,7 @@ function initials(name) {
   }
 
   .member-option.selected .member-avatar {
-    box-shadow: 0 0 0 2px rgb(22 136 248 / 12%);
+    box-shadow: 0 0 0 2px var(--color-primary-glow);
   }
 }
 </style>

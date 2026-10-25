@@ -32,7 +32,6 @@
             />
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
-          <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
@@ -78,21 +77,7 @@
                 ><small>{{ item.itemName }}</small></span
               >
             </div>
-            <span class="avatar-cluster"
-              ><q-avatar
-                v-for="share in visibleOwnershipShares(item.ownership)"
-                :key="share.memberId"
-                size="2.35rem"
-                class="ownership-avatar"
-                ><img
-                  v-if="memberFor(share.memberId)?.photoURL"
-                  :src="memberFor(share.memberId)?.photoURL"
-                  alt=""
-                /><span v-else>{{
-                  initials(memberFor(share.memberId)?.name || '')
-                }}</span></q-avatar
-              ></span
-            >
+            <OwnershipAvatar :ownership="item.ownership" :members="members" />
             <strong class="income-value"
               >{{ formatCurrency(displayedItemValue(item.scopedValue))
               }}<small>/ {{ periodLabel }}</small></strong
@@ -182,8 +167,8 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import IncomeForm from '@/components/income/IncomeForm.vue'
+import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
 import { getIncomeCategory } from '@/config/income-categories'
 import {
   currentFinancialYear,
@@ -406,21 +391,6 @@ async function deleteIncome() {
     closeIncomeDialog()
   }
 }
-function visibleOwnershipShares(ownership) {
-  return (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
-}
-function memberFor(id) {
-  return members.value.find((member) => member.id === id)
-}
-function initials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-}
 async function persist(action) {
   try {
     await action()
@@ -500,7 +470,7 @@ h1 {
     box-shadow 160ms ease;
 }
 .income-row:hover {
-  background: #f8fafc;
+  background: var(--color-surface-soft);
 }
 .income-row:focus-visible {
   position: relative;
@@ -530,14 +500,6 @@ h1 {
   font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.avatar-cluster {
-  display: flex;
-}
-.ownership-avatar {
-  margin-left: -0.45rem;
-  border: 2px solid white;
-  background: #edf2f6;
 }
 .income-value {
   text-align: right;
@@ -588,11 +550,8 @@ h1 {
 }
 @media (max-width: 720px) {
   .income-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     @include mobile-financial-row;
-  }
-  .avatar-cluster {
-    display: none;
   }
   .income-copy small {
     white-space: normal;

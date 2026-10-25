@@ -4,6 +4,7 @@ import {
   applyOwnership,
   createEqualOwnership,
   isValidOwnership,
+  ownershipDisplayId,
 } from '../../../src/domain/financial/ownership'
 
 describe('ownership', () => {
@@ -45,6 +46,17 @@ describe('ownership', () => {
         ['a', 'b'],
       ),
     ).toBe(true)
+  })
+
+  it('uses one person for individual ownership and All for shared ownership', () => {
+    expect(ownershipDisplayId(createEqualOwnership(['a']))).toBe('a')
+    expect(ownershipDisplayId(createEqualOwnership(['a', 'b']))).toBe('all')
+    expect(
+      ownershipDisplayId({
+        mode: 'shared',
+        shares: [{ memberId: 'a', percentage: 100 }],
+      }),
+    ).toBe('all')
   })
 
   it.each([

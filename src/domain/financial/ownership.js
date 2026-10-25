@@ -39,6 +39,14 @@ export function cloneOwnership(ownership) {
   }
 }
 
+export function ownershipDisplayId(ownership) {
+  const shares = (ownership?.shares || []).filter(
+    ({ memberId, percentage }) => memberId && Number(percentage) > 0,
+  )
+  if (ownership?.mode === 'shared' || shares.length > 1) return 'all'
+  return shares[0]?.memberId || null
+}
+
 export function isValidOwnership(ownership, memberIds = []) {
   if (!ownership?.shares?.length) return false
 

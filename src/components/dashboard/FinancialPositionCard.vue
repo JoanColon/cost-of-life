@@ -138,7 +138,7 @@ const { t } = useI18n()
   }
 
   .metric-dot.liabilities {
-    background: #ff8588;
+    background: var(--color-danger);
   }
 
   .breakdown-copy strong,

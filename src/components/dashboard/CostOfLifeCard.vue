@@ -132,7 +132,7 @@ const periodLabel = computed(() =>
     border: 0;
     border-radius: 999px !important;
     background: transparent;
-    color: rgb(255 255 255 / 72%);
+    color: var(--color-inverse-muted);
     font-size: 0.8rem;
     font-weight: 650;
     cursor: pointer;
@@ -141,7 +141,7 @@ const periodLabel = computed(() =>
   .period-switch button.selected {
     background: var(--color-surface);
     color: var(--color-ink);
-    box-shadow: 0 2px 10px rgb(24 43 68 / 8%);
+    box-shadow: var(--shadow-control);
   }
 
   .period-switch button:focus-visible {
@@ -172,7 +172,7 @@ const periodLabel = computed(() =>
   }
 
   button.equation-card:hover {
-    border-color: rgb(82 105 135 / 18%);
+    border-color: var(--color-ink-border);
   }
 
   button.equation-card:focus-visible {
@@ -190,7 +190,7 @@ const periodLabel = computed(() =>
   }
 
   .equation-card.costs:hover {
-    border-color: rgb(82 105 135 / 18%);
+    border-color: var(--color-ink-border);
   }
 
   .equation-card.costs:focus-visible {
@@ -218,7 +218,7 @@ const periodLabel = computed(() =>
 
   .costs .equation-icon {
     background: #ffdfe0;
-    color: #f15e64;
+    color: var(--color-danger);
   }
 
   .tracker-icon {
@@ -228,7 +228,7 @@ const periodLabel = computed(() =>
     width: 2rem;
     height: 2rem;
     min-height: 2rem;
-    color: #f15e64;
+    color: var(--color-danger);
     background: rgb(255 255 255 / 58%);
   }
 

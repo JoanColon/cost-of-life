@@ -45,32 +45,33 @@
             </div>
             <p>{{ t('plan.subtitle') }}</p>
           </div>
-          <div class="header-controls">
-            <MemberScopeSelector v-model="selectedMemberId" :members="members" />
-          </div>
         </header>
 
         <section class="capacity-card" :class="{ negative: annualSavings < 0 }">
-          <div class="period-switch" role="group" :aria-label="t('plan.periodSelector')">
-            <button
-              type="button"
-              :class="{ selected: period === 'annual' }"
-              :aria-pressed="period === 'annual'"
-              @click="period = 'annual'"
-            >
-              {{ t('dashboard.costOfLife.annual') }}
-            </button>
-            <button
-              type="button"
-              :class="{ selected: period === 'monthly' }"
-              :aria-pressed="period === 'monthly'"
-              @click="period = 'monthly'"
-            >
-              {{ t('dashboard.costOfLife.monthly') }}
-            </button>
-          </div>
           <div class="capacity-main">
-            <span>{{ annualSavings >= 0 ? t('plan.savingsCapacity') : t('plan.shortfall') }}</span>
+            <div class="capacity-heading">
+              <span>{{
+                annualSavings >= 0 ? t('plan.savingsCapacity') : t('plan.shortfall')
+              }}</span>
+              <div class="period-switch" role="group" :aria-label="t('plan.periodSelector')">
+                <button
+                  type="button"
+                  :class="{ selected: period === 'annual' }"
+                  :aria-pressed="period === 'annual'"
+                  @click="period = 'annual'"
+                >
+                  {{ t('dashboard.costOfLife.annual') }}
+                </button>
+                <button
+                  type="button"
+                  :class="{ selected: period === 'monthly' }"
+                  :aria-pressed="period === 'monthly'"
+                  @click="period = 'monthly'"
+                >
+                  {{ t('dashboard.costOfLife.monthly') }}
+                </button>
+              </div>
+            </div>
             <strong
               >{{ formatCurrency(displayedSavings) }}<small>{{ displayedPeriod }}</small></strong
             >
@@ -236,7 +237,6 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import {
   currentFinancialMonth,
   currentFinancialYear,
@@ -389,7 +389,7 @@ const donutStyle = computed(() => {
   const cashEnd = allocation.value.cash
   const investEnd = cashEnd + allocation.value.invest
   return {
-    background: `conic-gradient(#36cdb0 0 ${cashEnd}%, #8b4df4 ${cashEnd}% ${investEnd}%, #ff9b73 ${investEnd}% 100%)`,
+    background: `conic-gradient(var(--color-chart-cash) 0 ${cashEnd}%, var(--color-chart-investments) ${cashEnd}% ${investEnd}%, var(--color-chart-lifestyle) ${investEnd}% 100%)`,
   }
 })
 const homeRoute = computed(() => ({
@@ -422,10 +422,7 @@ async function load(force = false) {
   @include financial-shell;
 }
 .page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
+  @include financial-header;
 }
 .back-button {
   @include financial-back-button;
@@ -446,12 +443,6 @@ h1 {
   margin: 0.45rem 0 0;
   font-size: 1rem;
 }
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
 .capacity-card {
   position: relative;
   display: grid;
@@ -474,7 +465,7 @@ h1 {
   align-content: center;
   gap: 0.35rem;
 }
-.capacity-main > span {
+.capacity-heading > span {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -501,14 +492,14 @@ h1 {
 }
 .capacity-card.negative .capacity-main > strong,
 .capacity-card.negative .available-total strong {
-  color: #ffb8ba;
+  color: var(--color-danger-on-dark);
 }
 .capacity-breakdown {
   display: grid;
   align-content: center;
   gap: 0.8rem;
   padding: 2.1rem 0 0 2.5rem;
-  border-left: 1px solid rgb(255 255 255 / 18%);
+  border-left: 1px solid var(--color-inverse-line);
 }
 .capacity-breakdown > div {
   display: flex;
@@ -521,7 +512,7 @@ h1 {
 .capacity-breakdown .available-total {
   margin-top: 0.25rem;
   padding-top: 1rem;
-  border-top: 1px solid rgb(255 255 255 / 18%);
+  border-top: 1px solid var(--color-inverse-line);
 }
 
 .section-label {
@@ -717,13 +708,13 @@ h1 {
   border-radius: 50%;
 }
 .cash {
-  background: #36cdb0;
+  background: var(--color-chart-cash);
 }
 .invest {
-  background: #8b4df4;
+  background: var(--color-chart-investments);
 }
 .debt {
-  background: #ff9b73;
+  background: var(--color-chart-lifestyle);
 }
 .allocation-track,
 .mix-track {
@@ -845,17 +836,13 @@ h1 {
     flex-direction: column;
     gap: 1rem;
   }
-  .header-controls {
-    width: 100%;
-    justify-content: space-between;
-  }
   .capacity-card {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
   .capacity-breakdown {
     padding: 1.5rem 0 0;
-    border-top: 1px solid rgb(255 255 255 / 18%);
+    border-top: 1px solid var(--color-inverse-line);
     border-left: 0;
   }
   .plan-actions {
@@ -868,15 +855,54 @@ h1 {
 }
 
 @media (max-width: 600px) {
-  .header-controls {
-    align-items: flex-start;
-    flex-direction: column;
+  .capacity-card {
+    gap: 1rem;
+    margin-top: 0.85rem;
+    padding: 1.1rem;
+  }
+  .capacity-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
   }
   .period-switch {
     position: static;
-    grid-column: 1;
-    justify-self: end;
-    margin-bottom: -0.5rem;
+    flex-shrink: 0;
+    padding: 0.16rem;
+  }
+  .period-switch button {
+    min-width: 0;
+    padding: 0.32rem 0.58rem;
+    font-size: 0.7rem;
+  }
+  .capacity-main {
+    gap: 0.3rem;
+  }
+  .capacity-main > strong {
+    margin-top: 0.45rem;
+    font-size: clamp(2.25rem, 12vw, 3rem);
+  }
+  .capacity-main > strong small {
+    margin-left: 0.35rem;
+    font-size: 0.85rem;
+  }
+  .capacity-main b {
+    font-size: 0.9rem;
+  }
+  .capacity-main p {
+    margin-top: 0.25rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+  .capacity-breakdown {
+    gap: 0.6rem;
+    padding-top: 0.9rem;
+    font-size: 0.82rem;
+  }
+  .capacity-breakdown .available-total {
+    margin-top: 0.1rem;
+    padding-top: 0.75rem;
   }
   .action-body {
     grid-template-columns: 1fr;

@@ -16,6 +16,7 @@ export function calculateMilestoneProgress({
   financialHistory = [],
   achievements = [],
   month = currentFinancialMonth(),
+  memberId = 'all',
 } = {}) {
   const achievedIds = new Set(
     achievements
@@ -28,10 +29,10 @@ export function calculateMilestoneProgress({
       .map((achievement) => [achievement.milestoneId, achievement]),
   )
   const history = withCurrentFinancialYear(financialHistory, financialYear)
-  const annualCostOfLife = financialYearValue(financialYear, 'expenses')
-  const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash')
+  const annualCostOfLife = financialYearValue(financialYear, 'expenses', memberId)
+  const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash', memberId)
   const freedomAssets =
-    categoryTotal(financialYear, month, 'assets', INVESTABLE_ASSET_CATEGORY_IDS) +
+    categoryTotal(financialYear, month, 'assets', INVESTABLE_ASSET_CATEGORY_IDS, memberId) +
     FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS.reduce(
       (total, subcategoryId) =>
         total +
@@ -41,10 +42,11 @@ export function calculateMilestoneProgress({
           'assets',
           'real_estate',
           subcategoryId,
+          memberId,
         ),
       0,
     )
-  const netWorth = financialYearMonthValue(financialYear, month, 'netWorth')
+  const netWorth = financialYearMonthValue(financialYear, month, 'netWorth', memberId)
   const safetyMonths = annualCostOfLife > 0 ? cash / (annualCostOfLife / 12) : 0
   const fundedYears = annualCostOfLife > 0 ? freedomAssets / annualCostOfLife : 0
 
@@ -54,6 +56,7 @@ export function calculateMilestoneProgress({
       financialYear,
       fundedYears,
       history,
+      memberId,
       month,
       netWorth,
       safetyMonths,
@@ -97,10 +100,19 @@ function calculateDefinition(definition, context) {
     context.month,
     'liabilities',
     definition.liabilityCategoryIds,
+    context.memberId,
   )
-  const relevant = hasHistoricalDebt(context.history, definition.liabilityCategoryIds)
+  const relevant = hasHistoricalDebt(
+    context.history,
+    definition.liabilityCategoryIds,
+    context.memberId,
+  )
   const reached = relevant && currentValue <= 0
-  const startingValue = historicalDebtMaximum(context.history, definition.liabilityCategoryIds)
+  const startingValue = historicalDebtMaximum(
+    context.history,
+    definition.liabilityCategoryIds,
+    context.memberId,
+  )
   const progress =
     relevant && startingValue > 0 ? ratio(startingValue - currentValue, startingValue) : 0
   return { currentValue, progress, reached, relevant }
@@ -116,25 +128,25 @@ function targetProgress(currentValue, target, relevant) {
   }
 }
 
-function categoryTotal(financialYear, month, section, categoryIds) {
+function categoryTotal(financialYear, month, section, categoryIds, memberId = 'all') {
   return categoryIds.reduce(
     (total, categoryId) =>
-      total + financialYearMonthCategoryValue(financialYear, month, section, categoryId),
+      total + financialYearMonthCategoryValue(financialYear, month, section, categoryId, memberId),
     0,
   )
 }
 
-function hasHistoricalDebt(financialHistory, categoryIds) {
-  return historicalDebtMaximum(financialHistory, categoryIds) > 0
+function hasHistoricalDebt(financialHistory, categoryIds, memberId) {
+  return historicalDebtMaximum(financialHistory, categoryIds, memberId) > 0
 }
 
-function historicalDebtMaximum(financialHistory, categoryIds) {
+function historicalDebtMaximum(financialHistory, categoryIds, memberId) {
   return financialHistory.reduce(
     (maximum, financialYear) =>
       Math.max(
         maximum,
         ...Object.keys(financialYear?.months || {}).map((month) =>
-          categoryTotal(financialYear, month, 'liabilities', categoryIds),
+          categoryTotal(financialYear, month, 'liabilities', categoryIds, memberId),
         ),
       ),
     0,

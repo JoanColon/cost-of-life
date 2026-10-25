@@ -154,7 +154,7 @@ function toggle(subcategoryId) {
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  background: #e9f3ff;
+  background: var(--color-blue-soft);
   color: var(--color-primary);
 }
 
@@ -192,7 +192,7 @@ function toggle(subcategoryId) {
 }
 
 .subcategory-option:hover {
-  border-color: rgb(22 136 248 / 42%);
+  border-color: var(--color-primary-border);
   transform: translateY(-1px);
 }
 
@@ -206,8 +206,8 @@ function toggle(subcategoryId) {
 }
 
 .subcategory-option.selected {
-  border-color: rgb(22 136 248 / 40%);
-  background: #eaf4ff;
+  border-color: var(--color-primary-border);
+  background: var(--color-blue-soft);
   color: var(--color-ink);
   font-weight: 650;
 }

@@ -198,7 +198,7 @@ p {
 
 .category-choice.selected {
   border-color: var(--color-primary);
-  box-shadow: 0 12px 38px rgb(22 136 248 / 12%);
+  box-shadow: 0 12px 38px var(--color-primary-glow);
 }
 
 .category-choice:focus-visible {
@@ -217,7 +217,7 @@ p {
 }
 
 .setup-panel--liabilities .category-icon {
-  background: var(--color-red-soft, #fdebed);
+  background: var(--color-red-soft);
   color: var(--color-danger);
 }
 

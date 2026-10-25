@@ -254,7 +254,8 @@ function getAuthErrorMessage(error) {
 <style scoped lang="scss">
 .auth-layout {
   background:
-    radial-gradient(circle at 12% 12%, rgba(66, 121, 99, 0.18), transparent 34rem), #f5f3ec;
+    radial-gradient(circle at 12% 12%, var(--color-primary-focus), transparent 34rem),
+    var(--color-page);
 }
 
 .auth-page {
@@ -273,7 +274,7 @@ function getAuthErrorMessage(error) {
   display: flex;
   align-items: flex-start;
   gap: 1.25rem;
-  color: #18362c;
+  color: var(--color-ink);
 }
 
 .brand-mark {
@@ -283,15 +284,15 @@ function getAuthErrorMessage(error) {
   width: 3.75rem;
   height: 3.75rem;
   border-radius: 1.15rem;
-  background: #285b48;
-  color: #fff;
-  font-family: Georgia, serif;
+  background: var(--color-primary);
+  color: var(--color-inverse);
+  font-family: var(--font-family-display);
   font-size: 2rem;
-  box-shadow: 0 14px 30px rgba(30, 72, 56, 0.22);
+  box-shadow: 0 14px 30px var(--color-primary-focus);
 }
 
 .brand-name {
-  font-family: Georgia, serif;
+  font-family: var(--font-family-display);
   font-size: clamp(2.25rem, 5vw, 4.5rem);
   line-height: 1;
   letter-spacing: -0.04em;
@@ -300,24 +301,24 @@ function getAuthErrorMessage(error) {
 .brand-copy {
   max-width: 31rem;
   margin: 1.5rem 0 0;
-  color: #53635d;
+  color: var(--color-copy);
   font-size: 1.15rem;
   line-height: 1.7;
 }
 
 .auth-card {
   padding: clamp(1.75rem, 5vw, 3rem);
-  border: 1px solid rgba(34, 70, 57, 0.1);
+  border: 1px solid var(--color-line);
   border-radius: 1.5rem;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 24px 70px rgba(31, 48, 42, 0.12);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-dialog);
   backdrop-filter: blur(10px);
 }
 
 h1 {
   margin: 0;
-  color: #1c2c26;
-  font-family: Georgia, serif;
+  color: var(--color-ink);
+  font-family: var(--font-family-display);
   font-size: 2.15rem;
   font-weight: 500;
   letter-spacing: -0.025em;
@@ -325,7 +326,7 @@ h1 {
 
 .auth-subtitle {
   margin: 0.55rem 0 0;
-  color: #68736f;
+  color: var(--color-copy);
 }
 
 .forgot-row {
@@ -333,8 +334,8 @@ h1 {
 }
 
 .error-banner {
-  background: #fff0ef;
-  color: #7d2823;
+  background: var(--color-red-soft);
+  color: var(--color-danger-dark);
   font-size: 0.9rem;
 }
 
@@ -349,7 +350,7 @@ h1 {
   align-items: center;
   gap: 1rem;
   margin: 1.6rem 0;
-  color: #87908d;
+  color: var(--color-muted);
   font-size: 0.8rem;
 }
 
@@ -358,13 +359,13 @@ h1 {
   content: '';
   flex: 1;
   height: 1px;
-  background: #e0e4e1;
+  background: var(--color-line);
 }
 
 .google-button {
   min-height: 3.25rem;
   border-radius: 0.75rem;
-  color: #263c34;
+  color: var(--color-ink);
 }
 
 .google-g {
@@ -376,7 +377,7 @@ h1 {
 
 .switch-mode {
   margin: 1.5rem 0 0;
-  color: #68736f;
+  color: var(--color-copy);
   text-align: center;
 }
 

@@ -168,7 +168,7 @@ p {
 
 .category-choice.selected {
   border-color: var(--color-primary);
-  box-shadow: 0 12px 38px rgb(22 136 248 / 12%);
+  box-shadow: 0 12px 38px var(--color-primary-glow);
 }
 
 .category-choice:focus-visible {
@@ -181,8 +181,8 @@ p {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: #ffe9ea;
-  color: #e85d65;
+  background: var(--color-red-soft);
+  color: var(--color-danger);
   font-size: 1.4rem;
 }
 

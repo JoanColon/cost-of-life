@@ -122,6 +122,14 @@ export function changeTone(value) {
   return numericValue < 0 ? 'negative' : 'positive'
 }
 
+export function countryFlag(value) {
+  const code = String(value || '')
+    .trim()
+    .toUpperCase()
+  if (!/^[A-Z]{2}$/.test(code)) return ''
+  return String.fromCodePoint(...[...code].map((letter) => 127397 + letter.charCodeAt(0)))
+}
+
 function parseLocalizedNumber(value) {
   const input = String(value ?? '')
     .trim()

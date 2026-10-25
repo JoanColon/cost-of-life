@@ -38,7 +38,9 @@ async function workspaceCreated({ workspace }) {
   padding-right: max(clamp(1rem, 5vw, 3rem), env(safe-area-inset-right));
   padding-bottom: max(clamp(1rem, 5vw, 3rem), env(safe-area-inset-bottom));
   padding-left: max(clamp(1rem, 5vw, 3rem), env(safe-area-inset-left));
-  background: #f5f3ec;
+  background:
+    radial-gradient(circle at 12% 12%, var(--color-primary-focus), transparent 34rem),
+    var(--color-page);
 }
 
 @media (max-width: 700px) {

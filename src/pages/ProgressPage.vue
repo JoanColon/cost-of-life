@@ -37,43 +37,65 @@
 
       <template v-else>
         <section class="metric-grid" :aria-label="t('progress.keyMetrics')">
-          <article class="metric-card metric-card--net-worth">
+          <article
+            class="metric-card metric-card--net-worth"
+            :class="{ 'metric-card--negative': netWorth < 0 }"
+          >
             <div class="metric-heading">
               <span class="metric-icon"><q-icon name="account_balance_wallet" /></span>
               <span>{{ t('progress.netWorth') }}</span>
             </div>
-            <strong>{{ formatCurrency(netWorth) }}</strong>
-            <small>{{ t('progress.netWorthDescription') }}</small>
+            <strong class="metric-value">{{ formatCurrency(netWorth) }}</strong>
+            <div v-if="yearChangePercent !== null" class="metric-context">
+              <span class="metric-change" :class="{ 'metric-change--negative': yearChange < 0 }">
+                <q-icon :name="yearChange < 0 ? 'south_east' : 'north_east'" />
+                {{ signedPercentage(yearChangePercent) }}
+              </span>
+              <small>{{ t('progress.versusStartYear') }}</small>
+            </div>
+            <small v-else class="metric-description">{{ t('progress.historyBuilding') }}</small>
           </article>
 
-          <article class="metric-card" :class="{ 'metric-card--negative': yearChange < 0 }">
+          <article
+            class="metric-card metric-card--year-change"
+            :class="{ 'metric-card--negative': yearChange < 0 }"
+          >
             <div class="metric-heading">
               <span class="metric-icon metric-icon--trend">
-                <q-icon
-                  :name="yearChange != null && yearChange < 0 ? 'south_east' : 'north_east'"
-                />
+                <q-icon name="bar_chart" />
               </span>
-              <span>{{ t('progress.yearToDate') }}</span>
+              <span class="metric-label metric-label--desktop">{{ t('progress.yearToDate') }}</span>
+              <span class="metric-label metric-label--mobile">{{
+                t('progress.yearToDateShort')
+              }}</span>
             </div>
-            <strong v-if="yearChange !== null">
+            <strong v-if="yearChange !== null" class="metric-value">
               {{ yearChange >= 0 ? '+' : '−' }}{{ formatCurrency(Math.abs(yearChange)) }}
             </strong>
-            <strong v-else>—</strong>
-            <small>{{
-              yearChange === null ? t('progress.historyBuilding') : t('progress.netWorthChange')
-            }}</small>
+            <strong v-else class="metric-value">—</strong>
+            <div v-if="yearChangePercent !== null" class="metric-context">
+              <span class="metric-change" :class="{ 'metric-change--negative': yearChange < 0 }">
+                <q-icon :name="yearChange < 0 ? 'south_east' : 'north_east'" />
+                {{ signedPercentage(yearChangePercent) }}
+              </span>
+              <small>{{ t('progress.sinceJanuary', { year: currentYear }) }}</small>
+            </div>
+            <small v-else class="metric-description">{{ t('progress.historyBuilding') }}</small>
           </article>
 
-          <article class="metric-card" :class="{ 'metric-card--negative': annualSavings < 0 }">
+          <article
+            class="metric-card metric-card--savings"
+            :class="{ 'metric-card--negative': annualSavings < 0 }"
+          >
             <div class="metric-heading">
               <span class="metric-icon metric-icon--savings"><q-icon name="savings" /></span>
               <span>{{ t('progress.savingsRate') }}</span>
             </div>
-            <strong>{{ savingsRate }}%</strong>
-            <small>
-              {{ formatCurrency(monthlySavings) }}{{ t('whatIf.perMonth') }}
-              {{ t('progress.savingsCapacity') }}
-            </small>
+            <strong class="metric-value">{{ savingsRate }}%</strong>
+            <div class="metric-context metric-context--savings">
+              <span>{{ formatCurrency(monthlySavings) }}{{ t('whatIf.perMonth') }}</span>
+              <small>{{ t('progress.savingsCapacity') }}</small>
+            </div>
           </article>
         </section>
 
@@ -133,43 +155,67 @@ import { useRoute, useRouter } from 'vue-router'
 import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import NetWorthHistoryChart from '@/components/dashboard/NetWorthHistoryChart.vue'
 import { buildNetWorthBreakdownSeries, buildNetWorthSeries } from '@/domain/financial/history'
+import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {
   financialYearAvailableIncomeValue,
   financialYearMonthValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
+import { authUser } from '@/services/auth'
+import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
+import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const milestonesStore = useMilestonesStore()
+const scopeStore = useFinancialScopeStore()
+const workspaceStore = useWorkspaceStore()
 const chartMode = ref('netWorth')
 const {
   currentMonth,
   currentYear,
+  achievements,
   error,
   financialYear,
   historyDocuments,
   historyError,
   historyLoading,
   loading,
-  progress,
   trackingActive,
 } = storeToRefs(milestonesStore)
 
 const workspaceId = computed(() => String(route.params.workspaceId))
+const workspace = computed(
+  () => workspaceStore.workspaces.find(({ id }) => id === workspaceId.value) || null,
+)
+const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
+const memberIds = computed(() => members.value.map(({ id }) => id))
+const selectedMemberId = computed(() =>
+  scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
+)
 const homeRoute = computed(() => ({
   name: 'workspace-dashboard',
   params: { workspaceId: workspaceId.value },
 }))
 const netWorth = computed(() =>
-  financialYearMonthValue(financialYear.value, currentMonth.value, 'netWorth'),
+  financialYearMonthValue(
+    financialYear.value,
+    currentMonth.value,
+    'netWorth',
+    selectedMemberId.value,
+  ),
 )
-const availableIncome = computed(() => financialYearAvailableIncomeValue(financialYear.value))
+const availableIncome = computed(() =>
+  financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
+)
 const annualSavings = computed(
-  () => availableIncome.value - financialYearValue(financialYear.value, 'expenses'),
+  () =>
+    availableIncome.value -
+    financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
 )
 const monthlySavings = computed(() => annualSavings.value / 12)
 const savingsRate = computed(() =>
@@ -183,6 +229,7 @@ const completeHistoryDocuments = computed(() => [
 ])
 const historyOptions = computed(() => ({
   throughPeriod: `${currentYear.value}-${currentMonth.value}`,
+  memberId: selectedMemberId.value,
 }))
 const historyPoints = computed(() =>
   buildNetWorthSeries(completeHistoryDocuments.value, historyOptions.value),
@@ -198,6 +245,21 @@ const yearChange = computed(() =>
     ? currentYearPoints.value.at(-1).value - currentYearPoints.value[0].value
     : null,
 )
+const yearChangePercent = computed(() => {
+  if (yearChange.value === null || currentYearPoints.value.length < 2) return null
+  const startingValue = currentYearPoints.value[0].value
+  if (!Number.isFinite(startingValue) || startingValue === 0) return null
+  return (yearChange.value / Math.abs(startingValue)) * 100
+})
+const progress = computed(() =>
+  calculateMilestoneProgress({
+    financialYear: financialYear.value,
+    financialHistory: historyDocuments.value,
+    achievements: trackingActive.value ? achievements.value : [],
+    month: currentMonth.value,
+    memberId: selectedMemberId.value,
+  }),
+)
 
 watch(workspaceId, () => load(), { immediate: true })
 
@@ -207,6 +269,11 @@ function load(force = false) {
 
 function openAchievements() {
   router.push({ name: 'achievements', params: { workspaceId: workspaceId.value } })
+}
+
+function signedPercentage(value) {
+  const rounded = Math.round(Math.abs(value))
+  return `${value >= 0 ? '+' : '−'}${rounded}%`
 }
 </script>
 
@@ -245,7 +312,7 @@ h1 {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1.25rem;
   margin-top: 2rem;
 }
 
@@ -258,70 +325,119 @@ h1 {
 }
 
 .metric-card {
+  --metric-color: var(--color-primary);
+  --metric-soft: var(--color-blue-soft);
   display: flex;
   min-width: 0;
-  min-height: 11rem;
+  min-height: 15rem;
   flex-direction: column;
-  padding: 1.35rem;
+  padding: 1.5rem;
+  overflow: hidden;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--metric-soft) 32%, var(--color-surface)),
+    var(--color-surface) 70%
+  );
+}
+
+.metric-card--year-change {
+  --metric-color: var(--color-success);
+  --metric-soft: var(--color-green-soft);
+}
+
+.metric-card--savings {
+  --metric-color: var(--color-purple);
+  --metric-soft: var(--color-purple-soft);
 }
 
 .metric-heading {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.8rem;
   color: var(--color-copy);
-  font-size: 0.83rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+
+.metric-label--mobile {
+  display: none;
 }
 
 .metric-icon {
   display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 3rem;
+  height: 3rem;
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--color-blue-soft);
-  color: var(--color-primary);
-  font-size: 1.08rem;
+  background: var(--metric-soft);
+  color: var(--metric-color);
+  font-size: 1.35rem;
 }
 
-.metric-icon--trend {
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
-}
-
-.metric-icon--savings {
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-
-.metric-card strong {
-  margin-top: 1rem;
+.metric-value {
+  margin-top: 1.55rem;
   overflow: hidden;
   color: var(--color-ink);
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(2.3rem, 4vw, 3.35rem);
   line-height: 1;
   letter-spacing: -0.05em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.metric-card small {
-  margin-top: auto;
-  padding-top: 0.65rem;
+.metric-context {
+  display: flex;
+  min-height: 2.4rem;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.metric-context small,
+.metric-description {
   color: var(--color-copy);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   line-height: 1.4;
 }
 
-.metric-card--negative strong {
+.metric-description {
+  margin-top: 1.25rem;
+}
+
+.metric-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-success);
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.metric-change .q-icon {
+  font-size: 1.45rem;
+}
+
+.metric-change--negative,
+.metric-card--negative .metric-value {
   color: var(--color-danger);
 }
 
 .metric-card--negative .metric-icon--trend {
   background: var(--color-red-soft);
   color: var(--color-danger);
+}
+
+.metric-context--savings {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.metric-context--savings > span {
+  color: var(--color-ink);
+  font-size: 1.15rem;
+  font-weight: 750;
 }
 
 .history-card {
@@ -404,20 +520,10 @@ h1 {
   }
 }
 
-@media (max-width: 800px) {
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .metric-card--net-worth {
-    grid-column: 1 / -1;
-  }
-}
-
 @media (max-width: 599px) {
   .metric-grid {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
     margin-top: 1rem;
   }
 
@@ -426,38 +532,104 @@ h1 {
   }
 
   .metric-card {
-    min-height: 8.75rem;
-    padding: 1rem;
+    min-height: 9.25rem;
+    padding: 0.65rem 0.6rem;
   }
 
-  .metric-card strong {
-    margin-top: 0.7rem;
-    font-size: 2rem;
+  .metric-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.95rem;
+  }
+
+  .metric-heading {
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+
+  .metric-label--desktop {
+    display: none;
+  }
+
+  .metric-label--mobile {
+    display: inline;
+  }
+
+  .metric-value {
+    margin-top: 0.65rem;
+    overflow: visible;
+    font-size: clamp(1rem, 4.8vw, 1.4rem);
+    letter-spacing: -0.04em;
+    text-overflow: clip;
+  }
+
+  .metric-context,
+  .metric-description {
+    margin-top: 0.45rem;
+  }
+
+  .metric-context {
+    display: grid;
+    min-height: 0;
+    gap: 0.15rem;
+  }
+
+  .metric-change {
+    gap: 0.15rem;
+    font-size: 0.86rem;
+  }
+
+  .metric-change .q-icon {
+    font-size: 1rem;
+  }
+
+  .metric-context small,
+  .metric-description {
+    font-size: 0.62rem;
+    line-height: 1.25;
+  }
+
+  .metric-context--savings > span {
+    font-size: 0.72rem;
+    line-height: 1.2;
   }
 
   .history-card {
-    margin-top: 0.75rem;
-    padding: 1rem;
+    margin-top: 0.6rem;
+    padding: 0.8rem;
   }
 
   .section-heading {
-    display: grid;
+    align-items: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .section-eyebrow {
+    font-size: 0.62rem;
+  }
+
+  .section-heading h2 {
+    margin-top: 0.05rem;
+    font-size: 1.1rem;
   }
 
   .view-switch button {
-    min-width: 4.8rem;
-    padding: 0.38rem 0.55rem;
-    font-size: 0.7rem;
+    min-width: 4rem;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.64rem;
   }
 
   .history-card :deep(.chart-shell),
   .history-card :deep(.net-worth-chart) {
-    min-height: 14rem;
-    height: 14rem;
+    min-height: 11rem;
+    height: 11rem;
   }
 
   .milestone-summary {
-    margin-top: 0.75rem;
+    margin-top: 0.6rem;
   }
 }
 </style>

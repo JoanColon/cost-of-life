@@ -173,8 +173,8 @@
                 <svg class="investment-chart" viewBox="0 0 150 72" aria-hidden="true">
                   <defs>
                     <linearGradient id="what-if-chart-fill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.28" />
-                      <stop offset="1" stop-color="#3b82f6" stop-opacity="0.03" />
+                      <stop offset="0" stop-color="var(--color-primary)" stop-opacity="0.28" />
+                      <stop offset="1" stop-color="var(--color-primary)" stop-opacity="0.03" />
                     </linearGradient>
                   </defs>
                   <path d="M4 66 C42 61 72 49 96 36 C118 24 133 13 146 5 L146 68 L4 68 Z" />
@@ -275,21 +275,35 @@ import {
   calculateInvestmentScenario,
   calculateWhatIf,
 } from '@/domain/financial/what-if'
+import { authUser } from '@/services/auth'
+import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
+import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
+const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
+const workspaceStore = useWorkspaceStore()
 const customReductionOpen = ref(false)
 const customReduction = ref(0)
 const pageError = ref(null)
 const reductionOptions = [0, 10, 25, 50]
 const currentYear = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
+const workspace = computed(
+  () => workspaceStore.workspaces.find(({ id }) => id === workspaceId.value) || null,
+)
+const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
+const memberIds = computed(() => members.value.map(({ id }) => id))
+const selectedMemberId = computed(() =>
+  scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
+)
 const config = computed(() => whatIfStore.config)
 const activeScenario = computed(
   () =>
@@ -305,13 +319,17 @@ const error = computed(
     whatIfStore.error ||
     financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
-const annualCost = computed(() => financialYearValue(financialYear.value, 'expenses'))
-const annualAvailableIncome = computed(() => financialYearAvailableIncomeValue(financialYear.value))
+const annualCost = computed(() =>
+  financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+)
+const annualAvailableIncome = computed(() =>
+  financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
+)
 const annualDiscretionary = computed(() =>
-  financialYearExpenseNecessityValue(financialYear.value, 'lifestyle'),
+  financialYearExpenseNecessityValue(financialYear.value, 'lifestyle', selectedMemberId.value),
 )
 const unclassifiedMonthly = computed(
-  () => financialYearUnclassifiedExpenseValue(financialYear.value) / 12,
+  () => financialYearUnclassifiedExpenseValue(financialYear.value, selectedMemberId.value) / 12,
 )
 const simulation = computed(() =>
   calculateWhatIf({
@@ -322,7 +340,13 @@ const simulation = computed(() =>
   }),
 )
 const cash = computed(() =>
-  financialYearMonthCategoryValue(financialYear.value, positionMonth.value, 'assets', 'cash'),
+  financialYearMonthCategoryValue(
+    financialYear.value,
+    positionMonth.value,
+    'assets',
+    'cash',
+    selectedMemberId.value,
+  ),
 )
 const liabilities = computed(() => {
   const categories =
@@ -337,7 +361,7 @@ const liabilities = computed(() => {
               id: subcategoryId,
               categoryId,
               name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-              balance: Number(subcategory.total || 0),
+              balance: scopedValue(subcategory),
             },
           ]
         }
@@ -346,7 +370,7 @@ const liabilities = computed(() => {
           categoryId,
           name:
             item.itemName || t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-          balance: Number(item.total || 0),
+          balance: scopedValue(item),
         }))
       }),
     )
@@ -409,6 +433,13 @@ const cashProgressLabel = computed(() =>
 const cashProgressDetail = computed(() =>
   cashScenario.value.achieved ? t('whatIf.cash.yearCovered') : t('whatIf.cash.monthlyStep'),
 )
+
+function scopedValue(item) {
+  if (selectedMemberId.value !== 'all') {
+    return Number(item?.memberValues?.[selectedMemberId.value] || 0)
+  }
+  return Number(item?.total || 0)
+}
 
 watch(workspaceId, () => prepare(), { immediate: true })
 
@@ -727,8 +758,8 @@ h1 {
 }
 
 .scenario-icon.debt {
-  background: #fff2e8;
-  color: #f97316;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
 }
 
 .scenario-copy {
@@ -820,7 +851,7 @@ h1 {
 }
 
 .debt-outcome strong {
-  color: #c75d12;
+  color: var(--color-warning-dark);
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.1;

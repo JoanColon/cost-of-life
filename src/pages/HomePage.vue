@@ -388,12 +388,12 @@ h1 {
 }
 
 .workspace-tile:hover {
-  border-color: rgb(22 136 248 / 35%);
+  border-color: var(--color-primary-border);
   transform: translateY(-2px);
 }
 
 .workspace-open:focus-visible {
-  outline: 3px solid rgb(22 136 248 / 22%);
+  outline: 3px solid var(--color-primary-focus);
   outline-offset: -3px;
 }
 
@@ -463,8 +463,8 @@ h1 {
 
 .invite-error {
   margin-top: 1.25rem;
-  background: #fff0ef;
-  color: #7d2823;
+  background: var(--color-red-soft);
+  color: var(--color-danger-dark);
 }
 
 @media (max-width: 699px) {

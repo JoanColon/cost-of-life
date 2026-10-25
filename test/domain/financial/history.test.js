@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildAssetAnnualSeries,
   buildNetWorthBreakdownSeries,
   buildNetWorthSeries,
 } from '../../../src/domain/financial/history'
@@ -25,6 +26,34 @@ function positionMonth(assets, liabilities = 0) {
 }
 
 describe('financial history series', () => {
+  it('builds one annual history point for a specific asset', () => {
+    const annualDocument = (year, value) => ({
+      year,
+      months: {
+        12: {
+          assets: {
+            categories: {
+              investment: {
+                subcategories: {
+                  stocks: { items: { portfolio: { total: value }, other: { total: 10 } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    expect(
+      buildAssetAnnualSeries([annualDocument(2026, 30_000), annualDocument(2025, 25_000)], {
+        assetId: 'portfolio',
+      }),
+    ).toEqual([
+      { year: 2025, value: 25_000 },
+      { year: 2026, value: 30_000 },
+    ])
+  })
+
   it('flattens and sorts annual documents into monthly net worth points', () => {
     expect(
       buildNetWorthSeries([
@@ -110,6 +139,41 @@ describe('financial history series', () => {
         period: '2026-03',
         assets: { cash: 15_000, investment: 25_000 },
         liabilities: { mortgage: -12_000 },
+      },
+    ])
+  })
+
+  it('filters net worth and category history by member', () => {
+    const month = {
+      assets: {
+        categories: {
+          cash: {
+            subcategories: {
+              cash: { total: 1_000, memberValues: { alice: 400, bob: 600 } },
+            },
+          },
+        },
+      },
+      liabilities: {
+        categories: {
+          mortgage: {
+            subcategories: {
+              mortgage: { total: 300, memberValues: { alice: 100, bob: 200 } },
+            },
+          },
+        },
+      },
+    }
+    const history = [{ year: 2026, months: { '03': month } }]
+
+    expect(buildNetWorthSeries(history, { memberId: 'alice' })).toEqual([
+      { period: '2026-03', value: 300 },
+    ])
+    expect(buildNetWorthBreakdownSeries(history, { memberId: 'alice' })).toEqual([
+      {
+        period: '2026-03',
+        assets: { cash: 400 },
+        liabilities: { mortgage: -100 },
       },
     ])
   })

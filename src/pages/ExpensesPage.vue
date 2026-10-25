@@ -41,7 +41,6 @@
             />
             <h1>{{ t('expenses.title') }}</h1>
           </div>
-          <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
 
         <ExpensesSectionNav :workspace-id="workspaceId" active="plan" :context="planContext" />
@@ -232,7 +231,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ExpenseCategorySetup from '@/components/expenses/ExpenseCategorySetup.vue'
 import ExpensesSectionNav from '@/components/expenses/ExpensesSectionNav.vue'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import { expenseCategories } from '@/config/expense-categories'
 import {
@@ -614,8 +612,8 @@ async function runSaving(operation) {
   width: 2.7rem;
   height: 2.7rem;
   border-radius: 50%;
-  background: #ffe9ea;
-  color: #e85d65;
+  background: var(--color-red-soft);
+  color: var(--color-danger);
   font-size: 1.3rem;
 }
 

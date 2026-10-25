@@ -228,16 +228,48 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import { milestoneFamilies } from '@/config/milestone-families'
+import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
+import { authUser } from '@/services/auth'
+import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
+import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const { t } = useI18n()
 const $q = useQuasar()
 const route = useRoute()
 const milestonesStore = useMilestonesStore()
+const scopeStore = useFinancialScopeStore()
+const workspaceStore = useWorkspaceStore()
 const workspaceId = computed(() => String(route.params.workspaceId))
-const { achievements, activationLoading, error, loading, progress, trackingActive } =
-  storeToRefs(milestonesStore)
+const {
+  achievements,
+  activationLoading,
+  currentMonth,
+  error,
+  financialYear,
+  historyDocuments,
+  loading,
+  trackingActive,
+} = storeToRefs(milestonesStore)
+const workspace = computed(
+  () => workspaceStore.workspaces.find(({ id }) => id === workspaceId.value) || null,
+)
+const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
+const memberIds = computed(() => members.value.map(({ id }) => id))
+const selectedMemberId = computed(() =>
+  scopeStore.get(workspaceId.value, memberIds.value, authUser.value?.uid),
+)
+const progress = computed(() =>
+  calculateMilestoneProgress({
+    financialYear: financialYear.value,
+    financialHistory: historyDocuments.value,
+    achievements: trackingActive.value ? achievements.value : [],
+    month: currentMonth.value,
+    memberId: selectedMemberId.value,
+  }),
+)
 const expandedFamilies = ref(new Set())
 const infoDialogOpen = ref(false)
 const activationDialogOpen = ref(false)

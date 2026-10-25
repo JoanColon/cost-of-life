@@ -143,7 +143,7 @@ function save() {
 }
 
 .estimate-button:hover:not(:disabled) {
-  background: #f4f7f9;
+  background: var(--color-surface-soft);
 }
 
 .estimate-button:disabled {

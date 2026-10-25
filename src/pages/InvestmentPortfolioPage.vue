@@ -33,7 +33,6 @@
               :to="investmentsRoute"
               class="back-button"
             />
-            <span class="eyebrow">{{ t('assets.portfolio.eyebrow') }}</span>
             <h1>{{ investment.itemName }}</h1>
           </div>
         </header>
@@ -104,36 +103,70 @@
             class="portfolio-kpis"
             :aria-label="t('assets.portfolio.kpis.label')"
           >
-            <article class="portfolio-kpi">
-              <div class="portfolio-kpi-heading">
-                <span class="portfolio-kpi-icon"><q-icon name="account_balance_wallet" /></span>
-                <span>{{ t('assets.portfolio.kpis.portfolioValue') }}</span>
+            <article class="portfolio-kpi portfolio-kpi--value">
+              <div class="portfolio-kpi-copy">
+                <div class="portfolio-kpi-heading">
+                  <span class="portfolio-kpi-icon"><q-icon name="account_balance_wallet" /></span>
+                  <span>{{ t('assets.portfolio.kpis.portfolioValue') }}</span>
+                </div>
+                <strong>{{ portfolioMetrics.totalPortfolioValue }}</strong>
+                <small>{{ t('assets.portfolio.kpis.portfolioValueDescription') }}</small>
               </div>
-              <strong>{{ portfolioMetrics.totalPortfolioValue }}</strong>
-              <small>{{ t('assets.portfolio.kpis.portfolioValueDescription') }}</small>
+              <div v-if="portfolioHistoryPoints.length" class="portfolio-history">
+                <svg
+                  viewBox="0 0 320 100"
+                  preserveAspectRatio="none"
+                  role="img"
+                  :aria-label="t('assets.portfolio.kpis.annualHistory')"
+                >
+                  <path
+                    v-if="portfolioChart.area"
+                    class="portfolio-history-area"
+                    :d="portfolioChart.area"
+                  />
+                  <path class="portfolio-history-line" :d="portfolioChart.line" />
+                  <circle
+                    :cx="portfolioChart.last.x"
+                    :cy="portfolioChart.last.y"
+                    r="4"
+                    class="portfolio-history-point"
+                  />
+                </svg>
+                <div class="portfolio-history-years">
+                  <span>{{ portfolioHistoryPoints[0].year }}</span>
+                  <span v-if="portfolioHistoryPoints.length > 1">{{
+                    portfolioHistoryPoints.at(-1).year
+                  }}</span>
+                </div>
+              </div>
+              <div v-else-if="historyLoading" class="portfolio-history-state">
+                <q-spinner color="primary" size="1.5rem" />
+              </div>
             </article>
 
-            <article class="portfolio-kpi">
-              <div class="portfolio-kpi-heading">
-                <span class="portfolio-kpi-icon portfolio-kpi-icon--income">
-                  <q-icon name="payments" />
-                </span>
-                <span>{{ t('assets.portfolio.kpis.annualIncome') }}</span>
-              </div>
-              <strong>{{ portfolioMetrics.annualDividendIncome }}</strong>
-              <small>{{ t('assets.portfolio.kpis.annualIncomeDescription') }}</small>
-            </article>
+            <div class="portfolio-kpi-pair">
+              <article class="portfolio-kpi">
+                <div class="portfolio-kpi-heading">
+                  <span class="portfolio-kpi-icon portfolio-kpi-icon--income">
+                    <q-icon name="payments" />
+                  </span>
+                  <span>{{ t('assets.portfolio.kpis.annualIncome') }}</span>
+                </div>
+                <strong>{{ portfolioMetrics.annualDividendIncome }}</strong>
+                <small>{{ t('assets.portfolio.kpis.annualIncomeDescription') }}</small>
+              </article>
 
-            <article class="portfolio-kpi">
-              <div class="portfolio-kpi-heading">
-                <span class="portfolio-kpi-icon portfolio-kpi-icon--yield">
-                  <q-icon name="percent" />
-                </span>
-                <span>{{ t('assets.portfolio.kpis.dividendYield') }}</span>
-              </div>
-              <strong>{{ portfolioMetrics.dividendYield }}</strong>
-              <small>{{ t('assets.portfolio.kpis.dividendYieldDescription') }}</small>
-            </article>
+              <article class="portfolio-kpi">
+                <div class="portfolio-kpi-heading">
+                  <span class="portfolio-kpi-icon portfolio-kpi-icon--yield">
+                    <q-icon name="percent" />
+                  </span>
+                  <span>{{ t('assets.portfolio.kpis.dividendYield') }}</span>
+                </div>
+                <strong>{{ portfolioMetrics.dividendYield }}</strong>
+                <small>{{ t('assets.portfolio.kpis.dividendYieldDescription') }}</small>
+              </article>
+            </div>
           </section>
 
           <section class="portfolio-table-card">
@@ -151,15 +184,16 @@
               :rows-per-page-options="[10, 25, 50, 0]"
               :no-data-label="t('assets.portfolio.emptyPortfolio')"
             >
-              <template #top-right>
+              <template #top>
                 <q-input
                   v-model="tableFilter"
-                  borderless
+                  outlined
                   dense
                   debounce="250"
                   :placeholder="t('assets.portfolio.search')"
+                  class="portfolio-search"
                 >
-                  <template #append><q-icon name="search" /></template>
+                  <template #prepend><q-icon name="search" /></template>
                 </q-input>
               </template>
 
@@ -167,6 +201,17 @@
                 <q-td :props="props"
                   ><strong>{{ props.value }}</strong></q-td
                 >
+              </template>
+
+              <template #body-cell-country="props">
+                <q-td :props="props">
+                  <span class="country-value">
+                    <span v-if="countryFlag(props.value)" class="country-flag" aria-hidden="true">
+                      {{ countryFlag(props.value) }}
+                    </span>
+                    <span>{{ props.value || '—' }}</span>
+                  </span>
+                </q-td>
               </template>
 
               <template #header-cell-marketValueBase="props">
@@ -242,6 +287,7 @@
               :href="portfolio.spreadsheetUrl"
               target="_blank"
               rel="noopener noreferrer"
+              class="portfolio-action portfolio-action--open"
             />
             <div class="portfolio-management-actions">
               <q-btn
@@ -250,6 +296,7 @@
                 color="primary"
                 icon="edit"
                 :label="t('assets.portfolio.changeSheet')"
+                class="portfolio-action"
                 @click="startEditing"
               />
               <q-btn
@@ -258,6 +305,7 @@
                 color="negative"
                 icon="link_off"
                 :label="t('assets.portfolio.disconnect')"
+                class="portfolio-action"
                 @click="confirmDisconnect = true"
               />
             </div>
@@ -299,9 +347,12 @@ import {
 } from '@/services/firebase/investment-portfolios.service'
 import {
   changeTone,
+  countryFlag,
   portfolioKpis,
   portfolioTableRows,
 } from '@/domain/financial/investment-portfolio'
+import { buildAssetAnnualSeries } from '@/domain/financial/history'
+import { getFinancialHistory } from '@/services/firebase/history.service'
 import { useAssetsStore } from '@/stores/assets-store'
 
 const templateCopyUrl =
@@ -324,8 +375,11 @@ const portfolioSummary = ref(null)
 const sheetError = ref(false)
 const tableFilter = ref('')
 const tablePagination = ref({ sortBy: 'ticker', descending: false, page: 1, rowsPerPage: 25 })
+const historyDocuments = ref([])
+const historyLoading = ref(false)
 let preparationId = 0
 let sheetReadId = 0
+let historyRequestId = 0
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const assetId = computed(() => String(route.params.assetId))
@@ -349,19 +403,24 @@ const mobileTable = computed(() => $q.screen.lt.sm)
 const portfolioMetrics = computed(() =>
   portfolioKpis(portfolioRows.value, activePortfolioSummary.value),
 )
+const portfolioHistoryPoints = computed(() =>
+  buildAssetAnnualSeries(historyDocuments.value, { assetId: assetId.value }),
+)
+const portfolioChart = computed(() => buildPortfolioChart(portfolioHistoryPoints.value))
 const tableRows = computed(() =>
   portfolioTableRows(portfolioRows.value, activePortfolioSummary.value.baseCurrency),
 )
 const tableColumns = computed(() => {
   if (mobileTable.value) {
     return [
-      tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '28%'),
-      tableColumn('marketValueBase', t('assets.portfolio.columns.marketValue'), 'center', '36%'),
+      tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '24%'),
+      tableColumn('country', t('assets.portfolio.columns.country'), 'center', '18%'),
+      tableColumn('marketValueBase', t('assets.portfolio.columns.marketValue'), 'center', '29%'),
       tableColumn(
         'annualDividendBase',
         t('assets.portfolio.columns.annualIncome'),
         'center',
-        '36%',
+        '29%',
       ),
     ]
   }
@@ -416,6 +475,20 @@ async function prepare(force = false) {
     pageError.value = loadError
   } finally {
     if (currentPreparation === preparationId) preparing.value = false
+  }
+}
+
+async function loadHistory() {
+  const currentRequest = ++historyRequestId
+  historyDocuments.value = []
+  historyLoading.value = true
+  try {
+    const documents = await getFinancialHistory(workspaceId.value)
+    if (currentRequest === historyRequestId) historyDocuments.value = documents
+  } catch {
+    if (currentRequest === historyRequestId) historyDocuments.value = []
+  } finally {
+    if (currentRequest === historyRequestId) historyLoading.value = false
   }
 }
 
@@ -478,6 +551,7 @@ async function readSheet() {
     portfolioRows.value = Array.isArray(result.rows) ? result.rows : []
     portfolioSummary.value = result.summary || null
     assetsStore.applyInvestmentPortfolioSummary(currentAssetId, result.summary)
+    void loadHistory()
   } catch {
     if (currentRead !== sheetReadId) return
     portfolioRows.value = null
@@ -499,6 +573,36 @@ function clearSheetResult() {
 function tableColumn(name, label, align, width) {
   const size = `width: ${width}`
   return { name, label, field: name, align, sortable: true, style: size, headerStyle: size }
+}
+
+function buildPortfolioChart(points) {
+  if (!points.length) return { line: '', area: '', last: { x: 0, y: 0 } }
+  if (points.length === 1) {
+    return { line: 'M 16 50 L 304 50', area: '', last: { x: 304, y: 50 } }
+  }
+
+  const width = 320
+  const height = 100
+  const padding = 6
+  const values = points.map(({ value }) => value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const coordinates = values.map((value, index) => ({
+    x: padding + (index / (values.length - 1)) * (width - padding * 2),
+    y: padding + ((max - value) / range) * (height - padding * 2),
+  }))
+  const line = coordinates
+    .map(({ x, y }, index) => `${index ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`)
+    .join(' ')
+  const first = coordinates[0]
+  const last = coordinates.at(-1)
+
+  return {
+    line,
+    area: `${line} L ${last.x.toFixed(2)} ${height} L ${first.x.toFixed(2)} ${height} Z`,
+    last,
+  }
 }
 </script>
 
@@ -533,15 +637,6 @@ function tableColumn(name, label, align, width) {
 }
 .back-button {
   @include financial-back-button;
-}
-.eyebrow {
-  display: block;
-  margin-bottom: 0.35rem;
-  color: var(--color-primary);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 h1 {
   @include financial-title;
@@ -616,7 +711,7 @@ h1 {
 }
 .portfolio-kpis {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-top: 1.5rem;
 }
@@ -630,6 +725,36 @@ h1 {
   border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
+}
+.portfolio-kpi--value {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(16rem, 1.2fr);
+  align-items: center;
+  gap: 2rem;
+  min-height: 12rem;
+}
+.portfolio-kpi-copy {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+}
+.portfolio-kpi-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+.portfolio-kpi-pair .portfolio-kpi {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.portfolio-kpi-pair .portfolio-kpi + .portfolio-kpi {
+  border-left: 1px solid var(--color-line);
 }
 .portfolio-kpi-heading {
   display: flex;
@@ -675,6 +800,46 @@ h1 {
   font-size: 0.76rem;
   line-height: 1.35;
 }
+.portfolio-history {
+  display: grid;
+  align-self: stretch;
+  min-width: 0;
+}
+.portfolio-history svg {
+  width: 100%;
+  height: 7rem;
+  overflow: visible;
+}
+.portfolio-history-area {
+  fill: var(--color-primary);
+  opacity: 0.1;
+}
+.portfolio-history-line {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+.portfolio-history-point {
+  fill: var(--color-primary);
+  stroke: var(--color-surface);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.portfolio-history-years {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-copy);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+.portfolio-history-state {
+  display: grid;
+  min-height: 7rem;
+  place-items: center;
+}
 .portfolio-kpis + .portfolio-table-card {
   margin-top: 1rem;
 }
@@ -687,9 +852,25 @@ h1 {
   color: var(--color-ink);
 }
 .portfolio-table :deep(.q-table__top) {
-  min-height: 3.5rem;
-  padding: 0 1rem;
+  min-height: 4.25rem;
+  padding: 0.65rem;
   border-bottom: 1px solid var(--color-line);
+}
+.portfolio-search {
+  width: 100%;
+}
+.portfolio-search :deep(.q-field__control) {
+  min-height: 2.9rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+.portfolio-search :deep(.q-field__prepend) {
+  padding-right: 0.6rem;
+  color: var(--color-copy);
+}
+.portfolio-search :deep(.q-field__native) {
+  color: var(--color-ink);
+  font-size: 0.85rem;
 }
 .portfolio-table :deep(.q-table__middle) {
   max-width: 100%;
@@ -699,12 +880,17 @@ h1 {
   table-layout: fixed;
 }
 .portfolio-table :deep(th) {
+  height: 3.5rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.35rem;
   background: var(--color-surface-soft);
   color: var(--color-copy);
   font-size: 0.72rem;
   font-weight: 750;
   letter-spacing: 0.025em;
   line-height: 1.25;
+  text-align: center !important;
+  vertical-align: top;
   white-space: normal;
 }
 .portfolio-table :deep(th .q-table__sort-icon) {
@@ -713,8 +899,12 @@ h1 {
 .combined-heading {
   display: inline-grid;
   gap: 0.08rem;
+  place-items: center;
   line-height: 1.15;
   text-align: center;
+}
+.combined-heading > span {
+  white-space: nowrap;
 }
 .portfolio-table :deep(td) {
   height: 3.2rem;
@@ -742,6 +932,16 @@ h1 {
 .combined-value {
   display: grid;
   gap: 0.05rem;
+}
+.country-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.country-flag {
+  font-size: 1.15rem;
+  line-height: 1;
 }
 .combined-value strong {
   color: var(--color-ink);
@@ -774,33 +974,94 @@ h1 {
   background: color-mix(in srgb, var(--color-danger) 7%, white);
   color: var(--color-danger);
 }
-.portfolio-actions,
+.portfolio-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
 .portfolio-management-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-.portfolio-actions {
-  justify-content: space-between;
-  margin-top: 0.75rem;
+.portfolio-action {
+  min-height: 2.75rem;
 }
 .confirm-card {
   @include financial-simple-dialog(28rem);
 }
 
 @media (max-width: 760px) {
-  .portfolio-kpis {
-    grid-template-columns: 1fr;
+  .portfolio-table :deep(th) {
+    padding-right: 0.2rem;
+    padding-left: 0.2rem;
+    font-size: 0.62rem;
   }
-  .portfolio-actions,
+  .portfolio-kpis {
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .portfolio-kpi--value {
+    grid-template-columns: minmax(0, 0.9fr) minmax(7.5rem, 1.1fr);
+    gap: 0.65rem;
+    min-height: 9.5rem;
+    padding: 0.9rem;
+  }
+  .portfolio-kpi-pair .portfolio-kpi {
+    min-height: 8.75rem;
+    padding: 0.9rem;
+  }
+  .portfolio-kpi-heading {
+    gap: 0.45rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+  .portfolio-kpi-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.9rem;
+  }
+  .portfolio-kpi strong {
+    margin-top: 0.75rem;
+    font-size: clamp(1.35rem, 6vw, 2rem);
+  }
+  .portfolio-kpi small {
+    padding-top: 0.45rem;
+    font-size: 0.64rem;
+  }
+  .portfolio-history svg {
+    height: 5.5rem;
+  }
+  .portfolio-history-years {
+    font-size: 0.6rem;
+  }
+  .portfolio-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0;
+  }
+  .portfolio-action--open {
+    grid-column: 1 / -1;
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+  }
   .portfolio-management-actions {
-    align-items: stretch;
-    flex-direction: column;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
   }
   .portfolio-actions > .q-btn,
-  .portfolio-management-actions,
   .portfolio-management-actions > .q-btn {
     width: 100%;
+    min-width: 0;
+    padding-inline: 0.35rem;
+    font-size: 0.72rem;
   }
 }
 </style>

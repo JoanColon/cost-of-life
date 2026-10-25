@@ -34,7 +34,6 @@
             />
             <h1>{{ t(category.nameKey) }}</h1>
           </div>
-          <MemberScopeSelector v-model="selectedMemberId" :members="members" />
         </header>
 
         <section class="summary-card">
@@ -78,6 +77,7 @@
               <strong>{{ subcategoryLabel(item) }}</strong>
               <small>{{ item.itemName }}</small>
             </span>
+            <OwnershipAvatar :ownership="item.ownership" :members="members" />
             <strong class="expense-value">
               {{ formatCurrency(displayedItemValue(item)) }}
               <small>/ {{ periodLabel }}</small>
@@ -173,7 +173,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
-import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
+import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
 import { getExpenseCategory } from '@/config/expense-categories'
 import { expenseTrackingCategories } from '@/config/expense-tracking-categories'
 import {
@@ -439,8 +439,8 @@ async function persist(operation) {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: #ffe9ea;
-  color: #e85d65;
+  background: var(--color-red-soft);
+  color: var(--color-danger);
   font-size: 1.4rem;
 }
 
@@ -455,7 +455,7 @@ async function persist(operation) {
 
 .expense-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 0.8rem;
   padding: 0.9rem 1rem;
@@ -464,7 +464,7 @@ async function persist(operation) {
 }
 
 .expense-row:hover {
-  background: #f8fafc;
+  background: var(--color-surface-soft);
 }
 
 .expense-row:focus-visible {
@@ -533,7 +533,7 @@ async function persist(operation) {
 
 @media (max-width: 599px) {
   .expense-row {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     align-items: start;
     gap: 0.6rem;
   }
@@ -549,7 +549,7 @@ async function persist(operation) {
   }
 
   .expense-value {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
     padding-top: 0.1rem;
     text-align: right;
@@ -557,7 +557,7 @@ async function persist(operation) {
   }
 
   .expense-row > .q-btn {
-    grid-column: 4;
+    grid-column: 5;
     grid-row: 1;
     align-self: center;
   }

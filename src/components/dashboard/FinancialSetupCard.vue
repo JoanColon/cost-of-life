@@ -125,8 +125,8 @@ const progress = computed(() => (props.items.length ? completed.value / props.it
   color: var(--color-primary);
 }
 .setup-icon.expenses {
-  background: #fff1df;
-  color: #c46a19;
+  background: var(--color-warning-soft);
+  color: var(--color-warning-dark);
 }
 .setup-copy {
   display: grid;

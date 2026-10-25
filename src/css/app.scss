@@ -35,6 +35,28 @@ button:not(.q-btn--round),
   border-radius: var(--radius-button) !important;
 }
 
+.q-card {
+  color: var(--color-ink);
+}
+
+.q-field--outlined .q-field__control {
+  border-radius: var(--radius-button);
+}
+
+.q-field--outlined .q-field__control::before {
+  border-color: var(--color-line);
+}
+
+.q-field--outlined.q-field--focused .q-field__control::after {
+  color: var(--color-primary);
+}
+
+.q-menu,
+.q-dialog .q-card {
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-dialog);
+}
+
 .dialog-close {
   position: absolute;
   z-index: 2;
@@ -43,5 +65,5 @@ button:not(.q-btn--round),
 }
 
 ::selection {
-  background: rgb(22 136 248 / 18%);
+  background: var(--color-primary-focus);
 }

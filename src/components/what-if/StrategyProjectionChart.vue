@@ -30,8 +30,8 @@ let chart = null
 let resizeObserver = null
 
 const INVESTMENT_TYPES = [
-  { id: 'stockMarket', color: '#1688f8' },
-  { id: 'realEstate', color: '#159f73' },
+  { id: 'stockMarket', color: '#0870d8' },
+  { id: 'realEstate', color: '#0c6b4d' },
   { id: 'fixedIncome', color: '#8754ed' },
   { id: 'crypto', color: '#e58b43' },
   { id: 'businessEquity', color: '#39a8a3' },
@@ -130,8 +130,8 @@ function totalChartSeries() {
       data: props.strategyPoints.map(({ value }) => value),
       smooth: 0.25,
       showSymbol: false,
-      lineStyle: { width: 3, color: '#1688f8' },
-      itemStyle: { color: '#1688f8' },
+      lineStyle: { width: 3, color: '#0870d8' },
+      itemStyle: { color: '#0870d8' },
       areaStyle: {
         color: {
           type: 'linear',
@@ -140,8 +140,8 @@ function totalChartSeries() {
           x2: 0,
           y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(22, 136, 248, .2)' },
-            { offset: 1, color: 'rgba(22, 136, 248, .01)' },
+            { offset: 0, color: 'rgba(8, 112, 216, .2)' },
+            { offset: 1, color: 'rgba(8, 112, 216, .01)' },
           ],
         },
       },
