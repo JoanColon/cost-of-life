@@ -174,6 +174,24 @@ export const useAssetsStore = defineStore('assets', () => {
     replaceAsset(assetId, { ...asset, detail })
   }
 
+  function applyInvestmentPortfolioSummary(assetId, summary) {
+    const asset = findLoadedAsset(assetId)
+    const totalPortfolioValue = Number(summary?.totalPortfolioValue)
+    if (!asset || !Number.isFinite(totalPortfolioValue) || totalPortfolioValue < 0) return
+
+    replaceAsset(assetId, {
+      ...asset,
+      currentValue: Math.round((totalPortfolioValue + Number.EPSILON) * 100) / 100,
+      detail: {
+        ...(asset.detail || {}),
+        portfolio: {
+          ...(asset.detail?.portfolio || {}),
+          summary: { ...summary },
+        },
+      },
+    })
+  }
+
   async function deleteCategory(workspaceId, categoryId) {
     await deleteAssetCategoryDocuments(workspaceId, categoryId)
 
@@ -250,6 +268,7 @@ export const useAssetsStore = defineStore('assets', () => {
     deleteAsset,
     saveInvestmentPortfolio,
     disconnectInvestmentPortfolio,
+    applyInvestmentPortfolioSummary,
     deleteCategory,
     itemsForCategory,
     reset,

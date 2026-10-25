@@ -1,68 +1,78 @@
 import { describe, expect, it } from 'vitest'
-import { changeTone, portfolioTableRows } from '../../src/domain/financial/investment-portfolio.js'
+import {
+  changeTone,
+  formatCurrencyValue,
+  formatPercentageValue,
+  portfolioKpis,
+  portfolioTableRows,
+} from '../../src/domain/financial/investment-portfolio.js'
 
 describe('investment portfolio table', () => {
   it('maps the requested columns from a Google Sheets response', () => {
-    const rows = portfolioTableRows([
+    const rows = portfolioTableRows(
       [
-        'DividnedData Ticker',
-        'Name',
-        'Country',
-        'Sector',
-        'Industry',
-        'Currency',
-        'Shares',
-        'Price (local)',
-        'Day Change %',
-        'Cost basis (local)',
-        'Avg buy cost / share (local)',
-        'Avg cost / share (local FIFO)',
-        'Return %',
-        'Dividend (local)',
-        'Dividend yield (local)',
-        'FX to base',
-        'Market value (base)',
-        'Portfolio %',
-        'Annual dividend (base)',
-        'Income %',
+        [
+          'DividnedData Ticker',
+          'Name',
+          'Country',
+          'Sector',
+          'Industry',
+          'Currency',
+          'Shares',
+          'Price (local)',
+          'Day Change %',
+          'Cost basis (local)',
+          'Avg buy cost / share (local)',
+          'Avg cost / share (local FIFO)',
+          'Return %',
+          'Dividend (local)',
+          'Dividend yield (local)',
+          'FX to base',
+          'Market value (base)',
+          'Portfolio %',
+          'Annual dividend (base)',
+          'Income %',
+        ],
+        [
+          'IBE.MC',
+          'Iberdrola',
+          'ES',
+          'Utilities',
+          '',
+          'EUR',
+          '1000',
+          '21,9',
+          '0,74%',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '2,51%',
+          '1,00',
+          '21900',
+          '81,52%',
+          '550,00',
+          '82,89%',
+        ],
       ],
-      [
-        'IBE.MC',
-        'Iberdrola',
-        'ES',
-        'Utilities',
-        '',
-        'EUR',
-        '1000',
-        '21,9',
-        '0,74%',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '2,51%',
-        '1,00',
-        '21900',
-        '81,52%',
-        '550,00',
-        '82,89%',
-      ],
-    ])
+      'EUR',
+    )
 
     expect(rows).toEqual([
       {
         id: 'portfolio-0',
         ticker: 'IBE.MC',
         country: 'ES',
-        shares: '1000',
-        priceLocal: '21,9',
-        dayChange: '0,74%',
-        dividendYield: '2,51%',
-        marketValueBase: '21900',
-        portfolioWeight: '81,52%',
-        annualDividendBase: '550,00',
-        incomeWeight: '82,89%',
+        currency: 'EUR',
+        shares: '1,000',
+        priceLocal: '€21.90',
+        dayChange: '0.74%',
+        dividendYield: '2.51%',
+        marketValueBase: '€21,900',
+        portfolioWeight: '81.5%',
+        annualDividendBase: '€550',
+        incomeWeight: '82.9%',
       },
     ])
   })
@@ -73,5 +83,37 @@ describe('investment portfolio table', () => {
     expect(changeTone('0,74%')).toBe('positive')
     expect(changeTone('0%')).toBe('neutral')
     expect(changeTone('')).toBe('neutral')
+  })
+
+  it('formats localized currency and percentage values consistently', () => {
+    expect(formatCurrencyValue('5.793,2', 'EUR', 0)).toBe('€5,793')
+    expect(formatCurrencyValue('92,71', 'USD', 2)).toBe('$92.71')
+    expect(formatCurrencyValue('', 'EUR', 0)).toBe('')
+    expect(formatPercentageValue('79,08%', 1)).toBe('79.1%')
+  })
+
+  it('calculates portfolio KPIs from the summary and annual dividends', () => {
+    const metrics = portfolioKpis(
+      [
+        ['Ticker', 'Annual dividend (base)'],
+        ['IBE.MC', '550,00'],
+        ['KO', '132,47'],
+      ],
+      { baseCurrency: 'EUR', totalPortfolioValue: 27693.16 },
+    )
+
+    expect(metrics).toEqual({
+      totalPortfolioValue: '€27,693',
+      annualDividendIncome: '€682',
+      dividendYield: '2.5%',
+    })
+  })
+
+  it('uses placeholders when KPI source values are unavailable', () => {
+    expect(portfolioKpis(null)).toEqual({
+      totalPortfolioValue: '—',
+      annualDividendIncome: '—',
+      dividendYield: '—',
+    })
   })
 })

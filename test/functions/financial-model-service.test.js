@@ -327,6 +327,37 @@ describe('atomic financial model mutations', () => {
     expect(financialYearValue(financialYear, 'income')).toBe(42000)
   })
 
+  it('prevents two dividend income sources from linking to the same portfolio', async () => {
+    const existing = {
+      id: 'dividends-a',
+      categoryId: 'investments',
+      subcategoryId: 'dividends',
+      itemName: 'Existing dividends',
+      notes: '',
+      calculation: { mode: 'recurring', amount: 600, frequency: 'yearly' },
+      portfolioAssetId: 'portfolio-a',
+      disposablePercentage: 100,
+      ownership,
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'income',
+      collection: 'modelIncome',
+      category: 'investments',
+      items: [existing],
+    })
+
+    await expect(
+      mutateFinancialModel(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'member-a',
+        section: 'income',
+        operation: 'create',
+        item: { ...existing, id: undefined, itemName: 'Duplicate dividends' },
+      }),
+    ).rejects.toThrow('already linked')
+    expect(writes).toEqual([])
+  })
+
   it('preserves a simple expense entry while rebuilding the financial year', async () => {
     const { firestore, writes } = createFirestore({
       section: 'expenses',

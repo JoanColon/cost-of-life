@@ -1,8 +1,10 @@
 const { FieldValue } = require('firebase-admin/firestore')
+const { currentYear, rebuildFinancialYear } = require('./financial-years')
 
 const GOOGLE_SHEETS_HOST = 'docs.google.com'
 const SPREADSHEET_PATH = /^\/spreadsheets(?:\/u\/\d+)?\/d\/([A-Za-z0-9_-]+)(?:\/|$)/
 const PORTFOLIO_SHEET_NAME = 'Portfolio'
+const SUMMARY_SHEET_NAME = 'Summary'
 
 async function updateInvestmentPortfolio(
   firestore,
@@ -56,6 +58,7 @@ async function readInvestmentPortfolioSheet(
   firestore,
   { workspaceId, userId, assetId },
   fetchImpl = fetch,
+  rebuildFinancialYearImpl = rebuildFinancialYear,
 ) {
   assertText(workspaceId, 'A workspace is required')
   assertText(userId, 'Authentication is required')
@@ -83,24 +86,165 @@ async function readInvestmentPortfolioSheet(
 
   const spreadsheetUrl = asset?.detail?.portfolio?.spreadsheetUrl
   const spreadsheetId = spreadsheetIdFromUrl(spreadsheetUrl)
-  const readUrl = new URL(
+  const portfolioUrl = googleSheetQueryUrl(spreadsheetId, {
+    tqx: 'out:csv',
+    sheet: PORTFOLIO_SHEET_NAME,
+  })
+  const baseCurrencyUrl = googleSheetQueryUrl(spreadsheetId, {
+    tqx: 'out:json',
+    sheet: SUMMARY_SHEET_NAME,
+    range: 'B4',
+    headers: '0',
+  })
+  const totalsUrl = googleSheetQueryUrl(spreadsheetId, {
+    tqx: 'out:json',
+    sheet: SUMMARY_SHEET_NAME,
+    range: 'B6:B7',
+    headers: '0',
+  })
+
+  const [portfolioBody, baseCurrencyBody, totalsBody] = await Promise.all([
+    fetchGoogleSheet(portfolioUrl, fetchImpl, 1_000_000),
+    fetchGoogleSheet(baseCurrencyUrl, fetchImpl),
+    fetchGoogleSheet(totalsUrl, fetchImpl),
+  ])
+  const baseCurrencyValues = parseGoogleVisualizationValues(baseCurrencyBody)
+  const totalValues = parseGoogleVisualizationValues(totalsBody)
+  const portfolioRows = parseCsv(portfolioBody)
+  const summary = {
+    baseCurrency: String(baseCurrencyValues[0] ?? '')
+      .trim()
+      .toUpperCase(),
+    totalPortfolioValue: Number(totalValues[0]),
+    totalDividendsReceived: Number(totalValues[1]),
+    annualDividendIncome: portfolioAnnualDividendIncome(portfolioRows),
+  }
+
+  if (
+    !/^[A-Z]{3}$/.test(summary.baseCurrency) ||
+    !Number.isFinite(summary.totalPortfolioValue) ||
+    !Number.isFinite(summary.totalDividendsReceived) ||
+    !Number.isFinite(summary.annualDividendIncome)
+  ) {
+    throw new Error('The Google Sheet returned an invalid Summary')
+  }
+
+  const linkedIncomeSnapshot = await workspaceReference
+    .collection('modelIncome')
+    .where('portfolioAssetId', '==', assetId)
+    .get()
+  const linkedIncomeDocuments = (linkedIncomeSnapshot.docs || []).filter((document) => {
+    const income = document.data()
+    return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
+  })
+
+  await Promise.all([
+    assetReference.update({
+      currentValue: roundMoney(summary.totalPortfolioValue),
+      'detail.portfolio.summary': {
+        ...summary,
+        syncedAt: FieldValue.serverTimestamp(),
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: userId,
+    }),
+    ...linkedIncomeDocuments.map((document) =>
+      document.ref.update({
+        calculation: {
+          mode: 'recurring',
+          amount: summary.annualDividendIncome,
+          frequency: 'yearly',
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: userId,
+      }),
+    ),
+  ])
+  await rebuildFinancialYearImpl(firestore, workspaceId, currentYear(), {
+    sections: linkedIncomeDocuments.length ? ['assets', 'income'] : ['assets'],
+  })
+
+  return { sheet: PORTFOLIO_SHEET_NAME, rows: portfolioRows, summary }
+}
+
+function portfolioAnnualDividendIncome(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) return 0
+  const headers = rows[0].map(normalizeHeader)
+  const matchedIndex = headers.findIndex(
+    (header) => header === 'annual dividend base' || header.endsWith(' annual dividend base'),
+  )
+  const columnIndex = matchedIndex >= 0 ? matchedIndex : 18
+  return roundMoney(
+    rows.slice(1).reduce((total, row) => {
+      const value = parseLocalizedNumber(Array.isArray(row) ? row[columnIndex] : null)
+      return value === null ? total : total + value
+    }, 0),
+  )
+}
+
+function parseLocalizedNumber(value) {
+  const input = String(value ?? '')
+    .trim()
+    .replace(/[^0-9,.-]/g, '')
+  if (!input) return null
+
+  const lastComma = input.lastIndexOf(',')
+  const lastDot = input.lastIndexOf('.')
+  let normalized = input
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimalSeparator = lastComma > lastDot ? ',' : '.'
+    normalized = normalized.replaceAll(decimalSeparator === ',' ? '.' : ',', '')
+    const decimalIndex = normalized.lastIndexOf(decimalSeparator)
+    normalized =
+      normalized.slice(0, decimalIndex).replaceAll(decimalSeparator, '') +
+      '.' +
+      normalized.slice(decimalIndex + 1)
+  } else {
+    const separator = lastComma >= 0 ? ',' : lastDot >= 0 ? '.' : null
+    if (separator) {
+      const parts = normalized.split(separator)
+      const grouping = parts.length > 2 || (parts.length === 2 && parts[1].length === 3)
+      normalized = grouping ? parts.join('') : `${parts[0]}.${parts[1]}`
+    }
+  }
+
+  const number = Number(normalized)
+  return Number.isFinite(number) ? number : null
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
+}
+
+function normalizeHeader(value) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[()%]/g, ' ')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+function googleSheetQueryUrl(spreadsheetId, parameters) {
+  const url = new URL(
     `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq`,
   )
-  readUrl.searchParams.set('tqx', 'out:csv')
-  readUrl.searchParams.set('sheet', PORTFOLIO_SHEET_NAME)
+  for (const [name, value] of Object.entries(parameters)) url.searchParams.set(name, value)
+  return url
+}
 
+async function fetchGoogleSheet(url, fetchImpl, maximumLength = 100_000) {
   let response
   try {
-    response = await fetchImpl(readUrl, { signal: AbortSignal.timeout(10_000) })
+    response = await fetchImpl(url, { signal: AbortSignal.timeout(10_000) })
   } catch {
     throw new Error('The Google Sheet could not be read')
   }
   if (!response.ok) throw new Error('The Google Sheet could not be read')
 
   const body = await response.text()
-  if (body.length > 1_000_000) throw new Error('The Google Sheet returned an invalid response')
-
-  return { sheet: PORTFOLIO_SHEET_NAME, rows: parseCsv(body) }
+  if (body.length > maximumLength) throw new Error('The Google Sheet returned an invalid response')
+  return body
 }
 
 function canonicalGoogleSheetsUrl(value) {
@@ -179,6 +323,25 @@ function parseCsv(value) {
   return rows
 }
 
+function parseGoogleVisualizationValues(value) {
+  const response = String(value || '')
+  const start = response.indexOf('{')
+  const end = response.lastIndexOf('}')
+  if (start < 0 || end <= start) throw new Error('The Google Sheet returned an invalid response')
+
+  let payload
+  try {
+    payload = JSON.parse(response.slice(start, end + 1))
+  } catch {
+    throw new Error('The Google Sheet returned an invalid response')
+  }
+  if (payload?.status !== 'ok' || !Array.isArray(payload?.table?.rows)) {
+    throw new Error('The Google Sheet returned an invalid response')
+  }
+
+  return payload.table.rows.map((row) => row?.c?.[0]?.v ?? null)
+}
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -190,6 +353,8 @@ function assertText(value, message) {
 module.exports = {
   canonicalGoogleSheetsUrl,
   parseCsv,
+  parseGoogleVisualizationValues,
+  portfolioAnnualDividendIncome,
   readInvestmentPortfolioSheet,
   updateInvestmentPortfolio,
 }

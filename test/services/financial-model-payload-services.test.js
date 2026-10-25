@@ -121,7 +121,35 @@ describe('financial model service payloads', () => {
       disposablePercentage: 100,
       entryMode: 'simple',
       ownership,
+      portfolioAssetId: null,
     })
+  })
+
+  it('preserves a portfolio link for dividend income', async () => {
+    await updateIncome(
+      'workspace-a',
+      'income-a',
+      {
+        categoryId: 'investments',
+        subcategoryId: 'dividends',
+        itemName: 'Broker dividends',
+        notes: '',
+        calculation: { mode: 'recurring', amount: '682.47', frequency: 'yearly' },
+        portfolioAssetId: 'portfolio-a',
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'income',
+      'income-a',
+      expect.objectContaining({
+        portfolioAssetId: 'portfolio-a',
+        calculation: { mode: 'recurring', amount: 682.47, frequency: 'yearly' },
+      }),
+    )
   })
 
   it('preserves the simple entry mode when updating an expense', async () => {

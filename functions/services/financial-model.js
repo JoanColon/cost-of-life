@@ -89,6 +89,7 @@ async function mutateFinancialModel(
     if (operation === 'create') {
       assertCategoryEnabled(config, requestedItem.categoryId, section)
       assertOwnershipMembers(requestedItem.ownership, workspace.memberIds)
+      assertUniquePortfolioIncomeLink(existingItems, requestedItem)
       const itemData = withAuditFields(requestedItem, userId, true)
       nextItems = [...existingItems, { id: itemReference.id, ...itemData }]
       transaction.set(itemReference, itemData)
@@ -109,6 +110,7 @@ async function mutateFinancialModel(
         subcategoryId: previous.subcategoryId,
       })
       assertOwnershipMembers(updated.ownership, workspace.memberIds)
+      assertUniquePortfolioIncomeLink(existingItems, updated, itemReference.id)
       const itemData = withAuditFields({ ...previous, ...updated }, userId, false)
       nextItems = existingItems.map((candidate) =>
         candidate.id === itemReference.id ? { id: itemReference.id, ...itemData } : candidate,
@@ -226,6 +228,12 @@ function validatedCanonicalItem(section, item = {}) {
     if (item.entryMode != null && !['simple', 'detailed'].includes(item.entryMode)) {
       throw new Error('A valid income entry mode is required')
     }
+    if (item.portfolioAssetId != null) {
+      if (category !== 'investments' || item.subcategoryId !== 'dividends') {
+        throw new Error('Only dividend income can link to an investment portfolio')
+      }
+      assertCanonicalText(item.portfolioAssetId, 'A valid linked portfolio is required')
+    }
     return cleanItem({ ...item, categoryId: category, disposablePercentage: 100 })
   }
 
@@ -292,6 +300,17 @@ function assertCanonicalIncomeCalculation(calculation) {
     !['monthly', 'quarterly', 'yearly'].includes(calculation.frequency)
   ) {
     throw new Error('A valid income calculation is required')
+  }
+}
+
+function assertUniquePortfolioIncomeLink(items, candidate, candidateId = null) {
+  if (!candidate?.portfolioAssetId) return
+  if (
+    items.some(
+      (item) => item.id !== candidateId && item.portfolioAssetId === candidate.portfolioAssetId,
+    )
+  ) {
+    throw new Error('This portfolio is already linked to another dividend income source')
   }
 }
 

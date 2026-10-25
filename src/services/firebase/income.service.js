@@ -116,11 +116,20 @@ function normalizeIncomeItem(income) {
     notes: String(income.notes || '').trim(),
     calculation,
     disposablePercentage: 100,
+    portfolioAssetId:
+      category.id === 'investments' && subcategory.id === 'dividends'
+        ? normalizeOptionalId(income.portfolioAssetId)
+        : null,
   }
   if (income.entryMode === 'simple' || income.entryMode === 'detailed') {
     normalized.entryMode = income.entryMode
   }
   return normalized
+}
+
+function normalizeOptionalId(value) {
+  const normalized = String(value || '').trim()
+  return normalized || null
 }
 
 function assertValidOwnership(ownership, memberIds) {

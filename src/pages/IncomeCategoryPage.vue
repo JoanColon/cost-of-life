@@ -141,6 +141,7 @@
         :income="editingIncome"
         :defaults="incomeDefaults"
         :members="members"
+        :portfolios="linkedPortfolios"
         :saving="formSaving"
         @save="saveIncome"
         @cancel="closeIncomeDialog"
@@ -192,6 +193,7 @@ import {
 import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useAssetsStore } from '@/stores/assets-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -203,6 +205,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const incomeStore = useIncomeStore()
+const assetsStore = useAssetsStore()
 const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
@@ -231,6 +234,24 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allCategoryIncome = computed(() => incomeStore.itemsForCategory(categoryId.value))
+const linkedPortfolios = computed(() => {
+  const unavailablePortfolioIds = new Set(
+    allCategoryIncome.value
+      .filter((income) => income.id !== editingIncome.value?.id)
+      .map((income) => income.portfolioAssetId)
+      .filter(Boolean),
+  )
+  return assetsStore
+    .itemsForCategory('investment')
+    .filter(
+      (asset) => asset.detail?.portfolio?.spreadsheetUrl && !unavailablePortfolioIds.has(asset.id),
+    )
+    .map((asset) => ({
+      id: asset.id,
+      itemName: asset.itemName,
+      annualDividendIncome: asset.detail?.portfolio?.summary?.annualDividendIncome,
+    }))
+})
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const incomeDefaults = computed(() => {
   if (!categoryConfig.value || !category.value) return null
@@ -285,7 +306,8 @@ const pageLoading = computed(
     preparing.value ||
     incomeStore.loading ||
     incomeStore.categoryLoading ||
-    financialYearsStore.loading,
+    financialYearsStore.loading ||
+    (categoryId.value === 'investments' && (assetsStore.loading || assetsStore.categoryLoading)),
 )
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
 
@@ -314,6 +336,9 @@ async function preparePage(force = false) {
     await Promise.all([
       incomeStore.loadConfig(workspaceId.value, force),
       financialYearsStore.load(workspaceId.value, currentYear, force),
+      ...(categoryId.value === 'investments'
+        ? [assetsStore.loadCategory(workspaceId.value, 'investment', force)]
+        : []),
     ])
     if (current !== preparationId) return
     if (!incomeStore.setupCompleted || !category.value || !categoryConfig.value?.enabled) {

@@ -99,24 +99,44 @@
         </section>
 
         <template v-else>
-          <section class="portfolio-table-card">
-            <header class="portfolio-table-header">
-              <span class="placeholder-icon"><q-icon name="query_stats" /></span>
-              <div>
-                <h2>{{ t('assets.portfolio.portfolioTitle') }}</h2>
-                <p>{{ t('assets.portfolio.tableDescription') }}</p>
+          <section
+            v-if="portfolioRows !== null"
+            class="portfolio-kpis"
+            :aria-label="t('assets.portfolio.kpis.label')"
+          >
+            <article class="portfolio-kpi">
+              <div class="portfolio-kpi-heading">
+                <span class="portfolio-kpi-icon"><q-icon name="account_balance_wallet" /></span>
+                <span>{{ t('assets.portfolio.kpis.portfolioValue') }}</span>
               </div>
-              <q-btn
-                outline
-                no-caps
-                color="primary"
-                icon="sync"
-                :label="t('assets.portfolio.readSheet')"
-                :loading="readingSheet"
-                @click="readSheet"
-              />
-            </header>
+              <strong>{{ portfolioMetrics.totalPortfolioValue }}</strong>
+              <small>{{ t('assets.portfolio.kpis.portfolioValueDescription') }}</small>
+            </article>
 
+            <article class="portfolio-kpi">
+              <div class="portfolio-kpi-heading">
+                <span class="portfolio-kpi-icon portfolio-kpi-icon--income">
+                  <q-icon name="payments" />
+                </span>
+                <span>{{ t('assets.portfolio.kpis.annualIncome') }}</span>
+              </div>
+              <strong>{{ portfolioMetrics.annualDividendIncome }}</strong>
+              <small>{{ t('assets.portfolio.kpis.annualIncomeDescription') }}</small>
+            </article>
+
+            <article class="portfolio-kpi">
+              <div class="portfolio-kpi-heading">
+                <span class="portfolio-kpi-icon portfolio-kpi-icon--yield">
+                  <q-icon name="percent" />
+                </span>
+                <span>{{ t('assets.portfolio.kpis.dividendYield') }}</span>
+              </div>
+              <strong>{{ portfolioMetrics.dividendYield }}</strong>
+              <small>{{ t('assets.portfolio.kpis.dividendYieldDescription') }}</small>
+            </article>
+          </section>
+
+          <section class="portfolio-table-card">
             <q-table
               v-if="portfolioRows !== null"
               v-model:pagination="tablePagination"
@@ -127,6 +147,7 @@
               :rows="tableRows"
               :columns="tableColumns"
               :filter="tableFilter"
+              :loading="readingSheet"
               :rows-per-page-options="[10, 25, 50, 0]"
               :no-data-label="t('assets.portfolio.emptyPortfolio')"
             >
@@ -148,6 +169,30 @@
                 >
               </template>
 
+              <template #header-cell-marketValueBase="props">
+                <q-th :props="props">
+                  <span class="combined-heading">
+                    <span>{{ t('assets.portfolio.columns.marketValue') }}</span>
+                    <span>{{ t('assets.portfolio.columns.portfolioWeight') }}</span>
+                  </span>
+                </q-th>
+              </template>
+
+              <template #header-cell-annualDividendBase="props">
+                <q-th :props="props">
+                  <span class="combined-heading">
+                    <span>{{
+                      t(
+                        mobileTable
+                          ? 'assets.portfolio.columns.annualIncome'
+                          : 'assets.portfolio.columns.annualDividend',
+                      )
+                    }}</span>
+                    <span>{{ t('assets.portfolio.columns.incomeWeight') }}</span>
+                  </span>
+                </q-th>
+              </template>
+
               <template #body-cell-dayChange="props">
                 <q-td :props="props">
                   <span class="daily-change" :class="`daily-change--${changeTone(props.value)}`">
@@ -155,11 +200,31 @@
                   </span>
                 </q-td>
               </template>
+
+              <template #body-cell-marketValueBase="props">
+                <q-td :props="props">
+                  <span class="combined-value">
+                    <strong>{{ props.value || '—' }}</strong>
+                    <small>{{ props.row.portfolioWeight || '—' }}</small>
+                  </span>
+                </q-td>
+              </template>
+
+              <template #body-cell-annualDividendBase="props">
+                <q-td :props="props">
+                  <span class="combined-value">
+                    <strong>{{ props.value || '—' }}</strong>
+                    <small>{{ props.row.incomeWeight || '—' }}</small>
+                  </span>
+                </q-td>
+              </template>
             </q-table>
 
             <div v-else class="portfolio-table-empty">
-              <q-icon name="table_view" />
-              <p>{{ t('assets.portfolio.loadTablePrompt') }}</p>
+              <q-spinner v-if="readingSheet" color="primary" size="2rem" />
+              <q-icon v-else-if="!sheetError" name="table_view" />
+              <p v-if="readingSheet">{{ t('assets.portfolio.loadingPositions') }}</p>
+              <p v-else-if="!sheetError">{{ t('assets.portfolio.emptyPortfolio') }}</p>
             </div>
 
             <p v-if="sheetError" class="sheet-error">
@@ -232,7 +297,11 @@ import {
   isGoogleSheetsUrl,
   readInvestmentPortfolioSheet,
 } from '@/services/firebase/investment-portfolios.service'
-import { changeTone, portfolioTableRows } from '@/domain/financial/investment-portfolio'
+import {
+  changeTone,
+  portfolioKpis,
+  portfolioTableRows,
+} from '@/domain/financial/investment-portfolio'
 import { useAssetsStore } from '@/stores/assets-store'
 
 const templateCopyUrl =
@@ -251,10 +320,12 @@ const spreadsheetUrl = ref('')
 const confirmDisconnect = ref(false)
 const readingSheet = ref(false)
 const portfolioRows = ref(null)
+const portfolioSummary = ref(null)
 const sheetError = ref(false)
 const tableFilter = ref('')
 const tablePagination = ref({ sortBy: 'ticker', descending: false, page: 1, rowsPerPage: 25 })
 let preparationId = 0
+let sheetReadId = 0
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const assetId = computed(() => String(route.params.assetId))
@@ -271,19 +342,46 @@ const loading = computed(
   () => preparing.value || assetsStore.loading || assetsStore.categoryLoading,
 )
 const error = computed(() => pageError.value || assetsStore.error)
-const tableRows = computed(() => portfolioTableRows(portfolioRows.value))
-const tableColumns = computed(() => [
-  tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left'),
-  tableColumn('country', t('assets.portfolio.columns.country'), 'left'),
-  tableColumn('shares', t('assets.portfolio.columns.shares')),
-  tableColumn('priceLocal', t('assets.portfolio.columns.priceLocal')),
-  tableColumn('dayChange', t('assets.portfolio.columns.dayChange')),
-  tableColumn('dividendYield', t('assets.portfolio.columns.dividendYield')),
-  tableColumn('marketValueBase', t('assets.portfolio.columns.marketValueBase')),
-  tableColumn('portfolioWeight', t('assets.portfolio.columns.portfolioWeight')),
-  tableColumn('annualDividendBase', t('assets.portfolio.columns.annualDividendBase')),
-  tableColumn('incomeWeight', t('assets.portfolio.columns.incomeWeight')),
-])
+const activePortfolioSummary = computed(
+  () => portfolioSummary.value || portfolio.value?.summary || {},
+)
+const mobileTable = computed(() => $q.screen.lt.sm)
+const portfolioMetrics = computed(() =>
+  portfolioKpis(portfolioRows.value, activePortfolioSummary.value),
+)
+const tableRows = computed(() =>
+  portfolioTableRows(portfolioRows.value, activePortfolioSummary.value.baseCurrency),
+)
+const tableColumns = computed(() => {
+  if (mobileTable.value) {
+    return [
+      tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '28%'),
+      tableColumn('marketValueBase', t('assets.portfolio.columns.marketValue'), 'center', '36%'),
+      tableColumn(
+        'annualDividendBase',
+        t('assets.portfolio.columns.annualIncome'),
+        'center',
+        '36%',
+      ),
+    ]
+  }
+
+  return [
+    tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '11%'),
+    tableColumn('country', t('assets.portfolio.columns.country'), 'center', '9%'),
+    tableColumn('shares', t('assets.portfolio.columns.shares'), 'center', '10%'),
+    tableColumn('priceLocal', t('assets.portfolio.columns.priceLocal'), 'center', '13%'),
+    tableColumn('dayChange', t('assets.portfolio.columns.dayChange'), 'center', '12%'),
+    tableColumn('dividendYield', t('assets.portfolio.columns.dividendYield'), 'center', '13%'),
+    tableColumn('marketValueBase', t('assets.portfolio.columns.marketValue'), 'center', '16%'),
+    tableColumn(
+      'annualDividendBase',
+      t('assets.portfolio.columns.annualDividend'),
+      'center',
+      '16%',
+    ),
+  ]
+})
 const sheetUrlRules = [
   (value) => Boolean(String(value || '').trim()) || t('assets.portfolio.errors.urlRequired'),
   (value) => isGoogleSheetsUrl(value) || t('assets.portfolio.errors.urlInvalid'),
@@ -293,6 +391,7 @@ watch([workspaceId, assetId], () => prepare(), { immediate: true })
 
 async function prepare(force = false) {
   const currentPreparation = ++preparationId
+  clearSheetResult()
   preparing.value = true
   pageError.value = null
 
@@ -308,7 +407,11 @@ async function prepare(force = false) {
 
     await assetsStore.loadCategory(workspaceId.value, 'investment', force)
     if (currentPreparation !== preparationId) return
-    if (!investment.value) await router.replace(investmentsRoute.value)
+    if (!investment.value) {
+      await router.replace(investmentsRoute.value)
+      return
+    }
+    if (configured.value) void readSheet()
   } catch (loadError) {
     pageError.value = loadError
   } finally {
@@ -317,7 +420,6 @@ async function prepare(force = false) {
 }
 
 function startEditing() {
-  clearSheetResult()
   spreadsheetUrl.value = portfolio.value?.spreadsheetUrl || ''
   editing.value = true
 }
@@ -338,6 +440,8 @@ async function save() {
     )
     editing.value = false
     spreadsheetUrl.value = ''
+    clearSheetResult()
+    void readSheet()
     $q.notify({ type: 'positive', message: t('assets.portfolio.saved'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('assets.portfolio.errors.save'), position: 'top' })
@@ -363,28 +467,38 @@ async function disconnect() {
 }
 
 async function readSheet() {
-  if (readingSheet.value) return
+  const currentRead = ++sheetReadId
+  const currentWorkspaceId = workspaceId.value
+  const currentAssetId = assetId.value
   readingSheet.value = true
   sheetError.value = false
   try {
-    const result = await readInvestmentPortfolioSheet(workspaceId.value, assetId.value)
+    const result = await readInvestmentPortfolioSheet(currentWorkspaceId, currentAssetId)
+    if (currentRead !== sheetReadId) return
     portfolioRows.value = Array.isArray(result.rows) ? result.rows : []
+    portfolioSummary.value = result.summary || null
+    assetsStore.applyInvestmentPortfolioSummary(currentAssetId, result.summary)
   } catch {
+    if (currentRead !== sheetReadId) return
     portfolioRows.value = null
     sheetError.value = true
   } finally {
-    readingSheet.value = false
+    if (currentRead === sheetReadId) readingSheet.value = false
   }
 }
 
 function clearSheetResult() {
+  sheetReadId += 1
+  readingSheet.value = false
   portfolioRows.value = null
+  portfolioSummary.value = null
   sheetError.value = false
   tableFilter.value = ''
 }
 
-function tableColumn(name, label, align = 'right') {
-  return { name, label, field: name, align, sortable: true }
+function tableColumn(name, label, align, width) {
+  const size = `width: ${width}`
+  return { name, label, field: name, align, sortable: true, style: size, headerStyle: size }
 }
 </script>
 
@@ -444,8 +558,7 @@ h1 {
   margin-left: auto;
   padding: clamp(1.4rem, 4vw, 2.5rem);
 }
-.setup-icon,
-.placeholder-icon {
+.setup-icon {
   display: grid;
   place-items: center;
   border-radius: 1rem;
@@ -458,7 +571,6 @@ h1 {
   font-size: 1.65rem;
 }
 .setup-copy h2,
-.portfolio-table-card h2,
 .confirm-card h2 {
   margin: 0;
   color: var(--color-ink);
@@ -468,7 +580,6 @@ h1 {
   font-size: 1.65rem;
 }
 .setup-copy p,
-.portfolio-table-card p,
 .confirm-card p {
   color: var(--color-copy);
 }
@@ -503,33 +614,76 @@ h1 {
 .portfolio-table-card {
   overflow: hidden;
 }
-.placeholder-icon {
+.portfolio-kpis {
   display: grid;
-  width: 3.5rem;
-  height: 3.5rem;
-  flex: 0 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.portfolio-kpi {
+  display: flex;
+  min-width: 0;
+  min-height: 9rem;
+  flex-direction: column;
+  padding: 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+.portfolio-kpi-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--color-copy);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.portfolio-kpi-icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
   place-items: center;
-  border-radius: 1rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
   background: var(--color-blue-soft);
   color: var(--color-primary);
-  font-size: 1.65rem;
+  font-size: 1.05rem;
 }
-.portfolio-table-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.4rem 1.5rem;
-  border-bottom: 1px solid var(--color-line);
+.portfolio-kpi-icon--income {
+  background: var(--color-green-soft);
+  color: var(--color-success-dark);
 }
-.portfolio-table-header h2 {
-  font-size: 1.25rem;
+.portfolio-kpi-icon--yield {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
 }
-.portfolio-table-header p {
-  margin: 0.2rem 0 0;
-  font-size: 0.86rem;
+.portfolio-kpi strong {
+  margin-top: 0.9rem;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.portfolio-kpi small {
+  margin-top: auto;
+  padding-top: 0.65rem;
+  color: var(--color-copy);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+.portfolio-kpis + .portfolio-table-card {
+  margin-top: 1rem;
 }
 .portfolio-table {
+  width: calc(100% - 2rem);
+  margin: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
   color: var(--color-ink);
 }
 .portfolio-table :deep(.q-table__top) {
@@ -541,7 +695,8 @@ h1 {
   max-width: 100%;
 }
 .portfolio-table :deep(table) {
-  min-width: 76rem;
+  width: 100%;
+  table-layout: fixed;
 }
 .portfolio-table :deep(th) {
   background: var(--color-surface-soft);
@@ -549,10 +704,22 @@ h1 {
   font-size: 0.72rem;
   font-weight: 750;
   letter-spacing: 0.025em;
+  line-height: 1.25;
   white-space: normal;
 }
+.portfolio-table :deep(th .q-table__sort-icon) {
+  flex: 0 0 auto;
+}
+.combined-heading {
+  display: inline-grid;
+  gap: 0.08rem;
+  line-height: 1.15;
+  text-align: center;
+}
 .portfolio-table :deep(td) {
-  height: 2.8rem;
+  height: 3.2rem;
+  padding-right: 0.85rem;
+  padding-left: 0.85rem;
   border-color: var(--color-line);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -571,6 +738,18 @@ h1 {
 }
 .daily-change--neutral {
   color: var(--color-copy);
+}
+.combined-value {
+  display: grid;
+  gap: 0.05rem;
+}
+.combined-value strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.combined-value small {
+  color: var(--color-copy);
+  font-size: 0.72rem;
 }
 .portfolio-table-empty {
   display: grid;
@@ -610,12 +789,8 @@ h1 {
 }
 
 @media (max-width: 760px) {
-  .portfolio-table-header {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .portfolio-table-header > .q-btn {
-    grid-column: 1 / -1;
-    width: 100%;
+  .portfolio-kpis {
+    grid-template-columns: 1fr;
   }
   .portfolio-actions,
   .portfolio-management-actions {

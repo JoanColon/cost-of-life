@@ -42,6 +42,26 @@
               maxlength="80"
             />
           </div>
+          <div v-if="isDividendIncome" class="dialog-field">
+            <label>{{ t('income.form.linkPortfolio') }}</label>
+            <q-select
+              v-model="linkedPortfolioId"
+              outlined
+              clearable
+              :dense="$q.screen.lt.sm"
+              emit-value
+              map-options
+              :options="portfolioOptions"
+              :hint="
+                portfolioOptions.length
+                  ? t('income.form.linkPortfolioHint')
+                  : t('income.form.noPortfolios')
+              "
+              @update:model-value="applyLinkedPortfolio"
+            >
+              <template #prepend><q-icon name="account_balance_wallet" /></template>
+            </q-select>
+          </div>
           <div class="dialog-field">
             <label>{{ t('income.form.notes') }}</label>
             <q-input
@@ -64,6 +84,7 @@
               type="radio"
               color="primary"
               :options="calculationModeOptions"
+              :disable="Boolean(linkedPortfolioId)"
               @update:model-value="changeCalculationMode"
             />
             <q-select
@@ -75,6 +96,7 @@
               emit-value
               map-options
               :options="calculationModeOptions"
+              :disable="Boolean(linkedPortfolioId)"
               @update:model-value="changeCalculationMode"
             />
           </div>
@@ -92,6 +114,7 @@
                   min="0"
                   step="0.01"
                   :prefix="currencySymbol"
+                  :disable="Boolean(linkedPortfolioId)"
                   :rules="[moneyRule]"
                 />
               </div>
@@ -210,6 +233,7 @@
                   min="0"
                   step="0.01"
                   :prefix="currencySymbol"
+                  :disable="Boolean(linkedPortfolioId)"
                   :rules="[moneyRule]"
                 />
               </div>
@@ -223,6 +247,7 @@
                   emit-value
                   map-options
                   :options="frequencyOptions"
+                  :disable="Boolean(linkedPortfolioId)"
                 />
               </div>
             </div>
@@ -326,6 +351,7 @@ const props = defineProps({
   income: { type: Object, default: null },
   defaults: { type: Object, default: null },
   members: { type: Array, required: true },
+  portfolios: { type: Array, default: () => [] },
   saving: { type: Boolean, default: false },
 })
 const emit = defineEmits(['save', 'cancel', 'delete'])
@@ -345,6 +371,7 @@ const oneTimeMonth = ref('january')
 const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const lastAnnualValue = ref(0)
+const linkedPortfolioId = ref(null)
 
 const subcategoryOptions = computed(() =>
   props.category.subcategories.map((value) => ({ value, label: t(`income.subtypes.${value}`) })),
@@ -360,6 +387,19 @@ const frequencyOptions = computed(() =>
 )
 const monthOptions = computed(() =>
   incomeMonths.map((value) => ({ value, label: t(`income.months.${value}`) })),
+)
+const isDividendIncome = computed(
+  () => props.category.id === 'investments' && subcategoryId.value === 'dividends',
+)
+const portfolioOptions = computed(() =>
+  props.portfolios.map((portfolio) => ({
+    label: portfolio.itemName,
+    value: portfolio.id,
+    disable: !Number.isFinite(Number(portfolio.annualDividendIncome)),
+  })),
+)
+const linkedPortfolio = computed(
+  () => props.portfolios.find((portfolio) => portfolio.id === linkedPortfolioId.value) || null,
 )
 const calculation = computed(() => {
   if (calculationMode.value === 'annual_salary')
@@ -385,6 +425,7 @@ const formValid = computed(
     Boolean(subcategoryId.value) &&
     Boolean(itemName.value.trim()) &&
     Boolean(normalizedCalculation.value) &&
+    (!linkedPortfolioId.value || Boolean(linkedPortfolio.value)) &&
     ownershipValid.value,
 )
 const breakdown = computed(() => incomeCalculationBreakdown(calculation.value))
@@ -394,12 +435,16 @@ watch(breakdown, (value) => {
   if (value) lastAnnualValue.value = value.annualValue
 })
 watch(() => [props.income, props.defaults, props.category.id], reset, { immediate: true })
+watch(subcategoryId, (value) => {
+  if (value !== 'dividends') linkedPortfolioId.value = null
+})
 
 function reset() {
   const initial = props.income || props.defaults
   subcategoryId.value = initial?.subcategoryId || props.category.subcategories[0]
   itemName.value = initial?.itemName || ''
   notes.value = initial?.notes || ''
+  linkedPortfolioId.value = initial?.portfolioAssetId || null
   ownership.value = initial?.ownership
     ? cloneOwnership(initial.ownership)
     : createEqualOwnership(props.members.map((member) => member.id))
@@ -408,6 +453,19 @@ function reset() {
     props.members.map((member) => member.id),
   )
   setCalculation(initial?.calculation || defaultCalculation(props.category.calculationModes[0], 0))
+  if (linkedPortfolioId.value) applyLinkedPortfolio(linkedPortfolioId.value)
+}
+
+function applyLinkedPortfolio(portfolioId) {
+  if (!portfolioId) return
+  const portfolio = props.portfolios.find((candidate) => candidate.id === portfolioId)
+  const annualDividendIncome = normalizeNonNegativeMoney(portfolio?.annualDividendIncome)
+  if (!portfolio || annualDividendIncome === null) return
+
+  calculationMode.value = 'recurring'
+  recurringAmount.value = annualDividendIncome
+  frequency.value = 'yearly'
+  lastAnnualValue.value = annualDividendIncome
 }
 
 function setCalculation(value) {
@@ -464,6 +522,7 @@ function submit() {
     notes: notes.value.trim(),
     calculation: normalizedCalculation.value,
     ownership: cloneOwnership(ownership.value),
+    portfolioAssetId: isDividendIncome.value ? linkedPortfolioId.value : null,
   })
 }
 </script>
