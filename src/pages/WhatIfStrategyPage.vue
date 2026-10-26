@@ -288,33 +288,30 @@
               <div class="projection-heading">
                 <div>
                   <h2>{{ t('whatIf.strategy.investmentStrategy') }}</h2>
-                  <p>{{ t('whatIf.strategy.projectedValueDescription') }}</p>
                 </div>
                 <div class="projection-controls">
-                  <div class="horizon-options">
+                  <div class="horizon-options desktop-horizon-options">
                     <button
                       v-for="years in [10, 20, 30]"
                       :key="years"
                       type="button"
                       :class="{ selected: activeScenario.horizonYears === years }"
+                      :aria-label="`${years} ${t('whatIf.years')}`"
                       @click="updateScenario({ horizonYears: years })"
                     >
-                      {{ years }} years
+                      {{ years }}<span class="horizon-unit"> years</span>
                     </button>
                     <button
                       type="button"
                       :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                      :aria-label="t('whatIf.reduction.custom')"
                       @click="setCustomHorizon"
                     >
-                      {{
-                        [10, 20, 30].includes(activeScenario.horizonYears)
-                          ? t('whatIf.reduction.custom')
-                          : `${activeScenario.horizonYears} years`
-                      }}
+                      {{ t('whatIf.reduction.custom') }}
                     </button>
                   </div>
                   <div
-                    class="projection-view-switch"
+                    class="projection-view-switch desktop-view-switch"
                     role="group"
                     :aria-label="t('whatIf.strategy.chartView.label')"
                   >
@@ -337,11 +334,35 @@
                   </div>
                 </div>
               </div>
-              <div class="projected-total">
-                <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
-                <span>{{
-                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-                }}</span>
+              <div class="projection-result-row">
+                <div class="projected-total">
+                  <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
+                  <span>{{
+                    t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
+                  }}</span>
+                </div>
+                <div
+                  class="projection-view-switch mobile-view-switch"
+                  role="group"
+                  :aria-label="t('whatIf.strategy.chartView.label')"
+                >
+                  <button
+                    type="button"
+                    :class="{ selected: projectionChartMode === 'total' }"
+                    :aria-pressed="projectionChartMode === 'total'"
+                    @click="projectionChartMode = 'total'"
+                  >
+                    {{ t('whatIf.strategy.chartView.total') }}
+                  </button>
+                  <button
+                    type="button"
+                    :class="{ selected: projectionChartMode === 'breakdown' }"
+                    :aria-pressed="projectionChartMode === 'breakdown'"
+                    @click="projectionChartMode = 'breakdown'"
+                  >
+                    {{ t('whatIf.strategy.chartView.breakdown') }}
+                  </button>
+                </div>
               </div>
               <StrategyProjectionChart
                 :strategy-points="investmentProjectionPoints"
@@ -1331,15 +1352,16 @@ h1 {
 }
 .mix-row {
   display: grid;
-  grid-template-columns: auto minmax(5.5rem, 1fr) auto 5.6rem 7rem 1rem;
+  grid-template-columns: auto minmax(4rem, 1fr) 5rem 4.75rem 6.4rem 1.5rem;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
   padding: 0.4rem 0;
   border-bottom: 1px solid var(--color-line);
   font-size: 0.72rem;
 }
 .mix-row .mini-icon {
   grid-column: 1;
+  grid-row: 1;
   width: 1.8rem;
   height: 1.8rem;
   font-size: 0.9rem;
@@ -1351,17 +1373,20 @@ h1 {
 }
 .mix-identity > strong {
   grid-column: 2;
+  grid-row: 1;
 }
 .compact-stepper {
   grid-column: 3;
-  grid-template-columns: 1.5rem 2.5rem 1.5rem;
+  grid-row: 1;
+  grid-template-columns: 1.35rem 2.3rem 1.35rem;
 }
 .compact-stepper button {
   height: 1.5rem;
 }
 .return-input {
   grid-column: 4;
-  width: 5.6rem;
+  grid-row: 1;
+  width: 100%;
 }
 .return-control > small,
 .allocation-control > small {
@@ -1369,11 +1394,14 @@ h1 {
 }
 .mix-amount {
   grid-column: 5;
+  grid-row: 1;
   text-align: right;
   font-weight: 700;
+  white-space: nowrap;
 }
 .remove-mix {
   grid-column: 6;
+  grid-row: 1;
   display: grid;
   place-items: center;
   border: 0;
@@ -1598,6 +1626,12 @@ h1 {
   color: white;
   box-shadow: 0 2px 8px rgb(24 43 68 / 12%);
 }
+.mobile-view-switch {
+  display: none;
+}
+.projection-result-row {
+  display: contents;
+}
 .horizon-options button:focus-visible,
 .projection-view-switch button:focus-visible {
   @include focus-ring;
@@ -1605,10 +1639,10 @@ h1 {
 .projected-total {
   display: grid;
   grid-template-rows: auto auto;
-  justify-content: end;
+  justify-content: start;
   gap: 0 1.25rem;
   margin: 0.65rem 0 0.1rem;
-  text-align: right;
+  text-align: left;
 }
 .projected-total strong {
   grid-column: 1;
@@ -1799,6 +1833,7 @@ h1 {
   .mix-row .mini-icon {
     grid-area: icon;
     grid-column: auto;
+    grid-row: auto;
   }
   .mix-identity {
     display: grid;
@@ -1809,6 +1844,7 @@ h1 {
   .mix-identity > strong,
   .mix-amount {
     grid-column: auto;
+    grid-row: auto;
     text-align: left;
   }
   .mix-amount strong {
@@ -1828,10 +1864,12 @@ h1 {
   }
   .allocation-control .compact-stepper {
     grid-column: auto;
+    grid-row: auto;
   }
   .mix-row .remove-mix {
     grid-area: remove;
     grid-column: auto;
+    grid-row: auto;
     justify-self: end;
     width: 1.5rem;
     height: 1.5rem;
@@ -1854,6 +1892,7 @@ h1 {
   }
   .return-input {
     grid-column: auto;
+    grid-row: auto;
     width: 100%;
   }
   .mix-footer {
@@ -1875,14 +1914,52 @@ h1 {
   }
   .projection-heading {
     display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'copy horizon';
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .projection-heading > div:first-child {
+    grid-area: copy;
   }
   .projection-controls {
-    justify-self: start;
-    justify-content: flex-start;
+    display: contents;
+  }
+  .desktop-view-switch {
+    display: none;
+  }
+  .desktop-horizon-options {
+    display: flex;
+    grid-area: horizon;
+    justify-self: end;
+    padding: 0.15rem;
+  }
+  .desktop-horizon-options button {
+    min-width: 0;
+    height: 1.6rem;
+    padding: 0.15rem 0.3rem;
+  }
+  .horizon-unit {
+    display: none;
+  }
+  .projection-result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .mobile-view-switch {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .mobile-view-switch button {
+    min-width: 0;
+    padding: 0.38rem 0.45rem;
   }
   .projected-total {
     justify-content: start;
-    margin: 0.8rem 0 0;
+    margin: 0;
     text-align: left;
   }
   .result-breakdown {

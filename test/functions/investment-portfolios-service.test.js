@@ -98,13 +98,10 @@ describe('investment portfolio service', () => {
       },
     })
     const fetchSpreadsheet = vi.fn(async (url) => {
-      const range = url.searchParams.get('range')
       const body =
-        range === 'B4'
-          ? googleVisualizationResponse(['EUR'])
-          : range === 'B6:B7'
-            ? googleVisualizationResponse([27693.16, 682.47])
-            : 'Ticker,Annual dividend (base)\r\nVWCE,"550,00"\r\nKO,"132,47"'
+        url.searchParams.get('sheet') === 'Summary'
+          ? summaryCsv('EUR', '€27.693,16', '€682,47')
+          : 'Ticker,Annual dividend (base)\r\nVWCE,"550,00"\r\nKO,"132,47"'
       return { ok: true, text: async () => body }
     })
     const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
@@ -132,16 +129,17 @@ describe('investment portfolio service', () => {
     })
 
     const requestedUrls = fetchSpreadsheet.mock.calls.map(([url]) => url)
-    expect(requestedUrls).toHaveLength(3)
+    expect(requestedUrls).toHaveLength(2)
     expect(requestedUrls[0].hostname).toBe('docs.google.com')
     expect(requestedUrls[0].pathname).toBe('/spreadsheets/d/sheet_123/gviz/tq')
     expect(requestedUrls[0].searchParams.get('sheet')).toBe('Portfolio')
     expect(requestedUrls[1].searchParams.get('sheet')).toBe('Summary')
-    expect(requestedUrls[1].searchParams.get('range')).toBe('B4')
-    expect(requestedUrls[2].searchParams.get('range')).toBe('B6:B7')
-    expect(writes.at(-1)).toMatchObject({
-      path: 'workspaces/workspace-a/modelAssets/investment-a',
-      data: {
+    expect(requestedUrls[1].searchParams.has('range')).toBe(false)
+    expect(requestedUrls[1].searchParams.get('tqx')).toBe('out:csv')
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        path: 'workspaces/workspace-a/modelAssets/investment-a',
+        data: expect.objectContaining({
         currentValue: 27693.16,
         'detail.portfolio.summary': {
           baseCurrency: 'EUR',
@@ -150,9 +148,16 @@ describe('investment portfolio service', () => {
           annualDividendIncome: 682.47,
           syncedAt: expect.anything(),
         },
+        'detail.portfolio.snapshot': expect.objectContaining({
+          schemaVersion: 1,
+          sheet: 'Portfolio',
+          rowsJson: expect.stringContaining('VWCE'),
+          summary: expect.objectContaining({ totalPortfolioValue: 27693.16 }),
+        }),
         updatedBy: 'member-a',
-      },
-    })
+        }),
+      }),
+    )
     expect(rebuildProjection).toHaveBeenCalledWith(
       firestore,
       'workspace-a',
@@ -203,13 +208,10 @@ describe('investment portfolio service', () => {
     })
     const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
     const fetchSpreadsheet = vi.fn(async (url) => {
-      const range = url.searchParams.get('range')
       const body =
-        range === 'B4'
-          ? googleVisualizationResponse(['EUR'])
-          : range === 'B6:B7'
-            ? googleVisualizationResponse([30000, 700])
-            : 'Ticker,Annual dividend (base)\r\nVWCE,720'
+        url.searchParams.get('sheet') === 'Summary'
+          ? summaryCsv('EUR', '30,000.00', '700.00')
+          : 'Ticker,Annual dividend (base)\r\nVWCE,720'
       return { ok: true, text: async () => body }
     })
 
@@ -248,9 +250,100 @@ describe('investment portfolio service', () => {
       readInvestmentPortfolioSheet(
         firestore,
         { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-        async () => ({ ok: false }),
+        async () => ({ ok: false, status: 403 }),
       ),
-    ).rejects.toThrow('The Google Sheet could not be read')
+    ).rejects.toThrow('The Portfolio tab returned HTTP 403')
+  })
+
+  it('retries the complete Google Sheets read after a transient failure', async () => {
+    const { firestore } = createFirestore({
+      portfolio: {
+        source: 'google_sheets',
+        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
+      },
+    })
+    const fetchSpreadsheet = vi.fn(async (url) => {
+      if (fetchSpreadsheet.mock.calls.length === 1) throw new Error('temporary failure')
+      return {
+        ok: true,
+        text: async () =>
+          url.searchParams.get('sheet') === 'Summary'
+            ? summaryCsv('EUR', '1,000.00', '20.00')
+            : 'Ticker,Annual dividend (base)\r\nVWCE,25',
+      }
+    })
+
+    await expect(
+      readInvestmentPortfolioSheet(
+        firestore,
+        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
+        fetchSpreadsheet,
+        vi.fn(),
+      ),
+    ).resolves.toMatchObject({ summary: { totalPortfolioValue: 1000 } })
+    expect(fetchSpreadsheet).toHaveBeenCalledTimes(4)
+  })
+
+  it('reads localized values from the complete Summary tab by label', async () => {
+    const { firestore } = createFirestore({
+      portfolio: {
+        source: 'google_sheets',
+        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
+      },
+    })
+    const fetchSpreadsheet = vi.fn(async (url) => ({
+      ok: true,
+      text: async () =>
+        url.searchParams.get('sheet') === 'Summary'
+          ? summaryCsv('EUR', '27.693,16 €', '682,47 €', 'Portfolio 2026')
+          : 'Ticker,Annual dividend (base)\r\nVWCE,"682,47"',
+    }))
+
+    await expect(
+      readInvestmentPortfolioSheet(
+        firestore,
+        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
+        fetchSpreadsheet,
+        vi.fn(),
+      ),
+    ).resolves.toMatchObject({
+      summary: {
+        baseCurrency: 'EUR',
+        totalPortfolioValue: 27693.16,
+        totalDividendsReceived: 682.47,
+      },
+    })
+  })
+
+  it('accepts a currency symbol and the shorter Currency label', async () => {
+    const { firestore } = createFirestore({
+      portfolio: {
+        source: 'google_sheets',
+        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
+      },
+    })
+    const fetchSpreadsheet = vi.fn(async (url) => ({
+      ok: true,
+      text: async () =>
+        url.searchParams.get('sheet') === 'Summary'
+          ? summaryCsv('€', '27.693,16 €', '682,47 €').replace('Base currency', 'Currency')
+          : 'Ticker,Annual dividend (base)\r\nVWCE,"682,47"',
+    }))
+
+    await expect(
+      readInvestmentPortfolioSheet(
+        firestore,
+        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
+        fetchSpreadsheet,
+        vi.fn(),
+      ),
+    ).resolves.toMatchObject({
+      summary: {
+        baseCurrency: 'EUR',
+        totalPortfolioValue: 27693.16,
+        totalDividendsReceived: 682.47,
+      },
+    })
   })
 })
 
@@ -339,4 +432,15 @@ function googleVisualizationResponse(values) {
     status: 'ok',
     table: { rows: values.map((value) => ({ c: [{ v: value }] })) },
   })});`
+}
+
+function summaryCsv(currency, totalPortfolioValue, totalDividendsReceived, name = 'My portfolio') {
+  return [
+    '"Cost of Life — Investment Sheet settings",""',
+    '"","Value"',
+    `"Base currency","${currency}"`,
+    `"Portfolio name","${name}"`,
+    `"Total Portofolio Value","${totalPortfolioValue}"`,
+    `"Total dividends received","${totalDividendsReceived}"`,
+  ].join('\r\n')
 }

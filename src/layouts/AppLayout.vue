@@ -13,29 +13,6 @@
         <div class="mini-mark">C</div>
         <q-toolbar-title class="app-title">Cost of Life</q-toolbar-title>
 
-        <q-select
-          v-if="workspaceStore.hasWorkspaces"
-          :model-value="activeWorkspaceId"
-          :options="workspaceOptions"
-          :display-value="activeWorkspace?.name || t('navigation.selectWorkspace')"
-          emit-value
-          map-options
-          dense
-          borderless
-          options-dense
-          class="workspace-selector"
-          :aria-label="t('navigation.switchWorkspace')"
-          @update:model-value="handleWorkspaceSelection"
-        >
-          <template #prepend><q-icon name="workspaces_outline" size="1.15rem" /></template>
-          <template #option="scope">
-            <q-item v-bind="scope.itemProps">
-              <q-item-section avatar><q-icon :name="scope.opt.icon" /></q-item-section>
-              <q-item-section>{{ scope.opt.label }}</q-item-section>
-            </q-item>
-          </template>
-        </q-select>
-
         <MemberScopeSelector
           v-if="routeWorkspaceId && members.length"
           v-model="selectedMemberId"
@@ -186,9 +163,6 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
-const MANAGE_WORKSPACES_OPTION = '__manage-workspaces__'
-const CREATE_WORKSPACE_OPTION = '__create-workspace__'
-
 const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
@@ -209,23 +183,6 @@ const loggingOut = ref(false)
 const financialPeriodKey = ref(currentPeriodKey())
 const expandedNavigationNodes = ref(['your-money'])
 let periodTimer = null
-const workspaceOptions = computed(() => [
-  ...workspaceStore.workspaces.map((workspace) => ({
-    label: workspace.name,
-    value: workspace.id,
-    icon: isSharedWorkspace(workspace) ? 'group' : 'person_outline',
-  })),
-  {
-    label: t('navigation.manageWorkspaces'),
-    value: MANAGE_WORKSPACES_OPTION,
-    icon: 'settings',
-  },
-  {
-    label: t('navigation.createWorkspace'),
-    value: CREATE_WORKSPACE_OPTION,
-    icon: 'add_business',
-  },
-])
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace)
 const members = computed(() => getWorkspaceMembers(activeWorkspace.value, authUser.value))
@@ -340,22 +297,6 @@ async function loadWorkspaces(force = false) {
   }
 }
 
-async function handleWorkspaceSelection(value) {
-  if (value === MANAGE_WORKSPACES_OPTION) {
-    closeMobileDrawer()
-    await router.push({ name: 'home', query: { manage: '1' } })
-    return
-  }
-
-  if (value === CREATE_WORKSPACE_OPTION) {
-    closeMobileDrawer()
-    await router.push({ name: 'create-workspace' })
-    return
-  }
-
-  await switchWorkspace(value)
-}
-
 async function switchWorkspace(workspaceId) {
   if (!(await workspaceStore.setActiveWorkspace(workspaceId))) return
 
@@ -464,15 +405,9 @@ function currentPeriodKey() {
   font-size: 1.2rem;
 }
 
-.workspace-selector {
-  flex: 0 1 15rem;
-  min-width: 0;
-  max-width: 15rem;
-  margin-right: 0.5rem;
-}
-
 .layout-member-selector {
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .app-drawer {
@@ -583,13 +518,6 @@ function currentPeriodKey() {
   .mini-mark,
   .app-title {
     display: none;
-  }
-
-  .workspace-selector {
-    flex: 1 1 auto;
-    width: auto;
-    max-width: none;
-    margin: 0;
   }
 
   .layout-member-selector {

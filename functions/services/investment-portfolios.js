@@ -5,6 +5,10 @@ const GOOGLE_SHEETS_HOST = 'docs.google.com'
 const SPREADSHEET_PATH = /^\/spreadsheets(?:\/u\/\d+)?\/d\/([A-Za-z0-9_-]+)(?:\/|$)/
 const PORTFOLIO_SHEET_NAME = 'Portfolio'
 const SUMMARY_SHEET_NAME = 'Summary'
+const SHEET_READ_ATTEMPTS = 2
+const SHEET_RETRY_DELAY_MS = 200
+const GOOGLE_SHEET_TIMEOUT_MS = 25_000
+const MAXIMUM_SNAPSHOT_ROWS_BYTES = 700_000
 
 async function updateInvestmentPortfolio(
   firestore,
@@ -90,44 +94,15 @@ async function readInvestmentPortfolioSheet(
     tqx: 'out:csv',
     sheet: PORTFOLIO_SHEET_NAME,
   })
-  const baseCurrencyUrl = googleSheetQueryUrl(spreadsheetId, {
-    tqx: 'out:json',
+  const summaryUrl = googleSheetQueryUrl(spreadsheetId, {
+    tqx: 'out:csv',
     sheet: SUMMARY_SHEET_NAME,
-    range: 'B4',
-    headers: '0',
-  })
-  const totalsUrl = googleSheetQueryUrl(spreadsheetId, {
-    tqx: 'out:json',
-    sheet: SUMMARY_SHEET_NAME,
-    range: 'B6:B7',
-    headers: '0',
   })
 
-  const [portfolioBody, baseCurrencyBody, totalsBody] = await Promise.all([
-    fetchGoogleSheet(portfolioUrl, fetchImpl, 1_000_000),
-    fetchGoogleSheet(baseCurrencyUrl, fetchImpl),
-    fetchGoogleSheet(totalsUrl, fetchImpl),
-  ])
-  const baseCurrencyValues = parseGoogleVisualizationValues(baseCurrencyBody)
-  const totalValues = parseGoogleVisualizationValues(totalsBody)
-  const portfolioRows = parseCsv(portfolioBody)
-  const summary = {
-    baseCurrency: String(baseCurrencyValues[0] ?? '')
-      .trim()
-      .toUpperCase(),
-    totalPortfolioValue: Number(totalValues[0]),
-    totalDividendsReceived: Number(totalValues[1]),
-    annualDividendIncome: portfolioAnnualDividendIncome(portfolioRows),
-  }
-
-  if (
-    !/^[A-Z]{3}$/.test(summary.baseCurrency) ||
-    !Number.isFinite(summary.totalPortfolioValue) ||
-    !Number.isFinite(summary.totalDividendsReceived) ||
-    !Number.isFinite(summary.annualDividendIncome)
-  ) {
-    throw new Error('The Google Sheet returned an invalid Summary')
-  }
+  const { portfolioRows, summary } = await fetchPortfolioSheetData(
+    { portfolioUrl, summaryUrl },
+    fetchImpl,
+  )
 
   const linkedIncomeSnapshot = await workspaceReference
     .collection('modelIncome')
@@ -138,11 +113,23 @@ async function readInvestmentPortfolioSheet(
     return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
   })
 
+  const rowsJson = JSON.stringify(portfolioRows)
+  if (Buffer.byteLength(rowsJson, 'utf8') > MAXIMUM_SNAPSHOT_ROWS_BYTES) {
+    throw new Error('The Google Sheet is too large to cache safely')
+  }
+
   await Promise.all([
     assetReference.update({
       currentValue: roundMoney(summary.totalPortfolioValue),
       'detail.portfolio.summary': {
         ...summary,
+        syncedAt: FieldValue.serverTimestamp(),
+      },
+      'detail.portfolio.snapshot': {
+        schemaVersion: 1,
+        sheet: PORTFOLIO_SHEET_NAME,
+        rowsJson,
+        summary,
         syncedAt: FieldValue.serverTimestamp(),
       },
       updatedAt: FieldValue.serverTimestamp(),
@@ -233,18 +220,118 @@ function googleSheetQueryUrl(spreadsheetId, parameters) {
   return url
 }
 
-async function fetchGoogleSheet(url, fetchImpl, maximumLength = 100_000) {
+async function fetchGoogleSheet(
+  url,
+  fetchImpl,
+  maximumLength = 100_000,
+  sheetName = 'Google Sheet',
+) {
   let response
   try {
-    response = await fetchImpl(url, { signal: AbortSignal.timeout(10_000) })
+    response = await fetchImpl(url, {
+      signal: AbortSignal.timeout(GOOGLE_SHEET_TIMEOUT_MS),
+      headers: { accept: 'text/plain, text/csv, application/json', 'cache-control': 'no-cache' },
+    })
   } catch {
-    throw new Error('The Google Sheet could not be read')
+    throw new Error(`The ${sheetName} tab timed out`)
   }
-  if (!response.ok) throw new Error('The Google Sheet could not be read')
+  if (!response.ok) throw new Error(`The ${sheetName} tab returned HTTP ${response.status}`)
 
   const body = await response.text()
-  if (body.length > maximumLength) throw new Error('The Google Sheet returned an invalid response')
+  if (body.length > maximumLength) throw new Error(`The ${sheetName} tab is too large`)
   return body
+}
+
+async function fetchPortfolioSheetData(urls, fetchImpl) {
+  let lastError
+
+  for (let attempt = 0; attempt < SHEET_READ_ATTEMPTS; attempt += 1) {
+    try {
+      const [portfolioBody, summaryBody] = await Promise.all([
+        fetchGoogleSheet(urls.portfolioUrl, fetchImpl, 1_000_000, 'Portfolio'),
+        fetchGoogleSheet(urls.summaryUrl, fetchImpl, 100_000, 'Summary'),
+      ])
+      const portfolioRows = parseCsv(portfolioBody)
+      const summaryRows = parseCsv(summaryBody)
+      const summaryValues = summaryValuesByLabel(summaryRows)
+      const summary = {
+        baseCurrency: parseBaseCurrency(
+          summaryValues.baseCurrency,
+          summaryValues.totalPortfolioValue,
+          summaryValues.totalDividendsReceived,
+        ),
+        totalPortfolioValue: parseLocalizedNumber(summaryValues.totalPortfolioValue),
+        totalDividendsReceived: parseLocalizedNumber(summaryValues.totalDividendsReceived),
+        annualDividendIncome: portfolioAnnualDividendIncome(portfolioRows),
+      }
+
+      const invalidFields = []
+      if (!/^[A-Z]{3}$/.test(summary.baseCurrency)) invalidFields.push('base currency')
+      if (!Number.isFinite(summary.totalPortfolioValue)) invalidFields.push('portfolio value')
+      if (!Number.isFinite(summary.totalDividendsReceived)) invalidFields.push('dividends received')
+      if (!Number.isFinite(summary.annualDividendIncome)) invalidFields.push('annual dividends')
+      if (invalidFields.length) {
+        throw new Error(`The Google Sheet returned an invalid Summary: ${invalidFields.join(', ')}`)
+      }
+      return { portfolioRows, summary }
+    } catch (error) {
+      lastError = error
+      if (attempt + 1 < SHEET_READ_ATTEMPTS) await delay(SHEET_RETRY_DELAY_MS)
+    }
+  }
+
+  throw lastError
+}
+
+function summaryValuesByLabel(rows) {
+  const values = {}
+
+  for (const row of rows) {
+    if (!Array.isArray(row)) continue
+    const label = normalizeHeader(row[0])
+    const value = row[1]
+    const labelWords = label.split(' ')
+
+    if (
+      values.baseCurrency === undefined &&
+      ['currency', 'moneda', 'divisa'].some((word) => labelWords.includes(word))
+    ) {
+      values.baseCurrency = value
+    }
+    if (
+      label === 'portfolio value' ||
+      label === 'total portfolio value' ||
+      label === 'total portofolio value'
+    ) {
+      values.totalPortfolioValue = value
+    }
+    if (label === 'dividends received' || label === 'total dividends received') {
+      values.totalDividendsReceived = value
+    }
+  }
+
+  return values
+}
+
+function parseBaseCurrency(...values) {
+  const inputs = values.map((value) => String(value ?? '').trim()).filter(Boolean)
+  for (const input of inputs) {
+    const code = input.toUpperCase().match(/(?:^|[^A-Z])([A-Z]{3})(?:[^A-Z]|$)/)?.[1]
+    if (code) return code
+  }
+
+  const combined = inputs.join(' ')
+  if (combined.includes('€')) return 'EUR'
+  if (combined.includes('£')) return 'GBP'
+  if (combined.includes('₹')) return 'INR'
+  if (combined.includes('₩')) return 'KRW'
+  if (combined.includes('¥')) return 'JPY'
+  if (combined.includes('$')) return 'USD'
+  return ''
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function canonicalGoogleSheetsUrl(value) {

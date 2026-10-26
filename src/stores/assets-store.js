@@ -174,20 +174,31 @@ export const useAssetsStore = defineStore('assets', () => {
     replaceAsset(assetId, { ...asset, detail })
   }
 
-  function applyInvestmentPortfolioSummary(assetId, summary) {
+  function applyInvestmentPortfolioSummary(assetId, summary, snapshot = null) {
     const asset = findLoadedAsset(assetId)
     const totalPortfolioValue = Number(summary?.totalPortfolioValue)
     if (!asset || !Number.isFinite(totalPortfolioValue) || totalPortfolioValue < 0) return
+
+    const portfolio = {
+      ...(asset.detail?.portfolio || {}),
+      summary: { ...summary },
+    }
+    if (snapshot && Array.isArray(snapshot.rows)) {
+      portfolio.snapshot = {
+        schemaVersion: 1,
+        sheet: snapshot.sheet || 'Portfolio',
+        rowsJson: JSON.stringify(snapshot.rows),
+        summary: { ...summary },
+        syncedAt: null,
+      }
+    }
 
     replaceAsset(assetId, {
       ...asset,
       currentValue: Math.round((totalPortfolioValue + Number.EPSILON) * 100) / 100,
       detail: {
         ...(asset.detail || {}),
-        portfolio: {
-          ...(asset.detail?.portfolio || {}),
-          summary: { ...summary },
-        },
+        portfolio,
       },
     })
   }

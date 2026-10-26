@@ -35,3 +35,21 @@ export async function readInvestmentPortfolioSheet(workspaceId, assetId) {
   const result = await readPortfolioSheet({ workspaceId, assetId })
   return result.data
 }
+
+export function investmentPortfolioSnapshot(portfolio) {
+  const data = portfolio?.snapshot
+  if (data?.schemaVersion !== 1 || typeof data?.rowsJson !== 'string') return null
+
+  try {
+    const rows = JSON.parse(data.rowsJson)
+    if (!Array.isArray(rows)) return null
+    return {
+      sheet: data.sheet,
+      rows,
+      summary: data.summary || null,
+      syncedAt: data.syncedAt || null,
+    }
+  } catch {
+    return null
+  }
+}

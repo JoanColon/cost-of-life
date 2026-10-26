@@ -342,6 +342,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  investmentPortfolioSnapshot,
   isGoogleSheetsUrl,
   readInvestmentPortfolioSheet,
 } from '@/services/firebase/investment-portfolios.service'
@@ -545,16 +546,24 @@ async function readSheet() {
   const currentAssetId = assetId.value
   readingSheet.value = true
   sheetError.value = false
+
+  const snapshot = investmentPortfolioSnapshot(portfolio.value)
+  if (snapshot) {
+    portfolioRows.value = snapshot.rows
+    portfolioSummary.value = snapshot.summary
+    assetsStore.applyInvestmentPortfolioSummary(currentAssetId, snapshot.summary)
+    void loadHistory()
+  }
+
   try {
     const result = await readInvestmentPortfolioSheet(currentWorkspaceId, currentAssetId)
     if (currentRead !== sheetReadId) return
     portfolioRows.value = Array.isArray(result.rows) ? result.rows : []
     portfolioSummary.value = result.summary || null
-    assetsStore.applyInvestmentPortfolioSummary(currentAssetId, result.summary)
+    assetsStore.applyInvestmentPortfolioSummary(currentAssetId, result.summary, result)
     void loadHistory()
   } catch {
     if (currentRead !== sheetReadId) return
-    portfolioRows.value = null
     sheetError.value = true
   } finally {
     if (currentRead === sheetReadId) readingSheet.value = false
