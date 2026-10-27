@@ -99,27 +99,27 @@ describe('investment portfolio table', () => {
     expect(formatPercentageValue('79,08%', 1)).toBe('79.1%')
   })
 
-  it('calculates portfolio KPIs from the summary and annual dividends', () => {
-    const metrics = portfolioKpis(
-      [
-        ['Ticker', 'Annual dividend (base)'],
-        ['IBE.MC', '550,00'],
-        ['KO', '132,47'],
-      ],
-      { baseCurrency: 'EUR', totalPortfolioValue: 27693.16 },
-    )
+  it('calculates portfolio KPIs exclusively from the Summary values', () => {
+    const metrics = portfolioKpis({
+      baseCurrency: 'EUR',
+      totalPortfolioValue: 27693.16,
+      totalDividendsReceived: 800,
+      annualDividendIncome: 600,
+    })
 
     expect(metrics).toEqual({
       totalPortfolioValue: '€27,693',
-      annualDividendIncome: '€682',
-      dividendYield: '2.5%',
+      annualDividendIncome: '€600',
+      grossDividendIncome: '€800',
+      dividendYield: '2.2%',
     })
   })
 
   it('uses placeholders when KPI source values are unavailable', () => {
-    expect(portfolioKpis(null)).toEqual({
+    expect(portfolioKpis()).toEqual({
       totalPortfolioValue: '—',
       annualDividendIncome: '—',
+      grossDividendIncome: '—',
       dividendYield: '—',
     })
   })

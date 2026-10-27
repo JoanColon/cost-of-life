@@ -50,6 +50,11 @@ const routes = [
         component: () => import('@/pages/LiabilitiesPage.vue'),
       },
       {
+        path: 'workspaces/:workspaceId/liabilities/mortgage/:liabilityId/model',
+        name: 'mortgage-detail',
+        component: () => import('@/pages/MortgageDetailPage.vue'),
+      },
+      {
         path: 'workspaces/:workspaceId/liabilities/:category',
         name: 'liability-category',
         component: () => import('@/pages/LiabilityCategoryPage.vue'),

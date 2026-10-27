@@ -5,7 +5,6 @@ const {
   canonicalGoogleSheetsUrl,
   parseCsv,
   parseGoogleVisualizationValues,
-  portfolioAnnualDividendIncome,
   readInvestmentPortfolioSheet,
   updateInvestmentPortfolio,
 } = investmentPortfolioService
@@ -100,7 +99,7 @@ describe('investment portfolio service', () => {
     const fetchSpreadsheet = vi.fn(async (url) => {
       const body =
         url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('EUR', '€27.693,16', '€682,47')
+          ? summaryCsv('EUR', '€27.693,16', '€800,00', '€682,47')
           : 'Ticker,Annual dividend (base)\r\nVWCE,"550,00"\r\nKO,"132,47"'
       return { ok: true, text: async () => body }
     })
@@ -123,7 +122,7 @@ describe('investment portfolio service', () => {
       summary: {
         baseCurrency: 'EUR',
         totalPortfolioValue: 27693.16,
-        totalDividendsReceived: 682.47,
+        totalDividendsReceived: 800,
         annualDividendIncome: 682.47,
       },
     })
@@ -144,7 +143,7 @@ describe('investment portfolio service', () => {
         'detail.portfolio.summary': {
           baseCurrency: 'EUR',
           totalPortfolioValue: 27693.16,
-          totalDividendsReceived: 682.47,
+          totalDividendsReceived: 800,
           annualDividendIncome: 682.47,
           syncedAt: expect.anything(),
         },
@@ -181,17 +180,7 @@ describe('investment portfolio service', () => {
     ).toEqual([27693.16, 682.47])
   })
 
-  it('sums annual dividends using localized sheet values', () => {
-    expect(
-      portfolioAnnualDividendIncome([
-        ['Ticker', 'Annual dividend (base)'],
-        ['IBE.MC', '550,00'],
-        ['KO', '132.47'],
-      ]),
-    ).toBe(682.47)
-  })
-
-  it('updates income linked to the portfolio when annual dividends change', async () => {
+  it('updates linked income with the net dividends from the Summary tab', async () => {
     const { firestore, writes } = createFirestore({
       portfolio: {
         source: 'google_sheets',
@@ -210,7 +199,7 @@ describe('investment portfolio service', () => {
     const fetchSpreadsheet = vi.fn(async (url) => {
       const body =
         url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('EUR', '30,000.00', '700.00')
+          ? summaryCsv('EUR', '30,000.00', '900.00', '700.00')
           : 'Ticker,Annual dividend (base)\r\nVWCE,720'
       return { ok: true, text: async () => body }
     })
@@ -226,7 +215,7 @@ describe('investment portfolio service', () => {
       expect.objectContaining({
         path: 'workspaces/workspace-a/modelIncome/dividends-a',
         data: expect.objectContaining({
-          calculation: { mode: 'recurring', amount: 720, frequency: 'yearly' },
+          calculation: { mode: 'recurring', amount: 700, frequency: 'yearly' },
         }),
       }),
     )
@@ -268,7 +257,7 @@ describe('investment portfolio service', () => {
         ok: true,
         text: async () =>
           url.searchParams.get('sheet') === 'Summary'
-            ? summaryCsv('EUR', '1,000.00', '20.00')
+            ? summaryCsv('EUR', '1,000.00', '25.00', '20.00')
             : 'Ticker,Annual dividend (base)\r\nVWCE,25',
       }
     })
@@ -295,7 +284,7 @@ describe('investment portfolio service', () => {
       ok: true,
       text: async () =>
         url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('EUR', '27.693,16 €', '682,47 €', 'Portfolio 2026')
+          ? summaryCsv('EUR', '27.693,16 €', '800,00 €', '682,47 €', 'Portfolio 2026')
           : 'Ticker,Annual dividend (base)\r\nVWCE,"682,47"',
     }))
 
@@ -310,7 +299,8 @@ describe('investment portfolio service', () => {
       summary: {
         baseCurrency: 'EUR',
         totalPortfolioValue: 27693.16,
-        totalDividendsReceived: 682.47,
+        totalDividendsReceived: 800,
+        annualDividendIncome: 682.47,
       },
     })
   })
@@ -326,7 +316,10 @@ describe('investment portfolio service', () => {
       ok: true,
       text: async () =>
         url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('€', '27.693,16 €', '682,47 €').replace('Base currency', 'Currency')
+          ? summaryCsv('€', '27.693,16 €', '800,00 €', '682,47 €').replace(
+              'Base currency',
+              'Currency',
+            )
           : 'Ticker,Annual dividend (base)\r\nVWCE,"682,47"',
     }))
 
@@ -341,7 +334,8 @@ describe('investment portfolio service', () => {
       summary: {
         baseCurrency: 'EUR',
         totalPortfolioValue: 27693.16,
-        totalDividendsReceived: 682.47,
+        totalDividendsReceived: 800,
+        annualDividendIncome: 682.47,
       },
     })
   })
@@ -434,7 +428,13 @@ function googleVisualizationResponse(values) {
   })});`
 }
 
-function summaryCsv(currency, totalPortfolioValue, totalDividendsReceived, name = 'My portfolio') {
+function summaryCsv(
+  currency,
+  totalPortfolioValue,
+  totalDividendsReceived,
+  netDividendsReceived,
+  name = 'My portfolio',
+) {
   return [
     '"Cost of Life — Investment Sheet settings",""',
     '"","Value"',
@@ -442,5 +442,7 @@ function summaryCsv(currency, totalPortfolioValue, totalDividendsReceived, name 
     `"Portfolio name","${name}"`,
     `"Total Portofolio Value","${totalPortfolioValue}"`,
     `"Total dividends received","${totalDividendsReceived}"`,
+    '"Average % of taxes","20%"',
+    `"Net dividends received","${netDividendsReceived}"`,
   ].join('\r\n')
 }

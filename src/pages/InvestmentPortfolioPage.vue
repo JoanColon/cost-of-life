@@ -153,7 +153,13 @@
                   <span>{{ t('assets.portfolio.kpis.annualIncome') }}</span>
                 </div>
                 <strong>{{ portfolioMetrics.annualDividendIncome }}</strong>
-                <small>{{ t('assets.portfolio.kpis.annualIncomeDescription') }}</small>
+                <small>
+                  {{
+                    t('assets.portfolio.kpis.grossIncome', {
+                      value: portfolioMetrics.grossDividendIncome,
+                    })
+                  }}
+                </small>
               </article>
 
               <article class="portfolio-kpi">
@@ -401,9 +407,7 @@ const activePortfolioSummary = computed(
   () => portfolioSummary.value || portfolio.value?.summary || {},
 )
 const mobileTable = computed(() => $q.screen.lt.sm)
-const portfolioMetrics = computed(() =>
-  portfolioKpis(portfolioRows.value, activePortfolioSummary.value),
-)
+const portfolioMetrics = computed(() => portfolioKpis(activePortfolioSummary.value))
 const portfolioHistoryPoints = computed(() =>
   buildAssetAnnualSeries(historyDocuments.value, { assetId: assetId.value }),
 )

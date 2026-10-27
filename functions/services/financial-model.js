@@ -217,6 +217,12 @@ function validatedCanonicalItem(section, item = {}) {
     assertCanonicalText(item.itemName, 'A liability name is required')
     assertCanonicalTextField(item.notes, 'Canonical liability notes are required')
     assertNonNegativeMoney(item.balance, 'A non-negative balance is required')
+    if (item.categoryId === 'mortgage' && item.detail != null) {
+      if (!isPlainObject(item.detail) || Object.keys(item.detail).some((key) => key !== 'mortgage')) {
+        throw new Error('A canonical mortgage detail is required')
+      }
+      assertCanonicalMortgage(item.detail.mortgage, item.balance)
+    }
     return cleanItem({ ...item, categoryId: category })
   }
 
@@ -241,6 +247,54 @@ function validatedCanonicalItem(section, item = {}) {
   }
 
   return canonicalExpense(item, category)
+}
+
+function assertCanonicalMortgage(mortgage, currentBalance) {
+  if (!isPlainObject(mortgage) || mortgage.schemaVersion !== 1) {
+    throw new Error('A canonical mortgage model is required')
+  }
+  assertNonNegativeMoney(mortgage.originalPrincipal, 'A valid original principal is required')
+  assertNonNegativeMoney(mortgage.monthlyPayment, 'A valid monthly payment is required')
+  if (mortgage.monthlyPayment <= 0) throw new Error('A valid monthly payment is required')
+  if (
+    typeof mortgage.annualInterestRate !== 'number' ||
+    !Number.isFinite(mortgage.annualInterestRate) ||
+    mortgage.annualInterestRate < 0 ||
+    mortgage.annualInterestRate > 100
+  ) {
+    throw new Error('A valid annual interest rate is required')
+  }
+  if (
+    !Number.isInteger(mortgage.termMonths) ||
+    mortgage.termMonths <= 0 ||
+    mortgage.termMonths > 1_200
+  ) {
+    throw new Error('A valid mortgage term is required')
+  }
+  if (!isCanonicalIsoDate(mortgage.startDate)) {
+    throw new Error('A valid mortgage start date is required')
+  }
+  if (mortgage.amortizationType !== 'french' || mortgage.fixedRate !== true) {
+    throw new Error('Only fixed-rate French amortization is supported')
+  }
+  if (currentBalance > mortgage.originalPrincipal) {
+    throw new Error('The current balance cannot exceed the original principal')
+  }
+  const monthlyInterest = roundMoney(currentBalance * (mortgage.annualInterestRate / 100 / 12))
+  if (currentBalance > 0 && mortgage.monthlyPayment <= monthlyInterest) {
+    throw new Error('The monthly payment must cover the accrued interest')
+  }
+}
+
+function isCanonicalIsoDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return false
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  return (
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() === Number(match[2]) - 1 &&
+    date.getUTCDate() === Number(match[3])
+  )
 }
 
 function canonicalExpense(item, category) {

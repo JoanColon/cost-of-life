@@ -154,21 +154,6 @@ async function readInvestmentPortfolioSheet(
   return { sheet: PORTFOLIO_SHEET_NAME, rows: portfolioRows, summary }
 }
 
-function portfolioAnnualDividendIncome(rows) {
-  if (!Array.isArray(rows) || rows.length < 2) return 0
-  const headers = rows[0].map(normalizeHeader)
-  const matchedIndex = headers.findIndex(
-    (header) => header === 'annual dividend base' || header.endsWith(' annual dividend base'),
-  )
-  const columnIndex = matchedIndex >= 0 ? matchedIndex : 18
-  return roundMoney(
-    rows.slice(1).reduce((total, row) => {
-      const value = parseLocalizedNumber(Array.isArray(row) ? row[columnIndex] : null)
-      return value === null ? total : total + value
-    }, 0),
-  )
-}
-
 function parseLocalizedNumber(value) {
   const input = String(value ?? '')
     .trim()
@@ -262,7 +247,7 @@ async function fetchPortfolioSheetData(urls, fetchImpl) {
         ),
         totalPortfolioValue: parseLocalizedNumber(summaryValues.totalPortfolioValue),
         totalDividendsReceived: parseLocalizedNumber(summaryValues.totalDividendsReceived),
-        annualDividendIncome: portfolioAnnualDividendIncome(portfolioRows),
+        annualDividendIncome: parseLocalizedNumber(summaryValues.netDividendsReceived),
       }
 
       const invalidFields = []
@@ -307,6 +292,9 @@ function summaryValuesByLabel(rows) {
     }
     if (label === 'dividends received' || label === 'total dividends received') {
       values.totalDividendsReceived = value
+    }
+    if (label === 'net dividends received') {
+      values.netDividendsReceived = value
     }
   }
 
@@ -441,7 +429,6 @@ module.exports = {
   canonicalGoogleSheetsUrl,
   parseCsv,
   parseGoogleVisualizationValues,
-  portfolioAnnualDividendIncome,
   readInvestmentPortfolioSheet,
   updateInvestmentPortfolio,
 }

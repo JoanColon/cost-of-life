@@ -92,6 +92,52 @@ describe('financial model service payloads', () => {
     )
   })
 
+  it('canonicalizes mortgage Layer 3 details', async () => {
+    await updateLiability(
+      'workspace-a',
+      'mortgage-a',
+      {
+        categoryId: 'mortgage',
+        subcategoryId: 'mortgage',
+        itemName: 'Home loan',
+        notes: '',
+        balance: 146_230,
+        ownership,
+        detail: {
+          mortgage: {
+            originalPrincipal: '220000',
+            annualInterestRate: '2.41',
+            monthlyPayment: '812',
+            startDate: '2013-03-01',
+            termMonths: '360',
+          },
+        },
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'liabilities',
+      'mortgage-a',
+      expect.objectContaining({
+        balance: 146_230,
+        detail: {
+          mortgage: {
+            schemaVersion: 1,
+            originalPrincipal: 220_000,
+            annualInterestRate: 2.41,
+            monthlyPayment: 812,
+            startDate: '2013-03-01',
+            termMonths: 360,
+            amortizationType: 'french',
+            fixedRate: true,
+          },
+        },
+      }),
+    )
+  })
+
   it('canonicalizes income before updating it', async () => {
     await updateIncome(
       'workspace-a',

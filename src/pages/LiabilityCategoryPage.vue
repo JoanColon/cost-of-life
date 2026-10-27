@@ -79,10 +79,15 @@
                     ><q-item-section avatar><q-icon name="edit" /></q-item-section
                     ><q-item-section>{{ t('liabilities.editDetails') }}</q-item-section></q-item
                   >
-                  <q-item clickable
-                    ><q-item-section avatar><q-icon name="account_tree" /></q-item-section
-                    ><q-item-section>{{ t('liabilities.model') }}</q-item-section></q-item
+                  <q-item
+                    v-if="categoryId === 'mortgage'"
+                    clickable
+                    v-close-popup
+                    @click="openModel(liability)"
                   >
+                    <q-item-section avatar><q-icon name="account_tree" /></q-item-section>
+                    <q-item-section>{{ t('liabilities.model') }}</q-item-section>
+                  </q-item>
                   <q-item
                     clickable
                     v-close-popup
@@ -304,6 +309,12 @@ function add() {
 function edit(liability) {
   editingLiability.value = liability
   liabilityDialog.value = true
+}
+function openModel(liability) {
+  router.push({
+    name: 'mortgage-detail',
+    params: { workspaceId: workspaceId.value, liabilityId: liability.id },
+  })
 }
 function closeLiabilityDialog() {
   liabilityDialog.value = false

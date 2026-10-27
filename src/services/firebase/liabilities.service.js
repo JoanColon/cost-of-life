@@ -79,7 +79,7 @@ function canonicalLiability(liability) {
   if (balance === null) throw new Error('A non-negative balance is required')
   const itemName = String(liability.itemName || '').trim()
   if (!itemName) throw new Error('A liability name is required')
-  return {
+  const canonical = {
     categoryId: category.id,
     subcategoryId: liability.subcategoryId,
     itemName,
@@ -87,4 +87,49 @@ function canonicalLiability(liability) {
     balance,
     ownership: cloneOwnership(liability.ownership),
   }
+  if (category.id === 'mortgage' && liability.detail?.mortgage) {
+    canonical.detail = { mortgage: canonicalMortgageDetail(liability.detail.mortgage) }
+  }
+  return canonical
+}
+
+function canonicalMortgageDetail(mortgage) {
+  const originalPrincipal = normalizeNonNegativeMoney(mortgage.originalPrincipal)
+  const monthlyPayment = normalizeNonNegativeMoney(mortgage.monthlyPayment)
+  const annualInterestRate = Number(mortgage.annualInterestRate)
+  const termMonths = Number(mortgage.termMonths)
+  const startDate = String(mortgage.startDate || '').trim()
+  if (originalPrincipal === null) throw new Error('A valid original principal is required')
+  if (monthlyPayment === null || monthlyPayment <= 0) {
+    throw new Error('A valid monthly payment is required')
+  }
+  if (!Number.isFinite(annualInterestRate) || annualInterestRate < 0 || annualInterestRate > 100) {
+    throw new Error('A valid annual interest rate is required')
+  }
+  if (!Number.isInteger(termMonths) || termMonths <= 0 || termMonths > 1_200) {
+    throw new Error('A valid mortgage term is required')
+  }
+  if (!isIsoDate(startDate)) throw new Error('A valid mortgage start date is required')
+
+  return {
+    schemaVersion: 1,
+    originalPrincipal,
+    annualInterestRate,
+    monthlyPayment,
+    startDate,
+    termMonths,
+    amortizationType: 'french',
+    fixedRate: true,
+  }
+}
+
+function isIsoDate(value) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return false
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  return (
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() === Number(match[2]) - 1 &&
+    date.getUTCDate() === Number(match[3])
+  )
 }

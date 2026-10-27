@@ -107,6 +107,51 @@ describe('atomic financial model mutations', () => {
     }
   })
 
+  it('stores mortgage Layer 3 details while projecting the root balance', async () => {
+    const item = {
+      categoryId: 'mortgage',
+      subcategoryId: 'mortgage',
+      itemName: 'Home mortgage',
+      notes: '',
+      balance: 146_230,
+      ownership,
+      detail: {
+        mortgage: {
+          schemaVersion: 1,
+          originalPrincipal: 220_000,
+          annualInterestRate: 2.41,
+          monthlyPayment: 812,
+          startDate: '2013-03-01',
+          termMonths: 360,
+          amortizationType: 'french',
+          fixedRate: true,
+        },
+      },
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'liabilities',
+      collection: 'modelLiabilities',
+      category: 'mortgage',
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'liabilities',
+      operation: 'create',
+      item,
+    })
+
+    expect(result.liability.detail.mortgage).toMatchObject({
+      originalPrincipal: 220_000,
+      amortizationType: 'french',
+    })
+    const financialYearWrite = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    )
+    expect(financialYearValue(financialYearWrite.data, 'liabilities')).toBe(146_230)
+  })
+
   it('rejects ownership that references someone outside the workspace', async () => {
     const { firestore, writes } = createFirestore({
       section: 'assets',

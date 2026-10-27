@@ -48,22 +48,11 @@ export function portfolioTableRows(sheetRows, baseCurrency = '') {
   }, [])
 }
 
-export function portfolioKpis(sheetRows, summary = {}) {
+export function portfolioKpis(summary = {}) {
   const baseCurrency = String(summary?.baseCurrency || '').trim()
   const totalPortfolioValue = parseLocalizedNumber(summary?.totalPortfolioValue)
-  let annualDividendIncome = null
-
-  if (Array.isArray(sheetRows) && sheetRows.length >= 2) {
-    const { annualDividendBase } = portfolioColumnIndexes(sheetRows[0])
-    const dividendValues = sheetRows
-      .slice(1)
-      .map((row) => parseLocalizedNumber(Array.isArray(row) ? row[annualDividendBase] : null))
-      .filter((value) => value !== null)
-
-    if (dividendValues.length) {
-      annualDividendIncome = dividendValues.reduce((total, value) => total + value, 0)
-    }
-  }
+  const grossDividendIncome = parseLocalizedNumber(summary?.totalDividendsReceived)
+  const annualDividendIncome = parseLocalizedNumber(summary?.annualDividendIncome)
 
   const dividendYield =
     totalPortfolioValue !== null && totalPortfolioValue > 0 && annualDividendIncome !== null
@@ -79,6 +68,10 @@ export function portfolioKpis(sheetRows, summary = {}) {
       annualDividendIncome === null
         ? '—'
         : formatCurrencyValue(annualDividendIncome, baseCurrency, 0),
+    grossDividendIncome:
+      grossDividendIncome === null
+        ? '—'
+        : formatCurrencyValue(grossDividendIncome, baseCurrency, 0),
     dividendYield: dividendYield === null ? '—' : formatPercentageValue(dividendYield, 1),
   }
 }
