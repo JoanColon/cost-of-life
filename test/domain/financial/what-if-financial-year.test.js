@@ -18,12 +18,16 @@ describe('What If financial-year selectors', () => {
       '01': {
         income: {
           categories: {
-            employment: {
+            investments: {
               subcategories: {
-                salary: {
+                dividends: {
                   ...item(1_000),
                   items: { primary: item(1_000, { disposablePercentage: 80 }) },
                 },
+              },
+            },
+            employment: {
+              subcategories: {
                 bonus: { ...item(200), items: { annual: item(200) } },
               },
             },

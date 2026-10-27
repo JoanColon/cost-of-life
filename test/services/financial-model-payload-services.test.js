@@ -135,6 +135,7 @@ describe('financial model service payloads', () => {
         itemName: 'Broker dividends',
         notes: '',
         calculation: { mode: 'recurring', amount: '682.47', frequency: 'yearly' },
+        disposablePercentage: 65,
         portfolioAssetId: 'portfolio-a',
         ownership,
       },
@@ -147,8 +148,33 @@ describe('financial model service payloads', () => {
       'income-a',
       expect.objectContaining({
         portfolioAssetId: 'portfolio-a',
+        disposablePercentage: 65,
         calculation: { mode: 'recurring', amount: 682.47, frequency: 'yearly' },
       }),
+    )
+  })
+
+  it('ignores an available-income percentage outside dividend income', async () => {
+    await updateIncome(
+      'workspace-a',
+      'income-a',
+      {
+        categoryId: 'employment',
+        subcategoryId: 'salary',
+        itemName: 'Salary',
+        notes: '',
+        calculation: { mode: 'annual_salary', annualAmount: 42000, paymentsPerYear: 12 },
+        disposablePercentage: 25,
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'income',
+      'income-a',
+      expect.objectContaining({ disposablePercentage: 100 }),
     )
   })
 

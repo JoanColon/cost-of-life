@@ -174,8 +174,9 @@
         </div>
       </template>
 
-      <q-dialog v-model="infoDialogOpen">
-        <q-card v-if="selectedInfoFamily" class="family-info-dialog">
+      <q-dialog v-model="infoDialogOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+        <q-card v-if="selectedInfoFamily" class="family-info-dialog responsive-info-card">
+          <span class="info-sheet-handle" aria-hidden="true" />
           <q-card-section class="family-info-heading">
             <span class="family-icon" :class="`family-info-icon--${selectedInfoFamily.id}`">
               <q-icon :name="selectedInfoFamily.icon" />

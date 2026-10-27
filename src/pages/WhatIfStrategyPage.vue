@@ -273,7 +273,16 @@
                   additional repayments</small
                 >
                 <p class="info-note">
-                  <q-icon name="info" />{{ t('whatIf.strategy.debtDisclaimer') }}
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    size="sm"
+                    icon="info"
+                    :aria-label="t('whatIf.strategy.debtInfoAction')"
+                    @click="debtInfoDialogOpen = true"
+                  />
+                  <span>{{ t('whatIf.strategy.debtDisclaimer') }}</span>
                 </p>
               </section>
             </div>
@@ -425,8 +434,22 @@
       </template>
     </main>
 
-    <q-dialog v-model="freedomInfoDialogOpen">
-      <q-card class="freedom-info-dialog">
+    <q-dialog v-model="debtInfoDialogOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="app-info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
+        <q-card-section class="app-info-heading">
+          <h2>{{ t('whatIf.strategy.debtInfoTitle') }}</h2>
+          <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
+        </q-card-section>
+        <q-card-section class="app-info-copy">
+          <p>{{ t('whatIf.strategy.debtDisclaimer') }}</p>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="freedomInfoDialogOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="freedom-info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
         <q-card-section class="freedom-info-heading">
           <span class="mini-icon freedom"><q-icon name="flight_takeoff" /></span>
           <h2>{{ t('whatIf.strategy.freedomInfoTitle') }}</h2>
@@ -602,6 +625,7 @@ const whatIfStore = useWhatIfStore()
 const workspaceStore = useWorkspaceStore()
 const pageError = ref(null)
 const freedomInfoDialogOpen = ref(false)
+const debtInfoDialogOpen = ref(false)
 const investmentTypeDialogOpen = ref(false)
 const pendingInvestmentType = ref(null)
 const initialScenarioDialogOpen = ref(false)
@@ -1560,6 +1584,13 @@ h1 {
   background: var(--color-blue-soft);
   color: var(--color-copy);
   font-size: 0.65rem;
+}
+.info-note .q-btn {
+  flex: 0 0 auto;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  margin: -0.25rem 0 0 -0.25rem;
+  color: var(--color-copy);
 }
 .projection-panel {
   grid-area: projection;

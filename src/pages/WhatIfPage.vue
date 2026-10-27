@@ -45,7 +45,15 @@
               <div class="spending-label">
                 <span class="desktop-label">{{ t('whatIf.discretionary.reduceTitle') }}</span>
                 <span class="mobile-label">{{ t('whatIf.discretionary.title') }}</span>
-                <q-icon name="info_outline" />
+                <q-btn
+                  flat
+                  round
+                  dense
+                  size="sm"
+                  icon="info_outline"
+                  :aria-label="t('whatIf.discretionary.infoAction')"
+                  @click="discretionaryInfoOpen = true"
+                />
               </div>
               <strong
                 >{{ formatCurrency(simulation.monthlyDiscretionary)
@@ -98,7 +106,15 @@
           </div>
 
           <p v-if="unclassifiedMonthly > 0" class="notice">
-            <q-icon name="info_outline" />
+            <q-btn
+              flat
+              round
+              dense
+              size="sm"
+              icon="info_outline"
+              :aria-label="t('whatIf.discretionary.unclassifiedAction')"
+              @click="unclassifiedInfoOpen = true"
+            />
             {{
               t('whatIf.discretionary.unclassified', {
                 amount: formatCurrency(unclassifiedMonthly),
@@ -221,6 +237,38 @@
       </template>
     </main>
 
+    <q-dialog v-model="discretionaryInfoOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="app-info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
+        <q-card-section class="app-info-heading">
+          <h2>{{ t('whatIf.discretionary.infoTitle') }}</h2>
+          <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
+        </q-card-section>
+        <q-card-section class="app-info-copy">
+          <p>{{ t('whatIf.discretionary.description') }}</p>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="unclassifiedInfoOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="app-info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
+        <q-card-section class="app-info-heading">
+          <h2>{{ t('whatIf.discretionary.unclassifiedTitle') }}</h2>
+          <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
+        </q-card-section>
+        <q-card-section class="app-info-copy">
+          <p>
+            {{
+              t('whatIf.discretionary.unclassified', {
+                amount: formatCurrency(unclassifiedMonthly),
+              })
+            }}
+          </p>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="customReductionOpen">
       <q-card class="custom-card">
         <q-card-section>
@@ -291,6 +339,8 @@ const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
 const workspaceStore = useWorkspaceStore()
 const customReductionOpen = ref(false)
+const discretionaryInfoOpen = ref(false)
+const unclassifiedInfoOpen = ref(false)
 const customReduction = ref(0)
 const pageError = ref(null)
 const reductionOptions = [0, 10, 25, 50]
@@ -578,9 +628,14 @@ h1 {
   color: var(--color-ink);
 }
 
-.spending-label .q-icon,
+.spending-label .q-btn,
 .spending-summary small {
   color: var(--color-copy);
+}
+
+.spending-label .q-btn {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
 }
 
 .spending-summary strong {
@@ -676,6 +731,14 @@ h1 {
   margin: 0.8rem 0 0;
   color: var(--color-copy);
   font-size: 0.85rem;
+}
+
+.notice .q-btn {
+  flex: 0 0 auto;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  margin: -0.25rem 0 0 -0.25rem;
+  color: var(--color-copy);
 }
 
 .break-even {

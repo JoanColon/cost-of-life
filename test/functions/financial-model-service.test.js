@@ -358,6 +358,39 @@ describe('atomic financial model mutations', () => {
     expect(writes).toEqual([])
   })
 
+  it('uses the available percentage of dividend income in the financial year', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'income',
+      collection: 'modelIncome',
+      category: 'investments',
+      configCategory: { enabled: true },
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'income',
+      operation: 'create',
+      item: {
+        categoryId: 'investments',
+        subcategoryId: 'dividends',
+        itemName: 'Broker dividends',
+        notes: '',
+        calculation: { mode: 'recurring', amount: 1000, frequency: 'yearly' },
+        disposablePercentage: 60,
+        portfolioAssetId: null,
+        ownership,
+      },
+    })
+
+    expect(result.income.disposablePercentage).toBe(60)
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'income')).toBe(1000)
+    expect(financialYearValue(financialYear, 'savings')).toBe(600)
+  })
+
   it('preserves a simple expense entry while rebuilding the financial year', async () => {
     const { firestore, writes } = createFirestore({
       section: 'expenses',

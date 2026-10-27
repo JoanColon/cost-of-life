@@ -220,8 +220,9 @@
       </template>
     </main>
 
-    <q-dialog v-model="infoOpen">
-      <q-card class="info-dialog">
+    <q-dialog v-model="infoOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
         <q-btn flat round dense icon="close" class="dialog-close" v-close-popup />
         <q-card-section>
           <h2>{{ t('plan.info.title') }}</h2>

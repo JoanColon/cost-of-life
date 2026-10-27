@@ -39,28 +39,40 @@
           </div>
         </header>
         <section class="total-card">
-          <div class="total-copy">
-            <span>{{ t('income.totalIncome') }}</span>
-            <strong>{{ formatCurrency(displayedTotal) }}</strong>
+          <div class="total-card-heading">
+            <span>{{ t('income.availableIncome') }}</span>
+            <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
+              <button
+                type="button"
+                :class="{ selected: period === 'annual' }"
+                :aria-pressed="period === 'annual'"
+                @click="period = 'annual'"
+              >
+                {{ t('dashboard.costOfLife.annual') }}
+              </button>
+              <button
+                type="button"
+                :class="{ selected: period === 'monthly' }"
+                :aria-pressed="period === 'monthly'"
+                @click="period = 'monthly'"
+              >
+                {{ t('dashboard.costOfLife.monthly') }}
+              </button>
+            </div>
+          </div>
+          <div class="available-income-main">
+            <strong>{{ formatCurrency(displayedAvailableIncome) }}</strong>
             <small>{{ displayedPeriodLabel }} · {{ scopeLabel }}</small>
           </div>
-          <div class="period-switch" role="group" :aria-label="t('dashboard.costOfLife.period')">
-            <button
-              type="button"
-              :class="{ selected: period === 'annual' }"
-              :aria-pressed="period === 'annual'"
-              @click="period = 'annual'"
-            >
-              {{ t('dashboard.costOfLife.annual') }}
-            </button>
-            <button
-              type="button"
-              :class="{ selected: period === 'monthly' }"
-              :aria-pressed="period === 'monthly'"
-              @click="period = 'monthly'"
-            >
-              {{ t('dashboard.costOfLife.monthly') }}
-            </button>
+          <div class="income-breakdown">
+            <div>
+              <span>{{ t('income.totalIncome') }}</span>
+              <strong>{{ formatCurrency(displayedTotal) }}</strong>
+            </div>
+            <div>
+              <span>{{ t('income.reinvestedIncome') }}</span>
+              <strong>{{ formatCurrency(displayedReinvestedIncome) }}</strong>
+            </div>
           </div>
         </section>
         <section class="category-list" :aria-label="t('income.enabledCategories')">
@@ -211,6 +223,7 @@ import IncomeCategorySetup from '@/components/income/IncomeCategorySetup.vue'
 import { incomeCategories } from '@/config/income-categories'
 import {
   currentFinancialYear,
+  financialYearAvailableIncomeValue,
   financialYearCategoryValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
@@ -274,7 +287,16 @@ const pageLoading = computed(
 const total = computed(() =>
   financialYearValue(financialYear.value, 'income', selectedMemberId.value),
 )
+const availableIncome = computed(() =>
+  financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
+)
 const displayedTotal = computed(() => (period.value === 'annual' ? total.value : total.value / 12))
+const displayedAvailableIncome = computed(() =>
+  period.value === 'annual' ? availableIncome.value : availableIncome.value / 12,
+)
+const displayedReinvestedIncome = computed(() =>
+  Math.max(0, displayedTotal.value - displayedAvailableIncome.value),
+)
 const displayedPeriodLabel = computed(() =>
   period.value === 'annual'
     ? t('dashboard.costOfLife.perYear')
@@ -471,23 +493,49 @@ h1 {
   @include financial-title;
 }
 .total-card {
-  @include financial-total-card(flex);
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 2rem;
+  @include financial-total-card;
+  min-height: 0;
+  padding: 1.15rem 1.5rem;
 }
-.total-copy {
-  display: grid;
+.total-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 .total-card span,
 .total-card small {
   @include financial-total-secondary;
 }
-.total-card strong {
+.available-income-main {
+  display: grid;
+  width: fit-content;
+  margin-top: 0.25rem;
+}
+.available-income-main > strong {
   @include financial-total-value;
 }
 .total-card small {
   @include financial-total-meta;
+}
+.income-breakdown {
+  display: flex;
+  gap: 2.5rem;
+  width: fit-content;
+  min-width: min(100%, 26rem);
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgb(255 255 255 / 18%);
+}
+.income-breakdown > div {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1rem;
+  align-items: baseline;
+}
+.income-breakdown strong {
+  color: var(--color-inverse);
+  font-size: 1rem;
 }
 .period-switch {
   @include financial-period-switch;
@@ -584,14 +632,24 @@ h1 {
     display: none;
   }
   .total-card {
-    align-items: center;
-    gap: 0.75rem;
+    gap: 0;
+    padding: 0.8rem 1rem;
   }
   .period-switch {
     width: 8.25rem;
   }
   .period-switch button {
     flex: 1;
+  }
+  .income-breakdown {
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    min-width: 0;
+  }
+  .income-breakdown > div {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
   }
   .category-actions :deep(.q-btn) {
     width: 100%;

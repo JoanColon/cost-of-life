@@ -234,7 +234,10 @@ function validatedCanonicalItem(section, item = {}) {
       }
       assertCanonicalText(item.portfolioAssetId, 'A valid linked portfolio is required')
     }
-    return cleanItem({ ...item, categoryId: category, disposablePercentage: 100 })
+    const isDividendIncome = category === 'investments' && item.subcategoryId === 'dividends'
+    const disposablePercentage = isDividendIncome ? item.disposablePercentage ?? 100 : 100
+    assertPercentage(disposablePercentage, 'A valid available-income percentage is required')
+    return cleanItem({ ...item, categoryId: category, disposablePercentage })
   }
 
   return canonicalExpense(item, category)
@@ -424,6 +427,12 @@ function assertNonNegativeMoney(value, message) {
     value < 0 ||
     roundMoney(value) !== value
   ) {
+    throw new Error(message)
+  }
+}
+
+function assertPercentage(value, message) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
     throw new Error(message)
   }
 }

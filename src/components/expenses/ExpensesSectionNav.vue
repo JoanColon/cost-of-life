@@ -24,8 +24,9 @@
       </router-link>
     </nav>
 
-    <q-dialog v-model="infoOpen">
-      <q-card class="expenses-info-dialog">
+    <q-dialog v-model="infoOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="expenses-info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
         <q-card-section class="info-heading">
           <h2>{{ t('expenses.views.info.title') }}</h2>
           <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />

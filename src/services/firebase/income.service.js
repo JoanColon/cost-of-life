@@ -1,7 +1,10 @@
 import { collection, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 import { getIncomeCategory, getIncomeSubcategory } from '@/config/income-categories'
-import { normalizeIncomeCalculation } from '@/domain/financial/income-calculations'
+import {
+  normalizeDisposablePercentage,
+  normalizeIncomeCalculation,
+} from '@/domain/financial/income-calculations'
 import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
@@ -109,17 +112,21 @@ function normalizeIncomeItem(income) {
   if (!calculation || !category.calculationModes.includes(calculation.mode)) {
     throw new Error('A valid income calculation is required')
   }
+  const isDividendIncome = category.id === 'investments' && subcategory.id === 'dividends'
+  const disposablePercentage = isDividendIncome
+    ? normalizeDisposablePercentage(income.disposablePercentage, 100)
+    : 100
+  if (disposablePercentage === null) {
+    throw new Error('A valid available-income percentage is required')
+  }
   const normalized = {
     categoryId: category.id,
     subcategoryId: subcategory.id,
     itemName,
     notes: String(income.notes || '').trim(),
     calculation,
-    disposablePercentage: 100,
-    portfolioAssetId:
-      category.id === 'investments' && subcategory.id === 'dividends'
-        ? normalizeOptionalId(income.portfolioAssetId)
-        : null,
+    disposablePercentage,
+    portfolioAssetId: isDividendIncome ? normalizeOptionalId(income.portfolioAssetId) : null,
   }
   if (income.entryMode === 'simple' || income.entryMode === 'detailed') {
     normalized.entryMode = income.entryMode

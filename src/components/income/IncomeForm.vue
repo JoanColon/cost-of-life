@@ -62,6 +62,34 @@
               <template #prepend><q-icon name="account_balance_wallet" /></template>
             </q-select>
           </div>
+          <div v-if="isDividendIncome" class="dialog-field dividend-reinvestment-field">
+            <div class="reinvestment-label">
+              <span>{{ t('income.form.dividendReinvestment') }}</span>
+              <q-btn
+                flat
+                round
+                dense
+                type="button"
+                icon="info_outline"
+                class="reinvestment-info-button"
+                :aria-label="t('income.form.dividendReinvestmentHint')"
+                @click="reinvestmentInfoOpen = true"
+              />
+            </div>
+            <div class="reinvestment-selector">
+              <q-slider
+                v-model="dividendReinvestmentPercentage"
+                :min="0"
+                :max="100"
+                :step="5"
+                color="primary"
+                label
+                :label-value="`${dividendReinvestmentPercentage}%`"
+                :aria-label="t('income.form.dividendReinvestment')"
+              />
+              <strong>{{ dividendReinvestmentPercentage }}%</strong>
+            </div>
+          </div>
           <div class="dialog-field">
             <label>{{ t('income.form.notes') }}</label>
             <q-input
@@ -325,6 +353,22 @@
         </div>
       </q-card-actions>
     </q-form>
+
+    <q-dialog v-model="reinvestmentInfoOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="reinvestment-info-card responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
+        <q-card-section>
+          <div class="reinvestment-info-heading">
+            <h2>{{ t('income.form.dividendReinvestmentInfoTitle') }}</h2>
+            <q-btn flat round dense icon="close" :aria-label="t('common.close')" v-close-popup />
+          </div>
+          <p>{{ t('income.form.dividendReinvestmentHint') }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn unelevated no-caps color="primary" :label="t('common.close')" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-card>
 </template>
 
@@ -335,6 +379,7 @@ import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
   incomeMonths,
   incomeCalculationBreakdown,
+  normalizeDisposablePercentage,
   normalizeIncomeCalculation,
   recurringIncomeFrequencies,
 } from '@/domain/financial/income-calculations'
@@ -372,6 +417,8 @@ const ownership = ref(createEqualOwnership(props.members.map((member) => member.
 const ownershipValid = ref(true)
 const lastAnnualValue = ref(0)
 const linkedPortfolioId = ref(null)
+const dividendReinvestmentPercentage = ref(0)
+const reinvestmentInfoOpen = ref(false)
 
 const subcategoryOptions = computed(() =>
   props.category.subcategories.map((value) => ({ value, label: t(`income.subtypes.${value}`) })),
@@ -445,6 +492,8 @@ function reset() {
   itemName.value = initial?.itemName || ''
   notes.value = initial?.notes || ''
   linkedPortfolioId.value = initial?.portfolioAssetId || null
+  const disposablePercentage = normalizeDisposablePercentage(initial?.disposablePercentage, 100)
+  dividendReinvestmentPercentage.value = 100 - (disposablePercentage ?? 100)
   ownership.value = initial?.ownership
     ? cloneOwnership(initial.ownership)
     : createEqualOwnership(props.members.map((member) => member.id))
@@ -522,6 +571,7 @@ function submit() {
     notes: notes.value.trim(),
     calculation: normalizedCalculation.value,
     ownership: cloneOwnership(ownership.value),
+    disposablePercentage: isDividendIncome.value ? 100 - dividendReinvestmentPercentage.value : 100,
     portfolioAssetId: isDividendIncome.value ? linkedPortfolioId.value : null,
   })
 }
@@ -554,6 +604,75 @@ function submit() {
 .dialog-field {
   @include financial-dialog-field;
   margin-bottom: 0;
+}
+
+.reinvestment-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-copy);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.reinvestment-info-button {
+  color: var(--color-copy);
+  font-size: 0.75rem;
+}
+
+.reinvestment-selector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-button);
+}
+
+.reinvestment-selector strong {
+  text-align: right;
+}
+
+.reinvestment-info-card {
+  width: min(28rem, calc(100vw - 2rem));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-dialog);
+}
+
+.reinvestment-info-card > .q-card__section {
+  padding: 1.5rem 1.75rem 1rem;
+}
+
+.reinvestment-info-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reinvestment-info-heading h2,
+.reinvestment-info-card p {
+  margin: 0;
+}
+
+.reinvestment-info-heading h2 {
+  color: var(--color-ink);
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.reinvestment-info-card p {
+  margin-top: 0.75rem;
+  color: var(--color-copy);
+  line-height: 1.55;
+}
+
+.reinvestment-info-card > .q-card__actions {
+  padding: 0.5rem 1.75rem 1.5rem;
 }
 
 .calculation-method :deep(.q-option-group) {
@@ -621,6 +740,29 @@ function submit() {
 .form-actions {
   @include financial-dialog-actions;
 }
+
+@media (max-width: 599px) {
+  .reinvestment-info-card {
+    width: 100vw;
+    max-width: none;
+    border-width: 1px 0 0;
+    border-radius: 1.8rem 1.8rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .reinvestment-info-card > .q-card__section {
+    padding: 1rem 1.25rem 0.75rem;
+  }
+
+  .reinvestment-info-card > .q-card__actions {
+    padding: 0.5rem 1.25rem 1rem;
+  }
+
+  .reinvestment-info-card > .q-card__actions .q-btn {
+    width: 100%;
+  }
+}
+
 @media (max-width: 520px) {
   .calculation-method :deep(.q-option-group) {
     min-height: 2.75rem;

@@ -64,6 +64,61 @@ button:not(.q-btn--round),
   right: 0.75rem;
 }
 
+.info-sheet-handle {
+  display: none;
+}
+
+.app-info-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.app-info-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+.app-info-heading h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.app-info-copy {
+  padding-top: 0.5rem;
+  color: var(--color-copy);
+  line-height: 1.55;
+}
+
+.app-info-copy p {
+  margin: 0;
+}
+
+@media (max-width: 599px) {
+  .q-dialog__inner--bottom > .q-card.responsive-info-card {
+    width: 100vw !important;
+    max-width: none !important;
+    max-height: min(92dvh, 52rem);
+    border-width: 1px 0 0;
+    border-radius: 1.8rem 1.8rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .responsive-info-card .info-sheet-handle {
+    display: block;
+    width: 3.25rem;
+    height: 0.32rem;
+    margin: 0.75rem auto 0;
+    border-radius: 999px;
+    background: var(--color-line-strong);
+  }
+}
+
 ::selection {
   background: var(--color-primary-focus);
 }
