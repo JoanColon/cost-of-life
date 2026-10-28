@@ -2,7 +2,7 @@ import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase/firebase'
 
 const updatePortfolio = httpsCallable(functions, 'updateInvestmentPortfolio')
-const readPortfolioSheet = httpsCallable(functions, 'readInvestmentPortfolioSheet')
+const syncPortfolioSheet = httpsCallable(functions, 'readInvestmentPortfolioSheet')
 const spreadsheetPath = /^\/spreadsheets(?:\/u\/\d+)?\/d\/[A-Za-z0-9_-]+(?:\/|$)/
 
 export function isGoogleSheetsUrl(value) {
@@ -31,25 +31,21 @@ export async function disconnectInvestmentPortfolio(workspaceId, assetId) {
   return result.data
 }
 
-export async function readInvestmentPortfolioSheet(workspaceId, assetId) {
-  const result = await readPortfolioSheet({ workspaceId, assetId })
+export async function syncInvestmentPortfolio(workspaceId, assetId, force = false) {
+  const result = await syncPortfolioSheet({ workspaceId, assetId, force })
   return result.data
 }
 
-export function investmentPortfolioSnapshot(portfolio) {
-  const data = portfolio?.snapshot
-  if (data?.schemaVersion !== 1 || typeof data?.rowsJson !== 'string') return null
+export function investmentPortfolioCache(portfolio) {
+  const cache = portfolio?.cache
+  if (portfolio?.schemaVersion !== 1 || cache?.schemaVersion !== 1) return null
+  if (!Array.isArray(cache.holdings) || !portfolio?.summary) return null
+  return { summary: portfolio.summary, ...cache }
+}
 
-  try {
-    const rows = JSON.parse(data.rowsJson)
-    if (!Array.isArray(rows)) return null
-    return {
-      sheet: data.sheet,
-      rows,
-      summary: data.summary || null,
-      syncedAt: data.syncedAt || null,
-    }
-  } catch {
-    return null
-  }
+export function investmentPortfolioCacheIsFresh(portfolio, now = Date.now()) {
+  const cache = investmentPortfolioCache(portfolio)
+  return Boolean(
+    cache && !portfolio?.sync?.financialProjectionDirty && Number(cache.refreshAfter) > Number(now),
+  )
 }

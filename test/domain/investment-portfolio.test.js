@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  changeTone,
   countryFlag,
   formatCurrencyValue,
   formatPercentageValue,
@@ -15,53 +14,22 @@ describe('investment portfolio table', () => {
     expect(countryFlag('Spain')).toBe('')
   })
 
-  it('maps the requested columns from a Google Sheets response', () => {
+  it('formats normalized holdings without knowing the Google Sheets columns', () => {
     const rows = portfolioTableRows(
       [
-        [
-          'DividnedData Ticker',
-          'Name',
-          'Country',
-          'Sector',
-          'Industry',
-          'Currency',
-          'Shares',
-          'Price (local)',
-          'Day Change %',
-          'Cost basis (local)',
-          'Avg buy cost / share (local)',
-          'Avg cost / share (local FIFO)',
-          'Return %',
-          'Dividend (local)',
-          'Dividend yield (local)',
-          'FX to base',
-          'Market value (base)',
-          'Portfolio %',
-          'Annual dividend (base)',
-          'Income %',
-        ],
-        [
-          'IBE.MC',
-          'Iberdrola',
-          'ES',
-          'Utilities',
-          '',
-          'EUR',
-          '1000',
-          '21,9',
-          '0,74%',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '2,51%',
-          '1,00',
-          '21900',
-          '81,52%',
-          '550,00',
-          '82,89%',
-        ],
+        {
+          ticker: 'IBE.MC',
+          country: 'ES',
+          currency: 'EUR',
+          shares: 1000,
+          priceLocal: 21.9,
+          dayChangePercent: 0.74,
+          dividendYieldPercent: 2.51,
+          marketValueBase: 21900,
+          portfolioWeightPercent: 81.52,
+          annualDividendBase: 550,
+          incomeWeightPercent: 82.89,
+        },
       ],
       'EUR',
     )
@@ -75,6 +43,7 @@ describe('investment portfolio table', () => {
         shares: '1,000',
         priceLocal: '€21.90',
         dayChange: '0.74%',
+        dayChangeTone: 'positive',
         dividendYield: '2.51%',
         marketValueBase: '€21,900',
         portfolioWeight: '81.5%',
@@ -84,19 +53,20 @@ describe('investment portfolio table', () => {
     ])
   })
 
-  it('ignores empty rows and classifies daily changes', () => {
-    expect(portfolioTableRows([['Ticker'], ['', '']])).toEqual([])
-    expect(changeTone('-1,25%')).toBe('negative')
-    expect(changeTone('0,74%')).toBe('positive')
-    expect(changeTone('0%')).toBe('neutral')
-    expect(changeTone('')).toBe('neutral')
+  it('uses placeholders for unavailable normalized holding values', () => {
+    expect(portfolioTableRows(null)).toEqual([])
+    expect(portfolioTableRows([{ ticker: 'VWCE', dayChangePercent: null }])[0]).toMatchObject({
+      ticker: 'VWCE',
+      dayChange: '',
+      dayChangeTone: 'neutral',
+    })
   })
 
-  it('formats localized currency and percentage values consistently', () => {
-    expect(formatCurrencyValue('5.793,2', 'EUR', 0)).toBe('€5,793')
-    expect(formatCurrencyValue('92,71', 'USD', 2)).toBe('$92.71')
-    expect(formatCurrencyValue('', 'EUR', 0)).toBe('')
-    expect(formatPercentageValue('79,08%', 1)).toBe('79.1%')
+  it('formats canonical numeric currency and percentage values consistently', () => {
+    expect(formatCurrencyValue(5793.2, 'EUR', 0)).toBe('€5,793')
+    expect(formatCurrencyValue(92.71, 'USD', 2)).toBe('$92.71')
+    expect(formatCurrencyValue(null, 'EUR', 0)).toBe('')
+    expect(formatPercentageValue(79.08, 1)).toBe('79.1%')
   })
 
   it('calculates portfolio KPIs exclusively from the Summary values', () => {

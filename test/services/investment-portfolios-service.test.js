@@ -4,7 +4,8 @@ vi.mock('firebase/functions', () => ({ httpsCallable: vi.fn(() => vi.fn()) }))
 vi.mock('@/firebase/firebase', () => ({ functions: {} }))
 
 import {
-  investmentPortfolioSnapshot,
+  investmentPortfolioCache,
+  investmentPortfolioCacheIsFresh,
   isGoogleSheetsUrl,
 } from '../../src/services/firebase/investment-portfolios.service.js'
 
@@ -23,25 +24,34 @@ describe('investment portfolio client validation', () => {
     expect(isGoogleSheetsUrl('javascript:alert(1)')).toBe(false)
   })
 
-  it('reads and validates a persisted portfolio snapshot', () => {
-    expect(
-      investmentPortfolioSnapshot({
-        snapshot: {
-          schemaVersion: 1,
-          sheet: 'Portfolio',
-          rowsJson: '[["Ticker"],["VWCE"]]',
-          summary: { baseCurrency: 'EUR' },
-        },
-      }),
-    ).toMatchObject({
-      rows: [['Ticker'], ['VWCE']],
+  it('reads a normalized portfolio cache and evaluates its TTL', () => {
+    const portfolio = {
+      schemaVersion: 1,
+      summary: { baseCurrency: 'EUR' },
+      cache: {
+        schemaVersion: 1,
+        holdings: [{ ticker: 'VWCE' }],
+        lastCheckedAt: 100,
+        refreshAfter: 200,
+      },
+      sync: { financialProjectionDirty: false },
+    }
+    expect(investmentPortfolioCache(portfolio)).toMatchObject({
+      holdings: [{ ticker: 'VWCE' }],
       summary: { baseCurrency: 'EUR' },
     })
+    expect(investmentPortfolioCacheIsFresh(portfolio, 199)).toBe(true)
+    expect(investmentPortfolioCacheIsFresh(portfolio, 200)).toBe(false)
   })
 
-  it('ignores an invalid persisted snapshot', () => {
-    expect(
-      investmentPortfolioSnapshot({ snapshot: { schemaVersion: 1, rowsJson: '{invalid' } }),
-    ).toBeNull()
+  it('ignores invalid or financially dirty caches', () => {
+    expect(investmentPortfolioCache({ schemaVersion: 1, cache: { schemaVersion: 1 } })).toBeNull()
+    const dirty = {
+      schemaVersion: 1,
+      summary: {},
+      cache: { schemaVersion: 1, holdings: [], refreshAfter: 200 },
+      sync: { financialProjectionDirty: true },
+    }
+    expect(investmentPortfolioCacheIsFresh(dirty, 100)).toBe(false)
   })
 })

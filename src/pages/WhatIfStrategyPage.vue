@@ -74,10 +74,6 @@
 
         <div class="strategy-layout">
           <div class="configuration-column">
-            <div class="strategy-section-heading setup-heading">
-              <h2>{{ t('whatIf.strategy.setupTitle') }}</h2>
-            </div>
-
             <section class="panel available-panel">
               <div>
                 <span>{{ t('whatIf.strategy.available') }}</span>
@@ -93,7 +89,13 @@
             <section class="panel allocation-panel">
               <div class="panel-heading">
                 <h2>{{ t('whatIf.strategy.allocation') }}</h2>
-                <p>{{ t('whatIf.strategy.allocationDescription') }}</p>
+                <p>
+                  {{
+                    t('whatIf.strategy.allocationDescription', {
+                      amount: formatCurrency(monthlySavings),
+                    })
+                  }}
+                </p>
               </div>
               <div class="allocation-list">
                 <StrategyAllocationRow
@@ -103,8 +105,7 @@
                   :description="t('whatIf.strategy.cashDescription')"
                   :percent="allocation.cash"
                   :amount="monthlyFor(allocation.cash)"
-                  @decrease="adjustAllocation('cash', -5)"
-                  @increase="adjustAllocation('cash', 5)"
+                  @change="setAllocation('cash', $event)"
                 />
                 <StrategyAllocationRow
                   icon="trending_up"
@@ -113,8 +114,7 @@
                   :description="t('whatIf.strategy.investDescription')"
                   :percent="allocation.invest"
                   :amount="monthlyFor(allocation.invest)"
-                  @decrease="adjustAllocation('invest', -5)"
-                  @increase="adjustAllocation('invest', 5)"
+                  @change="setAllocation('invest', $event)"
                 />
                 <StrategyAllocationRow
                   v-if="selectedDebt"
@@ -124,8 +124,7 @@
                   :description="t('whatIf.strategy.debtDescription')"
                   :percent="allocation.debt"
                   :amount="monthlyFor(allocation.debt)"
-                  @decrease="adjustAllocation('debt', -5)"
-                  @increase="adjustAllocation('debt', 5)"
+                  @change="setAllocation('debt', $event)"
                 />
               </div>
               <div class="allocation-total">
@@ -141,74 +140,105 @@
                 <p>{{ t('whatIf.strategy.investmentMixDescription') }}</p>
               </div>
               <div class="mix-list">
-                <div v-for="entry in activeMix" :key="entry.id" class="mix-row">
-                  <span class="mini-icon invest"><q-icon :name="entry.icon" /></span>
-                  <div class="mix-identity">
+                <article v-for="entry in activeMix" :key="entry.id" class="investment-mix-card">
+                  <span :class="['mix-card-icon', entry.tone]">
+                    <q-icon :name="entry.icon" />
+                  </span>
+                  <div class="mix-card-identity">
                     <strong>{{ entry.label }}</strong>
-                    <span class="mix-amount">
-                      <strong
-                        >{{
-                          formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100)
-                        }}{{ t('whatIf.perMonth') }}</strong
-                      >
-                    </span>
-                  </div>
-                  <div class="allocation-control">
-                    <small>{{ t('whatIf.strategy.investmentAllocation') }}</small>
-                    <div class="stepper compact-stepper">
-                      <button type="button" @click="adjustMix(entry.id, -5)">−</button>
-                      <span>{{ entry.allocation }}%</span>
-                      <button type="button" @click="adjustMix(entry.id, 5)">+</button>
-                    </div>
-                  </div>
-                  <div class="return-control">
-                    <small>{{ t('whatIf.strategy.expectedAnnualReturn') }}</small>
-                    <q-input
-                      :model-value="entry.annualReturnPercent"
-                      dense
-                      outlined
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      suffix="%"
-                      class="return-input"
-                      :aria-label="`${entry.label} expected annual return`"
-                      @change="setReturn(entry.id, $event.target.value)"
-                    />
+                    <small>{{ entry.description }}</small>
                   </div>
                   <button
-                    v-if="activeMix.length > 1"
                     type="button"
-                    class="remove-mix"
-                    :aria-label="`Remove ${entry.label}`"
-                    @click="removeMix(entry.id)"
+                    class="mix-card-metric editable-metric allocation-metric"
+                    :aria-label="`Edit ${entry.label} allocation`"
                   >
-                    <q-icon name="delete_outline" />
+                    <strong>{{ entry.allocation }}%</strong>
+                    <small>{{ t('whatIf.strategy.ofInvestments') }}</small>
+                    <q-popup-edit
+                      :model-value="entry.allocation"
+                      buttons
+                      :title="t('whatIf.strategy.investmentAllocation')"
+                      :label-set="t('common.save')"
+                      :label-cancel="t('common.cancel')"
+                      @save="setMixAllocation(entry.id, $event)"
+                    >
+                      <template #default="scope">
+                        <q-input
+                          v-model.number="scope.value"
+                          autofocus
+                          dense
+                          outlined
+                          type="number"
+                          inputmode="numeric"
+                          min="0"
+                          max="100"
+                          step="5"
+                          suffix="%"
+                          @keyup.enter="scope.set"
+                        />
+                      </template>
+                    </q-popup-edit>
                   </button>
-                </div>
+                  <button
+                    type="button"
+                    class="mix-card-metric editable-metric return-metric"
+                    :aria-label="`Edit ${entry.label} expected return`"
+                  >
+                    <strong>{{ Number(entry.annualReturnPercent).toFixed(1) }}%</strong>
+                    <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
+                    <q-popup-edit
+                      :model-value="entry.annualReturnPercent"
+                      buttons
+                      :title="t('whatIf.strategy.expectedAnnualReturn')"
+                      :label-set="t('common.save')"
+                      :label-cancel="t('common.cancel')"
+                      @save="setReturn(entry.id, $event)"
+                    >
+                      <template #default="scope">
+                        <q-input
+                          v-model.number="scope.value"
+                          autofocus
+                          dense
+                          outlined
+                          type="number"
+                          inputmode="decimal"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          suffix="%"
+                          @keyup.enter="scope.set"
+                        />
+                      </template>
+                    </q-popup-edit>
+                  </button>
+                  <strong class="mix-card-amount">
+                    {{ formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100)
+                    }}{{ t('whatIf.perMonth') }}
+                  </strong>
+                  <q-btn
+                    v-if="activeMix.length > 1"
+                    flat
+                    round
+                    dense
+                    icon="delete_outline"
+                    color="negative"
+                    size="sm"
+                    :aria-label="`${t('whatIf.strategy.removeInvestmentType')}: ${entry.label}`"
+                    class="mix-card-remove"
+                    @click="removeMix(entry.id)"
+                  />
+                </article>
               </div>
-              <div class="mix-footer">
-                <div class="mix-status">
-                  <span>
-                    <small>{{ t('whatIf.strategy.investmentAllocation') }}</small>
-                    <strong>{{
-                      t('whatIf.strategy.allocatedPercentage', {
-                        percentage: investmentAllocatedPercent,
-                      })
-                    }}</strong>
-                  </span>
-                </div>
-                <button
-                  v-if="availableMixOptions.length"
-                  type="button"
-                  class="add-investment-link"
-                  @click="openInvestmentTypeDialog"
-                >
-                  <q-icon name="add" />
-                  {{ t('whatIf.strategy.addInvestmentType') }}
-                </button>
-              </div>
+              <button
+                v-if="availableMixOptions.length"
+                type="button"
+                class="add-investment-card"
+                @click="openInvestmentTypeDialog"
+              >
+                <q-icon name="add" />
+                {{ t('whatIf.strategy.addInvestmentType') }}
+              </button>
             </section>
 
             <div v-if="allocation.cash > 0" class="small-panels single-detail">
@@ -336,7 +366,7 @@
               </div>
               <StrategyProjectionChart
                 :strategy-points="investmentProjectionPoints"
-                :series-name="activeScenario.name"
+                :baseline-points="baselineInvestmentProjectionPoints"
                 :mode="projectionChartMode"
               />
               <div class="result-breakdown">
@@ -588,11 +618,12 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import MortgageComparisonChart from '@/components/liabilities/MortgageComparisonChart.vue'
+import StrategyAllocationRow from '@/components/what-if/StrategyAllocationRow.vue'
 import StrategyProjectionChart from '@/components/what-if/StrategyProjectionChart.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import { calculateDebtPayoffImpact } from '@/domain/financial/debt-payoff'
@@ -625,36 +656,6 @@ import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
-
-const StrategyAllocationRow = defineComponent({
-  props: {
-    icon: String,
-    tone: String,
-    title: String,
-    description: String,
-    percent: Number,
-    amount: Number,
-  },
-  emits: ['decrease', 'increase'],
-  setup(props, { emit }) {
-    return () =>
-      h('div', { class: 'allocation-row' }, [
-        h('span', { class: `mini-icon ${props.tone}` }, [
-          h('i', { class: 'q-icon material-icons' }, props.icon),
-        ]),
-        h('div', { class: 'allocation-copy' }, [
-          h('strong', props.title),
-          h('small', props.description),
-        ]),
-        h('div', { class: 'stepper' }, [
-          h('button', { type: 'button', onClick: () => emit('decrease') }, '−'),
-          h('span', `${props.percent}%`),
-          h('button', { type: 'button', onClick: () => emit('increase') }, '+'),
-        ]),
-        h('strong', { class: 'allocation-amount' }, `${formatCurrency(props.amount)} / month`),
-      ])
-  },
-})
 
 const $q = useQuasar()
 const { t } = useI18n()
@@ -749,6 +750,15 @@ const projection = computed(() =>
     debtAvailable: Boolean(selectedDebt.value),
   }),
 )
+const baselineProjection = computed(() =>
+  simulateStrategy({
+    startingPosition: startingPosition.value,
+    scenario: { ...activeScenario.value, allocation: allocation.value },
+    simulatedMonthlySavings: 0,
+    simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
+    debtAvailable: Boolean(selectedDebt.value),
+  }),
+)
 const debtPayoff = computed(() =>
   calculateDebtPayoffImpact({
     liability: selectedDebtModel.value,
@@ -768,6 +778,12 @@ const investmentProjectionPoints = computed(() =>
     breakdown: investmentBalances,
   })),
 )
+const baselineInvestmentProjectionPoints = computed(() =>
+  baselineProjection.value.strategy.points.map(({ month, investmentValue }) => ({
+    month,
+    value: investmentValue,
+  })),
+)
 
 const scenarioOptions = computed(() =>
   config.value.scenarios.map(({ id, name }) => ({ value: id, label: name })),
@@ -779,25 +795,20 @@ const cashTargetOptions = computed(() =>
   [3, 6, 12].map((months) => ({ value: months, label: `${months} months` })),
 )
 const mixMeta = {
-  stockMarket: { label: 'Stock market', icon: 'trending_up' },
-  realEstate: { label: 'Real estate', icon: 'apartment' },
-  fixedIncome: { label: 'Fixed income', icon: 'account_balance' },
-  crypto: { label: 'Crypto', icon: 'currency_bitcoin' },
-  businessEquity: { label: 'Business equity', icon: 'business_center' },
-  other: { label: 'Other', icon: 'category' },
+  stockMarket: { label: 'Stock market', icon: 'trending_up', tone: 'stock-market' },
+  realEstate: { label: 'Real estate', icon: 'apartment', tone: 'real-estate' },
+  fixedIncome: { label: 'Fixed income', icon: 'account_balance', tone: 'fixed-income' },
+  crypto: { label: 'Crypto', icon: 'currency_bitcoin', tone: 'crypto' },
+  businessEquity: { label: 'Business equity', icon: 'business_center', tone: 'business' },
+  other: { label: 'Other', icon: 'category', tone: 'other' },
 }
 const activeMix = computed(() =>
   Object.entries(activeScenario.value.investmentMix).map(([id, value]) => ({
     id,
     ...mixMeta[id],
+    description: t(`whatIf.strategy.investmentTypes.${id}`),
     ...value,
   })),
-)
-const investmentAllocatedPercent = computed(() =>
-  Math.min(
-    100,
-    activeMix.value.reduce((total, entry) => total + entry.allocation, 0),
-  ),
 )
 const availableMixOptions = computed(() =>
   investmentTypeDefinitions
@@ -1068,6 +1079,11 @@ function resetScenario() {
   })
 }
 
+function setAllocation(key, value) {
+  const target = Math.min(100, Math.max(0, Number(value) || 0))
+  adjustAllocation(key, target - allocation.value[key])
+}
+
 function adjustAllocation(key, delta) {
   const next = { ...allocation.value }
   if (key === 'invest') {
@@ -1089,6 +1105,13 @@ function adjustAllocation(key, delta) {
     next.invest -= change
   }
   updateScenario({ allocation: next })
+}
+
+function setMixAllocation(id, value) {
+  const current = activeScenario.value.investmentMix[id]?.allocation
+  if (current == null) return
+  const target = Math.min(100, Math.max(0, Number(value) || 0))
+  adjustMix(id, target - current)
 }
 
 function adjustMix(id, delta) {
@@ -1295,7 +1318,6 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
-    'setup-title setup-title'
     'available available'
     'allocation mix'
     'results-title results-title'
@@ -1321,10 +1343,6 @@ h1 {
   font-size: 1.35rem;
   letter-spacing: -0.025em;
 }
-.setup-heading {
-  grid-area: setup-title;
-  margin-top: 0;
-}
 .results-heading {
   grid-area: results-title;
 }
@@ -1349,9 +1367,12 @@ h1 {
 }
 .mix-panel {
   grid-area: mix;
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
+}
+.allocation-panel,
+.mix-panel {
+  min-width: 0;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
 }
 .available-panel > div {
   display: grid;
@@ -1379,7 +1400,7 @@ h1 {
 .projection-heading h2,
 .detail-title h2 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   line-height: 1.25;
 }
 .panel-heading p,
@@ -1391,32 +1412,10 @@ h1 {
 }
 .allocation-list,
 .mix-list {
-  margin-top: 0.55rem;
-}
-.mix-list {
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 0.2rem;
-}
-:deep(.allocation-row) {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto 7rem;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--color-line);
-}
-:deep(.allocation-copy) {
-  display: grid;
-  line-height: 1.25;
-}
-:deep(.allocation-copy small) {
-  color: var(--color-copy);
-  font-size: 0.68rem;
-}
-:deep(.allocation-amount) {
-  text-align: right;
-  font-size: 0.78rem;
+  gap: 0.45rem;
+  min-width: 0;
+  margin-top: 0.75rem;
 }
 :deep(.mini-icon) {
   display: inline-flex !important;
@@ -1454,126 +1453,134 @@ h1 {
   background: var(--color-blue-soft);
   color: var(--color-primary);
 }
-:deep(.stepper) {
-  display: grid;
-  grid-template-columns: 1.8rem 2.8rem 1.8rem;
-  align-items: center;
-  text-align: center;
-}
-:deep(.stepper button) {
-  height: 1.8rem;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface-soft);
-  color: var(--color-ink);
-  cursor: pointer;
-}
-:deep(.stepper span) {
-  font-size: 0.78rem;
-  font-weight: 700;
-}
 .allocation-total {
   display: grid;
-  grid-template-columns: 1fr auto 7rem;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
   gap: 1rem;
-  padding-top: 0.5rem;
-  font-size: 0.76rem;
+  margin-top: 0.55rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.75rem;
+  background: var(--color-surface-soft);
+  font-size: 0.86rem;
 }
 .allocation-total strong:last-child {
   text-align: right;
 }
-.mix-row {
+.investment-mix-card {
   display: grid;
-  grid-template-columns: auto minmax(4rem, 1fr) 5rem 4.75rem 6.4rem 1.5rem;
+  grid-template-columns: 2.5rem minmax(5.5rem, 1fr) 4rem 4.7rem minmax(5rem, auto) auto;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--color-line);
-  font-size: 0.72rem;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.65rem;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 0.8rem;
+  background: white;
 }
-.mix-row .mini-icon {
-  grid-column: 1;
-  grid-row: 1;
-  width: 1.8rem;
-  height: 1.8rem;
-  font-size: 0.9rem;
-}
-.mix-identity,
-.allocation-control,
-.return-control {
-  display: contents;
-}
-.mix-identity > strong {
-  grid-column: 2;
-  grid-row: 1;
-}
-.compact-stepper {
-  grid-column: 3;
-  grid-row: 1;
-  grid-template-columns: 1.35rem 2.3rem 1.35rem;
-}
-.compact-stepper button {
-  height: 1.5rem;
-}
-.return-input {
-  grid-column: 4;
-  grid-row: 1;
-  width: 100%;
-}
-.return-control > small,
-.allocation-control > small {
-  display: none;
-}
-.mix-amount {
-  grid-column: 5;
-  grid-row: 1;
-  text-align: right;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.remove-mix {
-  grid-column: 6;
-  grid-row: 1;
+.mix-card-icon {
   display: grid;
   place-items: center;
-  border: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  font-size: 1.3rem;
+}
+.mix-card-icon.stock-market {
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
+}
+.mix-card-icon.real-estate {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.mix-card-icon.fixed-income {
+  background: var(--color-green-soft);
+  color: var(--color-success-dark);
+}
+.mix-card-icon.crypto {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
+}
+.mix-card-icon.business {
+  background: #e6f7f6;
+  color: #087f7a;
+}
+.mix-card-icon.other {
+  background: var(--color-surface-soft);
+  color: var(--color-copy);
+}
+.mix-card-identity,
+.mix-card-metric {
+  display: grid;
+  min-width: 0;
+}
+.mix-card-identity strong {
+  font-size: 0.88rem;
+}
+.mix-card-identity small,
+.mix-card-metric small {
+  overflow: hidden;
+  color: var(--color-copy);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+}
+.mix-card-metric {
+  min-height: 2.4rem;
+  align-content: center;
+  padding: 0 0 0 0.55rem;
+  border-left: 1px solid var(--color-line);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
   background: transparent;
-  color: var(--color-danger);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.mix-card-metric strong {
   font-size: 1rem;
+}
+.editable-metric {
   cursor: pointer;
 }
-.add-investment-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.4rem;
-  padding: 0.25rem 0;
-  border: 0;
-  background: transparent;
+.editable-metric:hover strong,
+.editable-metric:focus-visible strong {
   color: var(--color-primary);
-  font-size: 0.76rem;
+}
+.editable-metric:focus-visible {
+  outline: 0;
+}
+.mix-card-amount {
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mix-card-remove {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+.add-investment-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.8rem;
+  border: 1px dashed #9ac5ff;
+  border-radius: 0.75rem;
+  background: #f8fbff;
+  color: var(--color-primary);
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
 }
-.mix-footer {
-  margin-top: auto;
-  padding-top: 0.45rem;
-}
-.mix-status {
-  padding-top: 0.45rem;
-  border-top: 1px solid var(--color-line);
-}
-.mix-status span {
-  display: grid;
-}
-.mix-status small {
-  color: var(--color-copy);
-  font-size: 0.62rem;
-}
-.mix-status strong {
-  color: var(--color-ink);
-  font-size: 0.72rem;
-}
-.add-investment-link:focus-visible {
+.add-investment-card:focus-visible {
   @include focus-ring;
 }
 .investment-type-dialog {
@@ -1930,18 +1937,10 @@ h1 {
   line-height: 1.55;
 }
 
-@media (min-width: 1001px) {
-  .allocation-panel,
-  .mix-panel {
-    height: 16.5rem;
-  }
-}
-
-@media (max-width: 1000px) {
+@media (max-width: 1180px) {
   .strategy-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
-      'setup-title'
       'available'
       'allocation'
       'mix'
@@ -1975,106 +1974,47 @@ h1 {
   .small-panels {
     grid-template-columns: 1fr;
   }
-  :deep(.allocation-row) {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  :deep(.allocation-amount) {
-    grid-column: 2 / -1;
-    text-align: left;
-    color: var(--color-copy);
-  }
-  .mix-row {
+  .investment-mix-card {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      'icon identity remove'
-      'return return allocation';
-    gap: 0.65rem 0.5rem;
-    padding: 0.75rem 0;
+      'icon identity action'
+      'icon allocation return'
+      'icon amount amount';
+    gap: 0.45rem 0.7rem;
   }
-  .mix-row:last-child {
-    border-bottom: 0;
-  }
-  .mix-row .mini-icon {
+  .mix-card-icon {
     grid-area: icon;
-    grid-column: auto;
-    grid-row: auto;
+    align-self: start;
+    width: 2.6rem;
+    height: 2.6rem;
   }
-  .mix-identity {
-    display: grid;
+  .mix-card-identity {
     grid-area: identity;
-    align-self: center;
-    gap: 0.1rem;
   }
-  .mix-identity > strong,
-  .mix-amount {
-    grid-column: auto;
-    grid-row: auto;
+  .allocation-metric {
+    grid-area: allocation;
+  }
+  .return-metric {
+    grid-area: return;
+  }
+  .mix-card-metric {
+    min-height: auto;
+    padding-left: 0;
+    border-left: 0;
+  }
+  .mix-card-amount {
+    grid-area: amount;
     text-align: left;
   }
-  .mix-amount strong {
-    color: var(--color-copy);
-    font-size: 0.68rem;
-    font-weight: 600;
+  .mix-card-remove {
+    grid-area: action;
   }
-  .allocation-control {
-    display: grid;
-    grid-area: allocation;
-    justify-items: end;
-    gap: 0.25rem;
+  .allocation-total {
+    grid-template-columns: 1fr auto;
   }
-  .allocation-control > small {
-    text-align: right;
-    white-space: nowrap;
-  }
-  .allocation-control .compact-stepper {
-    grid-column: auto;
-    grid-row: auto;
-  }
-  .mix-row .remove-mix {
-    grid-area: remove;
-    grid-column: auto;
-    grid-row: auto;
-    justify-self: end;
-    width: 1.5rem;
-    height: 1.5rem;
-    padding: 0;
-    border-radius: 50%;
-    color: var(--color-danger);
-    font-size: 1rem;
-  }
-  .return-control {
-    display: grid;
-    grid-area: return;
-    gap: 0.25rem;
-  }
-  .return-control > small,
-  .allocation-control > small {
-    display: block;
-    color: var(--color-copy);
-    font-size: 0.6rem;
-    font-weight: 500;
-  }
-  .return-input {
-    grid-column: auto;
-    grid-row: auto;
-    width: 100%;
-  }
-  .mix-footer {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-top: 0.55rem;
-    padding-top: 0.7rem;
-    border-top: 1px solid var(--color-line);
-  }
-  .mix-status {
-    padding-top: 0;
-    border-top: 0;
-  }
-  .add-investment-link {
-    flex-shrink: 0;
-    margin-top: 0;
+  .allocation-total strong:last-child {
+    grid-column: 1 / -1;
+    text-align: left;
   }
   .projection-heading {
     display: grid;

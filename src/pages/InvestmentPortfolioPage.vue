@@ -99,7 +99,7 @@
 
         <template v-else>
           <section
-            v-if="portfolioRows !== null"
+            v-if="portfolioHoldings !== null"
             class="portfolio-kpis"
             :aria-label="t('assets.portfolio.kpis.label')"
           >
@@ -113,31 +113,10 @@
                 <small>{{ t('assets.portfolio.kpis.portfolioValueDescription') }}</small>
               </div>
               <div v-if="portfolioHistoryPoints.length" class="portfolio-history">
-                <svg
-                  viewBox="0 0 320 100"
-                  preserveAspectRatio="none"
-                  role="img"
+                <PortfolioHistoryChart
+                  :points="portfolioHistoryPoints"
                   :aria-label="t('assets.portfolio.kpis.annualHistory')"
-                >
-                  <path
-                    v-if="portfolioChart.area"
-                    class="portfolio-history-area"
-                    :d="portfolioChart.area"
-                  />
-                  <path class="portfolio-history-line" :d="portfolioChart.line" />
-                  <circle
-                    :cx="portfolioChart.last.x"
-                    :cy="portfolioChart.last.y"
-                    r="4"
-                    class="portfolio-history-point"
-                  />
-                </svg>
-                <div class="portfolio-history-years">
-                  <span>{{ portfolioHistoryPoints[0].year }}</span>
-                  <span v-if="portfolioHistoryPoints.length > 1">{{
-                    portfolioHistoryPoints.at(-1).year
-                  }}</span>
-                </div>
+                />
               </div>
               <div v-else-if="historyLoading" class="portfolio-history-state">
                 <q-spinner color="primary" size="1.5rem" />
@@ -177,7 +156,7 @@
 
           <section class="portfolio-table-card">
             <q-table
-              v-if="portfolioRows !== null"
+              v-if="portfolioHoldings !== null"
               v-model:pagination="tablePagination"
               class="portfolio-table"
               flat
@@ -246,7 +225,7 @@
 
               <template #body-cell-dayChange="props">
                 <q-td :props="props">
-                  <span class="daily-change" :class="`daily-change--${changeTone(props.value)}`">
+                  <span class="daily-change" :class="`daily-change--${props.row.dayChangeTone}`">
                     {{ props.value || '—' }}
                   </span>
                 </q-td>
@@ -300,6 +279,16 @@
                 flat
                 no-caps
                 color="primary"
+                icon="refresh"
+                :label="t('assets.portfolio.refresh')"
+                :loading="readingSheet"
+                class="portfolio-action"
+                @click="readPortfolio(true)"
+              />
+              <q-btn
+                flat
+                no-caps
+                color="primary"
                 icon="edit"
                 :label="t('assets.portfolio.changeSheet')"
                 class="portfolio-action"
@@ -315,6 +304,9 @@
                 @click="confirmDisconnect = true"
               />
             </div>
+            <small v-if="lastCheckedLabel" class="portfolio-last-checked">
+              {{ t('assets.portfolio.lastChecked', { value: lastCheckedLabel }) }}
+            </small>
           </div>
         </template>
       </template>
@@ -347,13 +339,14 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import PortfolioHistoryChart from '@/components/assets/PortfolioHistoryChart.vue'
 import {
-  investmentPortfolioSnapshot,
+  investmentPortfolioCache,
+  investmentPortfolioCacheIsFresh,
   isGoogleSheetsUrl,
-  readInvestmentPortfolioSheet,
+  syncInvestmentPortfolio,
 } from '@/services/firebase/investment-portfolios.service'
 import {
-  changeTone,
   countryFlag,
   portfolioKpis,
   portfolioTableRows,
@@ -377,7 +370,7 @@ const editing = ref(false)
 const spreadsheetUrl = ref('')
 const confirmDisconnect = ref(false)
 const readingSheet = ref(false)
-const portfolioRows = ref(null)
+const portfolioHoldings = ref(null)
 const portfolioSummary = ref(null)
 const sheetError = ref(false)
 const tableFilter = ref('')
@@ -408,12 +401,19 @@ const activePortfolioSummary = computed(
 )
 const mobileTable = computed(() => $q.screen.lt.sm)
 const portfolioMetrics = computed(() => portfolioKpis(activePortfolioSummary.value))
+const lastCheckedLabel = computed(() => {
+  const value = Number(portfolio.value?.cache?.lastCheckedAt)
+  if (!Number.isFinite(value)) return ''
+  return new Intl.DateTimeFormat('en-IE', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+})
 const portfolioHistoryPoints = computed(() =>
   buildAssetAnnualSeries(historyDocuments.value, { assetId: assetId.value }),
 )
-const portfolioChart = computed(() => buildPortfolioChart(portfolioHistoryPoints.value))
 const tableRows = computed(() =>
-  portfolioTableRows(portfolioRows.value, activePortfolioSummary.value.baseCurrency),
+  portfolioTableRows(portfolioHoldings.value, activePortfolioSummary.value.baseCurrency),
 )
 const tableColumns = computed(() => {
   if (mobileTable.value) {
@@ -475,7 +475,7 @@ async function prepare(force = false) {
       await router.replace(investmentsRoute.value)
       return
     }
-    if (configured.value) void readSheet()
+    if (configured.value) void readPortfolio()
   } catch (loadError) {
     pageError.value = loadError
   } finally {
@@ -511,7 +511,7 @@ async function save() {
   if (saving.value || !isGoogleSheetsUrl(spreadsheetUrl.value)) return
   saving.value = true
   try {
-    await assetsStore.saveInvestmentPortfolio(
+    const result = await assetsStore.saveInvestmentPortfolio(
       workspaceId.value,
       assetId.value,
       spreadsheetUrl.value,
@@ -519,7 +519,8 @@ async function save() {
     editing.value = false
     spreadsheetUrl.value = ''
     clearSheetResult()
-    void readSheet()
+    applyPortfolioResult(result)
+    void loadHistory()
     $q.notify({ type: 'positive', message: t('assets.portfolio.saved'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('assets.portfolio.errors.save'), position: 'top' })
@@ -544,28 +545,27 @@ async function disconnect() {
   }
 }
 
-async function readSheet() {
+async function readPortfolio(force = false) {
   const currentRead = ++sheetReadId
   const currentWorkspaceId = workspaceId.value
   const currentAssetId = assetId.value
-  readingSheet.value = true
   sheetError.value = false
 
-  const snapshot = investmentPortfolioSnapshot(portfolio.value)
-  if (snapshot) {
-    portfolioRows.value = snapshot.rows
-    portfolioSummary.value = snapshot.summary
-    assetsStore.applyInvestmentPortfolioSummary(currentAssetId, snapshot.summary)
+  const cache = investmentPortfolioCache(portfolio.value)
+  if (cache) {
+    portfolioHoldings.value = cache.holdings
+    portfolioSummary.value = cache.summary
     void loadHistory()
   }
+  if (!force && investmentPortfolioCacheIsFresh(portfolio.value)) return
 
+  readingSheet.value = true
   try {
-    const result = await readInvestmentPortfolioSheet(currentWorkspaceId, currentAssetId)
+    const result = await syncInvestmentPortfolio(currentWorkspaceId, currentAssetId, force)
     if (currentRead !== sheetReadId) return
-    portfolioRows.value = Array.isArray(result.rows) ? result.rows : []
-    portfolioSummary.value = result.summary || null
-    assetsStore.applyInvestmentPortfolioSummary(currentAssetId, result.summary, result)
-    void loadHistory()
+    assetsStore.applyInvestmentPortfolioSync(currentAssetId, result)
+    applyPortfolioResult(result)
+    if (!cache || result.financialSections?.includes('assets')) void loadHistory()
   } catch {
     if (currentRead !== sheetReadId) return
     sheetError.value = true
@@ -574,10 +574,15 @@ async function readSheet() {
   }
 }
 
+function applyPortfolioResult(result) {
+  portfolioHoldings.value = Array.isArray(result?.holdings) ? result.holdings : []
+  portfolioSummary.value = result?.summary || null
+}
+
 function clearSheetResult() {
   sheetReadId += 1
   readingSheet.value = false
-  portfolioRows.value = null
+  portfolioHoldings.value = null
   portfolioSummary.value = null
   sheetError.value = false
   tableFilter.value = ''
@@ -586,36 +591,6 @@ function clearSheetResult() {
 function tableColumn(name, label, align, width) {
   const size = `width: ${width}`
   return { name, label, field: name, align, sortable: true, style: size, headerStyle: size }
-}
-
-function buildPortfolioChart(points) {
-  if (!points.length) return { line: '', area: '', last: { x: 0, y: 0 } }
-  if (points.length === 1) {
-    return { line: 'M 16 50 L 304 50', area: '', last: { x: 304, y: 50 } }
-  }
-
-  const width = 320
-  const height = 100
-  const padding = 6
-  const values = points.map(({ value }) => value)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = max - min || 1
-  const coordinates = values.map((value, index) => ({
-    x: padding + (index / (values.length - 1)) * (width - padding * 2),
-    y: padding + ((max - value) / range) * (height - padding * 2),
-  }))
-  const line = coordinates
-    .map(({ x, y }, index) => `${index ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`)
-    .join(' ')
-  const first = coordinates[0]
-  const last = coordinates.at(-1)
-
-  return {
-    line,
-    area: `${line} L ${last.x.toFixed(2)} ${height} L ${first.x.toFixed(2)} ${height} Z`,
-    last,
-  }
 }
 </script>
 
@@ -818,36 +793,6 @@ h1 {
   align-self: stretch;
   min-width: 0;
 }
-.portfolio-history svg {
-  width: 100%;
-  height: 7rem;
-  overflow: visible;
-}
-.portfolio-history-area {
-  fill: var(--color-primary);
-  opacity: 0.1;
-}
-.portfolio-history-line {
-  fill: none;
-  stroke: var(--color-primary);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
-}
-.portfolio-history-point {
-  fill: var(--color-primary);
-  stroke: var(--color-surface);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-.portfolio-history-years {
-  display: flex;
-  justify-content: space-between;
-  color: var(--color-copy);
-  font-size: 0.7rem;
-  font-weight: 650;
-}
 .portfolio-history-state {
   display: grid;
   min-height: 7rem;
@@ -989,6 +934,7 @@ h1 {
 }
 .portfolio-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
@@ -1002,6 +948,12 @@ h1 {
 }
 .portfolio-action {
   min-height: 2.75rem;
+}
+.portfolio-last-checked {
+  width: 100%;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  text-align: right;
 }
 .confirm-card {
   @include financial-simple-dialog(28rem);
@@ -1045,12 +997,6 @@ h1 {
     padding-top: 0.45rem;
     font-size: 0.64rem;
   }
-  .portfolio-history svg {
-    height: 5.5rem;
-  }
-  .portfolio-history-years {
-    font-size: 0.6rem;
-  }
   .portfolio-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1066,7 +1012,7 @@ h1 {
   .portfolio-management-actions {
     display: grid;
     grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.35rem;
   }
   .portfolio-actions > .q-btn,
@@ -1075,6 +1021,10 @@ h1 {
     min-width: 0;
     padding-inline: 0.35rem;
     font-size: 0.72rem;
+  }
+  .portfolio-last-checked {
+    grid-column: 1 / -1;
+    text-align: center;
   }
 }
 </style>

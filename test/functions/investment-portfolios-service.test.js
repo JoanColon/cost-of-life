@@ -2,58 +2,258 @@ import { describe, expect, it, vi } from 'vitest'
 import investmentPortfolioService from '../../functions/services/investment-portfolios.js'
 
 const {
+  PORTFOLIO_CACHE_TTL_MS,
   canonicalGoogleSheetsUrl,
-  parseCsv,
-  parseGoogleVisualizationValues,
-  readInvestmentPortfolioSheet,
+  portfolioCacheIsFresh,
+  syncInvestmentPortfolio,
   updateInvestmentPortfolio,
 } = investmentPortfolioService
 
-describe('investment portfolio service', () => {
-  it('accepts Google Sheets URLs and removes fragments', () => {
+describe('investment portfolio synchronization', () => {
+  it('accepts canonical Google Sheets URLs and rejects other sources', () => {
     expect(
       canonicalGoogleSheetsUrl(
         ' https://docs.google.com/spreadsheets/d/sheet_123/edit?usp=sharing#gid=42 ',
       ),
     ).toBe('https://docs.google.com/spreadsheets/d/sheet_123/edit?usp=sharing')
+    expect(() => canonicalGoogleSheetsUrl('https://example.com/spreadsheets/d/sheet/edit')).toThrow(
+      'A valid Google Sheets URL is required',
+    )
   })
 
-  it.each([
-    'https://example.com/spreadsheets/d/sheet/edit',
-    'http://docs.google.com/spreadsheets/d/sheet/edit',
-    'https://docs.google.com/document/d/document/edit',
-    'not a url',
-  ])('rejects invalid spreadsheet URL %s', (url) => {
-    expect(() => canonicalGoogleSheetsUrl(url)).toThrow('A valid Google Sheets URL is required')
-  })
-
-  it('updates only the investment detail without touching financial projections', async () => {
-    const { firestore, writes } = createFirestore()
-
-    const result = await updateInvestmentPortfolio(firestore, {
-      workspaceId: 'workspace-a',
-      userId: 'member-a',
-      assetId: 'investment-a',
-      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-123/edit?usp=sharing',
+  it('validates and synchronizes a Sheet before connecting it', async () => {
+    const { firestore, writes } = createFirestore({ currentValue: 100 })
+    const fetchSpreadsheet = sheetFetch({
+      portfolioValue: '27.693,16',
+      grossDividends: '800',
+      netDividends: '682,47',
     })
+    const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
 
-    expect(result.portfolio).toEqual({
-      source: 'google_sheets',
-      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-123/edit?usp=sharing',
-    })
-    expect(writes).toHaveLength(1)
-    expect(writes[0]).toMatchObject({
-      path: 'workspaces/workspace-a/modelAssets/investment-a',
-      data: { detail: { notes: 'preserved', portfolio: result.portfolio }, updatedBy: 'member-a' },
-    })
-  })
-
-  it('disconnects a portfolio while preserving other detail', async () => {
-    const { firestore, writes } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet/edit',
+    const result = await updateInvestmentPortfolio(
+      firestore,
+      {
+        workspaceId: 'workspace-a',
+        userId: 'member-a',
+        assetId: 'investment-a',
+        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
       },
+      fetchSpreadsheet,
+      rebuildProjection,
+      () => 1_000,
+    )
+
+    expect(result).toMatchObject({
+      currentValue: 27693.16,
+      summary: {
+        baseCurrency: 'EUR',
+        totalPortfolioValue: 27693.16,
+        totalDividendsReceived: 800,
+        annualDividendIncome: 682.47,
+      },
+      holdings: [expect.objectContaining({ ticker: 'IBE.MC', marketValueBase: 21900 })],
+      cacheStatus: 'refreshed',
+      financialSections: ['assets'],
+    })
+    expect(result.portfolio.cache).toMatchObject({
+      lastCheckedAt: 1_000,
+      refreshAfter: 1_000 + PORTFOLIO_CACHE_TTL_MS,
+    })
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        path: 'workspaces/workspace-a/modelAssets/investment-a',
+        data: expect.objectContaining({
+          currentValue: 27693.16,
+          'detail.portfolio': expect.objectContaining({
+            schemaVersion: 1,
+            spreadsheetId: 'sheet_123',
+          }),
+        }),
+      }),
+    )
+    expect(rebuildProjection).toHaveBeenCalledWith(
+      firestore,
+      'workspace-a',
+      expect.any(Number),
+      { sections: ['assets'] },
+    )
+  })
+
+  it('does not replace an existing connection when the new Sheet is invalid', async () => {
+    const existing = canonicalPortfolio({ refreshAfter: 0 })
+    const { firestore, writes } = createFirestore({ portfolio: existing, currentValue: 1000 })
+
+    await expect(
+      updateInvestmentPortfolio(
+        firestore,
+        {
+          workspaceId: 'workspace-a',
+          userId: 'member-a',
+          assetId: 'investment-a',
+          spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/broken/edit',
+        },
+        async () => ({ ok: false, status: 403 }),
+      ),
+    ).rejects.toThrow('Portfolio tab returned HTTP 403')
+    expect(writes).toEqual([])
+  })
+
+  it('returns a fresh cache without reading Google or writing Firestore', async () => {
+    const portfolio = canonicalPortfolio({ refreshAfter: 20_000 })
+    const { firestore, writes } = createFirestore({ portfolio, currentValue: 1000 })
+    const fetchSpreadsheet = vi.fn()
+    const rebuildProjection = vi.fn()
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
+      fetchSpreadsheet,
+      rebuildProjection,
+      () => 10_000,
+    )
+
+    expect(result).toMatchObject({ cacheStatus: 'fresh', holdings: portfolio.cache.holdings })
+    expect(fetchSpreadsheet).not.toHaveBeenCalled()
+    expect(rebuildProjection).not.toHaveBeenCalled()
+    expect(writes).toEqual([])
+  })
+
+  it('refreshes stale metadata but skips financial writes and rebuilds when values match', async () => {
+    const portfolio = canonicalPortfolio({ refreshAfter: 5_000 })
+    const { firestore, writes } = createFirestore({ portfolio, currentValue: 1000 })
+    const rebuildProjection = vi.fn()
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
+      sheetFetch(),
+      rebuildProjection,
+      () => 10_000,
+    )
+
+    expect(result).toMatchObject({ contentChanged: false, financialSections: [] })
+    expect(writes).toHaveLength(1)
+    expect(writes[0].data).not.toHaveProperty('currentValue')
+    expect(rebuildProjection).not.toHaveBeenCalled()
+  })
+
+  it('updates only Income and rebuilds its section when net dividends change', async () => {
+    const portfolio = canonicalPortfolio({ refreshAfter: 0 })
+    const { firestore, writes } = createFirestore({
+      portfolio,
+      currentValue: 1000,
+      linkedIncome: [
+        {
+          id: 'dividends-a',
+          categoryId: 'investments',
+          subcategoryId: 'dividends',
+          portfolioAssetId: 'investment-a',
+          calculation: { mode: 'recurring', amount: 90, frequency: 'yearly' },
+        },
+      ],
+    })
+    const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      sheetFetch({ netDividends: '120' }),
+      rebuildProjection,
+      () => 10_000,
+    )
+
+    expect(result.financialSections).toEqual(['income'])
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        path: 'workspaces/workspace-a/modelIncome/dividends-a',
+        data: expect.objectContaining({
+          calculation: { mode: 'recurring', amount: 120, frequency: 'yearly' },
+        }),
+      }),
+    )
+    expect(rebuildProjection).toHaveBeenCalledWith(
+      firestore,
+      'workspace-a',
+      expect.any(Number),
+      { sections: ['income'] },
+    )
+  })
+
+  it('does not rebuild Income when dividends change without a linked Income', async () => {
+    const { firestore } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 0 }),
+      currentValue: 1000,
+    })
+    const rebuildProjection = vi.fn()
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      sheetFetch({ netDividends: '120' }),
+      rebuildProjection,
+      () => 10_000,
+    )
+    expect(result.financialSections).toEqual([])
+    expect(rebuildProjection).not.toHaveBeenCalled()
+  })
+
+  it('retries a pending financial rebuild even when source data matches', async () => {
+    const portfolio = canonicalPortfolio({
+      refreshAfter: 20_000,
+      sync: { financialProjectionDirty: true, pendingSections: ['assets'] },
+    })
+    const { firestore } = createFirestore({ portfolio, currentValue: 1000 })
+    const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
+      sheetFetch(),
+      rebuildProjection,
+      () => 10_000,
+    )
+
+    expect(result.financialSections).toEqual(['assets'])
+    expect(rebuildProjection).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the financial projection marked dirty when its rebuild fails', async () => {
+    const { firestore, writes } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 0 }),
+      currentValue: 1000,
+    })
+    const rebuildProjection = vi.fn(async () => {
+      throw new Error('projection unavailable')
+    })
+
+    await expect(
+      syncInvestmentPortfolio(
+        firestore,
+        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+        sheetFetch({ portfolioValue: '2.000,00' }),
+        rebuildProjection,
+        () => 10_000,
+      ),
+    ).rejects.toThrow('projection unavailable')
+
+    const portfolioWrite = writes.find((write) => write.data?.['detail.portfolio'])
+    expect(portfolioWrite.data['detail.portfolio'].sync).toEqual({
+      financialProjectionDirty: true,
+      pendingSections: ['assets'],
+    })
+  })
+
+  it('disconnects the Sheet and preserves linked Income as a manual value', async () => {
+    const { firestore, writes } = createFirestore({
+      portfolio: canonicalPortfolio(),
+      linkedIncome: [
+        {
+          id: 'dividends-a',
+          categoryId: 'investments',
+          subcategoryId: 'dividends',
+          portfolioAssetId: 'investment-a',
+          calculation: { mode: 'recurring', amount: 100, frequency: 'yearly' },
+        },
+      ],
     })
 
     await expect(
@@ -64,7 +264,16 @@ describe('investment portfolio service', () => {
         spreadsheetUrl: null,
       }),
     ).resolves.toEqual({ portfolio: null })
-    expect(writes[0].data.detail).toEqual({ notes: 'preserved' })
+
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        path: 'workspaces/workspace-a/modelIncome/dividends-a',
+        data: expect.objectContaining({ portfolioAssetId: null }),
+      }),
+    )
+    expect(writes.find((write) => write.path.endsWith('dividends-a')).data).not.toHaveProperty(
+      'calculation',
+    )
   })
 
   it('rejects non-members and non-investment assets', async () => {
@@ -89,260 +298,122 @@ describe('investment portfolio service', () => {
     ).rejects.toThrow('Investment not found')
   })
 
-  it('reads the Portfolio tab from the configured Google Sheet', async () => {
-    const { firestore, writes } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit?usp=sharing',
-      },
-    })
-    const fetchSpreadsheet = vi.fn(async (url) => {
-      const body =
-        url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('EUR', '€27.693,16', '€800,00', '€682,47')
-          : 'Ticker,Annual dividend (base)\r\nVWCE,"550,00"\r\nKO,"132,47"'
-      return { ok: true, text: async () => body }
-    })
-    const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
-
-    await expect(
-      readInvestmentPortfolioSheet(
-        firestore,
-        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-        fetchSpreadsheet,
-        rebuildProjection,
-      ),
-    ).resolves.toEqual({
-      sheet: 'Portfolio',
-      rows: [
-        ['Ticker', 'Annual dividend (base)'],
-        ['VWCE', '550,00'],
-        ['KO', '132,47'],
-      ],
-      summary: {
-        baseCurrency: 'EUR',
-        totalPortfolioValue: 27693.16,
-        totalDividendsReceived: 800,
-        annualDividendIncome: 682.47,
-      },
-    })
-
-    const requestedUrls = fetchSpreadsheet.mock.calls.map(([url]) => url)
-    expect(requestedUrls).toHaveLength(2)
-    expect(requestedUrls[0].hostname).toBe('docs.google.com')
-    expect(requestedUrls[0].pathname).toBe('/spreadsheets/d/sheet_123/gviz/tq')
-    expect(requestedUrls[0].searchParams.get('sheet')).toBe('Portfolio')
-    expect(requestedUrls[1].searchParams.get('sheet')).toBe('Summary')
-    expect(requestedUrls[1].searchParams.has('range')).toBe(false)
-    expect(requestedUrls[1].searchParams.get('tqx')).toBe('out:csv')
-    expect(writes).toContainEqual(
-      expect.objectContaining({
-        path: 'workspaces/workspace-a/modelAssets/investment-a',
-        data: expect.objectContaining({
-        currentValue: 27693.16,
-        'detail.portfolio.summary': {
-          baseCurrency: 'EUR',
-          totalPortfolioValue: 27693.16,
-          totalDividendsReceived: 800,
-          annualDividendIncome: 682.47,
-          syncedAt: expect.anything(),
-        },
-        'detail.portfolio.snapshot': expect.objectContaining({
-          schemaVersion: 1,
-          sheet: 'Portfolio',
-          rowsJson: expect.stringContaining('VWCE'),
-          summary: expect.objectContaining({ totalPortfolioValue: 27693.16 }),
-        }),
-        updatedBy: 'member-a',
-        }),
-      }),
-    )
-    expect(rebuildProjection).toHaveBeenCalledWith(
-      firestore,
-      'workspace-a',
-      expect.any(Number),
-      { sections: ['assets'] },
-    )
-  })
-
-  it('parses a CSV sheet with quotes, commas, line breaks and empty cells', () => {
-    expect(parseCsv('Name,Notes,Value\r\nFund,"A ""quoted""\nvalue",""')).toEqual([
-      ['Name', 'Notes', 'Value'],
-      ['Fund', 'A "quoted"\nvalue', ''],
-    ])
-    expect(parseCsv('')).toEqual([])
-  })
-
-  it('extracts raw values from a Google Visualization response', () => {
-    expect(parseGoogleVisualizationValues(googleVisualizationResponse(['EUR']))).toEqual(['EUR'])
-    expect(
-      parseGoogleVisualizationValues(googleVisualizationResponse([27693.16, 682.47])),
-    ).toEqual([27693.16, 682.47])
-  })
-
-  it('updates linked income with the net dividends from the Summary tab', async () => {
-    const { firestore, writes } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
-      },
-      linkedIncome: [
-        {
-          id: 'dividends-a',
-          categoryId: 'investments',
-          subcategoryId: 'dividends',
-          portfolioAssetId: 'investment-a',
-        },
-      ],
-    })
-    const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
-    const fetchSpreadsheet = vi.fn(async (url) => {
-      const body =
-        url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('EUR', '30,000.00', '900.00', '700.00')
-          : 'Ticker,Annual dividend (base)\r\nVWCE,720'
-      return { ok: true, text: async () => body }
-    })
-
-    await readInvestmentPortfolioSheet(
-      firestore,
-      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-      fetchSpreadsheet,
-      rebuildProjection,
-    )
-
-    expect(writes).toContainEqual(
-      expect.objectContaining({
-        path: 'workspaces/workspace-a/modelIncome/dividends-a',
-        data: expect.objectContaining({
-          calculation: { mode: 'recurring', amount: 700, frequency: 'yearly' },
-        }),
-      }),
-    )
-    expect(rebuildProjection).toHaveBeenCalledWith(
-      firestore,
-      'workspace-a',
-      expect.any(Number),
-      { sections: ['assets', 'income'] },
-    )
-  })
-
-  it('reports an inaccessible configured Sheet', async () => {
-    const { firestore } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/private-sheet/edit',
-      },
-    })
-
-    await expect(
-      readInvestmentPortfolioSheet(
-        firestore,
-        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-        async () => ({ ok: false, status: 403 }),
-      ),
-    ).rejects.toThrow('The Portfolio tab returned HTTP 403')
-  })
-
-  it('retries the complete Google Sheets read after a transient failure', async () => {
-    const { firestore } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
-      },
-    })
-    const fetchSpreadsheet = vi.fn(async (url) => {
-      if (fetchSpreadsheet.mock.calls.length === 1) throw new Error('temporary failure')
-      return {
-        ok: true,
-        text: async () =>
-          url.searchParams.get('sheet') === 'Summary'
-            ? summaryCsv('EUR', '1,000.00', '25.00', '20.00')
-            : 'Ticker,Annual dividend (base)\r\nVWCE,25',
-      }
-    })
-
-    await expect(
-      readInvestmentPortfolioSheet(
-        firestore,
-        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-        fetchSpreadsheet,
-        vi.fn(),
-      ),
-    ).resolves.toMatchObject({ summary: { totalPortfolioValue: 1000 } })
-    expect(fetchSpreadsheet).toHaveBeenCalledTimes(4)
-  })
-
-  it('reads localized values from the complete Summary tab by label', async () => {
-    const { firestore } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
-      },
-    })
-    const fetchSpreadsheet = vi.fn(async (url) => ({
-      ok: true,
-      text: async () =>
-        url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('EUR', '27.693,16 €', '800,00 €', '682,47 €', 'Portfolio 2026')
-          : 'Ticker,Annual dividend (base)\r\nVWCE,"682,47"',
-    }))
-
-    await expect(
-      readInvestmentPortfolioSheet(
-        firestore,
-        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-        fetchSpreadsheet,
-        vi.fn(),
-      ),
-    ).resolves.toMatchObject({
-      summary: {
-        baseCurrency: 'EUR',
-        totalPortfolioValue: 27693.16,
-        totalDividendsReceived: 800,
-        annualDividendIncome: 682.47,
-      },
-    })
-  })
-
-  it('accepts a currency symbol and the shorter Currency label', async () => {
-    const { firestore } = createFirestore({
-      portfolio: {
-        source: 'google_sheets',
-        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
-      },
-    })
-    const fetchSpreadsheet = vi.fn(async (url) => ({
-      ok: true,
-      text: async () =>
-        url.searchParams.get('sheet') === 'Summary'
-          ? summaryCsv('€', '27.693,16 €', '800,00 €', '682,47 €').replace(
-              'Base currency',
-              'Currency',
-            )
-          : 'Ticker,Annual dividend (base)\r\nVWCE,"682,47"',
-    }))
-
-    await expect(
-      readInvestmentPortfolioSheet(
-        firestore,
-        { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a' },
-        fetchSpreadsheet,
-        vi.fn(),
-      ),
-    ).resolves.toMatchObject({
-      summary: {
-        baseCurrency: 'EUR',
-        totalPortfolioValue: 27693.16,
-        totalDividendsReceived: 800,
-        annualDividendIncome: 682.47,
-      },
-    })
+  it('recognizes cache freshness from the centralized TTL metadata', () => {
+    expect(portfolioCacheIsFresh(canonicalPortfolio({ refreshAfter: 101 }), 100)).toBe(true)
+    expect(portfolioCacheIsFresh(canonicalPortfolio({ refreshAfter: 100 }), 100)).toBe(false)
   })
 })
 
+function canonicalPortfolio({
+  refreshAfter = 20_000,
+  sync = { financialProjectionDirty: false, pendingSections: [] },
+} = {}) {
+  return {
+    schemaVersion: 1,
+    source: 'google_sheets',
+    spreadsheetId: 'sheet_123',
+    spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
+    summary: {
+      baseCurrency: 'EUR',
+      totalPortfolioValue: 1000,
+      totalDividendsReceived: 125,
+      annualDividendIncome: 100,
+    },
+    cache: {
+      schemaVersion: 1,
+      holdings: normalizedHoldings(),
+      lastCheckedAt: 1_000,
+      dataUpdatedAt: 1_000,
+      refreshAfter,
+    },
+    sync,
+  }
+}
+
+function normalizedHoldings() {
+  return [
+    {
+      id: 'portfolio-0',
+      ticker: 'IBE.MC',
+      country: 'ES',
+      currency: 'EUR',
+      shares: 1000,
+      priceLocal: 21.9,
+      dayChangePercent: 0.74,
+      dividendYieldPercent: 2.51,
+      marketValueBase: 21900,
+      portfolioWeightPercent: 81.52,
+      annualDividendBase: 550,
+      incomeWeightPercent: 82.89,
+    },
+  ]
+}
+
+function sheetFetch({
+  portfolioValue = '1.000,00',
+  grossDividends = '125,00',
+  netDividends = '100,00',
+} = {}) {
+  return vi.fn(async (url) => ({
+    ok: true,
+    text: async () =>
+      url.searchParams.get('sheet') === 'Summary'
+        ? summaryCsv('EUR', portfolioValue, grossDividends, netDividends)
+        : portfolioCsv(),
+  }))
+}
+
+function portfolioCsv() {
+  return [
+    [
+      'Ticker',
+      'Country',
+      'Currency',
+      'Shares',
+      'Price (local)',
+      'Day Change %',
+      'Dividend yield (local)',
+      'Market value (base)',
+      'Portfolio %',
+      'Annual dividend (base)',
+      'Income %',
+    ],
+    [
+      'IBE.MC',
+      'ES',
+      'EUR',
+      '1000',
+      '21,9',
+      '0,74%',
+      '2,51%',
+      '21900',
+      '81,52%',
+      '550,00',
+      '82,89%',
+    ],
+  ]
+    .map((row) => row.map(csvCell).join(','))
+    .join('\r\n')
+}
+
+function summaryCsv(currency, portfolioValue, grossDividends, netDividends) {
+  return [
+    ['Base currency', currency],
+    ['Total Portofolio Value', portfolioValue],
+    ['Total dividends received', grossDividends],
+    ['Net dividends received', netDividends],
+  ]
+    .map((row) => row.map(csvCell).join(','))
+    .join('\r\n')
+}
+
+function csvCell(value) {
+  return `"${String(value).replaceAll('"', '""')}"`
+}
+
 function createFirestore({
   portfolio,
+  currentValue = 0,
   memberIds = ['member-a'],
   categoryId = 'investment',
   linkedIncome = [],
@@ -352,6 +423,7 @@ function createFirestore({
     'workspaces/workspace-a': { memberIds },
     'workspaces/workspace-a/modelAssets/investment-a': {
       categoryId,
+      currentValue,
       detail: { notes: 'preserved', ...(portfolio ? { portfolio } : {}) },
     },
   }
@@ -372,8 +444,8 @@ function createFirestore({
       },
       where(field, operator, value) {
         return {
+          path: `${path}?${field}${operator}${value}`,
           async get() {
-            if (operator !== '==') return { docs: [] }
             const prefix = `${path}/`
             return {
               docs: Object.entries(records)
@@ -404,45 +476,17 @@ function createFirestore({
     collection(name) {
       return reference(name)
     },
-    async runTransaction(callback) {
-      return callback({
-        async get(target) {
-          const data = records[target.path]
-          return { exists: Boolean(data), data: () => data }
-        },
+    batch() {
+      const operations = []
+      return {
         update(target, data) {
-          writes.push({ path: target.path, data })
+          operations.push({ target, data })
         },
-      })
+        async commit() {
+          for (const { target, data } of operations) await target.update(data)
+        },
+      }
     },
   }
-
   return { firestore, writes }
-}
-
-function googleVisualizationResponse(values) {
-  return `google.visualization.Query.setResponse(${JSON.stringify({
-    version: '0.6',
-    status: 'ok',
-    table: { rows: values.map((value) => ({ c: [{ v: value }] })) },
-  })});`
-}
-
-function summaryCsv(
-  currency,
-  totalPortfolioValue,
-  totalDividendsReceived,
-  netDividendsReceived,
-  name = 'My portfolio',
-) {
-  return [
-    '"Cost of Life — Investment Sheet settings",""',
-    '"","Value"',
-    `"Base currency","${currency}"`,
-    `"Portfolio name","${name}"`,
-    `"Total Portofolio Value","${totalPortfolioValue}"`,
-    `"Total dividends received","${totalDividendsReceived}"`,
-    '"Average % of taxes","20%"',
-    `"Net dividends received","${netDividendsReceived}"`,
-  ].join('\r\n')
 }

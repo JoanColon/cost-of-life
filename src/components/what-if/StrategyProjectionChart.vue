@@ -15,7 +15,7 @@ use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent,
 
 const props = defineProps({
   strategyPoints: { type: Array, required: true },
-  seriesName: { type: String, default: 'Scenario' },
+  baselinePoints: { type: Array, default: () => [] },
   mode: { type: String, default: 'total' },
 })
 
@@ -51,7 +51,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.strategyPoints, props.seriesName, props.mode],
+  () => [props.strategyPoints, props.baselinePoints, props.mode],
   () => nextTick(renderChart),
   { deep: true },
 )
@@ -72,20 +72,17 @@ function renderChart() {
           ),
         },
       },
-      grid: { top: props.mode === 'breakdown' ? 50 : 16, right: 18, bottom: 28, left: 62 },
-      legend:
-        props.mode === 'breakdown'
-          ? {
-              show: true,
-              type: 'scroll',
-              top: 4,
-              left: 8,
-              right: 8,
-              itemWidth: 18,
-              itemHeight: 8,
-              textStyle: { color: '#526987', fontSize: 11 },
-            }
-          : { show: false },
+      grid: { top: 50, right: 18, bottom: 28, left: 62 },
+      legend: {
+        show: true,
+        type: 'scroll',
+        top: 4,
+        left: 8,
+        right: 8,
+        itemWidth: 18,
+        itemHeight: 8,
+        textStyle: { color: '#526987', fontSize: 11 },
+      },
       tooltip: {
         trigger: 'axis',
         backgroundColor: '#0b1633',
@@ -125,26 +122,24 @@ function renderChart() {
 function totalChartSeries() {
   return [
     {
-      name: props.seriesName,
+      name: t('whatIf.strategy.regularInvestment'),
       type: 'line',
-      data: props.strategyPoints.map(({ value }) => value),
+      data: props.baselinePoints.map(({ value }) => value),
       smooth: 0.25,
       showSymbol: false,
       lineStyle: { width: 3, color: '#0870d8' },
       itemStyle: { color: '#0870d8' },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(8, 112, 216, .2)' },
-            { offset: 1, color: 'rgba(8, 112, 216, .01)' },
-          ],
-        },
-      },
+      emphasis: { focus: 'series', lineStyle: { width: 4 } },
+    },
+    {
+      name: t('whatIf.strategy.strategyInvestment'),
+      type: 'line',
+      data: props.strategyPoints.map(({ value }) => value),
+      smooth: 0.25,
+      showSymbol: false,
+      lineStyle: { width: 3, color: '#0c6b4d' },
+      itemStyle: { color: '#0c6b4d' },
+      emphasis: { focus: 'series', lineStyle: { width: 4 } },
     },
   ]
 }

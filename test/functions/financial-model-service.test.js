@@ -471,6 +471,37 @@ describe('atomic financial model mutations', () => {
     expect(financialYearValue(financialYear, 'expenses')).toBe(12000)
     expect(financialYearValue(financialYear, 'savings')).toBe(-12000)
   })
+
+  it('turns linked dividend income into a manual value when deleting its portfolio asset', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'assets',
+      collection: 'modelAssets',
+      category: 'investment',
+      items: [{ id: 'investment-a', categoryId: 'investment', currentValue: 1000, ownership }],
+      linkedIncome: [
+        {
+          id: 'dividends-a',
+          portfolioAssetId: 'investment-a',
+          calculation: { mode: 'recurring', amount: 100, frequency: 'yearly' },
+        },
+      ],
+    })
+
+    await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'assets',
+      operation: 'delete',
+      itemId: 'investment-a',
+    })
+
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        path: 'workspaces/workspace-a/modelIncome/dividends-a',
+        data: expect.objectContaining({ portfolioAssetId: null }),
+      }),
+    )
+  })
 })
 
 function createFirestore({
@@ -480,6 +511,7 @@ function createFirestore({
   items = [],
   configCategory = { enabled: true, ownership },
   memberIds = ['member-a'],
+  linkedIncome = [],
 }) {
   const writes = []
   let generatedId = 0
@@ -516,6 +548,15 @@ function createFirestore({
       return documentSnapshot(financialYear)
     }
     if (target.path === `workspaces/workspace-a/${collection}`) return querySnapshot(items)
+    if (target.path === 'workspaces/workspace-a/modelIncome') {
+      return {
+        docs: linkedIncome.map(({ id, ...data }) => ({
+          id,
+          data: () => data,
+          ref: reference(`workspaces/workspace-a/modelIncome/${id}`),
+        })),
+      }
+    }
     if (target.path === 'workspaces/workspace-a/expenseTracking') return querySnapshot([])
     if (target.path.startsWith(`workspaces/workspace-a/${collection}/`)) {
       const id = target.path.split('/').at(-1)
@@ -536,6 +577,9 @@ function createFirestore({
         },
         delete(target) {
           writes.push({ path: target.path, deleted: true })
+        },
+        update(target, data) {
+          writes.push({ path: target.path, data })
         },
       })
     },

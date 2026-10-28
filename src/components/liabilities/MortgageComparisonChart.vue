@@ -1,37 +1,17 @@
 <template>
-  <div class="comparison-chart">
-    <div class="chart-legend" aria-hidden="true">
-      <span><i class="normal" />{{ normalLabel }}</span>
-      <span><i class="accelerated" />{{ acceleratedLabel }}</span>
-    </div>
-    <svg viewBox="0 0 720 260" preserveAspectRatio="none" role="img" :aria-label="ariaLabel">
-      <line v-for="line in gridLines" :key="line" x1="0" x2="720" :y1="line" :y2="line" />
-      <path v-if="chart.normal" class="balance-line normal" :d="chart.normal" />
-      <path v-if="chart.accelerated" class="balance-line accelerated" :d="chart.accelerated" />
-      <circle
-        v-if="chart.normalEnd"
-        class="endpoint normal"
-        :cx="chart.normalEnd.x"
-        :cy="chart.normalEnd.y"
-        r="5"
-      />
-      <circle
-        v-if="chart.acceleratedEnd"
-        class="endpoint accelerated"
-        :cx="chart.acceleratedEnd.x"
-        :cy="chart.acceleratedEnd.y"
-        r="5"
-      />
-    </svg>
-    <div v-if="normalSchedule.length" class="chart-labels">
-      <span>{{ formatMonthYear(startDate) }}</span>
-      <span>{{ formatMonthYear(normalSchedule.at(-1)?.date) }}</span>
-    </div>
-  </div>
+  <div ref="chartElement" class="mortgage-comparison-chart" />
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { LineChart } from 'echarts/charts'
+import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import { init, use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { formatCurrency } from '@/utils/formatters'
+
+use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent, CanvasRenderer])
 
 const props = defineProps({
   normalSchedule: { type: Array, default: () => [] },
@@ -43,132 +23,164 @@ const props = defineProps({
   ariaLabel: { type: String, required: true },
 })
 
-const gridLines = [20, 80, 140, 200, 260]
-const chart = computed(() => buildChart(props))
+const { locale } = useI18n()
+const chartElement = ref(null)
+let chart = null
+let resizeObserver = null
 
-function buildChart({ normalSchedule, acceleratedSchedule, startingBalance }) {
-  if (!normalSchedule.length) return {}
-  const width = 720
-  const height = 260
-  const padding = 8
-  const maximum = Math.max(1, Number(startingBalance) || 0)
-  const totalMonths = Math.max(1, normalSchedule.length)
+onMounted(() => {
+  chart = init(chartElement.value)
+  resizeObserver = new ResizeObserver(() => chart?.resize())
+  resizeObserver.observe(chartElement.value)
+  renderChart()
+})
 
-  function lineFor(schedule) {
-    const points = [
-      { paymentNumber: 0, remainingBalance: maximum },
-      ...schedule.filter(
-        (payment, index) => (index + 1) % 12 === 0 || index === schedule.length - 1,
-      ),
-    ].map(({ paymentNumber, remainingBalance }) => ({
-      x: padding + (paymentNumber / totalMonths) * (width - padding * 2),
-      y: padding + (1 - remainingBalance / maximum) * (height - padding * 2),
-    }))
-    return {
-      path: points
-        .map(({ x, y }, index) => `${index ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`)
-        .join(' '),
-      end: points.at(-1),
-    }
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  chart?.dispose()
+})
+
+watch(
+  () => [
+    props.normalSchedule,
+    props.acceleratedSchedule,
+    props.startingBalance,
+    props.startDate,
+    props.normalLabel,
+    props.acceleratedLabel,
+    props.ariaLabel,
+    locale.value,
+  ],
+  () => nextTick(renderChart),
+  { deep: true },
+)
+
+function renderChart() {
+  if (!chart) return
+  if (!props.normalSchedule.length) {
+    chart.clear()
+    return
   }
 
-  const normal = lineFor(normalSchedule)
-  const accelerated = lineFor(acceleratedSchedule)
+  const periods = [props.startDate, ...props.normalSchedule.map(({ date }) => date)]
+  const normalValues = [
+    props.startingBalance,
+    ...props.normalSchedule.map(({ remainingBalance }) => remainingBalance),
+  ]
+  const acceleratedValues = [
+    props.startingBalance,
+    ...props.acceleratedSchedule.map(({ remainingBalance }) => remainingBalance),
+  ]
+  while (acceleratedValues.length < periods.length) acceleratedValues.push(null)
+
+  chart.setOption(
+    {
+      animationDuration: 400,
+      aria: { enabled: true, label: { description: props.ariaLabel } },
+      grid: { top: 48, right: 18, bottom: 42, left: 72 },
+      legend: {
+        top: 4,
+        left: 4,
+        itemWidth: 22,
+        itemHeight: 8,
+        textStyle: { color: '#526987', fontSize: 11 },
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: '#0b1633',
+        borderWidth: 0,
+        padding: [9, 12],
+        textStyle: { color: '#fff', fontSize: 12 },
+        formatter: formatTooltip,
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: periods,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: '#dce5ed' } },
+        axisLabel: {
+          color: '#64748b',
+          fontSize: 11,
+          hideOverlap: true,
+          margin: 12,
+          formatter: (value, index) => yearLabel(value, index, periods.length),
+        },
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        splitNumber: 4,
+        axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
+        splitLine: { lineStyle: { color: '#edf2f5' } },
+      },
+      series: [
+        payoffSeries(props.normalLabel, normalValues, '#0870d8'),
+        payoffSeries(props.acceleratedLabel, acceleratedValues, '#0c6b4d'),
+      ],
+    },
+    true,
+  )
+}
+
+function payoffSeries(name, data, color) {
   return {
-    normal: normal.path,
-    accelerated: accelerated.path,
-    normalEnd: normal.end,
-    acceleratedEnd: accelerated.end,
+    name,
+    type: 'line',
+    data,
+    connectNulls: false,
+    showSymbol: false,
+    symbol: 'circle',
+    lineStyle: { width: 3, color },
+    itemStyle: { color, borderColor: '#fff', borderWidth: 2 },
+    emphasis: { focus: 'series', lineStyle: { width: 4 } },
   }
 }
 
+function formatTooltip(points) {
+  const values = (Array.isArray(points) ? points : [points]).filter(({ data }) => data != null)
+  return `<strong>${formatMonthYear(values[0]?.axisValue)}</strong><br/>${values
+    .map(
+      ({ marker, seriesName, data }) =>
+        `${marker}<span style="display:inline-block;min-width:9rem">${seriesName}</span> <strong>${formatCurrency(data)}</strong>`,
+    )
+    .join('<br/>')}`
+}
+
+function yearLabel(value, index, length) {
+  const year = String(value || '').slice(0, 4)
+  const month = String(value || '').slice(5, 7)
+  return index === 0 || index === length - 1 || month === '01' ? year : ''
+}
+
 function formatMonthYear(value) {
-  if (!value) return '—'
-  return new Intl.DateTimeFormat('en-IE', {
-    month: 'short',
+  if (!value) return ''
+  return new Intl.DateTimeFormat(locale.value, {
+    month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${value}T00:00:00Z`))
 }
+
+function compactCurrency(value) {
+  return new Intl.NumberFormat(locale.value, {
+    notation: 'compact',
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
 </script>
 
-<style scoped lang="scss">
-.comparison-chart {
-  min-width: 0;
-}
-
-.chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-  color: var(--color-copy);
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-
-.chart-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.chart-legend i {
-  width: 1.5rem;
-  height: 0.2rem;
-  border-radius: 999px;
-}
-
-.chart-legend i.normal {
-  background: var(--color-primary);
-}
-
-.chart-legend i.accelerated {
-  background: var(--color-success-dark);
-}
-
-svg {
-  display: block;
+<style scoped>
+.mortgage-comparison-chart {
   width: 100%;
-  height: clamp(13rem, 36vw, 21rem);
-  overflow: visible;
+  height: 21rem;
 }
 
-svg > line {
-  stroke: var(--color-line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.balance-line {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
-}
-
-.balance-line.normal,
-.endpoint.normal {
-  stroke: var(--color-primary);
-}
-
-.balance-line.accelerated,
-.endpoint.accelerated {
-  stroke: var(--color-success-dark);
-}
-
-.endpoint {
-  fill: white;
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
-}
-
-.chart-labels {
-  display: flex;
-  justify-content: space-between;
-  color: var(--color-copy);
-  font-size: 0.75rem;
-  font-weight: 650;
+@media (max-width: 760px) {
+  .mortgage-comparison-chart {
+    height: 17rem;
+  }
 }
 </style>

@@ -160,8 +160,10 @@ export const useAssetsStore = defineStore('assets', () => {
     const result = await saveInvestmentPortfolioDocument(workspaceId, assetId, spreadsheetUrl)
     replaceAsset(assetId, {
       ...asset,
+      currentValue: result.currentValue,
       detail: { ...(asset.detail || {}), portfolio: result.portfolio },
     })
+    return result
   }
 
   async function disconnectInvestmentPortfolio(workspaceId, assetId) {
@@ -174,31 +176,17 @@ export const useAssetsStore = defineStore('assets', () => {
     replaceAsset(assetId, { ...asset, detail })
   }
 
-  function applyInvestmentPortfolioSummary(assetId, summary, snapshot = null) {
+  function applyInvestmentPortfolioSync(assetId, result) {
     const asset = findLoadedAsset(assetId)
-    const totalPortfolioValue = Number(summary?.totalPortfolioValue)
-    if (!asset || !Number.isFinite(totalPortfolioValue) || totalPortfolioValue < 0) return
-
-    const portfolio = {
-      ...(asset.detail?.portfolio || {}),
-      summary: { ...summary },
-    }
-    if (snapshot && Array.isArray(snapshot.rows)) {
-      portfolio.snapshot = {
-        schemaVersion: 1,
-        sheet: snapshot.sheet || 'Portfolio',
-        rowsJson: JSON.stringify(snapshot.rows),
-        summary: { ...summary },
-        syncedAt: null,
-      }
-    }
+    const totalPortfolioValue = Number(result?.currentValue)
+    if (!asset || !result?.portfolio || !Number.isFinite(totalPortfolioValue)) return
 
     replaceAsset(assetId, {
       ...asset,
       currentValue: Math.round((totalPortfolioValue + Number.EPSILON) * 100) / 100,
       detail: {
         ...(asset.detail || {}),
-        portfolio,
+        portfolio: result.portfolio,
       },
     })
   }
@@ -279,7 +267,7 @@ export const useAssetsStore = defineStore('assets', () => {
     deleteAsset,
     saveInvestmentPortfolio,
     disconnectInvestmentPortfolio,
-    applyInvestmentPortfolioSummary,
+    applyInvestmentPortfolioSync,
     deleteCategory,
     itemsForCategory,
     reset,

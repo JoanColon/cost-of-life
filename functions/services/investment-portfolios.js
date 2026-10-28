@@ -1,73 +1,189 @@
 const { FieldValue } = require('firebase-admin/firestore')
 const { currentYear, rebuildFinancialYear } = require('./financial-years')
+const {
+  PORTFOLIO_SCHEMA_V1,
+  normalizeInvestmentPortfolio,
+  parseCsv,
+} = require('./investment-portfolio-schema')
 
 const GOOGLE_SHEETS_HOST = 'docs.google.com'
 const SPREADSHEET_PATH = /^\/spreadsheets(?:\/u\/\d+)?\/d\/([A-Za-z0-9_-]+)(?:\/|$)/
-const PORTFOLIO_SHEET_NAME = 'Portfolio'
-const SUMMARY_SHEET_NAME = 'Summary'
 const SHEET_READ_ATTEMPTS = 2
 const SHEET_RETRY_DELAY_MS = 200
 const GOOGLE_SHEET_TIMEOUT_MS = 25_000
-const MAXIMUM_SNAPSHOT_ROWS_BYTES = 700_000
+const PORTFOLIO_CACHE_TTL_MS = 15 * 60 * 1000
+const MAXIMUM_CACHE_BYTES = 700_000
 
 async function updateInvestmentPortfolio(
   firestore,
   { workspaceId, userId, assetId, spreadsheetUrl = null },
+  fetchImpl = fetch,
+  rebuildFinancialYearImpl = rebuildFinancialYear,
+  nowImpl = Date.now,
 ) {
-  assertText(workspaceId, 'A workspace is required')
-  assertText(userId, 'Authentication is required')
-  assertText(assetId, 'An investment is required')
+  assertRequest(workspaceId, userId, assetId)
+  if (spreadsheetUrl == null) {
+    return disconnectInvestmentPortfolio(firestore, { workspaceId, userId, assetId })
+  }
 
-  const canonicalUrl = spreadsheetUrl == null ? null : canonicalGoogleSheetsUrl(spreadsheetUrl)
-  const workspaceReference = firestore.collection('workspaces').doc(workspaceId)
-  const assetReference = workspaceReference.collection('modelAssets').doc(assetId)
+  const canonicalUrl = canonicalGoogleSheetsUrl(spreadsheetUrl)
+  return synchronizeInvestmentPortfolio(
+    firestore,
+    { workspaceId, userId, assetId, force: true },
+    fetchImpl,
+    rebuildFinancialYearImpl,
+    nowImpl,
+    canonicalUrl,
+  )
+}
 
-  return firestore.runTransaction(async (transaction) => {
-    const [workspaceSnapshot, assetSnapshot] = await Promise.all([
-      transaction.get(workspaceReference),
-      transaction.get(assetReference),
-    ])
-    const workspace = workspaceSnapshot.data()
-    const asset = assetSnapshot.data()
+async function syncInvestmentPortfolio(
+  firestore,
+  { workspaceId, userId, assetId, force = false },
+  fetchImpl = fetch,
+  rebuildFinancialYearImpl = rebuildFinancialYear,
+  nowImpl = Date.now,
+) {
+  assertRequest(workspaceId, userId, assetId)
+  return synchronizeInvestmentPortfolio(
+    firestore,
+    { workspaceId, userId, assetId, force: Boolean(force) },
+    fetchImpl,
+    rebuildFinancialYearImpl,
+    nowImpl,
+  )
+}
 
-    if (
-      !workspaceSnapshot.exists ||
-      workspace?.deletionPendingAt ||
-      !workspace?.memberIds?.includes(userId)
-    ) {
-      throw new Error('Workspace membership is required')
-    }
-    if (!assetSnapshot.exists || asset?.categoryId !== 'investment') {
-      throw new Error('Investment not found')
-    }
+async function synchronizeInvestmentPortfolio(
+  firestore,
+  { workspaceId, userId, assetId, force },
+  fetchImpl,
+  rebuildFinancialYearImpl,
+  nowImpl,
+  spreadsheetUrlOverride = null,
+) {
+  const context = await portfolioContext(firestore, { workspaceId, userId, assetId })
+  const existingPortfolio = context.asset?.detail?.portfolio || null
+  const now = Number(nowImpl())
 
-    const detail = isPlainObject(asset.detail) ? { ...asset.detail } : {}
-    if (canonicalUrl) {
-      detail.portfolio = { source: 'google_sheets', spreadsheetUrl: canonicalUrl }
-    } else {
-      delete detail.portfolio
-    }
+  if (!spreadsheetUrlOverride && !force && portfolioCacheIsFresh(existingPortfolio, now)) {
+    return portfolioResult(existingPortfolio, context.asset.currentValue, 'fresh')
+  }
 
-    transaction.update(assetReference, {
-      detail,
+  const spreadsheetUrl = spreadsheetUrlOverride || existingPortfolio?.spreadsheetUrl
+  const spreadsheetId = spreadsheetIdFromUrl(spreadsheetUrl)
+  const normalized = await fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl)
+  const cacheBytes = Buffer.byteLength(JSON.stringify(normalized.holdings), 'utf8')
+  if (cacheBytes > MAXIMUM_CACHE_BYTES) {
+    throw new Error('The Google Sheet is too large to cache safely')
+  }
+
+  const linkedIncomeSnapshot = await context.workspaceReference
+    .collection('modelIncome')
+    .where('portfolioAssetId', '==', assetId)
+    .get()
+  const linkedIncomeDocuments = (linkedIncomeSnapshot.docs || []).filter((document) => {
+    const income = document.data()
+    return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
+  })
+  const incomeDocumentsToUpdate = linkedIncomeDocuments.filter(
+    (document) => !incomeMatchesAnnualDividends(document.data(), normalized.summary),
+  )
+
+  const assetValueChanged =
+    roundMoney(context.asset.currentValue) !== normalized.summary.totalPortfolioValue
+  const summaryChanged = !sameValue(existingPortfolio?.summary, normalized.summary)
+  const holdingsChanged = !sameValue(existingPortfolio?.cache?.holdings, normalized.holdings)
+  const pendingSections = existingPortfolio?.sync?.financialProjectionDirty ?
+    existingPortfolio.sync.pendingSections || [] :
+    []
+  const sections = [
+    ...new Set([
+      ...pendingSections,
+      ...(assetValueChanged ? ['assets'] : []),
+      ...(incomeDocumentsToUpdate.length ? ['income'] : []),
+    ]),
+  ]
+  const contentChanged = summaryChanged || holdingsChanged
+  const nextPortfolio = {
+    schemaVersion: PORTFOLIO_SCHEMA_V1.version,
+    source: 'google_sheets',
+    spreadsheetId,
+    spreadsheetUrl: canonicalGoogleSheetsUrl(spreadsheetUrl),
+    summary: normalized.summary,
+    cache: {
+      schemaVersion: PORTFOLIO_SCHEMA_V1.version,
+      holdings: normalized.holdings,
+      lastCheckedAt: now,
+      dataUpdatedAt: contentChanged ? now : existingPortfolio?.cache?.dataUpdatedAt || now,
+      refreshAfter: now + PORTFOLIO_CACHE_TTL_MS,
+    },
+    sync: {
+      financialProjectionDirty: sections.length > 0,
+      pendingSections: sections,
+    },
+  }
+
+  const batch = firestore.batch()
+  batch.update(context.assetReference, {
+    ...(assetValueChanged ? { currentValue: normalized.summary.totalPortfolioValue } : {}),
+    'detail.portfolio': nextPortfolio,
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: userId,
+  })
+  for (const document of incomeDocumentsToUpdate) {
+    batch.update(document.ref, {
+      calculation: {
+        mode: 'recurring',
+        amount: normalized.summary.annualDividendIncome,
+        frequency: 'yearly',
+      },
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: userId,
     })
+  }
+  await batch.commit()
 
-    return { portfolio: detail.portfolio || null }
+  if (sections.length) {
+    await rebuildFinancialYearImpl(firestore, workspaceId, currentYear(), { sections })
+    nextPortfolio.sync = { financialProjectionDirty: false, pendingSections: [] }
+    await context.assetReference.update({
+      'detail.portfolio.sync': nextPortfolio.sync,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: userId,
+    })
+  }
+
+  return portfolioResult(nextPortfolio, normalized.summary.totalPortfolioValue, 'refreshed', {
+    contentChanged,
+    financialSections: sections,
   })
 }
 
-async function readInvestmentPortfolioSheet(
-  firestore,
-  { workspaceId, userId, assetId },
-  fetchImpl = fetch,
-  rebuildFinancialYearImpl = rebuildFinancialYear,
-) {
-  assertText(workspaceId, 'A workspace is required')
-  assertText(userId, 'Authentication is required')
-  assertText(assetId, 'An investment is required')
+async function disconnectInvestmentPortfolio(firestore, { workspaceId, userId, assetId }) {
+  const context = await portfolioContext(firestore, { workspaceId, userId, assetId })
+  const linkedIncomeSnapshot = await context.workspaceReference
+    .collection('modelIncome')
+    .where('portfolioAssetId', '==', assetId)
+    .get()
+  const batch = firestore.batch()
+  batch.update(context.assetReference, {
+    'detail.portfolio': FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: userId,
+  })
+  for (const document of linkedIncomeSnapshot.docs || []) {
+    batch.update(document.ref, {
+      portfolioAssetId: null,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: userId,
+    })
+  }
+  await batch.commit()
+  return { portfolio: null }
+}
 
+async function portfolioContext(firestore, { workspaceId, userId, assetId }) {
   const workspaceReference = firestore.collection('workspaces').doc(workspaceId)
   const assetReference = workspaceReference.collection('modelAssets').doc(assetId)
   const [workspaceSnapshot, assetSnapshot] = await Promise.all([
@@ -76,7 +192,6 @@ async function readInvestmentPortfolioSheet(
   ])
   const workspace = workspaceSnapshot.data()
   const asset = assetSnapshot.data()
-
   if (
     !workspaceSnapshot.exists ||
     workspace?.deletionPendingAt ||
@@ -87,122 +202,32 @@ async function readInvestmentPortfolioSheet(
   if (!assetSnapshot.exists || asset?.categoryId !== 'investment') {
     throw new Error('Investment not found')
   }
+  return { workspaceReference, assetReference, asset }
+}
 
-  const spreadsheetUrl = asset?.detail?.portfolio?.spreadsheetUrl
-  const spreadsheetId = spreadsheetIdFromUrl(spreadsheetUrl)
+async function fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl) {
   const portfolioUrl = googleSheetQueryUrl(spreadsheetId, {
     tqx: 'out:csv',
-    sheet: PORTFOLIO_SHEET_NAME,
+    sheet: PORTFOLIO_SCHEMA_V1.sheets.portfolio,
   })
   const summaryUrl = googleSheetQueryUrl(spreadsheetId, {
     tqx: 'out:csv',
-    sheet: SUMMARY_SHEET_NAME,
+    sheet: PORTFOLIO_SCHEMA_V1.sheets.summary,
   })
-
-  const { portfolioRows, summary } = await fetchPortfolioSheetData(
-    { portfolioUrl, summaryUrl },
-    fetchImpl,
-  )
-
-  const linkedIncomeSnapshot = await workspaceReference
-    .collection('modelIncome')
-    .where('portfolioAssetId', '==', assetId)
-    .get()
-  const linkedIncomeDocuments = (linkedIncomeSnapshot.docs || []).filter((document) => {
-    const income = document.data()
-    return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
-  })
-
-  const rowsJson = JSON.stringify(portfolioRows)
-  if (Buffer.byteLength(rowsJson, 'utf8') > MAXIMUM_SNAPSHOT_ROWS_BYTES) {
-    throw new Error('The Google Sheet is too large to cache safely')
-  }
-
-  await Promise.all([
-    assetReference.update({
-      currentValue: roundMoney(summary.totalPortfolioValue),
-      'detail.portfolio.summary': {
-        ...summary,
-        syncedAt: FieldValue.serverTimestamp(),
-      },
-      'detail.portfolio.snapshot': {
-        schemaVersion: 1,
-        sheet: PORTFOLIO_SHEET_NAME,
-        rowsJson,
-        summary,
-        syncedAt: FieldValue.serverTimestamp(),
-      },
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: userId,
-    }),
-    ...linkedIncomeDocuments.map((document) =>
-      document.ref.update({
-        calculation: {
-          mode: 'recurring',
-          amount: summary.annualDividendIncome,
-          frequency: 'yearly',
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: userId,
-      }),
-    ),
-  ])
-  await rebuildFinancialYearImpl(firestore, workspaceId, currentYear(), {
-    sections: linkedIncomeDocuments.length ? ['assets', 'income'] : ['assets'],
-  })
-
-  return { sheet: PORTFOLIO_SHEET_NAME, rows: portfolioRows, summary }
-}
-
-function parseLocalizedNumber(value) {
-  const input = String(value ?? '')
-    .trim()
-    .replace(/[^0-9,.-]/g, '')
-  if (!input) return null
-
-  const lastComma = input.lastIndexOf(',')
-  const lastDot = input.lastIndexOf('.')
-  let normalized = input
-  if (lastComma >= 0 && lastDot >= 0) {
-    const decimalSeparator = lastComma > lastDot ? ',' : '.'
-    normalized = normalized.replaceAll(decimalSeparator === ',' ? '.' : ',', '')
-    const decimalIndex = normalized.lastIndexOf(decimalSeparator)
-    normalized =
-      normalized.slice(0, decimalIndex).replaceAll(decimalSeparator, '') +
-      '.' +
-      normalized.slice(decimalIndex + 1)
-  } else {
-    const separator = lastComma >= 0 ? ',' : lastDot >= 0 ? '.' : null
-    if (separator) {
-      const parts = normalized.split(separator)
-      const grouping = parts.length > 2 || (parts.length === 2 && parts[1].length === 3)
-      normalized = grouping ? parts.join('') : `${parts[0]}.${parts[1]}`
+  let lastError
+  for (let attempt = 0; attempt < SHEET_READ_ATTEMPTS; attempt += 1) {
+    try {
+      const [portfolioBody, summaryBody] = await Promise.all([
+        fetchGoogleSheet(portfolioUrl, fetchImpl, 1_000_000, 'Portfolio'),
+        fetchGoogleSheet(summaryUrl, fetchImpl, 100_000, 'Summary'),
+      ])
+      return normalizeInvestmentPortfolio(parseCsv(portfolioBody), parseCsv(summaryBody))
+    } catch (error) {
+      lastError = error
+      if (attempt + 1 < SHEET_READ_ATTEMPTS) await delay(SHEET_RETRY_DELAY_MS)
     }
   }
-
-  const number = Number(normalized)
-  return Number.isFinite(number) ? number : null
-}
-
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
-}
-
-function normalizeHeader(value) {
-  return String(value ?? '')
-    .normalize('NFKD')
-    .replace(/[()%]/g, ' ')
-    .replace(/[^a-zA-Z0-9]+/g, ' ')
-    .trim()
-    .toLowerCase()
-}
-
-function googleSheetQueryUrl(spreadsheetId, parameters) {
-  const url = new URL(
-    `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq`,
-  )
-  for (const [name, value] of Object.entries(parameters)) url.searchParams.set(name, value)
-  return url
+  throw lastError
 }
 
 async function fetchGoogleSheet(
@@ -215,124 +240,73 @@ async function fetchGoogleSheet(
   try {
     response = await fetchImpl(url, {
       signal: AbortSignal.timeout(GOOGLE_SHEET_TIMEOUT_MS),
-      headers: { accept: 'text/plain, text/csv, application/json', 'cache-control': 'no-cache' },
+      headers: { accept: 'text/csv', 'cache-control': 'no-cache' },
     })
   } catch {
     throw new Error(`The ${sheetName} tab timed out`)
   }
   if (!response.ok) throw new Error(`The ${sheetName} tab returned HTTP ${response.status}`)
-
   const body = await response.text()
   if (body.length > maximumLength) throw new Error(`The ${sheetName} tab is too large`)
   return body
 }
 
-async function fetchPortfolioSheetData(urls, fetchImpl) {
-  let lastError
-
-  for (let attempt = 0; attempt < SHEET_READ_ATTEMPTS; attempt += 1) {
-    try {
-      const [portfolioBody, summaryBody] = await Promise.all([
-        fetchGoogleSheet(urls.portfolioUrl, fetchImpl, 1_000_000, 'Portfolio'),
-        fetchGoogleSheet(urls.summaryUrl, fetchImpl, 100_000, 'Summary'),
-      ])
-      const portfolioRows = parseCsv(portfolioBody)
-      const summaryRows = parseCsv(summaryBody)
-      const summaryValues = summaryValuesByLabel(summaryRows)
-      const summary = {
-        baseCurrency: parseBaseCurrency(
-          summaryValues.baseCurrency,
-          summaryValues.totalPortfolioValue,
-          summaryValues.totalDividendsReceived,
-        ),
-        totalPortfolioValue: parseLocalizedNumber(summaryValues.totalPortfolioValue),
-        totalDividendsReceived: parseLocalizedNumber(summaryValues.totalDividendsReceived),
-        annualDividendIncome: parseLocalizedNumber(summaryValues.netDividendsReceived),
-      }
-
-      const invalidFields = []
-      if (!/^[A-Z]{3}$/.test(summary.baseCurrency)) invalidFields.push('base currency')
-      if (!Number.isFinite(summary.totalPortfolioValue)) invalidFields.push('portfolio value')
-      if (!Number.isFinite(summary.totalDividendsReceived)) invalidFields.push('dividends received')
-      if (!Number.isFinite(summary.annualDividendIncome)) invalidFields.push('annual dividends')
-      if (invalidFields.length) {
-        throw new Error(`The Google Sheet returned an invalid Summary: ${invalidFields.join(', ')}`)
-      }
-      return { portfolioRows, summary }
-    } catch (error) {
-      lastError = error
-      if (attempt + 1 < SHEET_READ_ATTEMPTS) await delay(SHEET_RETRY_DELAY_MS)
-    }
-  }
-
-  throw lastError
+function portfolioCacheIsFresh(portfolio, now = Date.now()) {
+  return Boolean(
+    portfolio?.schemaVersion === PORTFOLIO_SCHEMA_V1.version &&
+      portfolio?.summary &&
+      portfolio?.cache?.schemaVersion === PORTFOLIO_SCHEMA_V1.version &&
+      Array.isArray(portfolio.cache.holdings) &&
+      !portfolio?.sync?.financialProjectionDirty &&
+      Number(portfolio.cache.refreshAfter) > Number(now),
+  )
 }
 
-function summaryValuesByLabel(rows) {
-  const values = {}
-
-  for (const row of rows) {
-    if (!Array.isArray(row)) continue
-    const label = normalizeHeader(row[0])
-    const value = row[1]
-    const labelWords = label.split(' ')
-
-    if (
-      values.baseCurrency === undefined &&
-      ['currency', 'moneda', 'divisa'].some((word) => labelWords.includes(word))
-    ) {
-      values.baseCurrency = value
-    }
-    if (
-      label === 'portfolio value' ||
-      label === 'total portfolio value' ||
-      label === 'total portofolio value'
-    ) {
-      values.totalPortfolioValue = value
-    }
-    if (label === 'dividends received' || label === 'total dividends received') {
-      values.totalDividendsReceived = value
-    }
-    if (label === 'net dividends received') {
-      values.netDividendsReceived = value
-    }
+function portfolioResult(portfolio, currentValue, cacheStatus, extra = {}) {
+  return {
+    portfolio,
+    currentValue: roundMoney(currentValue),
+    summary: portfolio.summary,
+    holdings: portfolio.cache.holdings,
+    cacheStatus,
+    ...extra,
   }
-
-  return values
 }
 
-function parseBaseCurrency(...values) {
-  const inputs = values.map((value) => String(value ?? '').trim()).filter(Boolean)
-  for (const input of inputs) {
-    const code = input.toUpperCase().match(/(?:^|[^A-Z])([A-Z]{3})(?:[^A-Z]|$)/)?.[1]
-    if (code) return code
-  }
-
-  const combined = inputs.join(' ')
-  if (combined.includes('€')) return 'EUR'
-  if (combined.includes('£')) return 'GBP'
-  if (combined.includes('₹')) return 'INR'
-  if (combined.includes('₩')) return 'KRW'
-  if (combined.includes('¥')) return 'JPY'
-  if (combined.includes('$')) return 'USD'
-  return ''
+function incomeMatchesAnnualDividends(income, summary) {
+  return (
+    income?.calculation?.mode === 'recurring' &&
+    income?.calculation?.frequency === 'yearly' &&
+    roundMoney(income?.calculation?.amount) === summary.annualDividendIncome
+  )
 }
 
-function delay(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+function sameValue(first, second) {
+  return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
+}
+
+function roundMoney(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : null
+}
+
+function googleSheetQueryUrl(spreadsheetId, parameters) {
+  const url = new URL(
+    `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq`,
+  )
+  for (const [name, value] of Object.entries(parameters)) url.searchParams.set(name, value)
+  return url
 }
 
 function canonicalGoogleSheetsUrl(value) {
   const input = String(value || '').trim()
   if (!input || input.length > 2048) throw new Error('A valid Google Sheets URL is required')
-
   let url
   try {
     url = new URL(input)
   } catch {
     throw new Error('A valid Google Sheets URL is required')
   }
-
   if (
     url.protocol !== 'https:' ||
     url.hostname !== GOOGLE_SHEETS_HOST ||
@@ -340,7 +314,6 @@ function canonicalGoogleSheetsUrl(value) {
   ) {
     throw new Error('A valid Google Sheets URL is required')
   }
-
   url.hash = ''
   return url.toString()
 }
@@ -352,73 +325,14 @@ function spreadsheetIdFromUrl(value) {
   return match[1]
 }
 
-function parseCsv(value) {
-  const csv = String(value || '').replace(/^\uFEFF/, '')
-  if (!csv) return []
-
-  const rows = []
-  let row = []
-  let field = ''
-  let quoted = false
-
-  for (let index = 0; index < csv.length; index += 1) {
-    const character = csv[index]
-
-    if (quoted) {
-      if (character === '"' && csv[index + 1] === '"') {
-        field += '"'
-        index += 1
-      } else if (character === '"') {
-        quoted = false
-      } else {
-        field += character
-      }
-    } else if (character === '"' && field === '') {
-      quoted = true
-    } else if (character === ',') {
-      row.push(field)
-      field = ''
-    } else if (character === '\n' || character === '\r') {
-      row.push(field)
-      rows.push(row)
-      row = []
-      field = ''
-      if (character === '\r' && csv[index + 1] === '\n') index += 1
-    } else {
-      field += character
-    }
-  }
-
-  if (quoted) throw new Error('The Google Sheet returned an invalid response')
-  if (field || row.length) {
-    row.push(field)
-    rows.push(row)
-  }
-
-  return rows
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-function parseGoogleVisualizationValues(value) {
-  const response = String(value || '')
-  const start = response.indexOf('{')
-  const end = response.lastIndexOf('}')
-  if (start < 0 || end <= start) throw new Error('The Google Sheet returned an invalid response')
-
-  let payload
-  try {
-    payload = JSON.parse(response.slice(start, end + 1))
-  } catch {
-    throw new Error('The Google Sheet returned an invalid response')
-  }
-  if (payload?.status !== 'ok' || !Array.isArray(payload?.table?.rows)) {
-    throw new Error('The Google Sheet returned an invalid response')
-  }
-
-  return payload.table.rows.map((row) => row?.c?.[0]?.v ?? null)
-}
-
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+function assertRequest(workspaceId, userId, assetId) {
+  assertText(workspaceId, 'A workspace is required')
+  assertText(userId, 'Authentication is required')
+  assertText(assetId, 'An investment is required')
 }
 
 function assertText(value, message) {
@@ -426,9 +340,9 @@ function assertText(value, message) {
 }
 
 module.exports = {
+  PORTFOLIO_CACHE_TTL_MS,
   canonicalGoogleSheetsUrl,
-  parseCsv,
-  parseGoogleVisualizationValues,
-  readInvestmentPortfolioSheet,
+  portfolioCacheIsFresh,
+  syncInvestmentPortfolio,
   updateInvestmentPortfolio,
 }

@@ -69,18 +69,23 @@ async function mutateFinancialModel(
       ...(configSnapshot.data() || {}),
       categories: { ...(configSnapshot.data()?.categories || {}) },
     }
-    const reads = [transaction.get(itemsReference)]
-    if (section === 'expenses') {
-      reads.push(
+    const linkedIncomeReference = workspaceReference.collection('modelIncome')
+    const [itemsSnapshot, trackingSnapshot, linkedIncomeSnapshot] = await Promise.all([
+      transaction.get(itemsReference),
+      section === 'expenses' ?
         transaction.get(
-          workspaceReference
-            .collection('expenseTracking')
-            .where(FieldPath.documentId(), '>=', `${year}-01`)
-            .where(FieldPath.documentId(), '<=', `${year}-12`),
-        ),
-      )
-    }
-    const [itemsSnapshot, trackingSnapshot] = await Promise.all(reads)
+            workspaceReference
+              .collection('expenseTracking')
+              .where(FieldPath.documentId(), '>=', `${year}-01`)
+              .where(FieldPath.documentId(), '<=', `${year}-12`),
+          ) :
+        null,
+      section === 'assets' && operation === 'delete' ?
+        transaction.get(linkedIncomeReference.where('portfolioAssetId', '==', itemId)) :
+        section === 'assets' && operation === 'deleteCategory' ?
+          transaction.get(linkedIncomeReference) :
+          null,
+    ])
     const existingItems = documents(itemsSnapshot)
     const existingItem = itemId ? existingItems.find(({ id }) => id === itemId) : null
     let nextItems = existingItems
@@ -124,6 +129,7 @@ async function mutateFinancialModel(
       const deletedItem = existingItem
       nextItems = existingItems.filter((candidate) => candidate.id !== itemReference.id)
       transaction.delete(itemReference)
+      unlinkPortfolioIncome(transaction, linkedIncomeSnapshot, new Set([itemReference.id]), userId)
       response = { categoryId: deletedItem.categoryId }
     }
 
@@ -139,6 +145,12 @@ async function mutateFinancialModel(
         (candidate) => candidate.categoryId !== categoryId,
       )
       categoryItems.forEach((candidate) => transaction.delete(itemsReference.doc(candidate.id)))
+      unlinkPortfolioIncome(
+        transaction,
+        linkedIncomeSnapshot,
+        new Set(categoryItems.map(({ id }) => id)),
+        userId,
+      )
       if (section === 'expenses') {
         removeTrackingPreferences(
           transaction,
@@ -400,6 +412,17 @@ function removeTrackingPreferences(transaction, reference, subcategoryIds, userI
     },
     { merge: true },
   )
+}
+
+function unlinkPortfolioIncome(transaction, snapshot, assetIds, userId) {
+  for (const document of snapshot?.docs || []) {
+    if (!assetIds.has(document.data()?.portfolioAssetId)) continue
+    transaction.update(document.ref, {
+      portfolioAssetId: null,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: userId,
+    })
+  }
 }
 
 function clientItem(id, item) {

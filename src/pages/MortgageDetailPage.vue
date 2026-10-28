@@ -944,7 +944,7 @@ h1 {
   font-weight: 700;
 }
 
-.chart-card :deep(.mortgage-chart) {
+.chart-card :deep(.mortgage-balance-chart) {
   margin-top: 1.25rem;
 }
 

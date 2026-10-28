@@ -2,7 +2,7 @@ const { getFirestore } = require('firebase-admin/firestore')
 const { HttpsError, onCall } = require('firebase-functions/https')
 const logger = require('firebase-functions/logger')
 const {
-  readInvestmentPortfolioSheet: readInvestmentPortfolioSheetData,
+  syncInvestmentPortfolio: syncInvestmentPortfolioData,
   updateInvestmentPortfolio: updateInvestmentPortfolioData,
 } = require('./services/investment-portfolios')
 
@@ -28,10 +28,11 @@ const readInvestmentPortfolioSheet = onCall({ region: 'europe-west1' }, async (r
   const workspaceId = String(request.data?.workspaceId || '').trim()
   const assetId = String(request.data?.assetId || '').trim()
   try {
-    return await readInvestmentPortfolioSheetData(getFirestore(), {
+    return await syncInvestmentPortfolioData(getFirestore(), {
       workspaceId,
       userId: request.auth.uid,
       assetId,
+      force: Boolean(request.data?.force),
     })
   } catch (error) {
     if (error instanceof HttpsError) throw error
