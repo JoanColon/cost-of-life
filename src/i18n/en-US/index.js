@@ -379,6 +379,17 @@ export default {
       perYear: '{amount}/year in additional repayments',
       perYearSuffix: '/year',
       additionalRepayments: 'in additional repayments',
+      paidOffIn: 'Paid off in {duration}',
+      interestSaved: '{amount} saved in interest',
+      extraPerMonth: '{amount}/month extra',
+      infoAction: 'How the debt is selected',
+      infoTitle: 'How Pay debt faster works',
+      infoDescription:
+        'We automatically direct the simulated savings capacity to the modeled debt with the highest annual interest rate.',
+      modeledInfo:
+        'The payoff date and interest saving use the fixed-rate French amortization model saved with this mortgage.',
+      fallbackInfo:
+        'No supported debt model is available, so this card shows additional repayments as it did before.',
     },
     strategy: {
       title: 'Your Strategy',
@@ -424,11 +435,23 @@ export default {
       allocatedMonthly: 'Allocated / month',
       emergencyFundTarget: 'Emergency fund target',
       redirectCash: 'After the target, cash goes to investments.',
-      debtStrategy: 'Debt strategy',
-      debtTarget: 'Additional repayments target',
       debtInfoAction: 'About extra debt repayments',
       debtInfoTitle: 'About extra debt repayments',
       debtDisclaimer: 'Extra repayments only; payoff dates need loan details.',
+      modeledDebtDisclaimer:
+        'Uses the saved mortgage model. Extra repayments reduce the term while the regular payment stays unchanged.',
+      finishEarlier: 'Finish earlier',
+      interestSaved: 'Interest saved',
+      modeledDebtResult: 'Paid off by {date} · {amount} interest saved',
+      debtProjection: {
+        title: 'Mortgage payoff comparison',
+        normalPayment: 'Regular payment',
+        withExtraPayment: 'Regular + extra payment',
+        chartAria:
+          'Comparison of the remaining mortgage balance with regular payments and with the strategy extra payment.',
+        normalPayoff: 'Regular payoff',
+        strategyPayoff: 'Strategy payoff',
+      },
       investmentStrategy: 'Investment strategy',
       projectedValueDescription: 'Estimated investment value over time.',
       customHorizon: 'Custom projection horizon',

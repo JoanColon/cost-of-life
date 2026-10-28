@@ -211,7 +211,7 @@
               </div>
             </section>
 
-            <div :class="['small-panels', { 'single-detail': !selectedDebt }]">
+            <div v-if="allocation.cash > 0" class="small-panels single-detail">
               <section class="panel strategy-detail">
                 <div class="detail-title">
                   <span class="mini-icon cash"><q-icon name="paid" /></span>
@@ -246,45 +246,6 @@
                 />
                 <small class="redirect-note">{{ t('whatIf.strategy.redirectCash') }}</small>
               </section>
-
-              <section v-if="selectedDebt" class="panel strategy-detail">
-                <div class="detail-title">
-                  <span class="mini-icon debt"><q-icon name="home" /></span>
-                  <div>
-                    <h2>{{ t('whatIf.strategy.debtStrategy') }}</h2>
-                    <p>{{ t('whatIf.strategy.debtTarget') }}</p>
-                  </div>
-                </div>
-                <q-select
-                  :model-value="selectedDebt.id"
-                  :options="liabilityOptions"
-                  emit-value
-                  map-options
-                  dense
-                  outlined
-                  @update:model-value="updateScenario({ selectedLiabilityId: $event })"
-                />
-                <strong class="debt-amount"
-                  >{{ formatCurrency(monthlyFor(allocation.debt))
-                  }}{{ t('whatIf.perMonth') }} extra</strong
-                >
-                <small
-                  >{{ formatCurrency(projection.strategy.annualDebtContribution) }}/year in
-                  additional repayments</small
-                >
-                <p class="info-note">
-                  <q-btn
-                    flat
-                    round
-                    dense
-                    size="sm"
-                    icon="info"
-                    :aria-label="t('whatIf.strategy.debtInfoAction')"
-                    @click="debtInfoDialogOpen = true"
-                  />
-                  <span>{{ t('whatIf.strategy.debtDisclaimer') }}</span>
-                </p>
-              </section>
             </div>
           </div>
 
@@ -293,7 +254,7 @@
               <h2>{{ t('whatIf.strategy.resultsTitle') }}</h2>
             </div>
 
-            <section class="panel projection-panel">
+            <section v-if="allocation.invest > 0" class="panel projection-panel">
               <div class="projection-heading">
                 <div>
                   <h2>{{ t('whatIf.strategy.investmentStrategy') }}</h2>
@@ -396,6 +357,82 @@
               </div>
             </section>
 
+            <section v-if="selectedDebt && allocation.debt > 0" class="panel debt-projection-panel">
+              <div class="projection-heading">
+                <div>
+                  <h2>{{ t('whatIf.strategy.debtProjection.title') }}</h2>
+                  <p>{{ debtInfoText }}</p>
+                </div>
+                <div class="debt-projection-controls">
+                  <q-select
+                    :model-value="selectedDebt.id"
+                    :options="liabilityOptions"
+                    emit-value
+                    map-options
+                    dense
+                    outlined
+                    options-dense
+                    @update:model-value="updateScenario({ selectedLiabilityId: $event })"
+                  />
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    size="sm"
+                    icon="info_outline"
+                    :aria-label="t('whatIf.strategy.debtInfoAction')"
+                    @click="debtInfoDialogOpen = true"
+                  />
+                </div>
+              </div>
+
+              <template v-if="debtPayoff">
+                <MortgageComparisonChart
+                  :normal-schedule="debtPayoff.schedule"
+                  :accelerated-schedule="debtPayoff.accelerated.schedule"
+                  :starting-balance="selectedDebtModel.balance"
+                  :start-date="localToday()"
+                  :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
+                  :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
+                  :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
+                  class="embedded-debt-chart"
+                />
+                <div class="result-breakdown debt-result-breakdown">
+                  <span>
+                    <small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small>
+                    <strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong>
+                  </span>
+                  <span>
+                    <small>{{ t('whatIf.strategy.debtProjection.strategyPayoff') }}</small>
+                    <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
+                  </span>
+                  <span>
+                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
+                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
+                  </span>
+                  <span>
+                    <small>{{ t('whatIf.strategy.interestSaved') }}</small>
+                    <strong class="positive">
+                      {{ formatCurrency(debtPayoff.accelerated.interestSaved) }}
+                    </strong>
+                  </span>
+                </div>
+              </template>
+              <div v-else class="debt-projection-fallback">
+                <q-icon name="info_outline" />
+                <div>
+                  <strong>
+                    {{
+                      t('whatIf.debt.perYear', {
+                        amount: formatCurrency(projection.strategy.annualDebtContribution),
+                      })
+                    }}
+                  </strong>
+                  <p>{{ t('whatIf.strategy.debtDisclaimer') }}</p>
+                </div>
+              </div>
+            </section>
+
             <div class="strategy-section-heading impact-heading">
               <h2>{{ t('whatIf.strategy.impactTitle') }}</h2>
             </div>
@@ -442,7 +479,7 @@
           <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
         </q-card-section>
         <q-card-section class="app-info-copy">
-          <p>{{ t('whatIf.strategy.debtDisclaimer') }}</p>
+          <p>{{ debtInfoText }}</p>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -555,8 +592,10 @@ import { computed, defineComponent, h, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import MortgageComparisonChart from '@/components/liabilities/MortgageComparisonChart.vue'
 import StrategyProjectionChart from '@/components/what-if/StrategyProjectionChart.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
+import { calculateDebtPayoffImpact } from '@/domain/financial/debt-payoff'
 import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
@@ -581,6 +620,7 @@ import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -620,6 +660,7 @@ const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
+const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
 const workspaceStore = useWorkspaceStore()
@@ -643,7 +684,13 @@ const selectedMemberId = computed(() =>
 )
 const config = computed(() => whatIfStore.config)
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, year))
-const loading = computed(() => financialYearsStore.loading || whatIfStore.loading)
+const loading = computed(
+  () =>
+    financialYearsStore.loading ||
+    whatIfStore.loading ||
+    liabilitiesStore.loading ||
+    liabilitiesStore.categoryLoading,
+)
 const error = computed(
   () =>
     pageError.value || whatIfStore.error || financialYearsStore.errorFor(workspaceId.value, year),
@@ -680,6 +727,13 @@ const selectedDebt = computed(
     liabilities.value[0] ||
     null,
 )
+const selectedDebtModel = computed(() => {
+  if (!selectedDebt.value) return null
+  const model = liabilitiesStore
+    .itemsForCategory('mortgage')
+    .find(({ id }) => id === selectedDebt.value.id)
+  return model ? { ...model, name: selectedDebt.value.name } : selectedDebt.value
+})
 const allocation = computed(() =>
   normalizeStrategyForOptions(activeScenario.value.allocation, {
     cash: true,
@@ -694,6 +748,18 @@ const projection = computed(() =>
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
     debtAvailable: Boolean(selectedDebt.value),
   }),
+)
+const debtPayoff = computed(() =>
+  calculateDebtPayoffImpact({
+    liability: selectedDebtModel.value,
+    extraMonthlyPayment: monthlyFor(allocation.value.debt),
+    asOfDate: localToday(),
+  }),
+)
+const debtInfoText = computed(() =>
+  debtPayoff.value
+    ? t('whatIf.strategy.modeledDebtDisclaimer')
+    : t('whatIf.strategy.debtDisclaimer'),
 )
 const investmentProjectionPoints = computed(() =>
   projection.value.strategy.points.map(({ month, investmentBalances, investmentValue }) => ({
@@ -853,18 +919,27 @@ const strategyOutcomes = computed(() => {
     })
   }
 
-  if (selectedDebt.value) {
+  if (selectedDebt.value && allocation.value.debt > 0) {
     const id = debtMilestoneId(selectedDebt.value.categoryId)
     const monthlyDebtContribution = monthlyFor(allocation.value.debt)
-    const payoffMonth =
-      monthlyDebtContribution > 0
+    const payoffMonth = debtPayoff.value
+      ? debtPayoff.value.accelerated.remainingPayments
+      : monthlyDebtContribution > 0
         ? Math.ceil(selectedDebt.value.balance / monthlyDebtContribution)
         : null
-    const projectedReduction = Math.min(
-      selectedDebt.value.balance,
-      monthlyDebtContribution * horizonMonths,
-    )
-    const projectedBalance = Math.max(0, selectedDebt.value.balance - projectedReduction)
+    const modeledHorizonPayment = debtPayoff.value?.accelerated.schedule[horizonMonths - 1]
+    const projectedReduction = debtPayoff.value
+      ? Math.max(
+          0,
+          selectedDebtModel.value.balance -
+            (modeledHorizonPayment?.remainingBalance ??
+              (payoffMonth <= horizonMonths ? 0 : selectedDebtModel.value.balance)),
+        )
+      : Math.min(selectedDebt.value.balance, monthlyDebtContribution * horizonMonths)
+    const projectedBalance = debtPayoff.value
+      ? (modeledHorizonPayment?.remainingBalance ??
+        (payoffMonth <= horizonMonths ? 0 : selectedDebtModel.value.balance))
+      : Math.max(0, selectedDebt.value.balance - projectedReduction)
     outcomes.push({
       id,
       icon: 'credit_score',
@@ -877,12 +952,17 @@ const strategyOutcomes = computed(() => {
       result:
         monthlyDebtContribution <= 0
           ? t('whatIf.strategy.noExtraDebtReduction')
-          : payoffMonth <= horizonMonths
-            ? reachEstimate(payoffMonth)
-            : t('whatIf.strategy.extraDebtReduction', {
-                value: formatCurrency(projectedReduction),
-                years: activeScenario.value.horizonYears,
-              }),
+          : debtPayoff.value
+            ? t('whatIf.strategy.modeledDebtResult', {
+                date: formatMonthYear(debtPayoff.value.accelerated.payoffDate),
+                amount: formatCurrency(debtPayoff.value.accelerated.interestSaved),
+              })
+            : payoffMonth <= horizonMonths
+              ? reachEstimate(payoffMonth)
+              : t('whatIf.strategy.extraDebtReduction', {
+                  value: formatCurrency(projectedReduction),
+                  years: activeScenario.value.horizonYears,
+                }),
       status:
         monthlyDebtContribution <= 0
           ? 'negative'
@@ -902,6 +982,7 @@ async function prepare(force = false) {
     await Promise.all([
       financialYearsStore.load(workspaceId.value, year, force),
       whatIfStore.load(workspaceId.value, force),
+      liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force),
     ])
     if (activeScenario.value.id === defaultStrategyScenario.id) {
       initialScenarioName.value = ''
@@ -1090,6 +1171,31 @@ function reachEstimate(months) {
   })
 }
 
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`
+}
+
+function formatDuration(months) {
+  const total = Math.max(0, Number(months) || 0)
+  const years = Math.floor(total / 12)
+  const remainingMonths = total % 12
+  if (!years) return t('liabilities.mortgage.durationMonths', { months: remainingMonths })
+  if (!remainingMonths) return t('liabilities.mortgage.durationYears', { years })
+  return t('liabilities.mortgage.duration', { years, months: remainingMonths })
+}
+
+function formatMonthYear(value) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('en-IE', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`))
+}
+
 function debtMilestoneId(categoryId) {
   if (categoryId === 'mortgage') return 'debt_mortgage_free'
   if (categoryId === 'car_loan') return 'debt_car_free'
@@ -1194,6 +1300,7 @@ h1 {
     'allocation mix'
     'results-title results-title'
     'projection projection'
+    'debt-projection debt-projection'
     'details details'
     'impact-title impact-title'
     'milestones milestones';
@@ -1571,30 +1678,46 @@ h1 {
   padding-top: 0.6rem;
   border-top: 1px solid var(--color-line);
 }
-.debt-amount {
-  display: block;
-  font-size: 0.9rem;
-}
-.info-note {
-  display: flex;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0.55rem;
-  border-radius: 0.55rem;
-  background: var(--color-blue-soft);
-  color: var(--color-copy);
-  font-size: 0.65rem;
-}
-.info-note .q-btn {
-  flex: 0 0 auto;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-  margin: -0.25rem 0 0 -0.25rem;
-  color: var(--color-copy);
-}
 .projection-panel {
   grid-area: projection;
   position: relative;
+}
+.debt-projection-panel {
+  grid-area: debt-projection;
+}
+.debt-projection-controls {
+  display: grid;
+  grid-template-columns: minmax(10rem, 15rem) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.debt-projection-controls .q-btn {
+  color: var(--color-copy);
+}
+.embedded-debt-chart {
+  margin-top: 1rem;
+}
+.debt-projection-fallback {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-surface-soft);
+}
+.debt-projection-fallback > .q-icon {
+  color: var(--color-primary);
+  font-size: 1.4rem;
+}
+.debt-projection-fallback div {
+  display: grid;
+  gap: 0.2rem;
+}
+.debt-projection-fallback p {
+  margin: 0;
+  color: var(--color-copy);
+  font-size: 0.72rem;
 }
 .projection-heading {
   display: flex;
@@ -1690,14 +1813,18 @@ h1 {
 .result-breakdown {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.4rem;
-  padding: 0.7rem;
+  gap: 0;
+  margin-top: 0.75rem;
+  padding: 1rem 1.1rem;
   border-radius: 0.75rem;
   background: var(--color-surface-soft);
 }
 .result-breakdown span {
   display: grid;
-  padding: 0.25rem 0.45rem;
+  align-content: center;
+  gap: 0.2rem;
+  min-height: 3rem;
+  padding: 0.3rem 0.85rem;
   border-right: 1px solid var(--color-line);
 }
 .result-breakdown span:last-child {
@@ -1705,12 +1832,17 @@ h1 {
 }
 .result-breakdown small {
   color: var(--color-copy);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
+  font-weight: 550;
+  line-height: 1.25;
 }
 .result-breakdown strong {
-  font-size: 0.78rem;
-  line-height: 1.2;
+  font-size: clamp(0.95rem, 1.6vw, 1.1rem);
+  line-height: 1.15;
   overflow-wrap: anywhere;
+}
+.result-breakdown.debt-result-breakdown {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .scenario-name-dialog {
   width: min(28rem, calc(100vw - 2rem));
@@ -1815,6 +1947,7 @@ h1 {
       'mix'
       'results-title'
       'projection'
+      'debt-projection'
       'details'
       'impact-title'
       'milestones';
@@ -1953,6 +2086,17 @@ h1 {
   .projection-heading > div:first-child {
     grid-area: copy;
   }
+  .debt-projection-panel .projection-heading {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'copy'
+      'debt-controls';
+    align-items: stretch;
+  }
+  .debt-projection-controls {
+    grid-area: debt-controls;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
   .projection-controls {
     display: contents;
   }
@@ -1995,18 +2139,29 @@ h1 {
   }
   .result-breakdown {
     gap: 0;
-    padding: 0.55rem;
+    padding: 0.7rem;
   }
   .result-breakdown span {
     min-width: 0;
-    padding: 0.2rem 0.4rem;
+    min-height: 3.25rem;
+    padding: 0.4rem 0.55rem;
   }
   .result-breakdown small {
+    font-size: 0.68rem;
     line-height: 1.2;
   }
   .result-breakdown strong {
-    font-size: clamp(0.7rem, 3vw, 0.78rem);
-    white-space: nowrap;
+    font-size: clamp(0.88rem, 3.5vw, 1rem);
+  }
+  .debt-result-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 0.5rem;
+  }
+  .debt-result-breakdown span:nth-child(2) {
+    border-right: 0;
+  }
+  .debt-result-breakdown span:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--color-line);
   }
   .milestones-panel {
     gap: 0.6rem;

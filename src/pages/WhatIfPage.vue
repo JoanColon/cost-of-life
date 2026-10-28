@@ -209,11 +209,46 @@
               <span class="scenario-heading">
                 <span class="scenario-icon debt"><q-icon name="home" /></span>
                 <span class="scenario-copy">
-                  <strong>{{ t('whatIf.debt.title') }}</strong>
+                  <span class="debt-title">
+                    <strong>{{ t('whatIf.debt.title') }}</strong>
+                    <q-btn
+                      flat
+                      round
+                      dense
+                      size="sm"
+                      icon="info_outline"
+                      :aria-label="t('whatIf.debt.infoAction')"
+                      @click="debtInfoOpen = true"
+                    />
+                  </span>
                   <span>{{ selectedDebt.name }}</span>
                 </span>
               </span>
-              <span class="scenario-outcome debt-outcome">
+              <span v-if="debtPayoff" class="scenario-outcome debt-outcome modeled-debt-outcome">
+                <strong>
+                  {{
+                    t('whatIf.debt.paidOffIn', {
+                      duration: formatDuration(debtPayoff.accelerated.remainingPayments),
+                    })
+                  }}
+                </strong>
+                <small>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</small>
+                <small class="debt-saving">
+                  {{
+                    t('whatIf.debt.interestSaved', {
+                      amount: formatCurrency(debtPayoff.accelerated.interestSaved),
+                    })
+                  }}
+                </small>
+                <small>
+                  {{
+                    t('whatIf.debt.extraPerMonth', {
+                      amount: formatCurrency(debtScenario.monthly),
+                    })
+                  }}
+                </small>
+              </span>
+              <span v-else class="scenario-outcome debt-outcome">
                 <strong>
                   <span>{{ formatCurrency(debtScenario.annual) }}</span
                   >{{ t('whatIf.debt.perYearSuffix') }}
@@ -222,17 +257,6 @@
               </span>
             </article>
           </div>
-
-          <router-link
-            class="strategy-link"
-            :to="{ name: 'what-if-strategy', params: { workspaceId } }"
-          >
-            <span class="strategy-link-copy">
-              <strong>{{ t('whatIf.strategy.title') }}</strong>
-              <small>{{ t('whatIf.strategy.cardDescription') }}</small>
-            </span>
-            <q-icon name="arrow_forward" />
-          </router-link>
         </section>
       </template>
     </main>
@@ -265,6 +289,21 @@
               })
             }}
           </p>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="debtInfoOpen" :position="$q.screen.lt.sm ? 'bottom' : undefined">
+      <q-card class="app-info-dialog responsive-info-card">
+        <span class="info-sheet-handle" aria-hidden="true" />
+        <q-card-section class="app-info-heading">
+          <h2>{{ t('whatIf.debt.infoTitle') }}</h2>
+          <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
+        </q-card-section>
+        <q-card-section class="app-info-copy">
+          <p>{{ t('whatIf.debt.infoDescription') }}</p>
+          <p v-if="debtPayoff">{{ t('whatIf.debt.modeledInfo') }}</p>
+          <p v-else>{{ t('whatIf.debt.fallbackInfo') }}</p>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -309,6 +348,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import {
+  calculateDebtPayoffImpact,
+  highestInterestModeledDebt,
+} from '@/domain/financial/debt-payoff'
+import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
@@ -326,6 +369,7 @@ import {
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -335,12 +379,14 @@ const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
+const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
 const workspaceStore = useWorkspaceStore()
 const customReductionOpen = ref(false)
 const discretionaryInfoOpen = ref(false)
 const unclassifiedInfoOpen = ref(false)
+const debtInfoOpen = ref(false)
 const customReduction = ref(0)
 const pageError = ref(null)
 const reductionOptions = [0, 10, 25, 50]
@@ -362,7 +408,13 @@ const activeScenario = computed(
 )
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const positionMonth = computed(() => latestPositionMonth(financialYear.value))
-const loading = computed(() => whatIfStore.loading || financialYearsStore.loading)
+const loading = computed(
+  () =>
+    whatIfStore.loading ||
+    financialYearsStore.loading ||
+    liabilitiesStore.loading ||
+    liabilitiesStore.categoryLoading,
+)
 const error = computed(
   () =>
     pageError.value ||
@@ -427,17 +479,23 @@ const liabilities = computed(() => {
     .filter(({ balance }) => balance > 0)
     .sort((left, right) => right.balance - left.balance)
 })
+const modeledDebts = computed(() => {
+  const mortgageModels = new Map(
+    liabilitiesStore.itemsForCategory('mortgage').map((liability) => [liability.id, liability]),
+  )
+  return liabilities.value.flatMap((liability) => {
+    const model = mortgageModels.get(liability.id)
+    return model ? [{ ...model, name: liability.name }] : []
+  })
+})
 const recommendedDebt = computed(
   () =>
+    highestInterestModeledDebt(modeledDebts.value) ||
     liabilities.value.find(({ categoryId }) => categoryId === 'mortgage') ||
     liabilities.value[0] ||
     null,
 )
-const selectedDebt = computed(
-  () =>
-    liabilities.value.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
-    recommendedDebt.value,
-)
+const selectedDebt = computed(() => recommendedDebt.value)
 const cashScenario = computed(() =>
   calculateCashScenario({
     cash: cash.value,
@@ -465,6 +523,13 @@ const cashProgress = computed(() => {
 })
 const debtScenario = computed(() =>
   calculateDebtScenario(simulation.value.simulatedSavingsCapacity),
+)
+const debtPayoff = computed(() =>
+  calculateDebtPayoffImpact({
+    liability: selectedDebt.value,
+    extraMonthlyPayment: debtScenario.value.monthly,
+    asOfDate: localToday(),
+  }),
 )
 const showScenarios = computed(() => simulation.value.simulatedSavingsCapacity > 0)
 const breakEvenReachable = computed(
@@ -499,6 +564,7 @@ async function prepare(force = false) {
     await Promise.all([
       financialYearsStore.load(workspaceId.value, currentYear, force),
       whatIfStore.load(workspaceId.value, force),
+      liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force),
     ])
   } catch (loadError) {
     pageError.value = loadError
@@ -527,6 +593,31 @@ function percentageRule(value) {
   return (
     (Number.isFinite(number) && number >= 0 && number <= 100) || t('whatIf.validation.percentage')
   )
+}
+
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`
+}
+
+function formatDuration(months) {
+  const total = Math.max(0, Number(months) || 0)
+  const years = Math.floor(total / 12)
+  const remainingMonths = total % 12
+  if (!years) return t('liabilities.mortgage.durationMonths', { months: remainingMonths })
+  if (!remainingMonths) return t('liabilities.mortgage.durationYears', { years })
+  return t('liabilities.mortgage.duration', { years, months: remainingMonths })
+}
+
+function formatMonthYear(value) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('en-IE', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`))
 }
 async function saveCustomReduction() {
   if (percentageRule(customReduction.value) !== true) return
@@ -677,8 +768,7 @@ h1 {
   box-shadow: 0 0.3rem 0.75rem rgb(31 111 235 / 20%);
 }
 
-.reduction-options button:focus-visible,
-.strategy-link:focus-visible {
+.reduction-options button:focus-visible {
   @include focus-ring;
 }
 
@@ -840,6 +930,18 @@ h1 {
   font-size: 0.78rem;
 }
 
+.debt-title {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.debt-title .q-btn {
+  min-width: 1.4rem;
+  min-height: 1.4rem;
+  color: var(--color-copy);
+}
+
 .scenario-outcome {
   display: grid;
   gap: 0.25rem;
@@ -930,35 +1032,14 @@ h1 {
   font-size: 0.86rem;
 }
 
-.strategy-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  width: fit-content;
-  margin-top: 1rem;
-  padding: 0.4rem 0;
-  color: var(--color-primary);
-  text-decoration: none;
+.modeled-debt-outcome strong {
+  color: var(--color-warning-dark);
+  font-size: 1.2rem;
 }
 
-.strategy-link-copy {
-  display: grid;
-  gap: 0.1rem;
-}
-
-.strategy-link-copy strong {
-  color: var(--color-primary);
-  font-size: 0.9rem;
-}
-
-.strategy-link-copy small {
-  color: var(--color-copy);
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
-.strategy-link:hover strong {
-  text-decoration: underline;
+.modeled-debt-outcome .debt-saving {
+  color: var(--color-success-dark);
+  font-weight: 700;
 }
 
 .custom-card {
