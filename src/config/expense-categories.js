@@ -15,6 +15,7 @@ export const expenseCategories = [
       suggestion('home_repairs', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('community_fees', 'monthly', 'fixed', 'recurring', 'essential'),
       suggestion('home_services', 'monthly', 'variable', 'recurring', null),
+      suggestion('cleaning', 'monthly', 'variable', 'recurring', null),
     ],
   },
   {
@@ -110,6 +111,7 @@ export const expenseCategories = [
     suggestions: [
       suggestion('school_education', 'monthly', 'fixed', 'recurring', 'essential'),
       suggestion('daycare', 'monthly', 'fixed', 'recurring', 'essential'),
+      suggestion('babysitter', 'monthly', 'variable', 'recurring', null),
       suggestion('kids_clothes', 'yearly', 'variable', 'occasional', 'essential'),
       suggestion('activities', 'monthly', 'variable', 'recurring', null),
     ],

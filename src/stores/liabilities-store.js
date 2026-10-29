@@ -25,6 +25,8 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
   const loadedCategoryIds = ref(new Set())
   let configRequestId = 0
   let categoryRequestId = 0
+  const categoryRequestIds = new Map()
+  const categoryLoadingKeys = new Set()
 
   const setupCompleted = computed(() => Boolean(config.value?.setupCompleted))
   const enabledCategories = computed(() =>
@@ -41,6 +43,9 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     liabilitiesByCategory.value = {}
     loadedCategoryIds.value = new Set()
     categoryRequestId += 1
+    categoryRequestIds.clear()
+    categoryLoadingKeys.clear()
+    categoryLoading.value = false
     const requestId = ++configRequestId
     try {
       const state = await getLiabilitiesConfig(workspaceId)
@@ -61,21 +66,28 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     if (error.value || !config.value?.categories?.[categoryId]) return
     if (!force && loadedCategoryIds.value.has(categoryId)) return
 
+    const key = `${workspaceId}:${categoryId}`
     categoryLoading.value = true
     const requestId = ++categoryRequestId
+    categoryRequestIds.set(key, requestId)
+    categoryLoadingKeys.add(key)
     try {
       const liabilities = await getCategoryLiabilities(workspaceId, categoryId)
-      if (requestId !== categoryRequestId) return
+      if (categoryRequestIds.get(key) !== requestId) return
       liabilitiesByCategory.value = {
         ...liabilitiesByCategory.value,
         [categoryId]: liabilities,
       }
       loadedCategoryIds.value = new Set(loadedCategoryIds.value).add(categoryId)
     } catch (loadError) {
-      if (requestId !== categoryRequestId) return
+      if (categoryRequestIds.get(key) !== requestId) return
       error.value = loadError
     } finally {
-      if (requestId === categoryRequestId) categoryLoading.value = false
+      if (categoryRequestIds.get(key) === requestId) {
+        categoryRequestIds.delete(key)
+        categoryLoadingKeys.delete(key)
+        categoryLoading.value = categoryLoadingKeys.size > 0
+      }
     }
   }
 
@@ -185,6 +197,8 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
   function reset() {
     configRequestId += 1
     categoryRequestId += 1
+    categoryRequestIds.clear()
+    categoryLoadingKeys.clear()
     config.value = null
     liabilitiesByCategory.value = {}
     loading.value = false

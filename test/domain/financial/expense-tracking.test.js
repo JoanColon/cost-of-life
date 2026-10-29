@@ -40,14 +40,23 @@ describe('expense tracking month', () => {
     expect(
       expenseTrackingCategories
         .filter(({ id }) =>
-          ['coffee_snacks', 'taxi_ride_sharing', 'subscriptions', 'pets'].includes(id),
+          [
+            'cleaning',
+            'coffee_snacks',
+            'taxi_ride_sharing',
+            'subscriptions',
+            'pets',
+            'babysitter',
+          ].includes(id),
         )
         .map(({ id, categoryId }) => ({ id, categoryId })),
     ).toEqual([
+      { id: 'cleaning', categoryId: 'housing' },
       { id: 'taxi_ride_sharing', categoryId: 'transportation' },
       { id: 'coffee_snacks', categoryId: 'food' },
       { id: 'subscriptions', categoryId: 'personal' },
       { id: 'pets', categoryId: 'personal' },
+      { id: 'babysitter', categoryId: 'education_childcare' },
     ])
   })
 

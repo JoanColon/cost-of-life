@@ -212,10 +212,12 @@
                       </template>
                     </q-popup-edit>
                   </button>
-                  <strong class="mix-card-amount">
-                    {{ formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100)
-                    }}{{ t('whatIf.perMonth') }}
-                  </strong>
+                  <span class="mix-card-amount">
+                    <strong>
+                      {{ formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100) }}
+                    </strong>
+                    <small>{{ t('whatIf.perMonth').trim() }}</small>
+                  </span>
                   <q-btn
                     v-if="activeMix.length > 1"
                     flat
@@ -1469,7 +1471,7 @@ h1 {
 }
 .investment-mix-card {
   display: grid;
-  grid-template-columns: 2.5rem minmax(5.5rem, 1fr) 4rem 4.7rem minmax(5rem, auto) auto;
+  grid-template-columns: 2.5rem minmax(5.5rem, 1fr) 4.4rem 5.1rem minmax(3.75rem, auto) auto;
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
@@ -1553,12 +1555,20 @@ h1 {
   outline: 0;
 }
 .mix-card-amount {
+  display: grid;
+  justify-items: end;
   min-width: 0;
   overflow: hidden;
   text-align: right;
-  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.mix-card-amount strong {
+  font-size: 0.75rem;
+}
+.mix-card-amount small {
+  color: var(--color-copy);
+  font-size: 0.65rem;
 }
 .mix-card-remove {
   width: 1.8rem;
@@ -2004,6 +2014,7 @@ h1 {
   }
   .mix-card-amount {
     grid-area: amount;
+    justify-items: start;
     text-align: left;
   }
   .mix-card-remove {

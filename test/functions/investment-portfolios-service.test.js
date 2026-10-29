@@ -65,7 +65,7 @@ describe('investment portfolio synchronization', () => {
         data: expect.objectContaining({
           currentValue: 27693.16,
           'detail.portfolio': expect.objectContaining({
-            schemaVersion: 1,
+            schemaVersion: 2,
             spreadsheetId: 'sheet_123',
           }),
         }),
@@ -309,7 +309,7 @@ function canonicalPortfolio({
   sync = { financialProjectionDirty: false, pendingSections: [] },
 } = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: 'google_sheets',
     spreadsheetId: 'sheet_123',
     spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet_123/edit',
@@ -320,7 +320,7 @@ function canonicalPortfolio({
       annualDividendIncome: 100,
     },
     cache: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       holdings: normalizedHoldings(),
       lastCheckedAt: 1_000,
       dataUpdatedAt: 1_000,
@@ -336,6 +336,8 @@ function normalizedHoldings() {
       id: 'portfolio-0',
       ticker: 'IBE.MC',
       country: 'ES',
+      sector: 'Utilities',
+      industry: 'Diversified Utilities',
       currency: 'EUR',
       shares: 1000,
       priceLocal: 21.9,
@@ -368,6 +370,8 @@ function portfolioCsv() {
     [
       'Ticker',
       'Country',
+      'Sector',
+      'Industry',
       'Currency',
       'Shares',
       'Price (local)',
@@ -381,6 +385,8 @@ function portfolioCsv() {
     [
       'IBE.MC',
       'ES',
+      'Utilities',
+      'Diversified Utilities',
       'EUR',
       '1000',
       '21,9',

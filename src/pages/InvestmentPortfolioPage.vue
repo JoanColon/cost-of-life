@@ -103,152 +103,198 @@
             class="portfolio-kpis"
             :aria-label="t('assets.portfolio.kpis.label')"
           >
-            <article class="portfolio-kpi portfolio-kpi--value">
-              <div class="portfolio-kpi-copy">
-                <div class="portfolio-kpi-heading">
-                  <span class="portfolio-kpi-icon"><q-icon name="account_balance_wallet" /></span>
-                  <span>{{ t('assets.portfolio.kpis.portfolioValue') }}</span>
-                </div>
-                <strong>{{ portfolioMetrics.totalPortfolioValue }}</strong>
-                <small>{{ t('assets.portfolio.kpis.portfolioValueDescription') }}</small>
+            <article class="portfolio-kpi">
+              <div class="portfolio-kpi-heading">
+                <span class="portfolio-kpi-icon"><q-icon name="account_balance_wallet" /></span>
+                <span class="portfolio-kpi-label">
+                  <b>{{ t('assets.portfolio.kpis.portfolioValue') }}</b>
+                  <small>{{ t('assets.portfolio.kpis.portfolioValueDescription') }}</small>
+                </span>
               </div>
-              <div v-if="portfolioHistoryPoints.length" class="portfolio-history">
-                <PortfolioHistoryChart
-                  :points="portfolioHistoryPoints"
-                  :aria-label="t('assets.portfolio.kpis.annualHistory')"
-                />
-              </div>
-              <div v-else-if="historyLoading" class="portfolio-history-state">
-                <q-spinner color="primary" size="1.5rem" />
-              </div>
+              <strong>{{ portfolioMetrics.totalPortfolioValue }}</strong>
             </article>
 
-            <div class="portfolio-kpi-pair">
-              <article class="portfolio-kpi">
-                <div class="portfolio-kpi-heading">
-                  <span class="portfolio-kpi-icon portfolio-kpi-icon--income">
-                    <q-icon name="payments" />
-                  </span>
-                  <span>{{ t('assets.portfolio.kpis.annualIncome') }}</span>
-                </div>
-                <strong>{{ portfolioMetrics.annualDividendIncome }}</strong>
-                <small>
-                  {{
-                    t('assets.portfolio.kpis.grossIncome', {
-                      value: portfolioMetrics.grossDividendIncome,
-                    })
-                  }}
-                </small>
-              </article>
+            <article class="portfolio-kpi">
+              <div class="portfolio-kpi-heading">
+                <span class="portfolio-kpi-icon portfolio-kpi-icon--income">
+                  <q-icon name="payments" />
+                </span>
+                <span class="portfolio-kpi-label">
+                  <b>{{ t('assets.portfolio.kpis.annualIncome') }}</b>
+                  <small>
+                    {{
+                      t('assets.portfolio.kpis.grossIncome', {
+                        value: portfolioMetrics.grossDividendIncome,
+                      })
+                    }}
+                  </small>
+                </span>
+              </div>
+              <strong>{{ portfolioMetrics.annualDividendIncome }}</strong>
+            </article>
 
-              <article class="portfolio-kpi">
-                <div class="portfolio-kpi-heading">
-                  <span class="portfolio-kpi-icon portfolio-kpi-icon--yield">
-                    <q-icon name="percent" />
-                  </span>
-                  <span>{{ t('assets.portfolio.kpis.dividendYield') }}</span>
-                </div>
-                <strong>{{ portfolioMetrics.dividendYield }}</strong>
-                <small>{{ t('assets.portfolio.kpis.dividendYieldDescription') }}</small>
-              </article>
-            </div>
+            <article class="portfolio-kpi">
+              <div class="portfolio-kpi-heading">
+                <span class="portfolio-kpi-icon portfolio-kpi-icon--yield">
+                  <q-icon name="percent" />
+                </span>
+                <span class="portfolio-kpi-label">
+                  <b>{{ t('assets.portfolio.kpis.dividendYield') }}</b>
+                  <small>{{ t('assets.portfolio.kpis.dividendYieldDescription') }}</small>
+                </span>
+              </div>
+              <strong>{{ portfolioMetrics.dividendYield }}</strong>
+            </article>
           </section>
 
-          <section class="portfolio-table-card">
-            <q-table
-              v-if="portfolioHoldings !== null"
-              v-model:pagination="tablePagination"
-              class="portfolio-table"
-              flat
-              dense
-              row-key="id"
-              :rows="tableRows"
-              :columns="tableColumns"
-              :filter="tableFilter"
-              :loading="readingSheet"
-              :rows-per-page-options="[10, 25, 50, 0]"
-              :no-data-label="t('assets.portfolio.emptyPortfolio')"
-            >
-              <template #top>
-                <q-input
-                  v-model="tableFilter"
-                  outlined
-                  dense
-                  debounce="250"
-                  :placeholder="t('assets.portfolio.search')"
-                  class="portfolio-search"
-                >
-                  <template #prepend><q-icon name="search" /></template>
-                </q-input>
-              </template>
+          <section class="portfolio-content-card">
+            <template v-if="portfolioHoldings !== null">
+              <q-tabs
+                v-model="portfolioView"
+                dense
+                no-caps
+                inline-label
+                align="left"
+                indicator-color="transparent"
+                class="portfolio-view-tabs"
+              >
+                <q-tab
+                  name="holdings"
+                  icon="table_chart"
+                  :label="t('assets.portfolio.views.holdings')"
+                />
+                <q-tab
+                  name="charts"
+                  icon="donut_large"
+                  :label="t('assets.portfolio.views.charts')"
+                />
+              </q-tabs>
 
-              <template #body-cell-ticker="props">
-                <q-td :props="props"
-                  ><strong>{{ props.value }}</strong></q-td
-                >
-              </template>
+              <q-table
+                v-if="portfolioView === 'holdings'"
+                v-model:pagination="tablePagination"
+                class="portfolio-table"
+                flat
+                dense
+                row-key="id"
+                :rows="tableRows"
+                :columns="tableColumns"
+                :loading="readingSheet"
+                :rows-per-page-options="[10, 25, 50, 0]"
+                :no-data-label="t('assets.portfolio.emptyPortfolio')"
+              >
+                <template #body-cell-ticker="props">
+                  <q-td :props="props"
+                    ><strong>{{ props.value }}</strong></q-td
+                  >
+                </template>
 
-              <template #body-cell-country="props">
-                <q-td :props="props">
-                  <span class="country-value">
-                    <span v-if="countryFlag(props.value)" class="country-flag" aria-hidden="true">
-                      {{ countryFlag(props.value) }}
+                <template #body-cell-country="props">
+                  <q-td :props="props">
+                    <span class="country-value">
+                      <span v-if="countryFlag(props.value)" class="country-flag" aria-hidden="true">
+                        {{ countryFlag(props.value) }}
+                      </span>
+                      <span>{{ props.value || '—' }}</span>
                     </span>
-                    <span>{{ props.value || '—' }}</span>
-                  </span>
-                </q-td>
-              </template>
+                  </q-td>
+                </template>
 
-              <template #header-cell-marketValueBase="props">
-                <q-th :props="props">
-                  <span class="combined-heading">
-                    <span>{{ t('assets.portfolio.columns.marketValue') }}</span>
-                    <span>{{ t('assets.portfolio.columns.portfolioWeight') }}</span>
-                  </span>
-                </q-th>
-              </template>
+                <template #header-cell-marketValueBase="props">
+                  <q-th :props="props">
+                    <span class="combined-heading">
+                      <span>{{ t('assets.portfolio.columns.marketValue') }}</span>
+                      <span>{{ t('assets.portfolio.columns.portfolioWeight') }}</span>
+                    </span>
+                  </q-th>
+                </template>
 
-              <template #header-cell-annualDividendBase="props">
-                <q-th :props="props">
-                  <span class="combined-heading">
-                    <span>{{
-                      t(
-                        mobileTable
-                          ? 'assets.portfolio.columns.annualIncome'
-                          : 'assets.portfolio.columns.annualDividend',
-                      )
-                    }}</span>
-                    <span>{{ t('assets.portfolio.columns.incomeWeight') }}</span>
-                  </span>
-                </q-th>
-              </template>
+                <template #header-cell-annualDividendBase="props">
+                  <q-th :props="props">
+                    <span class="combined-heading">
+                      <span>{{
+                        t(
+                          mobileTable
+                            ? 'assets.portfolio.columns.annualIncome'
+                            : 'assets.portfolio.columns.annualDividend',
+                        )
+                      }}</span>
+                      <span>{{ t('assets.portfolio.columns.incomeWeight') }}</span>
+                    </span>
+                  </q-th>
+                </template>
 
-              <template #body-cell-dayChange="props">
-                <q-td :props="props">
-                  <span class="daily-change" :class="`daily-change--${props.row.dayChangeTone}`">
-                    {{ props.value || '—' }}
-                  </span>
-                </q-td>
-              </template>
+                <template #body-cell-dayChange="props">
+                  <q-td :props="props">
+                    <span class="daily-change" :class="`daily-change--${props.row.dayChangeTone}`">
+                      {{ props.value || '—' }}
+                    </span>
+                  </q-td>
+                </template>
 
-              <template #body-cell-marketValueBase="props">
-                <q-td :props="props">
-                  <span class="combined-value">
-                    <strong>{{ props.value || '—' }}</strong>
-                    <small>{{ props.row.portfolioWeight || '—' }}</small>
-                  </span>
-                </q-td>
-              </template>
+                <template #body-cell-marketValueBase="props">
+                  <q-td :props="props">
+                    <span class="combined-value">
+                      <strong>{{ props.value || '—' }}</strong>
+                      <small>{{ props.row.portfolioWeight || '—' }}</small>
+                    </span>
+                  </q-td>
+                </template>
 
-              <template #body-cell-annualDividendBase="props">
-                <q-td :props="props">
-                  <span class="combined-value">
-                    <strong>{{ props.value || '—' }}</strong>
-                    <small>{{ props.row.incomeWeight || '—' }}</small>
-                  </span>
-                </q-td>
-              </template>
-            </q-table>
+                <template #body-cell-annualDividendBase="props">
+                  <q-td :props="props">
+                    <span class="combined-value">
+                      <strong>{{ props.value || '—' }}</strong>
+                      <small>{{ props.row.incomeWeight || '—' }}</small>
+                    </span>
+                  </q-td>
+                </template>
+              </q-table>
+
+              <div v-else class="portfolio-allocation-view">
+                <q-tabs
+                  v-model="allocationDimension"
+                  dense
+                  no-caps
+                  outside-arrows
+                  mobile-arrows
+                  align="left"
+                  active-color="primary"
+                  indicator-color="primary"
+                  class="allocation-dimension-tabs"
+                >
+                  <q-tab
+                    v-for="dimension in allocationDimensions"
+                    :key="dimension"
+                    :name="dimension"
+                    :label="t(`assets.portfolio.allocation.dimensions.${dimension}`)"
+                  />
+                </q-tabs>
+
+                <div class="portfolio-allocation-charts">
+                  <PortfolioAllocationChart
+                    :groups="marketValueAllocation"
+                    :color-labels="allocationColorLabels"
+                    :title="t('assets.portfolio.allocation.marketValue')"
+                    :subtitle="allocationSubtitle"
+                    :base-currency="activePortfolioSummary.baseCurrency"
+                    :aria-label="t('assets.portfolio.allocation.marketValueAria')"
+                    :empty-label="t('assets.portfolio.allocation.empty')"
+                    @select="openAllocationDetails($event, 'marketValueBase')"
+                  />
+                  <PortfolioAllocationChart
+                    :groups="dividendAllocation"
+                    :color-labels="allocationColorLabels"
+                    :title="t('assets.portfolio.allocation.dividendIncome')"
+                    :subtitle="allocationSubtitle"
+                    :base-currency="activePortfolioSummary.baseCurrency"
+                    :aria-label="t('assets.portfolio.allocation.dividendIncomeAria')"
+                    :empty-label="t('assets.portfolio.allocation.emptyDividends')"
+                    @select="openAllocationDetails($event, 'annualDividendBase')"
+                  />
+                </div>
+              </div>
+            </template>
 
             <div v-else class="portfolio-table-empty">
               <q-spinner v-if="readingSheet" color="primary" size="2rem" />
@@ -331,6 +377,42 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog
+      :model-value="Boolean(selectedAllocation)"
+      @update:model-value="closeAllocationDetails"
+    >
+      <q-card v-if="selectedAllocation" class="allocation-detail-dialog">
+        <q-card-section class="allocation-detail-heading">
+          <div>
+            <small>{{ allocationDetailMetricLabel }}</small>
+            <h2>{{ selectedAllocation.name }}</h2>
+            <p>
+              {{
+                formatCurrencyValue(
+                  selectedAllocation.value,
+                  activePortfolioSummary.baseCurrency,
+                  0,
+                )
+              }}
+              · {{ formatAllocationPercentage(selectedAllocation.percentage) }}
+            </p>
+          </div>
+          <q-btn flat round dense icon="close" :aria-label="t('common.close')" v-close-popup />
+        </q-card-section>
+        <q-card-section class="allocation-detail-table-section">
+          <q-table
+            flat
+            dense
+            row-key="id"
+            :rows="allocationDetailRows"
+            :columns="allocationDetailColumns"
+            :rows-per-page-options="[0]"
+            hide-pagination
+          />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -339,7 +421,7 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import PortfolioHistoryChart from '@/components/assets/PortfolioHistoryChart.vue'
+import PortfolioAllocationChart from '@/components/assets/PortfolioAllocationChart.vue'
 import {
   investmentPortfolioCache,
   investmentPortfolioCacheIsFresh,
@@ -348,11 +430,11 @@ import {
 } from '@/services/firebase/investment-portfolios.service'
 import {
   countryFlag,
+  formatCurrencyValue,
+  portfolioAllocationGroups,
   portfolioKpis,
   portfolioTableRows,
 } from '@/domain/financial/investment-portfolio'
-import { buildAssetAnnualSeries } from '@/domain/financial/history'
-import { getFinancialHistory } from '@/services/firebase/history.service'
 import { useAssetsStore } from '@/stores/assets-store'
 
 const templateCopyUrl =
@@ -373,13 +455,15 @@ const readingSheet = ref(false)
 const portfolioHoldings = ref(null)
 const portfolioSummary = ref(null)
 const sheetError = ref(false)
-const tableFilter = ref('')
 const tablePagination = ref({ sortBy: 'ticker', descending: false, page: 1, rowsPerPage: 25 })
-const historyDocuments = ref([])
-const historyLoading = ref(false)
+const portfolioView = ref('holdings')
+const allocationDimension = ref('ticker')
+const selectedAllocation = ref(null)
+const selectedAllocationMetric = ref('marketValueBase')
 let preparationId = 0
 let sheetReadId = 0
-let historyRequestId = 0
+
+const allocationDimensions = ['ticker', 'country', 'currency', 'sector', 'industry']
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const assetId = computed(() => String(route.params.assetId))
@@ -401,6 +485,64 @@ const activePortfolioSummary = computed(
 )
 const mobileTable = computed(() => $q.screen.lt.sm)
 const portfolioMetrics = computed(() => portfolioKpis(activePortfolioSummary.value))
+const marketValueAllocation = computed(() =>
+  portfolioAllocationGroups(
+    portfolioHoldings.value,
+    allocationDimension.value,
+    'marketValueBase',
+    t('assets.portfolio.allocation.unknown'),
+  ),
+)
+const dividendAllocation = computed(() =>
+  portfolioAllocationGroups(
+    portfolioHoldings.value,
+    allocationDimension.value,
+    'annualDividendBase',
+    t('assets.portfolio.allocation.unknown'),
+  ),
+)
+const allocationColorLabels = computed(() =>
+  [
+    ...new Set(
+      [...marketValueAllocation.value, ...dividendAllocation.value].map(({ name }) => name),
+    ),
+  ].sort((left, right) => left.localeCompare(right)),
+)
+const allocationSubtitle = computed(() =>
+  t('assets.portfolio.allocation.groupedBy', {
+    dimension: t(`assets.portfolio.allocation.dimensions.${allocationDimension.value}`),
+  }),
+)
+const allocationDetailRows = computed(() =>
+  portfolioTableRows(
+    selectedAllocation.value?.holdings || [],
+    activePortfolioSummary.value.baseCurrency,
+  ),
+)
+const allocationDetailColumns = computed(() => [
+  tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '34%'),
+  tableColumn(
+    'marketValueBase',
+    t('assets.portfolio.columns.marketValue'),
+    'right',
+    '33%',
+    'marketValueBaseValue',
+  ),
+  tableColumn(
+    'annualDividendBase',
+    t('assets.portfolio.columns.annualDividend'),
+    'right',
+    '33%',
+    'annualDividendBaseValue',
+  ),
+])
+const allocationDetailMetricLabel = computed(() =>
+  t(
+    selectedAllocationMetric.value === 'annualDividendBase'
+      ? 'assets.portfolio.allocation.dividendIncome'
+      : 'assets.portfolio.allocation.marketValue',
+  ),
+)
 const lastCheckedLabel = computed(() => {
   const value = Number(portfolio.value?.cache?.lastCheckedAt)
   if (!Number.isFinite(value)) return ''
@@ -409,9 +551,6 @@ const lastCheckedLabel = computed(() => {
     timeStyle: 'short',
   }).format(new Date(value))
 })
-const portfolioHistoryPoints = computed(() =>
-  buildAssetAnnualSeries(historyDocuments.value, { assetId: assetId.value }),
-)
 const tableRows = computed(() =>
   portfolioTableRows(portfolioHoldings.value, activePortfolioSummary.value.baseCurrency),
 )
@@ -420,12 +559,19 @@ const tableColumns = computed(() => {
     return [
       tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '24%'),
       tableColumn('country', t('assets.portfolio.columns.country'), 'center', '18%'),
-      tableColumn('marketValueBase', t('assets.portfolio.columns.marketValue'), 'center', '29%'),
+      tableColumn(
+        'marketValueBase',
+        t('assets.portfolio.columns.marketValue'),
+        'center',
+        '29%',
+        'marketValueBaseValue',
+      ),
       tableColumn(
         'annualDividendBase',
         t('assets.portfolio.columns.annualIncome'),
         'center',
         '29%',
+        'annualDividendBaseValue',
       ),
     ]
   }
@@ -433,16 +579,41 @@ const tableColumns = computed(() => {
   return [
     tableColumn('ticker', t('assets.portfolio.columns.ticker'), 'left', '11%'),
     tableColumn('country', t('assets.portfolio.columns.country'), 'center', '9%'),
-    tableColumn('shares', t('assets.portfolio.columns.shares'), 'center', '10%'),
-    tableColumn('priceLocal', t('assets.portfolio.columns.priceLocal'), 'center', '13%'),
-    tableColumn('dayChange', t('assets.portfolio.columns.dayChange'), 'center', '12%'),
-    tableColumn('dividendYield', t('assets.portfolio.columns.dividendYield'), 'center', '13%'),
-    tableColumn('marketValueBase', t('assets.portfolio.columns.marketValue'), 'center', '16%'),
+    tableColumn('shares', t('assets.portfolio.columns.shares'), 'center', '10%', 'sharesValue'),
+    tableColumn(
+      'priceLocal',
+      t('assets.portfolio.columns.priceLocal'),
+      'center',
+      '13%',
+      'priceLocalValue',
+    ),
+    tableColumn(
+      'dayChange',
+      t('assets.portfolio.columns.dayChange'),
+      'center',
+      '12%',
+      'dayChangeValue',
+    ),
+    tableColumn(
+      'dividendYield',
+      t('assets.portfolio.columns.dividendYield'),
+      'center',
+      '13%',
+      'dividendYieldValue',
+    ),
+    tableColumn(
+      'marketValueBase',
+      t('assets.portfolio.columns.marketValue'),
+      'center',
+      '16%',
+      'marketValueBaseValue',
+    ),
     tableColumn(
       'annualDividendBase',
       t('assets.portfolio.columns.annualDividend'),
       'center',
       '16%',
+      'annualDividendBaseValue',
     ),
   ]
 })
@@ -483,20 +654,6 @@ async function prepare(force = false) {
   }
 }
 
-async function loadHistory() {
-  const currentRequest = ++historyRequestId
-  historyDocuments.value = []
-  historyLoading.value = true
-  try {
-    const documents = await getFinancialHistory(workspaceId.value)
-    if (currentRequest === historyRequestId) historyDocuments.value = documents
-  } catch {
-    if (currentRequest === historyRequestId) historyDocuments.value = []
-  } finally {
-    if (currentRequest === historyRequestId) historyLoading.value = false
-  }
-}
-
 function startEditing() {
   spreadsheetUrl.value = portfolio.value?.spreadsheetUrl || ''
   editing.value = true
@@ -520,7 +677,6 @@ async function save() {
     spreadsheetUrl.value = ''
     clearSheetResult()
     applyPortfolioResult(result)
-    void loadHistory()
     $q.notify({ type: 'positive', message: t('assets.portfolio.saved'), position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: t('assets.portfolio.errors.save'), position: 'top' })
@@ -552,26 +708,39 @@ async function readPortfolio(force = false) {
   sheetError.value = false
 
   const cache = investmentPortfolioCache(portfolio.value)
+  const needsClassificationRefresh = portfolioCacheNeedsClassifications(cache)
   if (cache) {
     portfolioHoldings.value = cache.holdings
     portfolioSummary.value = cache.summary
-    void loadHistory()
   }
-  if (!force && investmentPortfolioCacheIsFresh(portfolio.value)) return
+  if (!force && !needsClassificationRefresh && investmentPortfolioCacheIsFresh(portfolio.value)) {
+    return
+  }
 
   readingSheet.value = true
   try {
-    const result = await syncInvestmentPortfolio(currentWorkspaceId, currentAssetId, force)
+    const result = await syncInvestmentPortfolio(
+      currentWorkspaceId,
+      currentAssetId,
+      force || needsClassificationRefresh,
+    )
     if (currentRead !== sheetReadId) return
     assetsStore.applyInvestmentPortfolioSync(currentAssetId, result)
     applyPortfolioResult(result)
-    if (!cache || result.financialSections?.includes('assets')) void loadHistory()
   } catch {
     if (currentRead !== sheetReadId) return
     sheetError.value = true
   } finally {
     if (currentRead === sheetReadId) readingSheet.value = false
   }
+}
+
+function portfolioCacheNeedsClassifications(cache) {
+  return Boolean(
+    cache?.holdings?.some(
+      (holding) => !Object.hasOwn(holding, 'sector') || !Object.hasOwn(holding, 'industry'),
+    ),
+  )
 }
 
 function applyPortfolioResult(result) {
@@ -585,12 +754,34 @@ function clearSheetResult() {
   portfolioHoldings.value = null
   portfolioSummary.value = null
   sheetError.value = false
-  tableFilter.value = ''
+  selectedAllocation.value = null
 }
 
-function tableColumn(name, label, align, width) {
+function openAllocationDetails(group, metric) {
+  selectedAllocation.value = group
+  selectedAllocationMetric.value = metric
+}
+
+function closeAllocationDetails(open) {
+  if (!open) selectedAllocation.value = null
+}
+
+function formatAllocationPercentage(value) {
+  return `${new Intl.NumberFormat('en-IE', { maximumFractionDigits: 1 }).format(value)}%`
+}
+
+function tableColumn(name, label, align, width, sortField = null) {
   const size = `width: ${width}`
-  return { name, label, field: name, align, sortable: true, style: size, headerStyle: size }
+  return {
+    name,
+    label,
+    field: sortField || name,
+    format: sortField ? (_value, row) => row[name] : undefined,
+    align,
+    sortable: true,
+    style: size,
+    headerStyle: size,
+  }
 }
 </script>
 
@@ -630,7 +821,7 @@ h1 {
   @include financial-title;
 }
 .setup-card,
-.portfolio-table-card {
+.portfolio-content-card {
   @include dashboard-card;
   margin-top: 1.5rem;
 }
@@ -694,13 +885,17 @@ h1 {
   justify-content: flex-end;
   gap: 0.5rem;
 }
-.portfolio-table-card {
+.portfolio-content-card {
   overflow: hidden;
 }
 .portfolio-kpis {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
   margin-top: 1.5rem;
 }
 .portfolio-kpi {
@@ -709,48 +904,34 @@ h1 {
   min-height: 9rem;
   flex-direction: column;
   padding: 1.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-.portfolio-kpi--value {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(16rem, 1.2fr);
-  align-items: center;
-  gap: 2rem;
-  min-height: 12rem;
-}
-.portfolio-kpi-copy {
-  display: flex;
-  min-width: 0;
-  height: 100%;
-  flex-direction: column;
-}
-.portfolio-kpi-pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-.portfolio-kpi-pair .portfolio-kpi {
   border: 0;
   border-radius: 0;
   box-shadow: none;
 }
-.portfolio-kpi-pair .portfolio-kpi + .portfolio-kpi {
+.portfolio-kpi + .portfolio-kpi {
   border-left: 1px solid var(--color-line);
 }
 .portfolio-kpi-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.65rem;
   color: var(--color-copy);
   font-size: 0.82rem;
-  font-weight: 700;
+}
+.portfolio-kpi-label {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.portfolio-kpi-label b {
+  color: var(--color-copy);
+  font-size: 0.82rem;
+}
+.portfolio-kpi-label small {
+  color: var(--color-copy);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.3;
 }
 .portfolio-kpi-icon {
   display: grid;
@@ -772,7 +953,8 @@ h1 {
   color: var(--color-purple);
 }
 .portfolio-kpi strong {
-  margin-top: 0.9rem;
+  margin-top: auto;
+  padding-top: 0.9rem;
   overflow: hidden;
   color: var(--color-ink);
   font-size: clamp(1.7rem, 3vw, 2.35rem);
@@ -781,25 +963,60 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.portfolio-kpi small {
-  margin-top: auto;
-  padding-top: 0.65rem;
-  color: var(--color-copy);
-  font-size: 0.76rem;
-  line-height: 1.35;
-}
-.portfolio-history {
-  display: grid;
-  align-self: stretch;
-  min-width: 0;
-}
-.portfolio-history-state {
-  display: grid;
-  min-height: 7rem;
-  place-items: center;
-}
-.portfolio-kpis + .portfolio-table-card {
+.portfolio-kpis + .portfolio-content-card {
   margin-top: 1rem;
+}
+.portfolio-view-tabs {
+  width: fit-content;
+  max-width: calc(100% - 2rem);
+  min-height: 2.75rem;
+  margin: 1rem 1rem 0;
+  padding: 0.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.85rem;
+  background: var(--color-surface-soft);
+}
+.portfolio-view-tabs :deep(.q-tab) {
+  min-height: 2.2rem;
+  padding: 0 1rem;
+  border-radius: 0.62rem;
+  color: var(--color-copy);
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+.portfolio-view-tabs :deep(.q-tab__content) {
+  min-width: 0;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.portfolio-view-tabs :deep(.q-tab__icon) {
+  font-size: 1.05rem;
+}
+.portfolio-view-tabs :deep(.q-tab--active) {
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(15 36 72 / 10%);
+  color: var(--color-primary);
+}
+.portfolio-allocation-view {
+  padding: 1rem;
+}
+.allocation-dimension-tabs {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 2.5rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.7rem;
+  background: var(--color-surface-soft);
+}
+.portfolio-allocation-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.8rem;
 }
 .portfolio-table {
   width: calc(100% - 2rem);
@@ -808,27 +1025,6 @@ h1 {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
   color: var(--color-ink);
-}
-.portfolio-table :deep(.q-table__top) {
-  min-height: 4.25rem;
-  padding: 0.65rem;
-  border-bottom: 1px solid var(--color-line);
-}
-.portfolio-search {
-  width: 100%;
-}
-.portfolio-search :deep(.q-field__control) {
-  min-height: 2.9rem;
-  border-radius: 999px;
-  background: var(--color-surface);
-}
-.portfolio-search :deep(.q-field__prepend) {
-  padding-right: 0.6rem;
-  color: var(--color-copy);
-}
-.portfolio-search :deep(.q-field__native) {
-  color: var(--color-ink);
-  font-size: 0.85rem;
 }
 .portfolio-table :deep(.q-table__middle) {
   max-width: 100%;
@@ -925,7 +1121,7 @@ h1 {
 .portfolio-table-empty p {
   margin: 0.65rem 0 0;
 }
-.portfolio-table-card .sheet-error {
+.portfolio-content-card .sheet-error {
   margin: 0;
   padding: 0.8rem 1.5rem;
   border-top: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
@@ -958,6 +1154,40 @@ h1 {
 .confirm-card {
   @include financial-simple-dialog(28rem);
 }
+.allocation-detail-dialog {
+  width: min(38rem, calc(100vw - 2rem));
+  max-width: none;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+}
+.allocation-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.allocation-detail-heading small,
+.allocation-detail-heading h2,
+.allocation-detail-heading p {
+  margin: 0;
+}
+.allocation-detail-heading small,
+.allocation-detail-heading p {
+  color: var(--color-copy);
+}
+.allocation-detail-heading h2 {
+  margin-top: 0.1rem;
+  font-size: 1.25rem;
+}
+.allocation-detail-heading p {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+}
+.allocation-detail-table-section {
+  padding: 0;
+}
 
 @media (max-width: 760px) {
   .portfolio-table :deep(th) {
@@ -966,23 +1196,30 @@ h1 {
     font-size: 0.62rem;
   }
   .portfolio-kpis {
-    gap: 0.75rem;
+    grid-template-columns: 1fr;
     margin-top: 1rem;
   }
-  .portfolio-kpi--value {
-    grid-template-columns: minmax(0, 0.9fr) minmax(7.5rem, 1.1fr);
-    gap: 0.65rem;
-    min-height: 9.5rem;
+  .portfolio-allocation-view {
+    padding: 0.75rem;
+  }
+  .portfolio-allocation-charts {
+    grid-template-columns: 1fr;
+  }
+  .portfolio-kpi {
+    min-height: 8rem;
     padding: 0.9rem;
   }
-  .portfolio-kpi-pair .portfolio-kpi {
-    min-height: 8.75rem;
-    padding: 0.9rem;
+  .portfolio-kpi + .portfolio-kpi {
+    border-top: 1px solid var(--color-line);
+    border-left: 0;
   }
   .portfolio-kpi-heading {
     gap: 0.45rem;
     font-size: 0.7rem;
     line-height: 1.2;
+  }
+  .portfolio-kpi-label b {
+    font-size: 0.7rem;
   }
   .portfolio-kpi-icon {
     width: 2rem;
@@ -993,8 +1230,7 @@ h1 {
     margin-top: 0.75rem;
     font-size: clamp(1.35rem, 6vw, 2rem);
   }
-  .portfolio-kpi small {
-    padding-top: 0.45rem;
+  .portfolio-kpi-label small {
     font-size: 0.64rem;
   }
   .portfolio-actions {

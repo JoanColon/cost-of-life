@@ -1,5 +1,5 @@
-const PORTFOLIO_SCHEMA_V1 = {
-  version: 1,
+const PORTFOLIO_SCHEMA = {
+  version: 2,
   sheets: {
     portfolio: 'Portfolio',
     summary: 'Summary',
@@ -17,6 +17,8 @@ const PORTFOLIO_SCHEMA_V1 = {
   holdings: [
     { name: 'ticker', aliases: ['ticker'], type: 'text' },
     { name: 'country', aliases: ['country'], type: 'text' },
+    { name: 'sector', aliases: ['sector'], type: 'text', required: false },
+    { name: 'industry', aliases: ['industry'], type: 'text', required: false },
     { name: 'currency', aliases: ['currency'], type: 'text' },
     { name: 'shares', aliases: ['shares'], type: 'number' },
     { name: 'priceLocal', aliases: ['price local'], type: 'number' },
@@ -51,7 +53,7 @@ const PORTFOLIO_SCHEMA_V1 = {
 
 function normalizeInvestmentPortfolio(portfolioRows, summaryRows) {
   return {
-    schemaVersion: PORTFOLIO_SCHEMA_V1.version,
+    schemaVersion: PORTFOLIO_SCHEMA.version,
     summary: normalizeSummary(summaryRows),
     holdings: normalizeHoldings(portfolioRows),
   }
@@ -62,7 +64,7 @@ function normalizeSummary(rows) {
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!Array.isArray(row)) continue
     const label = normalizeLabel(row[0])
-    for (const [name, aliases] of Object.entries(PORTFOLIO_SCHEMA_V1.summary)) {
+    for (const [name, aliases] of Object.entries(PORTFOLIO_SCHEMA.summary)) {
       if (aliases.includes(label)) values[name] = row[1]
     }
   }
@@ -103,11 +105,11 @@ function normalizeHoldings(rows) {
   const headers = rows[0].map(normalizeLabel)
   const indexes = {}
   const missingColumns = []
-  for (const field of PORTFOLIO_SCHEMA_V1.holdings) {
+  for (const field of PORTFOLIO_SCHEMA.holdings) {
     const index = headers.findIndex((header) =>
       field.aliases.some((alias) => header === alias || header.endsWith(` ${alias}`)),
     )
-    if (index < 0) missingColumns.push(field.aliases[0])
+    if (index < 0 && field.required !== false) missingColumns.push(field.aliases[0])
     indexes[field.name] = index
   }
   if (missingColumns.length) {
@@ -122,9 +124,9 @@ function normalizeHoldings(rows) {
     if (!ticker) return holdings
 
     const holding = { id: `portfolio-${rowIndex}`, ticker }
-    for (const field of PORTFOLIO_SCHEMA_V1.holdings) {
+    for (const field of PORTFOLIO_SCHEMA.holdings) {
       if (field.name === 'ticker') continue
-      const value = row[indexes[field.name]]
+      const value = indexes[field.name] < 0 ? null : row[indexes[field.name]]
       holding[field.name] =
         field.type === 'number' ? parseLocalizedNumber(value) : String(value ?? '').trim()
     }
@@ -239,7 +241,7 @@ function roundMoney(value) {
 }
 
 module.exports = {
-  PORTFOLIO_SCHEMA_V1,
+  PORTFOLIO_SCHEMA,
   normalizeInvestmentPortfolio,
   normalizeSummary,
   normalizeHoldings,

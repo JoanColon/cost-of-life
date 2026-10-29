@@ -502,6 +502,60 @@ describe('atomic financial model mutations', () => {
       }),
     )
   })
+
+  it('rejects an expense category deletion when related writes exceed the transaction limit', async () => {
+    const items = Array.from({ length: 498 }, (_, index) => ({
+      id: `expense-${index}`,
+      categoryId: 'housing',
+      subcategoryId: 'utilities',
+    }))
+    const { firestore, writes } = createFirestore({
+      section: 'expenses',
+      collection: 'modelExpenses',
+      category: 'housing',
+      items,
+    })
+
+    await expect(
+      mutateFinancialModel(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'member-a',
+        section: 'expenses',
+        operation: 'deleteCategory',
+        categoryId: 'housing',
+      }),
+    ).rejects.toThrow('too many related items')
+    expect(writes).toEqual([])
+  })
+
+  it('includes linked income writes when validating an asset category deletion', async () => {
+    const items = Array.from({ length: 250 }, (_, index) => ({
+      id: `investment-${index}`,
+      categoryId: 'investment',
+    }))
+    const linkedIncome = items.map((item, index) => ({
+      id: `income-${index}`,
+      portfolioAssetId: item.id,
+    }))
+    const { firestore, writes } = createFirestore({
+      section: 'assets',
+      collection: 'modelAssets',
+      category: 'investment',
+      items,
+      linkedIncome,
+    })
+
+    await expect(
+      mutateFinancialModel(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'member-a',
+        section: 'assets',
+        operation: 'deleteCategory',
+        categoryId: 'investment',
+      }),
+    ).rejects.toThrow('too many related items')
+    expect(writes).toEqual([])
+  })
 })
 
 function createFirestore({

@@ -26,10 +26,10 @@ describe('investment portfolio client validation', () => {
 
   it('reads a normalized portfolio cache and evaluates its TTL', () => {
     const portfolio = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       summary: { baseCurrency: 'EUR' },
       cache: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         holdings: [{ ticker: 'VWCE' }],
         lastCheckedAt: 100,
         refreshAfter: 200,
@@ -45,11 +45,11 @@ describe('investment portfolio client validation', () => {
   })
 
   it('ignores invalid or financially dirty caches', () => {
-    expect(investmentPortfolioCache({ schemaVersion: 1, cache: { schemaVersion: 1 } })).toBeNull()
+    expect(investmentPortfolioCache({ schemaVersion: 2, cache: { schemaVersion: 2 } })).toBeNull()
     const dirty = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       summary: {},
-      cache: { schemaVersion: 1, holdings: [], refreshAfter: 200 },
+      cache: { schemaVersion: 2, holdings: [], refreshAfter: 200 },
       sync: { financialProjectionDirty: true },
     }
     expect(investmentPortfolioCacheIsFresh(dirty, 100)).toBe(false)

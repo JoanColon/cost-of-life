@@ -37,13 +37,29 @@ describe('Google Sheets investment portfolio schema', () => {
   it('maps Portfolio columns into typed canonical holdings', () => {
     const holdings = normalizeHoldings([
       portfolioHeaders(),
-      ['IBE.MC', 'ES', 'EUR', '1000', '21,9', '0,74%', '2,51%', '21900', '81,52%', '550', '82,89%'],
+      [
+        'IBE.MC',
+        'ES',
+        'Utilities',
+        'Diversified Utilities',
+        'EUR',
+        '1000',
+        '21,9',
+        '0,74%',
+        '2,51%',
+        '21900',
+        '81,52%',
+        '550',
+        '82,89%',
+      ],
     ])
     expect(holdings).toEqual([
       {
         id: 'portfolio-0',
         ticker: 'IBE.MC',
         country: 'ES',
+        sector: 'Utilities',
+        industry: 'Diversified Utilities',
         currency: 'EUR',
         shares: 1000,
         priceLocal: 21.9,
@@ -55,6 +71,27 @@ describe('Google Sheets investment portfolio schema', () => {
         incomeWeightPercent: 82.89,
       },
     ])
+  })
+
+  it('keeps older portfolio templates compatible when classifications are absent', () => {
+    const holdings = normalizeHoldings([
+      [
+        'Ticker',
+        'Country',
+        'Currency',
+        'Shares',
+        'Price (local)',
+        'Day Change %',
+        'Dividend yield (local)',
+        'Market value (base)',
+        'Portfolio %',
+        'Annual dividend (base)',
+        'Income %',
+      ],
+      ['ETF', 'IE', 'EUR', '1', '10', '0', '0', '10', '100', '0', '0'],
+    ])
+
+    expect(holdings[0]).toMatchObject({ sector: '', industry: '' })
   })
 
   it('rejects incomplete templates instead of using fallback indexes', () => {
@@ -69,6 +106,8 @@ function portfolioHeaders() {
   return [
     'Ticker',
     'Country',
+    'Sector',
+    'Industry',
     'Currency',
     'Shares',
     'Price (local)',

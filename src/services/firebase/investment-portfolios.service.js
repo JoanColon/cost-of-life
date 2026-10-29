@@ -4,6 +4,7 @@ import { functions } from '@/firebase/firebase'
 const updatePortfolio = httpsCallable(functions, 'updateInvestmentPortfolio')
 const syncPortfolioSheet = httpsCallable(functions, 'readInvestmentPortfolioSheet')
 const spreadsheetPath = /^\/spreadsheets(?:\/u\/\d+)?\/d\/[A-Za-z0-9_-]+(?:\/|$)/
+const PORTFOLIO_SCHEMA_VERSION = 2
 
 export function isGoogleSheetsUrl(value) {
   try {
@@ -38,7 +39,12 @@ export async function syncInvestmentPortfolio(workspaceId, assetId, force = fals
 
 export function investmentPortfolioCache(portfolio) {
   const cache = portfolio?.cache
-  if (portfolio?.schemaVersion !== 1 || cache?.schemaVersion !== 1) return null
+  if (
+    portfolio?.schemaVersion !== PORTFOLIO_SCHEMA_VERSION ||
+    cache?.schemaVersion !== PORTFOLIO_SCHEMA_VERSION
+  ) {
+    return null
+  }
   if (!Array.isArray(cache.holdings) || !portfolio?.summary) return null
   return { summary: portfolio.summary, ...cache }
 }

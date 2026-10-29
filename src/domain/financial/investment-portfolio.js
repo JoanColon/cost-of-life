@@ -1,22 +1,77 @@
 const NUMBER_LOCALE = 'en-IE'
+const ALLOCATION_DIMENSIONS = new Set(['ticker', 'country', 'currency', 'sector', 'industry'])
+const ALLOCATION_VALUES = new Set(['marketValueBase', 'annualDividendBase'])
+
+export function portfolioAllocationGroups(
+  holdings,
+  dimension,
+  valueField,
+  unknownLabel = 'Unknown',
+) {
+  if (
+    !Array.isArray(holdings) ||
+    !ALLOCATION_DIMENSIONS.has(dimension) ||
+    !ALLOCATION_VALUES.has(valueField)
+  ) {
+    return []
+  }
+
+  const grouped = new Map()
+  for (const holding of holdings) {
+    const value = numericValue(holding?.[valueField])
+    if (value === null || value <= 0) continue
+    const name = textValue(holding?.[dimension]) || unknownLabel
+    const group = grouped.get(name) || { name, value: 0, holdings: [] }
+    group.value += value
+    group.holdings.push(holding)
+    grouped.set(name, group)
+  }
+
+  const total = [...grouped.values()].reduce((sum, group) => sum + group.value, 0)
+  return [...grouped.values()]
+    .map((group) => ({
+      ...group,
+      percentage: total > 0 ? (group.value / total) * 100 : 0,
+    }))
+    .sort((left, right) => right.value - left.value || left.name.localeCompare(right.name))
+}
 
 export function portfolioTableRows(holdings, baseCurrency = '') {
   if (!Array.isArray(holdings)) return []
-  return holdings.map((holding, index) => ({
-    id: holding.id || `portfolio-${index}`,
-    ticker: textValue(holding.ticker),
-    country: textValue(holding.country),
-    currency: textValue(holding.currency),
-    shares: formatNumberValue(holding.shares, 0, 4),
-    priceLocal: formatCurrencyValue(holding.priceLocal, holding.currency, 2),
-    dayChange: formatPercentageValue(holding.dayChangePercent, 2),
-    dayChangeTone: numberTone(holding.dayChangePercent),
-    dividendYield: formatPercentageValue(holding.dividendYieldPercent, 2),
-    marketValueBase: formatCurrencyValue(holding.marketValueBase, baseCurrency, 0),
-    portfolioWeight: formatPercentageValue(holding.portfolioWeightPercent, 1),
-    annualDividendBase: formatCurrencyValue(holding.annualDividendBase, baseCurrency, 0),
-    incomeWeight: formatPercentageValue(holding.incomeWeightPercent, 1),
-  }))
+  return holdings.map((holding, index) => {
+    const sharesValue = numericValue(holding.shares)
+    const priceLocalValue = numericValue(holding.priceLocal)
+    const dayChangeValue = numericValue(holding.dayChangePercent)
+    const dividendYieldValue = numericValue(holding.dividendYieldPercent)
+    const marketValueBaseValue = numericValue(holding.marketValueBase)
+    const portfolioWeightValue = numericValue(holding.portfolioWeightPercent)
+    const annualDividendBaseValue = numericValue(holding.annualDividendBase)
+    const incomeWeightValue = numericValue(holding.incomeWeightPercent)
+
+    return {
+      id: holding.id || `portfolio-${index}`,
+      ticker: textValue(holding.ticker),
+      country: textValue(holding.country),
+      currency: textValue(holding.currency),
+      shares: formatNumberValue(sharesValue, 0, 4),
+      sharesValue,
+      priceLocal: formatCurrencyValue(priceLocalValue, holding.currency, 2),
+      priceLocalValue,
+      dayChange: formatPercentageValue(dayChangeValue, 2),
+      dayChangeValue,
+      dayChangeTone: numberTone(dayChangeValue),
+      dividendYield: formatPercentageValue(dividendYieldValue, 2),
+      dividendYieldValue,
+      marketValueBase: formatCurrencyValue(marketValueBaseValue, baseCurrency, 0),
+      marketValueBaseValue,
+      portfolioWeight: formatPercentageValue(portfolioWeightValue, 1),
+      portfolioWeightValue,
+      annualDividendBase: formatCurrencyValue(annualDividendBaseValue, baseCurrency, 0),
+      annualDividendBaseValue,
+      incomeWeight: formatPercentageValue(incomeWeightValue, 1),
+      incomeWeightValue,
+    }
+  })
 }
 
 export function portfolioKpis(summary = {}) {

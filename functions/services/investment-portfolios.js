@@ -1,7 +1,7 @@
 const { FieldValue } = require('firebase-admin/firestore')
 const { currentYear, rebuildFinancialYear } = require('./financial-years')
 const {
-  PORTFOLIO_SCHEMA_V1,
+  PORTFOLIO_SCHEMA,
   normalizeInvestmentPortfolio,
   parseCsv,
 } = require('./investment-portfolio-schema')
@@ -106,13 +106,13 @@ async function synchronizeInvestmentPortfolio(
   ]
   const contentChanged = summaryChanged || holdingsChanged
   const nextPortfolio = {
-    schemaVersion: PORTFOLIO_SCHEMA_V1.version,
+    schemaVersion: PORTFOLIO_SCHEMA.version,
     source: 'google_sheets',
     spreadsheetId,
     spreadsheetUrl: canonicalGoogleSheetsUrl(spreadsheetUrl),
     summary: normalized.summary,
     cache: {
-      schemaVersion: PORTFOLIO_SCHEMA_V1.version,
+      schemaVersion: PORTFOLIO_SCHEMA.version,
       holdings: normalized.holdings,
       lastCheckedAt: now,
       dataUpdatedAt: contentChanged ? now : existingPortfolio?.cache?.dataUpdatedAt || now,
@@ -208,11 +208,11 @@ async function portfolioContext(firestore, { workspaceId, userId, assetId }) {
 async function fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl) {
   const portfolioUrl = googleSheetQueryUrl(spreadsheetId, {
     tqx: 'out:csv',
-    sheet: PORTFOLIO_SCHEMA_V1.sheets.portfolio,
+    sheet: PORTFOLIO_SCHEMA.sheets.portfolio,
   })
   const summaryUrl = googleSheetQueryUrl(spreadsheetId, {
     tqx: 'out:csv',
-    sheet: PORTFOLIO_SCHEMA_V1.sheets.summary,
+    sheet: PORTFOLIO_SCHEMA.sheets.summary,
   })
   let lastError
   for (let attempt = 0; attempt < SHEET_READ_ATTEMPTS; attempt += 1) {
@@ -253,9 +253,9 @@ async function fetchGoogleSheet(
 
 function portfolioCacheIsFresh(portfolio, now = Date.now()) {
   return Boolean(
-    portfolio?.schemaVersion === PORTFOLIO_SCHEMA_V1.version &&
+    portfolio?.schemaVersion === PORTFOLIO_SCHEMA.version &&
       portfolio?.summary &&
-      portfolio?.cache?.schemaVersion === PORTFOLIO_SCHEMA_V1.version &&
+      portfolio?.cache?.schemaVersion === PORTFOLIO_SCHEMA.version &&
       Array.isArray(portfolio.cache.holdings) &&
       !portfolio?.sync?.financialProjectionDirty &&
       Number(portfolio.cache.refreshAfter) > Number(now),

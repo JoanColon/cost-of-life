@@ -24,6 +24,8 @@ const sectionDefinitions = {
   expenses: { collection: 'modelExpenses', result: 'expense' },
 }
 
+const MAX_TRANSACTION_WRITES = 500
+
 async function mutateFinancialModel(
   firestore,
   {
@@ -138,9 +140,13 @@ async function mutateFinancialModel(
       const categoryItems = existingItems.filter(
         (candidate) => candidate.categoryId === categoryId,
       )
-      if (categoryItems.length > 498) {
-        throw new Error('Categories with more than 498 items cannot be deleted at once')
-      }
+      const categoryItemIds = new Set(categoryItems.map(({ id }) => id))
+      assertDeleteCategoryWriteLimit(
+        section,
+        categoryItems,
+        linkedIncomeSnapshot,
+        categoryItemIds,
+      )
       nextItems = existingItems.filter(
         (candidate) => candidate.categoryId !== categoryId,
       )
@@ -148,7 +154,7 @@ async function mutateFinancialModel(
       unlinkPortfolioIncome(
         transaction,
         linkedIncomeSnapshot,
-        new Set(categoryItems.map(({ id }) => id)),
+        categoryItemIds,
         userId,
       )
       if (section === 'expenses') {
@@ -422,6 +428,19 @@ function unlinkPortfolioIncome(transaction, snapshot, assetIds, userId) {
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: userId,
     })
+  }
+}
+
+function assertDeleteCategoryWriteLimit(section, categoryItems, linkedIncomeSnapshot, itemIds) {
+  const linkedIncomeWrites = (linkedIncomeSnapshot?.docs || []).filter((document) =>
+    itemIds.has(document.data()?.portfolioAssetId),
+  ).length
+  const trackingConfigWrites = section === 'expenses' && categoryItems.length ? 1 : 0
+  const totalWrites =
+    categoryItems.length + linkedIncomeWrites + trackingConfigWrites + 2
+
+  if (totalWrites > MAX_TRANSACTION_WRITES) {
+    throw new Error('This category has too many related items to delete at once')
   }
 }
 

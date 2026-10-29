@@ -3,11 +3,44 @@ import {
   countryFlag,
   formatCurrencyValue,
   formatPercentageValue,
+  portfolioAllocationGroups,
   portfolioKpis,
   portfolioTableRows,
 } from '../../src/domain/financial/investment-portfolio.js'
 
 describe('investment portfolio table', () => {
+  it('groups market value and dividend income by portfolio dimensions', () => {
+    const holdings = [
+      {
+        ticker: 'IBE.MC',
+        sector: 'Utilities',
+        marketValueBase: 700,
+        annualDividendBase: 40,
+      },
+      {
+        ticker: 'ENG.MC',
+        sector: 'Utilities',
+        marketValueBase: 300,
+        annualDividendBase: 60,
+      },
+      {
+        ticker: 'ETF',
+        sector: '',
+        marketValueBase: 1000,
+        annualDividendBase: 0,
+      },
+    ]
+
+    expect(portfolioAllocationGroups(holdings, 'sector', 'marketValueBase', 'Unknown')).toEqual([
+      expect.objectContaining({ name: 'Unknown', value: 1000, percentage: 50 }),
+      expect.objectContaining({ name: 'Utilities', value: 1000, percentage: 50 }),
+    ])
+    expect(portfolioAllocationGroups(holdings, 'ticker', 'annualDividendBase')).toEqual([
+      expect.objectContaining({ name: 'ENG.MC', value: 60, percentage: 60 }),
+      expect.objectContaining({ name: 'IBE.MC', value: 40, percentage: 40 }),
+    ])
+  })
+
   it('derives flags from ISO country codes without a country map', () => {
     expect(countryFlag('ES')).toBe('🇪🇸')
     expect(countryFlag('us')).toBe('🇺🇸')
@@ -41,14 +74,22 @@ describe('investment portfolio table', () => {
         country: 'ES',
         currency: 'EUR',
         shares: '1,000',
+        sharesValue: 1000,
         priceLocal: '€21.90',
+        priceLocalValue: 21.9,
         dayChange: '0.74%',
+        dayChangeValue: 0.74,
         dayChangeTone: 'positive',
         dividendYield: '2.51%',
+        dividendYieldValue: 2.51,
         marketValueBase: '€21,900',
+        marketValueBaseValue: 21900,
         portfolioWeight: '81.5%',
+        portfolioWeightValue: 81.52,
         annualDividendBase: '€550',
+        annualDividendBaseValue: 550,
         incomeWeight: '82.9%',
+        incomeWeightValue: 82.89,
       },
     ])
   })
