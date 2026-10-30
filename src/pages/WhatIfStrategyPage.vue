@@ -1286,20 +1286,13 @@ function scopedValue(item, memberId) {
   color: var(--color-copy);
 }
 .strategy-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.5rem;
+  @include financial-header;
 }
 .back-button {
   @include financial-back-button;
 }
 h1 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: clamp(2.2rem, 5vw, 3.6rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  @include financial-title;
 }
 .strategy-header p,
 .panel-heading p,
@@ -1330,7 +1323,7 @@ h1 {
     'milestones milestones';
   column-gap: 1rem;
   row-gap: 0.85rem;
-  margin-top: 1.25rem;
+  margin-top: 0.75rem;
 }
 .configuration-column,
 .results-column {

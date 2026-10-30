@@ -754,6 +754,11 @@ h1 {
   margin-top: 1.25rem;
 }
 
+.setup-card,
+.mortgage-summary {
+  margin-top: 0.75rem;
+}
+
 .setup-card {
   max-width: 52rem;
   margin-right: auto;

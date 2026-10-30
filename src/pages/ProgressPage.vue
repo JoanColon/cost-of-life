@@ -313,7 +313,7 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.25rem;
-  margin-top: 2rem;
+  margin-top: 0.75rem;
 }
 
 .metric-card,

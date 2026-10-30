@@ -95,15 +95,17 @@ p {
   font-size: 0.95rem;
 }
 
-@media (max-width: 599px) {
+@media (min-width: 1024px) {
   .dashboard-card {
-    padding: 1.2rem;
-    border-radius: var(--radius-md);
+    padding: clamp(1rem, 1.6vw, 1.35rem);
   }
 
   .card-header {
-    align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: clamp(0.55rem, 1.3vh, 0.85rem);
+  }
+
+  .card-heading {
+    gap: 0.8rem;
   }
 
   .card-icon {
@@ -111,6 +113,43 @@ p {
     width: 3rem;
     height: 3rem;
     font-size: 1.4rem;
+  }
+
+  h2 {
+    font-size: clamp(1.15rem, 1.7vw, 1.4rem);
+  }
+
+  p {
+    margin-top: 0.2rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 599px) {
+  .dashboard-card {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+  }
+
+  .card-header {
+    align-items: center;
+    margin-bottom: 0.85rem;
+  }
+
+  .card-icon {
+    flex-basis: 2.65rem;
+    width: 2.65rem;
+    height: 2.65rem;
+    font-size: 1.2rem;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+  }
+
+  p {
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
   }
 }
 </style>

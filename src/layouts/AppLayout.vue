@@ -218,6 +218,7 @@ const activeNavigationNode = computed(() => {
     'what-if-strategy': 'plan',
     progress: 'progress',
     achievements: 'progress',
+    setup: 'your-money',
   }
 
   return routeNodes[route.name] || null

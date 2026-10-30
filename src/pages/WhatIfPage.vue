@@ -685,9 +685,12 @@ h1 {
   margin: 0;
 }
 
-.simulator-card,
+.simulator-card {
+  margin-top: 0.75rem;
+}
+
 .comparison-card {
-  margin-top: 1.75rem;
+  margin-top: 1.25rem;
 }
 
 .simulator-card {

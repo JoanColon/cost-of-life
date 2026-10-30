@@ -21,3 +21,32 @@ export async function saveActiveWorkspaceId(workspaceId) {
     { merge: true },
   )
 }
+
+export async function getQuickLinks(workspaceId) {
+  const userId = currentUserId()
+  const snapshot = await getDoc(doc(db, 'users', userId))
+  const links = snapshot.data()?.quickLinksByWorkspace?.[workspaceId]
+
+  return normalizeQuickLinks(links)
+}
+
+export async function saveQuickLinks(workspaceId, links) {
+  const userId = currentUserId()
+  const normalized = normalizeQuickLinks(links)
+
+  await setDoc(
+    doc(db, 'users', userId),
+    {
+      quickLinksByWorkspace: { [workspaceId]: normalized },
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+
+  return normalized
+}
+
+function normalizeQuickLinks(links) {
+  if (!Array.isArray(links)) return []
+  return [...new Set(links.filter((link) => typeof link === 'string' && link.trim()))]
+}

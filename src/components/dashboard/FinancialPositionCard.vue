@@ -163,6 +163,56 @@ const { t } = useI18n()
     background: var(--color-line);
   }
 
+  @media (min-width: 1024px) {
+    .position-layout {
+      grid-template-columns: minmax(15rem, 0.78fr) minmax(24rem, 1.22fr);
+      height: calc(100% - 3.7rem);
+      gap: clamp(1.5rem, 4vw, 3.5rem);
+    }
+
+    .position-summary {
+      padding-left: clamp(1.5rem, 4vw, 3.5rem);
+    }
+
+    .net-worth strong {
+      font-size: clamp(3rem, 5.7vh, 4.1rem);
+    }
+
+    .net-worth span {
+      margin-top: 0.3rem;
+      font-size: 0.95rem;
+    }
+
+    .position-breakdown {
+      gap: 1rem;
+      margin-top: clamp(0.75rem, 2vh, 1.25rem);
+    }
+
+    .breakdown-row {
+      gap: 0.6rem;
+    }
+
+    .breakdown-copy strong {
+      font-size: 1rem;
+    }
+
+    .metric-dot {
+      flex-basis: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .metric-divider {
+      height: 2.5rem;
+    }
+
+    .chart-shell,
+    .net-worth-chart {
+      min-height: 9.5rem;
+      height: 100%;
+    }
+  }
+
   @media (max-width: 800px) {
     .position-layout {
       grid-template-columns: 1fr;
@@ -176,20 +226,24 @@ const { t } = useI18n()
 
   @media (max-width: 599px) {
     .position-layout {
-      gap: 1rem;
+      gap: 0.65rem;
     }
 
     .net-worth strong {
-      font-size: clamp(2.55rem, 13vw, 3.7rem);
+      font-size: clamp(2.35rem, 12vw, 3.2rem);
     }
 
     .position-breakdown {
-      gap: 0.8rem;
-      margin-top: 1.35rem;
+      width: 100%;
+      gap: 0;
+      margin-top: 0.75rem;
     }
 
     .breakdown-row {
+      justify-content: center;
+      flex: 1 1 50%;
       gap: 0.55rem;
+      padding: 0.3rem 0.45rem;
     }
 
     .breakdown-copy strong {
@@ -198,6 +252,12 @@ const { t } = useI18n()
 
     .metric-divider {
       height: 2.6rem;
+    }
+
+    .chart-shell,
+    .net-worth-chart {
+      min-height: 8.5rem;
+      height: 8.5rem;
     }
   }
 }

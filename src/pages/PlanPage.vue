@@ -107,7 +107,29 @@
               >
             </div>
             <div class="action-body">
-              <p>{{ t('plan.whatIf.description') }}</p>
+              <div class="action-copy">
+                <p>{{ t('plan.whatIf.description') }}</p>
+                <div class="action-result">
+                  <span>{{ t('whatIf.result.label') }}</span>
+                  <strong
+                    >{{ formatCurrency(simulation.simulatedSavingsCapacity)
+                    }}<small>{{ t('whatIf.perMonth') }}</small></strong
+                  >
+                  <small v-if="simulation.extraSavings > 0" class="positive-result">
+                    {{
+                      t('whatIf.result.extra', {
+                        amount: formatCurrency(simulation.extraSavings),
+                      })
+                    }}
+                  </small>
+                </div>
+                <ul class="allocation-summary" :aria-label="t('plan.outcomes.label')">
+                  <li v-for="item in whatIfOutcomes" :key="item.id" :class="item.id">
+                    <span><i aria-hidden="true" />{{ item.label }}</span>
+                    <strong>{{ item.result }}</strong>
+                  </li>
+                </ul>
+              </div>
               <svg class="scenario-graphic" viewBox="0 0 300 110" aria-hidden="true">
                 <path d="M8 94 C95 94 166 86 292 35" class="line muted" />
                 <path d="M8 94 C115 94 205 79 292 13" class="line dashed" />
@@ -131,91 +153,26 @@
               >
             </div>
             <div class="action-body">
-              <p>{{ t('plan.strategy.description') }}</p>
+              <div class="action-copy">
+                <p>{{ t('plan.strategy.description') }}</p>
+                <div class="action-result strategy-result">
+                  <span>{{ activeScenario.name }}</span>
+                  <strong
+                    >{{ formatCurrency(strategyMonthlyAmount)
+                    }}<small>{{ t('whatIf.perMonth') }}</small></strong
+                  >
+                </div>
+                <ul class="allocation-summary" :aria-label="t('plan.outcomes.label')">
+                  <li v-for="item in strategyOutcomes" :key="item.id" :class="item.id">
+                    <span><i aria-hidden="true" />{{ item.label }}</span>
+                    <strong>{{ item.result }}</strong>
+                  </li>
+                </ul>
+              </div>
               <span class="strategy-preview" :style="donutStyle" aria-hidden="true"></span>
             </div>
             <b>{{ t('plan.strategy.action') }} <q-icon name="arrow_forward" /></b>
           </router-link>
-        </section>
-
-        <h2 class="section-label current-plan-label">{{ t('plan.current.title') }}</h2>
-        <section class="current-plan-card">
-          <div class="current-plan-heading">
-            <span class="current-icon"><q-icon name="route" /></span>
-            <div>
-              <small>{{
-                hasSavedStrategy ? activeScenario.name : t('plan.current.suggested')
-              }}</small>
-              <strong>{{ allocationHeadline }}</strong>
-              <p>
-                {{
-                  t('plan.current.monthlyAllocation', {
-                    amount: formatCurrency(strategyMonthlyAmount),
-                  })
-                }}
-              </p>
-            </div>
-            <q-btn
-              flat
-              no-caps
-              color="primary"
-              icon-right="arrow_forward"
-              :label="hasSavedStrategy ? t('plan.current.view') : t('plan.strategy.action')"
-              :to="{ name: 'what-if-strategy', params: { workspaceId } }"
-            />
-          </div>
-
-          <div class="strategy-breakdown">
-            <div class="allocation-summary">
-              <div v-for="entry in allocationEntries" :key="entry.id" class="allocation-item">
-                <span :class="['allocation-dot', entry.id]"></span>
-                <div>
-                  <span>{{ entry.label }}</span
-                  ><strong>{{ entry.percent }}%</strong>
-                </div>
-                <div class="allocation-track">
-                  <span :class="entry.id" :style="{ width: `${entry.percent}%` }"></span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="mixEntries.length && allocation.invest > 0" class="mix-summary">
-              <span class="mix-title">{{ t('plan.current.investmentMix') }}</span>
-              <div class="mix-grid">
-                <div v-for="entry in mixEntries" :key="entry.id" class="mix-item">
-                  <span class="mix-icon"><q-icon :name="entry.icon" /></span>
-                  <div>
-                    <span>{{ entry.label }}</span
-                    ><strong>{{ entry.allocation }}%</strong>
-                    <div class="mix-track">
-                      <span :style="{ width: `${entry.allocation}%` }"></span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="projection-summary">
-            <div>
-              <span class="projection-icon"><q-icon name="bar_chart" /></span>
-              <span
-                ><small>{{
-                  t('plan.current.estimatedValue', { years: activeScenario.horizonYears })
-                }}</small
-                ><strong>{{ formatCurrency(projection.strategy.finalValue) }}</strong></span
-              >
-            </div>
-            <div>
-              <span class="projection-icon growth"><q-icon name="trending_up" /></span>
-              <span
-                ><small>{{ t('plan.current.estimatedGrowth') }}</small
-                ><strong class="positive"
-                  >+{{ formatCurrency(projection.strategy.growth) }}</strong
-                ></span
-              >
-            </div>
-          </div>
         </section>
       </template>
     </main>
@@ -238,6 +195,8 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { getLiabilityCategory } from '@/config/liability-categories'
+import { calculateDebtPayoffImpact, highestInterestModeledDebt } from '@/domain/financial/debt-payoff'
 import {
   currentFinancialMonth,
   currentFinancialYear,
@@ -250,14 +209,12 @@ import {
   simulateStrategy,
   strategyStartingPosition,
 } from '@/domain/financial/strategy-simulation'
-import {
-  calculateWhatIf,
-  defaultStrategyScenario,
-  normalizeStrategyForOptions,
-} from '@/domain/financial/what-if'
+import { calculateWhatIf, normalizeStrategyForOptions } from '@/domain/financial/what-if'
+import { calculateCashScenario, calculateInvestmentScenario } from '@/domain/financial/what-if'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
@@ -266,6 +223,7 @@ import { getWorkspaceMembers } from '@/utils/workspace-members'
 const { t } = useI18n()
 const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
+const liabilitiesStore = useLiabilitiesStore()
 const whatIfStore = useWhatIfStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
@@ -285,11 +243,18 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
-const loading = computed(() => financialYearsStore.loading || whatIfStore.loading)
+const loading = computed(
+  () =>
+    financialYearsStore.loading ||
+    whatIfStore.loading ||
+    liabilitiesStore.loading ||
+    liabilitiesStore.categoryLoading,
+)
 const error = computed(
   () =>
     pageError.value ||
     whatIfStore.error ||
+    liabilitiesStore.error ||
     financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
 const annualIncome = computed(() =>
@@ -323,12 +288,42 @@ const activeScenario = computed(
     whatIfStore.config.scenarios.find(({ id }) => id === whatIfStore.config.activeScenarioId) ||
     whatIfStore.config.scenarios[0],
 )
-const hasSavedStrategy = computed(() => activeScenario.value.id !== defaultStrategyScenario.id)
-const positionMonth = computed(() =>
-  latestPositionMonth(financialYear.value, currentFinancialMonth()),
-)
+const positionMonth = computed(() => latestPositionMonth(financialYear.value, currentFinancialMonth()))
 const startingPosition = computed(() =>
   strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
+)
+const liabilities = computed(() =>
+  extractLiabilities(financialYear.value, positionMonth.value, selectedMemberId.value),
+)
+const selectedDebt = computed(
+  () =>
+    liabilities.value.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
+    liabilities.value.find(({ categoryId }) => categoryId === 'mortgage') ||
+    liabilities.value[0] ||
+    null,
+)
+const modeledDebts = computed(() => {
+  const mortgageModels = new Map(
+    liabilitiesStore.itemsForCategory('mortgage').map((liability) => [liability.id, liability]),
+  )
+  return liabilities.value.flatMap((liability) => {
+    const model = mortgageModels.get(liability.id)
+    return model ? [{ ...model, name: liability.name }] : []
+  })
+})
+const selectedDebtModel = computed(() => {
+  if (!selectedDebt.value) return null
+  return modeledDebts.value.find(({ id }) => id === selectedDebt.value.id) || selectedDebt.value
+})
+const whatIfDebtModel = computed(
+  () => highestInterestModeledDebt(modeledDebts.value) || selectedDebtModel.value,
+)
+const debtAvailable = computed(() => Boolean(selectedDebt.value))
+const allocation = computed(() =>
+  normalizeStrategyForOptions(activeScenario.value.allocation, {
+    cash: true,
+    debt: debtAvailable.value,
+  }),
 )
 const simulation = computed(() =>
   calculateWhatIf({
@@ -343,15 +338,6 @@ const simulation = computed(() =>
   }),
 )
 const strategyMonthlyAmount = computed(() => Math.max(0, simulation.value.simulatedSavingsCapacity))
-const debtAvailable = computed(
-  () => financialYearValue(financialYear.value, 'liabilities', selectedMemberId.value) > 0,
-)
-const allocation = computed(() =>
-  normalizeStrategyForOptions(activeScenario.value.allocation, {
-    cash: true,
-    debt: debtAvailable.value,
-  }),
-)
 const projection = computed(() =>
   simulateStrategy({
     startingPosition: startingPosition.value,
@@ -361,31 +347,86 @@ const projection = computed(() =>
     debtAvailable: debtAvailable.value,
   }),
 )
-const allocationEntries = computed(() =>
-  [
-    { id: 'cash', label: t('plan.current.cash'), percent: allocation.value.cash },
-    { id: 'invest', label: t('plan.current.investments'), percent: allocation.value.invest },
-    { id: 'debt', label: t('plan.current.debt'), percent: allocation.value.debt },
-  ].filter(({ percent }) => percent > 0),
+const cashScenario = computed(() =>
+  calculateCashScenario({
+    cash: startingPosition.value.cash,
+    currentMonthlyCost: simulation.value.monthlyCostOfLife,
+    simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
+    currentMonthlySavings: simulation.value.currentSavingsCapacity,
+    simulatedMonthlySavings: strategyMonthlyAmount.value,
+  }),
 )
-const allocationHeadline = computed(() =>
-  allocationEntries.value.map(({ label, percent }) => `${percent}% ${label}`).join(' · '),
+const featuredInvestment = computed(
+  () =>
+    calculateInvestmentScenario({
+      monthlyContribution: strategyMonthlyAmount.value,
+      currentMonthlyContribution: simulation.value.currentSavingsCapacity,
+      annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,
+    }).find(({ years }) => years === 20),
 )
-const mixMeta = computed(() => ({
-  stockMarket: { label: t('plan.investments.stockMarket'), icon: 'trending_up' },
-  realEstate: { label: t('plan.investments.realEstate'), icon: 'apartment' },
-  fixedIncome: { label: t('plan.investments.fixedIncome'), icon: 'account_balance' },
-  crypto: { label: t('plan.investments.crypto'), icon: 'currency_bitcoin' },
-  businessEquity: { label: t('plan.investments.businessEquity'), icon: 'business_center' },
-  other: { label: t('plan.investments.other'), icon: 'category' },
-}))
-const mixEntries = computed(() =>
-  Object.entries(activeScenario.value.investmentMix).map(([id, value]) => ({
-    id,
-    ...mixMeta.value[id],
-    ...value,
-  })),
+const whatIfDebtPayoff = computed(() =>
+  calculateDebtPayoffImpact({
+    liability: whatIfDebtModel.value,
+    extraMonthlyPayment: strategyMonthlyAmount.value,
+    asOfDate: localToday(),
+  }),
 )
+const strategyDebtPayoff = computed(() =>
+  calculateDebtPayoffImpact({
+    liability: selectedDebtModel.value,
+    extraMonthlyPayment: monthlyFor(allocation.value.debt),
+    asOfDate: localToday(),
+  }),
+)
+const whatIfOutcomes = computed(() => [
+  {
+    id: 'cash',
+    label: t('whatIf.cash.title'),
+    result: cashOutcome(cashScenario.value),
+  },
+  {
+    id: 'invest',
+    label: t('whatIf.invest.title'),
+    result: featuredInvestment.value
+      ? t('plan.outcomes.inYears', {
+          amount: formatCurrency(featuredInvestment.value.projectedValue),
+          years: featuredInvestment.value.years,
+        })
+      : '—',
+  },
+  {
+    id: 'debt',
+    label: t('whatIf.debt.title'),
+    result: debtOutcome(
+      whatIfDebtPayoff.value,
+      Boolean(whatIfDebtModel.value),
+      whatIfDebtModel.value?.name,
+    ),
+  },
+])
+const strategyOutcomes = computed(() => [
+  {
+    id: 'cash',
+    label: t('whatIf.cash.title'),
+    result: strategyCashOutcome(),
+  },
+  {
+    id: 'invest',
+    label: t('whatIf.invest.title'),
+    result: t('plan.outcomes.inYears', {
+      amount: formatCurrency(projection.value.strategy.investmentValue),
+      years: activeScenario.value.horizonYears,
+    }),
+  },
+  {
+    id: 'debt',
+    label: t('whatIf.debt.title'),
+    result:
+      allocation.value.debt > 0
+        ? debtOutcome(strategyDebtPayoff.value, debtAvailable.value, selectedDebt.value?.name)
+        : t('plan.outcomes.notIncluded'),
+  },
+])
 const donutStyle = computed(() => {
   const cashEnd = allocation.value.cash
   const investEnd = cashEnd + allocation.value.invest
@@ -406,10 +447,97 @@ async function load(force = false) {
     await Promise.all([
       financialYearsStore.load(workspaceId.value, currentYear, force),
       whatIfStore.load(workspaceId.value, force),
+      liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force),
     ])
   } catch (loadError) {
     pageError.value = loadError
   }
+}
+
+function monthlyFor(percent) {
+  return (strategyMonthlyAmount.value * percent) / 100
+}
+
+function cashOutcome(scenario) {
+  if (!scenario) return '—'
+  if (scenario.achieved)
+    return t('plan.outcomes.fundReady', { amount: formatCurrency(scenario.simulatedTarget) })
+  if (scenario.simulatedMonths != null)
+    return t('plan.outcomes.fundInMonths', {
+      amount: formatCurrency(scenario.simulatedTarget),
+      months: scenario.simulatedMonths,
+    })
+  return t('plan.outcomes.fundTarget', { amount: formatCurrency(scenario.simulatedTarget) })
+}
+
+function strategyCashOutcome() {
+  const strategy = projection.value.strategy
+  if (allocation.value.cash <= 0) return t('plan.outcomes.notIncluded')
+  if (strategy.cashTargetMonth === 0)
+    return t('plan.outcomes.fundReady', { amount: formatCurrency(strategy.cashTarget) })
+  if (strategy.cashTargetMonth != null)
+    return t('plan.outcomes.fundInMonths', {
+      amount: formatCurrency(strategy.cashTarget),
+      months: strategy.cashTargetMonth,
+    })
+  return t('plan.outcomes.fundTarget', { amount: formatCurrency(strategy.cashTarget) })
+}
+
+function debtOutcome(payoff, hasDebt, debtName) {
+  if (!hasDebt) return t('plan.outcomes.noDebt')
+  if (!payoff?.accelerated?.payoffDate) return t('plan.outcomes.modelUnavailable')
+  return t('plan.outcomes.paidOffNamed', {
+    name: debtName || t('whatIf.debt.title'),
+    date: formatMonthYear(payoff.accelerated.payoffDate),
+  })
+}
+
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`
+}
+
+function formatMonthYear(value) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('en-IE', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`))
+}
+
+function extractLiabilities(document, month, memberId) {
+  const categories = document?.months?.[month]?.liabilities?.categories || {}
+  return Object.entries(categories)
+    .flatMap(([categoryId, category]) =>
+      Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
+        const items = Object.entries(subcategory.items || {})
+        if (!items.length)
+          return [
+            {
+              id: subcategoryId,
+              categoryId,
+              name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
+              balance: scopedValue(subcategory, memberId),
+            },
+          ]
+        return items.map(([id, item]) => ({
+          id,
+          categoryId,
+          name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
+          balance: scopedValue(item, memberId),
+        }))
+      }),
+    )
+    .filter(({ balance }) => balance > 0)
+    .sort((left, right) => right.balance - left.balance)
+}
+
+function scopedValue(item, memberId) {
+  if (memberId !== 'all') return Number(item?.memberValues?.[memberId] || 0)
+  return Number(item?.total || 0)
 }
 </script>
 
@@ -562,10 +690,7 @@ h1 {
 .action-heading small {
   color: var(--color-copy);
 }
-.action-icon,
-.current-icon,
-.projection-icon,
-.mix-icon {
+.action-icon {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -578,8 +703,7 @@ h1 {
   height: 3.5rem;
   font-size: 1.5rem;
 }
-.strategy .action-icon,
-.current-icon {
+.strategy .action-icon {
   background: var(--color-purple-soft);
   color: var(--color-purple);
 }
@@ -594,6 +718,87 @@ h1 {
   color: var(--color-copy);
   font-size: 0.95rem;
   line-height: 1.45;
+}
+.action-copy {
+  display: grid;
+  align-content: center;
+  gap: 0.8rem;
+}
+.action-result {
+  display: grid;
+  gap: 0.15rem;
+  padding-left: 0.8rem;
+  border-left: 3px solid var(--color-primary);
+}
+.action-result > span {
+  color: var(--color-copy);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.action-result > strong {
+  color: var(--color-ink);
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+.action-result > strong small {
+  margin-left: 0.2rem;
+  color: var(--color-copy);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.action-result > small {
+  color: var(--color-copy);
+  font-size: 0.72rem;
+}
+.action-result .positive-result {
+  color: var(--color-success-dark);
+}
+.allocation-summary {
+  display: grid;
+  gap: 0.32rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.allocation-summary li,
+.allocation-summary li > span {
+  display: flex;
+  align-items: center;
+}
+.allocation-summary li {
+  justify-content: space-between;
+  gap: 0.65rem;
+  color: var(--color-copy);
+  font-size: 0.76rem;
+}
+.allocation-summary li > span {
+  min-width: 0;
+  gap: 0.42rem;
+}
+.allocation-summary i {
+  width: 0.48rem;
+  height: 0.48rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-chart-cash);
+}
+.allocation-summary .invest i {
+  background: var(--color-chart-investments);
+}
+.allocation-summary .debt i {
+  background: var(--color-chart-lifestyle);
+}
+.allocation-summary strong {
+  color: var(--color-ink);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+.strategy-result {
+  border-left-color: var(--color-purple);
 }
 .plan-action > b {
   display: flex;
@@ -644,166 +849,6 @@ h1 {
   content: '';
 }
 
-.current-plan-card {
-  padding: 1.4rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-}
-.current-plan-heading {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-}
-.current-icon {
-  width: 3.7rem;
-  height: 3.7rem;
-  font-size: 1.45rem;
-}
-.current-plan-heading > div {
-  display: grid;
-}
-.current-plan-heading small {
-  color: var(--color-purple);
-  font-weight: 700;
-}
-.current-plan-heading strong {
-  font-size: 1.35rem;
-}
-.current-plan-heading p {
-  margin: 0.15rem 0 0;
-  color: var(--color-copy);
-}
-.strategy-breakdown,
-.projection-summary {
-  margin-top: 1rem;
-  padding: 1.15rem;
-  border-radius: 0.8rem;
-  background: color-mix(in srgb, var(--color-primary) 2.5%, var(--color-page));
-}
-.strategy-breakdown {
-  display: grid;
-  gap: 1rem;
-}
-.allocation-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 1rem;
-}
-.allocation-item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.55rem;
-}
-.allocation-item > div:nth-child(2) {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.allocation-dot {
-  width: 0.65rem;
-  height: 0.65rem;
-  margin-top: 0.35rem;
-  border-radius: 50%;
-}
-.cash {
-  background: var(--color-chart-cash);
-}
-.invest {
-  background: var(--color-chart-investments);
-}
-.debt {
-  background: var(--color-chart-lifestyle);
-}
-.allocation-track,
-.mix-track {
-  grid-column: 2;
-  height: 0.45rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--color-line);
-}
-.allocation-track span,
-.mix-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-.mix-summary {
-  display: grid;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-line);
-  gap: 0.8rem;
-}
-.mix-title {
-  color: var(--color-copy);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.mix-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 1rem 1.5rem;
-}
-.mix-item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 0.7rem;
-}
-.mix-icon {
-  width: 2.7rem;
-  height: 2.7rem;
-}
-.mix-item > div {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.25rem 0.5rem;
-}
-.mix-track {
-  grid-column: 1 / -1;
-}
-.mix-track span {
-  background: var(--color-primary);
-}
-.projection-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.projection-summary > div {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding: 0.2rem 1rem;
-}
-.projection-summary > div + div {
-  border-left: 1px solid var(--color-line);
-}
-.projection-summary > div > span:last-child {
-  display: grid;
-}
-.projection-icon {
-  width: 3rem;
-  height: 3rem;
-}
-.projection-icon.growth {
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
-}
-.projection-summary small {
-  color: var(--color-copy);
-}
-.projection-summary strong {
-  font-size: 1.35rem;
-}
-.projection-summary .positive {
-  color: var(--color-success-dark);
-}
-
 .info-dialog {
   position: relative;
   width: min(34rem, calc(100vw - 2rem));
@@ -831,6 +876,153 @@ h1 {
   gap: 0.75rem;
 }
 
+@media (min-width: 1024px) {
+  .plan-page {
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+    min-height: 0;
+    padding: clamp(0.75rem, 1.8vh, 1.15rem) clamp(1rem, 2vw, 1.75rem);
+    overflow: hidden;
+  }
+
+  .plan-shell {
+    display: grid;
+    grid-template-rows: auto auto auto auto;
+    align-content: start;
+    height: 100%;
+  }
+
+  .back-button {
+    min-height: 1.5rem;
+    margin-bottom: 0.1rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 3.5vh, 2.7rem);
+  }
+
+  .page-header p {
+    margin-top: 0.2rem;
+    font-size: 0.9rem;
+  }
+
+  .capacity-card {
+    grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.85fr);
+    gap: clamp(1.25rem, 3vw, 2rem);
+    min-height: 0;
+    margin-top: clamp(0.5rem, 1.2vh, 0.75rem);
+    padding: clamp(1rem, 2.2vh, 1.35rem) clamp(1.25rem, 2.5vw, 1.75rem);
+  }
+
+  .capacity-main {
+    gap: 0.2rem;
+  }
+
+  .capacity-main > strong {
+    font-size: clamp(2.6rem, 5.6vh, 3.8rem);
+  }
+
+  .capacity-main > strong small,
+  .capacity-main b {
+    font-size: 0.85rem;
+  }
+
+  .capacity-main p {
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+  }
+
+  .period-switch {
+    top: 0.7rem;
+    right: 0.8rem;
+    padding: 0.15rem;
+  }
+
+  .period-switch button {
+    min-width: 4.7rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.72rem;
+  }
+
+  .capacity-breakdown {
+    gap: 0.45rem;
+    padding: 1.65rem 0 0 1.5rem;
+    font-size: 0.85rem;
+  }
+
+  .capacity-breakdown .available-total {
+    margin-top: 0.1rem;
+    padding-top: 0.55rem;
+  }
+
+  .section-label {
+    margin: clamp(0.5rem, 1.2vh, 0.75rem) 0 0.3rem 0.25rem;
+    font-size: 0.74rem;
+  }
+
+  .plan-actions {
+    height: clamp(18rem, 38vh, 21rem);
+    min-height: 0;
+    gap: clamp(0.65rem, 1.5vw, 0.9rem);
+  }
+
+  .plan-action {
+    gap: clamp(0.4rem, 1vh, 0.7rem);
+    height: 100%;
+    min-height: 0;
+    padding: clamp(0.85rem, 2vh, 1.15rem);
+  }
+
+  .action-heading {
+    gap: 0.75rem;
+  }
+
+  .action-heading strong {
+    font-size: clamp(1.2rem, 2.5vh, 1.45rem);
+  }
+
+  .action-icon {
+    width: 2.8rem;
+    height: 2.8rem;
+    font-size: 1.25rem;
+  }
+
+  .action-body {
+    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.5fr);
+    gap: 0.75rem;
+    min-height: 0;
+  }
+
+  .action-body p {
+    font-size: 0.85rem;
+  }
+
+  .action-copy {
+    gap: clamp(0.4rem, 0.8vh, 0.6rem);
+  }
+
+  .action-result > strong {
+    font-size: clamp(1.35rem, 3.2vh, 1.8rem);
+  }
+
+  .scenario-graphic {
+    max-height: clamp(4.5rem, 12vh, 7rem);
+  }
+
+  .strategy-preview {
+    width: clamp(4.7rem, 10vh, 6rem);
+  }
+
+  .strategy-preview::after {
+    inset: 1.05rem;
+  }
+
+  .plan-action > b {
+    padding: 0.55rem 0.75rem;
+    font-size: 0.82rem;
+  }
+}
+
 @media (max-width: 850px) {
   .page-header {
     align-items: flex-start;
@@ -847,10 +1039,6 @@ h1 {
     border-left: 0;
   }
   .plan-actions {
-    grid-template-columns: 1fr;
-  }
-  .allocation-summary,
-  .mix-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -911,22 +1099,6 @@ h1 {
   .scenario-graphic,
   .strategy-preview {
     display: none;
-  }
-  .current-plan-heading {
-    grid-template-columns: auto 1fr;
-  }
-  .current-plan-heading .q-btn {
-    grid-column: 1 / -1;
-    justify-self: stretch;
-  }
-  .projection-summary {
-    grid-template-columns: 1fr;
-  }
-  .projection-summary > div + div {
-    margin-top: 0.8rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
   }
 }
 </style>

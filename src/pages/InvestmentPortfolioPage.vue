@@ -823,7 +823,7 @@ h1 {
 .setup-card,
 .portfolio-content-card {
   @include dashboard-card;
-  margin-top: 1.5rem;
+  margin-top: 0.75rem;
 }
 .setup-card {
   display: grid;

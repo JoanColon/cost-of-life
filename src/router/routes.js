@@ -30,6 +30,11 @@ const routes = [
         component: () => import('@/pages/WorkspaceDashboardPage.vue'),
       },
       {
+        path: 'workspaces/:workspaceId/setup',
+        name: 'setup',
+        component: () => import('@/pages/SetupPage.vue'),
+      },
+      {
         path: 'workspaces/:workspaceId/assets',
         name: 'assets',
         component: () => import('@/pages/AssetsPage.vue'),
