@@ -18,6 +18,20 @@ export function currentFinancialMonth(date = new Date()) {
   }).format(date)
 }
 
+export function currentFinancialDate(date = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: FINANCIAL_YEAR_TIME_ZONE,
+    })
+      .formatToParts(date)
+      .map(({ type, value }) => [type, value]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
 export function financialYearValue(financialYear, section, memberId = 'all') {
   if (!financialYear) return 0
   if (section === 'netWorth') {

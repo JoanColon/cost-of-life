@@ -7,8 +7,10 @@ export async function createFinancialModelItem(workspaceId, section, item) {
   return call({ workspaceId, section, operation: 'create', item })
 }
 
-export async function updateFinancialModelItem(workspaceId, section, itemId, item) {
-  return call({ workspaceId, section, operation: 'update', itemId, item })
+export async function updateFinancialModelItem(workspaceId, section, itemId, item, relations) {
+  const payload = { workspaceId, section, operation: 'update', itemId, item }
+  if (relations !== undefined) payload.relations = relations
+  return call(payload)
 }
 
 export async function deleteFinancialModelItem(workspaceId, section, itemId) {

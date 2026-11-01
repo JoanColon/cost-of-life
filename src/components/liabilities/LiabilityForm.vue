@@ -67,6 +67,7 @@
               min="0"
               step="0.01"
               prefix="€"
+              :readonly="modelManaged"
               lazy-rules
               :rules="[
                 (value) =>
@@ -153,6 +154,7 @@ const subcategoryOptions = computed(() =>
     label: t(props.category.nameKey),
   })),
 )
+const modelManaged = computed(() => Boolean(props.liability?.detail?.mortgage?.schemaVersion === 2))
 
 watch(() => [props.liability, props.defaults, props.category.id], reset, { immediate: true })
 watch(

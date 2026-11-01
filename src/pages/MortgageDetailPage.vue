@@ -6,7 +6,10 @@
         <span>{{ t('liabilities.mortgage.loading') }}</span>
       </div>
 
-      <section v-else-if="pageError || liabilitiesStore.error" class="page-state error-state">
+      <section
+        v-else-if="pageError || liabilitiesStore.error || expensesStore.error || assetsStore.error"
+        class="page-state error-state"
+      >
         <q-icon name="cloud_off" />
         <h1>{{ t('liabilities.errors.loadTitle') }}</h1>
         <p>{{ t('liabilities.errors.load') }}</p>
@@ -150,6 +153,50 @@
                     :rules="[monthPartRule]"
                   />
                 </div>
+              </div>
+              <div class="form-field linked-property-field">
+                <label>{{ t('liabilities.mortgage.linkedProperty') }}</label>
+                <q-select
+                  v-model="form.mortgageAssetId"
+                  outlined
+                  clearable
+                  emit-value
+                  map-options
+                  :options="propertyOptions"
+                  :placeholder="t('liabilities.mortgage.noLinkedProperty')"
+                >
+                  <template #prepend><q-icon name="home" /></template>
+                  <template #no-option>
+                    <q-item>
+                      <q-item-section class="text-grey-7">
+                        {{ t('liabilities.mortgage.noPropertiesAvailable') }}
+                      </q-item-section>
+                    </q-item>
+                  </template>
+                </q-select>
+                <small>{{ t('liabilities.mortgage.linkedPropertyHint') }}</small>
+              </div>
+              <div class="form-field linked-expense-field">
+                <label>{{ t('liabilities.mortgage.linkedExpense') }}</label>
+                <q-select
+                  v-model="form.mortgageExpenseId"
+                  outlined
+                  clearable
+                  emit-value
+                  map-options
+                  :options="expenseOptions"
+                  :placeholder="t('liabilities.mortgage.noLinkedExpense')"
+                >
+                  <template #prepend><q-icon name="receipt_long" /></template>
+                  <template #no-option>
+                    <q-item>
+                      <q-item-section class="text-grey-7">
+                        {{ t('liabilities.mortgage.noExpensesAvailable') }}
+                      </q-item-section>
+                    </q-item>
+                  </template>
+                </q-select>
+                <small>{{ t('liabilities.mortgage.linkedExpenseHint') }}</small>
               </div>
             </div>
 
@@ -349,8 +396,12 @@ import {
   mortgageDetailFromLiability,
 } from '@/domain/financial/mortgage-amortization'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+import { currentFinancialYear } from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
+import { useAssetsStore } from '@/stores/assets-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
+import { useExpensesStore } from '@/stores/expenses-store'
+import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -360,6 +411,9 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const liabilitiesStore = useLiabilitiesStore()
+const expensesStore = useExpensesStore()
+const assetsStore = useAssetsStore()
+const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
 const preparing = ref(false)
 const pageError = ref(null)
@@ -383,6 +437,41 @@ const mortgage = computed(() =>
 )
 const mortgageModel = computed(() => mortgageDetailFromLiability(mortgage.value))
 const configured = computed(() => Boolean(mortgageModel.value))
+const linkedProperty = computed(() =>
+  assetsStore
+    .itemsForCategory('real_estate')
+    .find(({ mortgageLiabilityId }) => mortgageLiabilityId === liabilityId.value),
+)
+const eligibleProperties = computed(() =>
+  assetsStore
+    .itemsForCategory('real_estate')
+    .filter(
+      (asset) =>
+        ['primary_home', 'rental_property'].includes(asset.subcategoryId) &&
+        (!asset.mortgageLiabilityId || asset.mortgageLiabilityId === liabilityId.value),
+    ),
+)
+const propertyOptions = computed(() =>
+  eligibleProperties.value.map((asset) => ({ value: asset.id, label: asset.itemName })),
+)
+const linkedExpense = computed(() =>
+  expensesStore
+    .itemsForCategory('housing')
+    .find(({ liabilityId: linkedLiabilityId }) => linkedLiabilityId === liabilityId.value),
+)
+const eligibleExpenses = computed(() =>
+  expensesStore
+    .itemsForCategory('housing')
+    .filter(
+      (expense) =>
+        expense.entryMode !== 'simple' &&
+        expense.subcategoryId === 'mortgage_rent' &&
+        (!expense.liabilityId || expense.liabilityId === liabilityId.value),
+    ),
+)
+const expenseOptions = computed(() =>
+  eligibleExpenses.value.map((expense) => ({ value: expense.id, label: expense.itemName })),
+)
 const workspace = computed(
   () => workspaceStore.workspaces.find(({ id }) => id === workspaceId.value) || null,
 )
@@ -450,7 +539,14 @@ const amortizationColumns = computed(() => [
   moneyColumn('remainingBalance', 'liabilities.mortgage.table.remainingBalance'),
 ])
 const pageLoading = computed(
-  () => preparing.value || liabilitiesStore.loading || liabilitiesStore.categoryLoading,
+  () =>
+    preparing.value ||
+    liabilitiesStore.loading ||
+    liabilitiesStore.categoryLoading ||
+    expensesStore.loading ||
+    expensesStore.categoryLoading ||
+    assetsStore.loading ||
+    assetsStore.categoryLoading,
 )
 
 watch([workspaceId, liabilityId], () => prepare(), { immediate: true })
@@ -460,7 +556,12 @@ async function prepare(force = false) {
   preparing.value = true
   pageError.value = null
   try {
-    await liabilitiesStore.loadConfig(workspaceId.value, force)
+    await Promise.all([
+      liabilitiesStore.loadConfig(workspaceId.value, force),
+      expensesStore.loadConfig(workspaceId.value, force),
+      assetsStore.loadConfig(workspaceId.value, force),
+      financialYearsStore.load(workspaceId.value, currentFinancialYear(), force),
+    ])
     if (currentPreparation !== preparationId) return
     if (
       !liabilitiesStore.setupCompleted ||
@@ -470,6 +571,12 @@ async function prepare(force = false) {
       return
     }
     await liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force)
+    if (expensesStore.config?.categories?.housing) {
+      await expensesStore.loadCategory(workspaceId.value, 'housing', force)
+    }
+    if (assetsStore.config?.categories?.real_estate) {
+      await assetsStore.loadCategory(workspaceId.value, 'real_estate', force)
+    }
     if (currentPreparation !== preparationId) return
     if (!mortgage.value) await router.replace(mortgagesRoute.value)
     else resetForm()
@@ -501,6 +608,8 @@ function resetForm() {
     startDate: detail?.startDate ?? '',
     termYears: Math.floor(termMonths / 12) || '',
     termExtraMonths: termMonths % 12,
+    mortgageAssetId: linkedProperty.value?.id || null,
+    mortgageExpenseId: linkedExpense.value?.id || null,
   })
 }
 
@@ -553,7 +662,7 @@ async function saveModel() {
         ownership: mortgage.value.ownership,
         detail: {
           mortgage: {
-            schemaVersion: 1,
+            schemaVersion: 2,
             originalPrincipal,
             annualInterestRate,
             monthlyPayment,
@@ -561,11 +670,22 @@ async function saveModel() {
             termMonths,
             amortizationType: 'french',
             fixedRate: true,
+            balanceAnchor: { amount: currentBalance, date: localToday() },
           },
         },
       },
       memberIds.value,
+      {
+        mortgageAssetId: form.mortgageAssetId,
+        mortgageExpenseId: form.mortgageExpenseId,
+      },
     )
+    if (expensesStore.config?.categories?.housing) {
+      await expensesStore.loadCategory(workspaceId.value, 'housing', true)
+    }
+    if (assetsStore.config?.categories?.real_estate) {
+      await assetsStore.loadCategory(workspaceId.value, 'real_estate', true)
+    }
     editing.value = false
     resetForm()
     $q.notify({ type: 'positive', message: t('liabilities.mortgage.saved'), position: 'top' })
@@ -585,6 +705,8 @@ function emptyForm() {
     startDate: '',
     termYears: '',
     termExtraMonths: 0,
+    mortgageAssetId: null,
+    mortgageExpenseId: null,
   }
 }
 
@@ -819,6 +941,16 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.linked-property-field,
+.linked-expense-field {
+  grid-column: 1 / -1;
+}
+
+.linked-property-field small,
+.linked-expense-field small {
+  color: var(--color-copy);
 }
 
 .form-actions {

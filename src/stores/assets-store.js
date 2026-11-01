@@ -261,6 +261,13 @@ export const useAssetsStore = defineStore('assets', () => {
     loadedCategoryIds.value = new Set()
   }
 
+  async function refreshLoadedCategories(workspaceId) {
+    if (loadedWorkspaceId.value !== workspaceId) return
+    await Promise.all(
+      [...loadedCategoryIds.value].map((categoryId) => loadCategory(workspaceId, categoryId, true)),
+    )
+  }
+
   return {
     config,
     assetsByCategory,
@@ -284,6 +291,7 @@ export const useAssetsStore = defineStore('assets', () => {
     applyInvestmentPortfolioSync,
     deleteCategory,
     itemsForCategory,
+    refreshLoadedCategories,
     reset,
   }
 })

@@ -54,7 +54,7 @@ import { incomeCategories } from '@/config/income-categories'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import { liabilityCategories } from '@/config/liability-categories'
 import { calculateDebtPayoffImpact } from '@/domain/financial/debt-payoff'
-import { buildNetWorthSeries } from '@/domain/financial/history'
+import { buildNetWorthSeries, withCurrentPosition } from '@/domain/financial/history'
 import {
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
@@ -110,12 +110,7 @@ const selectedMemberId = computed({
 })
 const historyPoints = computed(() =>
   buildNetWorthSeries(
-    [
-      ...historyDocuments.value.filter(
-        (document) => Number(document.year || document.id) !== currentYear.value,
-      ),
-      ...(financialYear.value ? [financialYear.value] : []),
-    ],
+    withCurrentPosition(historyDocuments.value, financialYear.value, currentMonth.value),
     {
       throughPeriod: `${currentYear.value}-${currentMonth.value}`,
       memberId: selectedMemberId.value,

@@ -51,6 +51,19 @@ describe('French mortgage amortization', () => {
     expect(schedule.at(-1).remainingBalance).toBe(0)
   })
 
+  it('keeps future payments on the contractual mortgage day', () => {
+    const schedule = buildFrenchAmortizationSchedule({
+      currentBalance: 10_000,
+      annualInterestRate: 0,
+      monthlyPayment: 1_000,
+      startDate: '2022-04-01',
+      asOfDate: '2026-11-20',
+    })
+
+    expect(schedule[0].date).toBe('2026-12-01')
+    expect(schedule[1].date).toBe('2027-01-01')
+  })
+
   it('calculates the effect of an additional monthly payment', () => {
     const projection = calculateMortgageProjection({
       currentBalance: 146_230,

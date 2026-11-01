@@ -67,12 +67,25 @@
               min="0"
               step="0.01"
               prefix="€"
+              :disable="modelManagedValue"
               lazy-rules
               :rules="[
                 (value) =>
                   normalizeNonNegativeMoney(value) !== null || t('assets.form.valueInvalid'),
               ]"
             />
+            <small v-if="modelManagedValue" class="model-managed-hint">
+              {{ t('assets.form.modelManagedValueHint') }}
+            </small>
+          </div>
+
+          <div v-if="isMortgageEligible" class="linked-mortgage-notice">
+            <q-icon name="account_balance" color="primary" size="1.4rem" />
+            <div>
+              <strong>{{ t('assets.form.linkedMortgage') }}</strong>
+              <span>{{ linkedMortgage?.itemName || t('assets.form.noMortgage') }}</span>
+              <small>{{ t('assets.form.linkedMortgageReadOnlyHint') }}</small>
+            </div>
           </div>
 
           <OwnershipEditor
@@ -134,6 +147,7 @@ const props = defineProps({
   defaults: { type: Object, default: null },
   members: { type: Array, required: true },
   saving: { type: Boolean, default: false },
+  mortgages: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
@@ -153,6 +167,14 @@ const subcategoryOptions = computed(() =>
     label: t(`assets.subtypes.${value}`),
   })),
 )
+const isMortgageEligible = computed(() =>
+  ['primary_home', 'rental_property'].includes(subcategoryId.value),
+)
+const linkedMortgage = computed(
+  () =>
+    props.mortgages.find((mortgage) => mortgage.id === props.asset?.mortgageLiabilityId) || null,
+)
+const modelManagedValue = computed(() => props.asset?.detail?.realEstate?.schemaVersion === 2)
 
 watch(() => [props.asset, props.defaults, props.category.id], reset, { immediate: true })
 watch(
@@ -192,7 +214,13 @@ async function submit() {
     notes: notes.value.trim(),
     currentValue: value,
     ownership: cloneOwnership(ownership.value),
+    detail: { ...(initialDetail() || {}) },
+    mortgageLiabilityId: isMortgageEligible.value ? props.asset?.mortgageLiabilityId || null : null,
   })
+}
+
+function initialDetail() {
+  return (props.asset || props.defaults)?.detail
 }
 </script>
 
@@ -223,6 +251,30 @@ async function submit() {
 .dialog-field {
   @include financial-dialog-field;
   margin-bottom: 0;
+}
+
+.linked-mortgage-notice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.linked-mortgage-notice div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.linked-mortgage-notice span,
+.linked-mortgage-notice small {
+  color: var(--color-copy);
+}
+
+.model-managed-hint {
+  color: var(--color-copy);
 }
 
 .form-actions {

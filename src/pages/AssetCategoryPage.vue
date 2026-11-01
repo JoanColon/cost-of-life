@@ -6,7 +6,12 @@
         <span>{{ t('assets.loading') }}</span>
       </div>
 
-      <section v-else-if="pageError || assetsStore.error" class="error-state">
+      <section
+        v-else-if="
+          pageError || assetsStore.error || (categoryId === 'real_estate' && liabilitiesStore.error)
+        "
+        class="error-state"
+      >
         <q-icon name="cloud_off" />
         <h1>{{ t('assets.errors.loadTitle') }}</h1>
         <p>{{ t('assets.errors.load') }}</p>
@@ -83,12 +88,7 @@
                     <q-item-section avatar><q-icon name="edit" /></q-item-section>
                     <q-item-section>{{ t('assets.editDetails') }}</q-item-section>
                   </q-item>
-                  <q-item
-                    v-if="categoryId === 'investment'"
-                    clickable
-                    v-close-popup
-                    @click="openModel(asset)"
-                  >
+                  <q-item v-if="hasModel(asset)" clickable v-close-popup @click="openModel(asset)">
                     <q-item-section avatar><q-icon name="account_tree" /></q-item-section>
                     <q-item-section>{{ t('assets.model') }}</q-item-section>
                   </q-item>
@@ -136,6 +136,7 @@
         :defaults="assetDefaults"
         :members="members"
         :saving="formSaving"
+        :mortgages="availableMortgages"
         @save="saveAsset"
         @cancel="closeAssetDialog"
         @delete="requestDelete(editingAsset)"
@@ -192,6 +193,7 @@ import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import {
   applyOwnership,
@@ -210,6 +212,7 @@ const assetsStore = useAssetsStore()
 const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
+const liabilitiesStore = useLiabilitiesStore()
 const preparing = ref(false)
 const pageError = ref(null)
 const assetDialog = ref(false)
@@ -236,6 +239,17 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allCategoryAssets = computed(() => assetsStore.itemsForCategory(categoryId.value))
+const availableMortgages = computed(() => {
+  const unavailableIds = new Set(
+    allCategoryAssets.value
+      .filter((asset) => asset.id !== editingAsset.value?.id)
+      .map((asset) => asset.mortgageLiabilityId)
+      .filter(Boolean),
+  )
+  return liabilitiesStore
+    .itemsForCategory('mortgage')
+    .filter((mortgage) => !unavailableIds.has(mortgage.id))
+})
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
 const assetDefaults = computed(() => {
   const config = categoryConfig.value
@@ -278,7 +292,12 @@ const itemSummary = computed(() => {
   return t('assets.itemSummary', { count, items: t(itemKey) })
 })
 const pageLoading = computed(
-  () => preparing.value || assetsStore.loading || assetsStore.categoryLoading,
+  () =>
+    preparing.value ||
+    assetsStore.loading ||
+    assetsStore.categoryLoading ||
+    liabilitiesStore.loading ||
+    liabilitiesStore.categoryLoading,
 )
 
 watch([workspaceId, categoryId], () => preparePage(), { immediate: true })
@@ -292,6 +311,9 @@ async function preparePage(force = false) {
     await Promise.all([
       assetsStore.loadConfig(workspaceId.value, force),
       financialYearsStore.load(workspaceId.value, currentYear, force),
+      categoryId.value === 'real_estate'
+        ? liabilitiesStore.loadConfig(workspaceId.value, force)
+        : Promise.resolve(),
     ])
     if (currentPreparation !== preparationId) return
 
@@ -303,6 +325,9 @@ async function preparePage(force = false) {
     }
 
     await assetsStore.loadCategory(workspaceId.value, categoryId.value, force)
+    if (categoryId.value === 'real_estate' && liabilitiesStore.config?.categories?.mortgage) {
+      await liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force)
+    }
   } catch (error) {
     pageError.value = error
   } finally {
@@ -329,10 +354,21 @@ function edit(asset) {
 }
 
 function openModel(asset) {
+  if (asset.categoryId === 'real_estate') {
+    router.push({
+      name: 'real-estate-model',
+      params: { workspaceId: workspaceId.value, assetId: asset.id },
+    })
+    return
+  }
   router.push({
     name: 'investment-portfolio',
     params: { workspaceId: workspaceId.value, assetId: asset.id },
   })
+}
+
+function hasModel(asset) {
+  return asset.categoryId === 'investment' || asset.categoryId === 'real_estate'
 }
 
 function closeAssetDialog() {

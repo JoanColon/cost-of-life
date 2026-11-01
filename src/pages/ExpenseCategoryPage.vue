@@ -5,7 +5,12 @@
         <q-spinner color="primary" size="2rem" />
         <span>{{ t('expenses.loading') }}</span>
       </div>
-      <section v-else-if="pageError || expensesStore.error" class="state">
+      <section
+        v-else-if="
+          pageError || expensesStore.error || (categoryId === 'housing' && liabilitiesStore.error)
+        "
+        class="state"
+      >
         <q-icon name="cloud_off" size="2rem" />
         <h1>{{ t('expenses.errors.loadTitle') }}</h1>
         <p>{{ t('expenses.errors.load') }}</p>
@@ -133,6 +138,7 @@
         :members="members"
         :financial-year="financialYear"
         :saving="formSaving"
+        :mortgages="availableMortgages"
         @save="saveExpense"
         @cancel="closeExpenseDialog"
         @delete="requestDelete(editingExpense)"
@@ -186,6 +192,7 @@ import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -198,6 +205,7 @@ const expensesStore = useExpensesStore()
 const financialYearsStore = useFinancialYearsStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
+const liabilitiesStore = useLiabilitiesStore()
 const preparing = ref(false)
 const pageError = ref(null)
 const expenseDialog = ref(false)
@@ -227,6 +235,17 @@ const selectedMemberId = computed({
   set: (memberId) => scopeStore.select(workspaceId.value, memberId),
 })
 const allExpenses = computed(() => expensesStore.itemsForCategory(categoryId.value))
+const availableMortgages = computed(() => {
+  const unavailableIds = new Set(
+    allExpenses.value
+      .filter((expense) => expense.id !== editingExpense.value?.id)
+      .map((expense) => expense.liabilityId)
+      .filter(Boolean),
+  )
+  return liabilitiesStore
+    .itemsForCategory('mortgage')
+    .filter((mortgage) => !unavailableIds.has(mortgage.id))
+})
 const sortedExpenses = computed(() =>
   [...allExpenses.value].sort(
     (left, right) => displayedItemValue(right) - displayedItemValue(left),
@@ -238,7 +257,9 @@ const pageLoading = computed(
     preparing.value ||
     expensesStore.loading ||
     expensesStore.categoryLoading ||
-    financialYearsStore.loading,
+    financialYearsStore.loading ||
+    liabilitiesStore.loading ||
+    liabilitiesStore.categoryLoading,
 )
 const categoryTotal = computed(() =>
   financialYearCategoryValue(
@@ -310,6 +331,9 @@ async function preparePage(force = false) {
     await Promise.all([
       expensesStore.loadConfig(workspaceId.value, force),
       financialYearsStore.load(workspaceId.value, currentYear, force),
+      categoryId.value === 'housing'
+        ? liabilitiesStore.loadConfig(workspaceId.value, force)
+        : Promise.resolve(),
     ])
     if (current !== preparationId) return
     if (!expensesStore.setupCompleted || !category.value || !categoryConfig.value?.enabled) {
@@ -317,6 +341,9 @@ async function preparePage(force = false) {
       return
     }
     await expensesStore.loadCategory(workspaceId.value, categoryId.value, force)
+    if (categoryId.value === 'housing' && liabilitiesStore.config?.categories?.mortgage) {
+      await liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force)
+    }
   } catch (error) {
     pageError.value = error
   } finally {

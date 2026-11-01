@@ -1,7 +1,22 @@
 const { FieldPath, FieldValue } = require('firebase-admin/firestore')
 const { applyTrackingMonth, updateFinancialYearProjection } = require('../domain/financial-year')
+const { calculatePositionsAt } = require('../domain/positions')
 
 const PROJECTION_SECTIONS = ['assets', 'liabilities', 'income', 'expenses']
+const MONTHS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+]
 
 async function rebuildFinancialYear(
   firestore,
@@ -53,11 +68,16 @@ async function rebuildFinancialYear(
             ) :
           null,
       ])
+    const positions = calculatePositionsAt({
+      assets: documents(assetsSnapshot),
+      liabilities: documents(liabilitiesSnapshot),
+      asOfDate: madridToday(),
+    })
     const source = {
       year,
       config,
-      assets: documents(assetsSnapshot),
-      liabilities: documents(liabilitiesSnapshot),
+      assets: positions.assets,
+      liabilities: positions.liabilities,
       income: documents(incomeSnapshot),
       expenses: documents(expenseSnapshot),
       trackingMonths: Object.fromEntries(
@@ -116,6 +136,95 @@ async function refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
   return { status: 'updated', workspaceId, year }
 }
 
+async function refreshModeledPositions(
+  firestore,
+  workspaceId,
+  userId,
+  asOfDate = madridToday(),
+) {
+  assertWorkspaceId(workspaceId)
+  const workspace = firestore.collection('workspaces').doc(workspaceId)
+  const assets = workspace.collection('modelAssets').where('categoryId', '==', 'real_estate')
+  const mortgages = workspace
+    .collection('modelLiabilities')
+    .where('categoryId', '==', 'mortgage')
+  const expenses = workspace.collection('modelExpenses')
+  const result = {
+    assetsUpdated: 0,
+    liabilitiesUpdated: 0,
+    expensesUpdated: 0,
+    mortgagesMigrated: 0,
+  }
+  await firestore.runTransaction(async (transaction) => {
+    const [assetsSnapshot, mortgagesSnapshot, expensesSnapshot] = await Promise.all([
+      transaction.get(assets),
+      transaction.get(mortgages),
+      transaction.get(expenses),
+    ])
+    const positions = calculatePositionsAt({
+      assets: documents(assetsSnapshot),
+      liabilities: documents(mortgagesSnapshot),
+      asOfDate,
+    })
+    const assetsById = new Map(positions.assets.map((asset) => [asset.id, asset]))
+    const liabilitiesById = new Map(
+      positions.liabilities.map((liability) => [liability.id, liability]),
+    )
+    for (const document of assetsSnapshot.docs || []) {
+      const asset = document.data()
+      if (asset.detail?.realEstate?.schemaVersion !== 2) continue
+      const currentValue = assetsById.get(document.id).currentValue
+      if (Number(asset.currentValue) === currentValue && asset.valueSource === 'model') continue
+      transaction.update(document.ref, {
+        currentValue,
+        valueSource: 'model',
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: userId,
+      })
+      result.assetsUpdated += 1
+    }
+    for (const document of mortgagesSnapshot.docs || []) {
+      const liability = document.data()
+      const mortgage = liability.detail?.mortgage
+      if (!mortgage) continue
+      if (mortgage.schemaVersion === 1) {
+        transaction.update(document.ref, {
+          'detail.mortgage': {
+            ...mortgage,
+            schemaVersion: 2,
+            balanceAnchor: { amount: Number(liability.balance || 0), date: asOfDate },
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: userId,
+        })
+        result.mortgagesMigrated += 1
+        continue
+      }
+      if (mortgage.schemaVersion !== 2) continue
+      const balance = liabilitiesById.get(document.id).balance
+      if (Number(liability.balance) === balance) continue
+      transaction.update(document.ref, {
+        balance,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: userId,
+      })
+      result.liabilitiesUpdated += 1
+      if (balance !== 0) continue
+      for (const expense of expensesSnapshot.docs || []) {
+        if (expense.data()?.liabilityId !== document.id) continue
+        transaction.update(expense.ref, {
+          estimate: { amount: 0, frequency: 'monthly' },
+          monthlyAmounts: Object.fromEntries(MONTHS.map((month) => [month, 0])),
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: userId,
+        })
+        result.expensesUpdated += 1
+      }
+    }
+  })
+  return result
+}
+
 async function loadConfig(workspace, sections, transaction) {
   const configs = await Promise.all(
     PROJECTION_SECTIONS.map((section) =>
@@ -163,6 +272,20 @@ function currentMonth() {
   }).format(new Date())
 }
 
+function madridToday() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'Europe/Madrid',
+    })
+      .formatToParts(new Date())
+      .map(({ type, value }) => [type, value]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
 function assertWorkspaceId(value) {
   if (!String(value || '').trim()) throw new Error('A workspace ID is required')
 }
@@ -174,9 +297,11 @@ function assertYear(value) {
 }
 
 module.exports = {
+  madridToday,
   currentMonth,
   currentYear,
   positionStartMonth,
   rebuildFinancialYear,
   refreshFinancialYearTrackingMonth,
+  refreshModeledPositions,
 }

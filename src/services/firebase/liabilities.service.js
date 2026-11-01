@@ -51,14 +51,19 @@ export async function createLiability(workspaceId, liability, memberIds) {
   return createFinancialModelItem(workspaceId, 'liabilities', canonicalLiability(liability))
 }
 
-export async function updateLiability(workspaceId, liabilityId, changes, memberIds) {
+export async function updateLiability(workspaceId, liabilityId, changes, memberIds, options = {}) {
   assertPositionOwnership(changes.ownership, memberIds)
-  return updateFinancialModelItem(
-    workspaceId,
-    'liabilities',
-    liabilityId,
-    canonicalLiability(changes),
-  )
+  const relations = {}
+  if (Object.hasOwn(options, 'mortgageAssetId')) {
+    relations.mortgageAssetId = normalizeOptionalId(options.mortgageAssetId)
+  }
+  if (Object.hasOwn(options, 'mortgageExpenseId')) {
+    relations.mortgageExpenseId = normalizeOptionalId(options.mortgageExpenseId)
+  }
+  const canonical = canonicalLiability(changes)
+  return Object.keys(relations).length
+    ? updateFinancialModelItem(workspaceId, 'liabilities', liabilityId, canonical, relations)
+    : updateFinancialModelItem(workspaceId, 'liabilities', liabilityId, canonical)
 }
 
 export async function deleteLiability(workspaceId, liabilityId) {
@@ -111,8 +116,19 @@ function canonicalMortgageDetail(mortgage) {
   }
   if (!isIsoDate(startDate)) throw new Error('A valid mortgage start date is required')
 
+  const schemaVersion = mortgage.schemaVersion === 2 ? 2 : 1
+  let balanceAnchor
+  if (schemaVersion === 2) {
+    const amount = normalizeNonNegativeMoney(mortgage.balanceAnchor?.amount)
+    const date = String(mortgage.balanceAnchor?.date || '').trim()
+    if (amount === null || !isIsoDate(date)) {
+      throw new Error('A valid mortgage balance anchor is required')
+    }
+    balanceAnchor = { amount, date }
+  }
+
   return {
-    schemaVersion: 1,
+    schemaVersion,
     originalPrincipal,
     annualInterestRate,
     monthlyPayment,
@@ -120,6 +136,7 @@ function canonicalMortgageDetail(mortgage) {
     termMonths,
     amortizationType: 'french',
     fixedRate: true,
+    ...(balanceAnchor ? { balanceAnchor } : {}),
   }
 }
 
@@ -132,4 +149,9 @@ function isIsoDate(value) {
     date.getUTCMonth() === Number(match[2]) - 1 &&
     date.getUTCDate() === Number(match[3])
   )
+}
+
+function normalizeOptionalId(value) {
+  const id = String(value || '').trim()
+  return id || null
 }

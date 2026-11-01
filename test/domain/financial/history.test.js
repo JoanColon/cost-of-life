@@ -3,6 +3,7 @@ import {
   buildAssetAnnualSeries,
   buildNetWorthBreakdownSeries,
   buildNetWorthSeries,
+  withCurrentPosition,
 } from '../../../src/domain/financial/history'
 
 function positionMonth(assets, liabilities = 0) {
@@ -26,6 +27,17 @@ function positionMonth(assets, liabilities = 0) {
 }
 
 describe('financial history series', () => {
+  it('keeps closed snapshots and replaces only the live current month', () => {
+    const result = withCurrentPosition(
+      [{ year: 2026, months: { '01': positionMonth(100), '02': positionMonth(110) } }],
+      { year: 2026, months: { '03': positionMonth(125), '04': positionMonth(999) } },
+      '03',
+    )
+
+    expect(Object.keys(result[0].months)).toEqual(['01', '02', '03'])
+    expect(buildNetWorthSeries(result).at(-1)).toEqual({ period: '2026-03', value: 125 })
+  })
+
   it('builds one annual history point for a specific asset', () => {
     const annualDocument = (year, value) => ({
       year,

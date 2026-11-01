@@ -122,6 +122,8 @@ function normalizeExpenseItem(expense) {
     monthlyAmounts,
     ...attributes,
     ownership: cloneOwnership(expense.ownership),
+    liabilityId:
+      subcategoryId === 'mortgage_rent' ? normalizeOptionalId(expense.liabilityId) : null,
   }
 
   if (expense.entryMode === 'simple' || expense.entryMode === 'detailed') {
@@ -129,6 +131,11 @@ function normalizeExpenseItem(expense) {
   }
 
   return normalized
+}
+
+function normalizeOptionalId(value) {
+  const id = String(value || '').trim()
+  return id || null
 }
 
 function canonicalExpenseCategories(categories) {

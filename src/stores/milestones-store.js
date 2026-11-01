@@ -63,7 +63,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
 
     const year = currentFinancialYear()
     const month = currentFinancialMonth()
-    const key = `${id}:${year}`
+    const key = `${id}:${year}-${month}`
     workspaceId.value = id
     currentYear.value = year
     currentMonth.value = month
@@ -83,8 +83,8 @@ export const useMilestonesStore = defineStore('milestones', () => {
     historyLoading.value = true
     achievementsLoading.value = true
 
-    const [, historyResult, achievementsResult] = await Promise.allSettled([
-      financialYearsStore.load(id, year, force),
+    await financialYearsStore.load(id, year, force)
+    const [historyResult, achievementsResult] = await Promise.allSettled([
       getFinancialHistory(id),
       getAchievements(id),
     ])

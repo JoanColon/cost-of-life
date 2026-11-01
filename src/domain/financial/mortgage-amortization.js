@@ -22,6 +22,7 @@ export function buildFrenchAmortizationSchedule({
   monthlyPayment,
   extraMonthlyPayment = 0,
   asOfDate = new Date(),
+  startDate = null,
 }) {
   let balance = roundMoney(finiteNonNegativeNumber(currentBalance, 'current balance'))
   const regularPayment = roundMoney(finiteNonNegativeNumber(monthlyPayment, 'monthly payment'))
@@ -30,6 +31,10 @@ export function buildFrenchAmortizationSchedule({
   )
   const rate = monthlyInterestRate(annualInterestRate)
   const projectionDate = canonicalDate(asOfDate)
+  const contractualStartDate = startDate ? canonicalDate(startDate) : null
+  const firstContractualPayment = contractualStartDate
+    ? firstPaymentAfter(contractualStartDate, projectionDate)
+    : null
 
   if (balance === 0) return []
   if (regularPayment === 0) throw new RangeError('A positive monthly payment is required')
@@ -48,7 +53,9 @@ export function buildFrenchAmortizationSchedule({
     balance = roundMoney(Math.max(0, balance - principal))
     schedule.push({
       paymentNumber,
-      date: addUtcMonths(projectionDate, paymentNumber),
+      date: contractualStartDate
+        ? addUtcMonths(contractualStartDate, firstContractualPayment + paymentNumber - 1)
+        : addUtcMonths(projectionDate, paymentNumber),
       payment,
       interest,
       principal,
@@ -59,6 +66,14 @@ export function buildFrenchAmortizationSchedule({
   }
 
   throw new RangeError('The mortgage cannot be repaid within the supported projection period')
+}
+
+function firstPaymentAfter(startDate, asOfDate) {
+  const asOf = asOfDate.toISOString().slice(0, 10)
+  for (let paymentNumber = 1; paymentNumber <= MAX_SCHEDULE_MONTHS; paymentNumber += 1) {
+    if (addUtcMonths(startDate, paymentNumber) > asOf) return paymentNumber
+  }
+  throw new RangeError('The projection date exceeds the supported mortgage schedule')
 }
 
 export function calculateMortgageProjection({ extraMonthlyPayment = 0, ...mortgage }) {

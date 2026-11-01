@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { currentFinancialYear } from '@/domain/financial/financial-year'
+import { currentFinancialDate, currentFinancialYear } from '@/domain/financial/financial-year'
 import {
   getFinancialYear,
   subscribeFinancialYear,
@@ -12,6 +12,8 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
   const errors = ref({})
   const requestIds = new Map()
   const loadingKeys = new Set()
+  const ensuredPeriods = new Set()
+  const ensureRequests = new Map()
   let activeSubscription = null
   let latestLoadId = 0
 
@@ -19,6 +21,7 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     const key = `${workspaceId}:${year}`
     const loadId = ++latestLoadId
     if (!force && Object.hasOwn(documents.value, key)) {
+      if (year === currentFinancialYear()) await ensureCurrentPeriod(workspaceId, year, key)
       if (loadId === latestLoadId) watchFinancialYear(workspaceId, year)
       return documents.value[key]
     }
@@ -28,9 +31,10 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     loading.value = true
     setError(key, null)
     try {
-      const value = await getFinancialYear(workspaceId, year, {
-        ensure: year === currentFinancialYear(),
-      })
+      const value =
+        year === currentFinancialYear()
+          ? await ensureCurrentPeriod(workspaceId, year, key, force)
+          : await getFinancialYear(workspaceId, year)
       if (currentRequest !== requestIds.get(key)) return null
       documents.value = { ...documents.value, [key]: value }
       if (loadId === latestLoadId) watchFinancialYear(workspaceId, year)
@@ -59,6 +63,8 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     latestLoadId += 1
     requestIds.clear()
     loadingKeys.clear()
+    ensuredPeriods.clear()
+    ensureRequests.clear()
     documents.value = {}
     loading.value = false
     errors.value = {}
@@ -99,6 +105,12 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     for (const key of loadingKeys) {
       if (key.startsWith(prefix)) loadingKeys.delete(key)
     }
+    for (const key of ensuredPeriods) {
+      if (key.startsWith(prefix)) ensuredPeriods.delete(key)
+    }
+    for (const key of ensureRequests.keys()) {
+      if (key.startsWith(prefix)) ensureRequests.delete(key)
+    }
     loading.value = loadingKeys.size > 0
   }
 
@@ -112,6 +124,31 @@ export const useFinancialYearsStore = defineStore('financial-years', () => {
     if (value) next[key] = value
     else delete next[key]
     errors.value = next
+  }
+
+  async function ensureCurrentPeriod(workspaceId, year, documentKey, force = false) {
+    const key = periodKey(workspaceId, year)
+    if (force) ensuredPeriods.delete(key)
+    if (ensuredPeriods.has(key)) return documents.value[documentKey] || null
+    if (!ensureRequests.has(key)) {
+      ensureRequests.set(
+        key,
+        getFinancialYear(workspaceId, year, { ensure: true }).then((value) => {
+          documents.value = { ...documents.value, [documentKey]: value }
+          ensuredPeriods.add(key)
+          return value
+        }),
+      )
+    }
+    try {
+      return await ensureRequests.get(key)
+    } finally {
+      ensureRequests.delete(key)
+    }
+  }
+
+  function periodKey(workspaceId, year) {
+    return `${workspaceId}:${year}:${currentFinancialDate()}`
   }
 
   return {

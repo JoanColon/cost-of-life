@@ -138,10 +138,16 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     return result.liability
   }
 
-  async function editLiability(workspaceId, liabilityId, changes, memberIds) {
+  async function editLiability(workspaceId, liabilityId, changes, memberIds, options) {
     const liability = findLoadedLiability(liabilityId)
     if (!liability) throw new Error('Liability not found')
-    const result = await updateLiabilityDocument(workspaceId, liabilityId, changes, memberIds)
+    const result = await updateLiabilityDocument(
+      workspaceId,
+      liabilityId,
+      changes,
+      memberIds,
+      options,
+    )
     liabilitiesByCategory.value = {
       ...liabilitiesByCategory.value,
       [liability.categoryId]: itemsForCategory(liability.categoryId).map((candidate) =>
@@ -208,6 +214,13 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     loadedCategoryIds.value = new Set()
   }
 
+  async function refreshLoadedCategories(workspaceId) {
+    if (loadedWorkspaceId.value !== workspaceId) return
+    await Promise.all(
+      [...loadedCategoryIds.value].map((categoryId) => loadCategory(workspaceId, categoryId, true)),
+    )
+  }
+
   return {
     config,
     loading,
@@ -226,6 +239,7 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     deleteLiability,
     deleteCategory,
     itemsForCategory,
+    refreshLoadedCategories,
     reset,
   }
 })

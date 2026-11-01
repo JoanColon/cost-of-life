@@ -149,7 +149,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
-import { currentFinancialMonth, currentFinancialYear } from '@/domain/financial/financial-year'
+import { currentFinancialDate, currentFinancialYear } from '@/domain/financial/financial-year'
 import { authUser, signOut } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -258,6 +258,13 @@ onBeforeUnmount(() => clearInterval(periodTimer))
 
 watch(() => route.fullPath, syncWorkspaceFromRoute)
 watch(authUser, handleAuthChange)
+watch(
+  [routeWorkspaceId, financialPeriodKey],
+  ([workspaceId]) => synchronizeWorkspace(workspaceId),
+  {
+    immediate: true,
+  },
+)
 
 async function handleAuthChange(user, previousUser) {
   if (!user) {
@@ -363,8 +370,21 @@ function refreshFinancialPeriod() {
   financialPeriodKey.value = currentPeriodKey()
 }
 
+async function synchronizeWorkspace(workspaceId) {
+  if (!workspaceId || !authUser.value) return
+  try {
+    await financialYearsStore.load(workspaceId, currentFinancialYear())
+    await Promise.all([
+      assetsStore.refreshLoadedCategories(workspaceId),
+      liabilitiesStore.refreshLoadedCategories(workspaceId),
+    ])
+  } catch {
+    // The destination page exposes the financial-year error and retry action.
+  }
+}
+
 function currentPeriodKey() {
-  return `${currentFinancialYear()}-${currentFinancialMonth()}`
+  return `${currentFinancialYear()}-${currentFinancialDate()}`
 }
 </script>
 

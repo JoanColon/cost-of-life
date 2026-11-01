@@ -73,6 +73,7 @@
               :dense="$q.screen.lt.sm"
               hide-bottom-space
               prefix="€"
+              :disable="managedByMortgage"
               :rules="[(value) => value >= 0 || t('expenses.validation.amount')]"
             />
           </div>
@@ -86,7 +87,18 @@
               emit-value
               map-options
               :options="frequencyOptions"
+              :disable="managedByMortgage"
             />
+          </div>
+        </div>
+
+        <div v-if="managedByMortgage" class="linked-mortgage-notice">
+          <q-icon name="account_balance" color="primary" size="1.4rem" />
+          <div>
+            <strong>{{ t('expenses.form.managedByMortgage') }}</strong>
+            <span>{{
+              linkedMortgage?.itemName || t('expenses.form.linkedMortgageUnavailable')
+            }}</span>
           </div>
         </div>
 
@@ -106,6 +118,7 @@
                 emit-value
                 map-options
                 :options="variabilityOptions"
+                :disable="managedByMortgage"
               />
             </div>
             <div class="dialog-field">
@@ -118,6 +131,7 @@
                 emit-value
                 map-options
                 :options="recurrenceOptions"
+                :disable="managedByMortgage"
               />
             </div>
             <div class="dialog-field full-width">
@@ -138,7 +152,7 @@
         </q-expansion-item>
 
         <q-expansion-item
-          v-if="monthlyAmounts"
+          v-if="monthlyAmounts && !managedByMortgage"
           icon="calendar_month"
           :label="t('expenses.form.yearBreakdown')"
           class="year-breakdown"
@@ -272,6 +286,7 @@ const props = defineProps({
   members: { type: Array, required: true },
   financialYear: { type: Object, default: null },
   saving: Boolean,
+  mortgages: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['save', 'cancel', 'delete'])
 const { t } = useI18n()
@@ -296,6 +311,10 @@ const necessityOptions = computed(() => expenseNecessities.map(option('necessiti
 const subcategoryOptions = computed(() =>
   props.category.suggestions.map((item) => ({ value: item.id, label: t(item.nameKey) })),
 )
+const linkedMortgage = computed(
+  () => props.mortgages.find((mortgage) => mortgage.id === props.expense?.liabilityId) || null,
+)
+const managedByMortgage = computed(() => Boolean(props.expense?.liabilityId))
 const suggestionIcon = computed(
   () =>
     expenseTrackingCategories.find(({ id }) => id === subcategoryId.value)?.icon ||
@@ -412,6 +431,7 @@ function submit() {
     monthlyAmounts: normalizeMonthlyExpenseAmounts(monthlyAmounts.value),
     ...normalizedAttributes.value,
     ownership: cloneOwnership(ownership.value),
+    liabilityId: props.expense?.liabilityId || null,
   })
 }
 </script>
@@ -441,6 +461,26 @@ function submit() {
 
 .field-hint {
   @include financial-dialog-hint;
+}
+
+.linked-mortgage-notice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.linked-mortgage-notice div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.linked-mortgage-notice span {
+  color: var(--color-copy);
 }
 
 .form-grid {

@@ -154,7 +154,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import NetWorthHistoryChart from '@/components/dashboard/NetWorthHistoryChart.vue'
-import { buildNetWorthBreakdownSeries, buildNetWorthSeries } from '@/domain/financial/history'
+import {
+  buildNetWorthBreakdownSeries,
+  buildNetWorthSeries,
+  withCurrentPosition,
+} from '@/domain/financial/history'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {
   financialYearAvailableIncomeValue,
@@ -221,12 +225,9 @@ const monthlySavings = computed(() => annualSavings.value / 12)
 const savingsRate = computed(() =>
   availableIncome.value > 0 ? Math.round((annualSavings.value / availableIncome.value) * 100) : 0,
 )
-const completeHistoryDocuments = computed(() => [
-  ...historyDocuments.value.filter(
-    (document) => Number(document.year || document.id) !== currentYear.value,
-  ),
-  ...(financialYear.value ? [financialYear.value] : []),
-])
+const completeHistoryDocuments = computed(() =>
+  withCurrentPosition(historyDocuments.value, financialYear.value, currentMonth.value),
+)
 const historyOptions = computed(() => ({
   throughPeriod: `${currentYear.value}-${currentMonth.value}`,
   memberId: selectedMemberId.value,

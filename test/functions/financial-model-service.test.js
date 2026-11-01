@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import financialModelService from '../../functions/services/financial-model.js'
+import realEstateDomain from '../../functions/domain/real-estate.js'
 import financialYearDomain from '../../functions/domain/financial-year.js'
 import financialYearsService from '../../functions/services/financial-years.js'
 import { financialYearValue } from '../../src/domain/financial/financial-year.js'
 
-const { mutateFinancialModel } = financialModelService
+const { financialModelMutationInput, mutateFinancialModel } = financialModelService
+const { annualRealEstateValue } = realEstateDomain
 const { buildFinancialYear } = financialYearDomain
 const { currentYear } = financialYearsService
 
@@ -14,6 +16,31 @@ const ownership = {
 }
 
 describe('atomic financial model mutations', () => {
+  it('forwards mortgage relationship metadata from the callable request', () => {
+    expect(
+      financialModelMutationInput(
+        {
+          workspaceId: ' workspace-a ',
+          section: 'liabilities',
+          operation: 'update',
+          itemId: 'mortgage-a',
+          item: { categoryId: 'mortgage' },
+          relations: { mortgageAssetId: 'property-a', mortgageExpenseId: 'expense-a' },
+        },
+        'member-a',
+      ),
+    ).toEqual({
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'liabilities',
+      operation: 'update',
+      itemId: 'mortgage-a',
+      item: { categoryId: 'mortgage' },
+      categoryId: undefined,
+      relations: { mortgageAssetId: 'property-a', mortgageExpenseId: 'expense-a' },
+    })
+  })
+
   it.each([
     {
       section: 'assets',
@@ -150,6 +177,45 @@ describe('atomic financial model mutations', () => {
       path.endsWith(`/financialYears/${currentYear()}`),
     )
     expect(financialYearValue(financialYearWrite.data, 'liabilities')).toBe(146_230)
+  })
+
+  it('derives a property root value from its Layer 3 model', async () => {
+    const realEstate = {
+      schemaVersion: 2,
+      purchasePrice: 134_000,
+      purchaseDate: '2022-04-01',
+      annualAppreciationRate: 2.5,
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'assets',
+      collection: 'modelAssets',
+      category: 'real_estate',
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'assets',
+      operation: 'create',
+      item: {
+        categoryId: 'real_estate',
+        subcategoryId: 'land',
+        itemName: 'Land',
+        notes: '',
+        currentValue: 134_000,
+        valueSource: 'model',
+        detail: { realEstate },
+        mortgageLiabilityId: null,
+        ownership,
+      },
+    })
+
+    const expectedValue = annualRealEstateValue(realEstate, madridToday())
+    expect(result.asset.currentValue).toBe(expectedValue)
+    expect(result.asset.valueSource).toBe('model')
+    expect(
+      writes.find(({ path }) => path.includes('/modelAssets/')).data.currentValue,
+    ).toBe(expectedValue)
   })
 
   it('rejects ownership that references someone outside the workspace', async () => {
@@ -556,6 +622,174 @@ describe('atomic financial model mutations', () => {
     ).rejects.toThrow('too many related items')
     expect(writes).toEqual([])
   })
+
+  it('requires real estate mortgage links to be managed from the mortgage model', async () => {
+    const existingProperty = {
+      id: 'property-a',
+      categoryId: 'real_estate',
+      subcategoryId: 'primary_home',
+      mortgageLiabilityId: 'mortgage-a',
+      currentValue: 300_000,
+      ownership,
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'assets',
+      collection: 'modelAssets',
+      category: 'real_estate',
+      items: [existingProperty],
+      linkedLiabilities: [{ id: 'mortgage-a', categoryId: 'mortgage' }],
+    })
+
+    await expect(
+      mutateFinancialModel(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'member-a',
+        section: 'assets',
+        operation: 'create',
+        item: {
+          categoryId: 'real_estate',
+          subcategoryId: 'rental_property',
+          itemName: 'Rental',
+          notes: '',
+          currentValue: 200_000,
+          valueSource: 'manual',
+          mortgageLiabilityId: 'mortgage-a',
+          detail: {},
+          ownership,
+        },
+      }),
+    ).rejects.toThrow('must be managed from the mortgage model')
+    expect(writes).toEqual([])
+  })
+
+  it('syncs a linked mortgage expense when the mortgage payment changes', async () => {
+    const mortgage = {
+      id: 'mortgage-a',
+      categoryId: 'mortgage',
+      subcategoryId: 'mortgage',
+      itemName: 'Home loan',
+      notes: '',
+      balance: 100_000,
+      ownership,
+      detail: {
+        mortgage: {
+          schemaVersion: 1,
+          originalPrincipal: 150_000,
+          annualInterestRate: 2,
+          monthlyPayment: 600,
+          startDate: '2020-01-01',
+          termMonths: 360,
+          amortizationType: 'french',
+          fixedRate: true,
+        },
+      },
+    }
+    const linkedExpense = {
+      id: 'expense-a',
+      categoryId: 'housing',
+      subcategoryId: 'mortgage_rent',
+      itemName: 'Mortgage payment',
+      notes: '',
+      estimate: { amount: 600, frequency: 'monthly' },
+      monthlyAmounts: monthlyAmounts(600),
+      variability: 'fixed',
+      recurrence: 'recurring',
+      necessity: 'essential',
+      liabilityId: 'mortgage-a',
+      ownership,
+    }
+    const unrelatedExpense = {
+      ...linkedExpense,
+      id: 'expense-b',
+      itemName: 'Second mortgage payment',
+      estimate: { amount: 100, frequency: 'monthly' },
+      monthlyAmounts: monthlyAmounts(100),
+      liabilityId: null,
+    }
+    const linkedProperty = {
+      id: 'property-a',
+      categoryId: 'real_estate',
+      subcategoryId: 'primary_home',
+      mortgageLiabilityId: 'mortgage-a',
+    }
+    const replacementProperty = {
+      id: 'property-b',
+      categoryId: 'real_estate',
+      subcategoryId: 'rental_property',
+      mortgageLiabilityId: null,
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'liabilities',
+      collection: 'modelLiabilities',
+      category: 'mortgage',
+      items: [mortgage],
+      linkedAssets: [linkedProperty, replacementProperty],
+      linkedExpenses: [linkedExpense, unrelatedExpense],
+    })
+
+    await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'liabilities',
+      operation: 'update',
+      itemId: 'mortgage-a',
+      item: {
+        ...mortgage,
+        detail: { mortgage: { ...mortgage.detail.mortgage, monthlyPayment: 725 } },
+      },
+      relations: { mortgageAssetId: 'property-b', mortgageExpenseId: 'expense-b' },
+    })
+
+    expect(
+      writes.find(({ path }) => path === 'workspaces/workspace-a/modelAssets/property-a').data
+        .mortgageLiabilityId,
+    ).toBeNull()
+    expect(
+      writes.find(({ path }) => path === 'workspaces/workspace-a/modelAssets/property-b').data
+        .mortgageLiabilityId,
+    ).toBe('mortgage-a')
+
+    const expenseWrite = writes.find(
+      ({ path }) => path === 'workspaces/workspace-a/modelExpenses/expense-b',
+    )
+    const previousExpenseWrite = writes.find(
+      ({ path }) => path === 'workspaces/workspace-a/modelExpenses/expense-a',
+    )
+    expect(previousExpenseWrite.data).toMatchObject({
+      liabilityId: null,
+      estimate: { amount: 600, frequency: 'monthly' },
+    })
+    expect(expenseWrite.data.liabilityId).toBe('mortgage-a')
+    expect(expenseWrite.data.estimate).toEqual({ amount: 725, frequency: 'monthly' })
+    expect(expenseWrite.data.monthlyAmounts).toEqual(monthlyAmounts(725))
+    expect(expenseWrite.data).toMatchObject({ variability: 'fixed', recurrence: 'recurring' })
+    const financialYear = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    ).data
+    expect(financialYearValue(financialYear, 'expenses')).toBe(15_900)
+
+    const previousWriteCount = writes.length
+    await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'liabilities',
+      operation: 'update',
+      itemId: 'mortgage-a',
+      item: mortgage,
+      relations: { mortgageAssetId: null, mortgageExpenseId: null },
+    })
+    const unlinkWrites = writes.slice(previousWriteCount)
+    expect(
+      unlinkWrites.find(
+        ({ path }) => path === 'workspaces/workspace-a/modelExpenses/expense-a',
+      ).data.liabilityId,
+    ).toBeNull()
+    expect(
+      unlinkWrites.some(
+        ({ path }) => path === 'workspaces/workspace-a/modelExpenses/expense-b',
+      ),
+    ).toBe(false)
+  })
 })
 
 function createFirestore({
@@ -566,6 +800,9 @@ function createFirestore({
   configCategory = { enabled: true, ownership },
   memberIds = ['member-a'],
   linkedIncome = [],
+  linkedAssets = [],
+  linkedLiabilities = [],
+  linkedExpenses = [],
 }) {
   const writes = []
   let generatedId = 0
@@ -598,10 +835,22 @@ function createFirestore({
     if (target.path === `workspaces/workspace-a/modelConfig/${section}`) {
       return documentSnapshot({ categories: { [category]: configCategory } })
     }
+    if (target.path === 'workspaces/workspace-a/modelConfig/expenses') {
+      return documentSnapshot({ categories: { housing: { enabled: true } } })
+    }
     if (target.path === `workspaces/workspace-a/financialYears/${year}`) {
       return documentSnapshot(financialYear)
     }
     if (target.path === `workspaces/workspace-a/${collection}`) return querySnapshot(items)
+    if (target.path === 'workspaces/workspace-a/modelAssets') {
+      return querySnapshot(linkedAssets, 'workspaces/workspace-a/modelAssets', reference)
+    }
+    if (target.path === 'workspaces/workspace-a/modelLiabilities') {
+      return querySnapshot(linkedLiabilities, 'workspaces/workspace-a/modelLiabilities', reference)
+    }
+    if (target.path === 'workspaces/workspace-a/modelExpenses') {
+      return querySnapshot(linkedExpenses, 'workspaces/workspace-a/modelExpenses', reference)
+    }
     if (target.path === 'workspaces/workspace-a/modelIncome') {
       return {
         docs: linkedIncome.map(({ id, ...data }) => ({
@@ -646,9 +895,13 @@ function documentSnapshot(data) {
   return { exists: data != null, data: () => data ?? undefined }
 }
 
-function querySnapshot(documents) {
+function querySnapshot(documents, path = null, reference = null) {
   return {
-    docs: documents.map(({ id, ...data }) => ({ id, data: () => data })),
+    docs: documents.map(({ id, ...data }) => ({
+      id,
+      data: () => data,
+      ...(path && reference ? { ref: reference(`${path}/${id}`) } : {}),
+    })),
   }
 }
 
@@ -669,4 +922,18 @@ function monthlyAmounts(amount) {
       'december',
     ].map((month) => [month, amount]),
   )
+}
+
+function madridToday() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'Europe/Madrid',
+    })
+      .formatToParts(new Date())
+      .map(({ type, value }) => [type, value]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}`
 }

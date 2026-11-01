@@ -1,5 +1,34 @@
 import { financialYearMonthCategoryValue, financialYearMonthValue } from './financial-year'
 
+export function withCurrentPosition(historyDocuments, financialYear, month) {
+  if (!financialYear || !/^\d{2}$/.test(String(month || '')))
+    return historyDocuments.filter(Boolean)
+  const year = Number(financialYear.year || financialYear.id)
+  const existing = historyDocuments.find(
+    (document) => Number(document?.year || document?.id) === year,
+  )
+  const current = financialYear.months?.[month]
+  return [
+    ...historyDocuments.filter((document) => Number(document?.year || document?.id) !== year),
+    {
+      id: String(year),
+      year,
+      months: {
+        ...(existing?.months || {}),
+        ...(current
+          ? {
+              [month]: {
+                assets: current.assets,
+                liabilities: current.liabilities,
+                positionStatus: 'current',
+              },
+            }
+          : {}),
+      },
+    },
+  ]
+}
+
 export function buildNetWorthSeries(
   historyDocuments = [],
   { throughPeriod = null, memberId = 'all' } = {},

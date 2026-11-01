@@ -24,6 +24,7 @@ vi.mock('@/services/firebase/financial-model-mutations.service', () => ({
 }))
 
 import { updateAsset } from '../../src/services/firebase/assets.service.js'
+import { annualRealEstateValue } from '../../src/domain/financial/real-estate-valuation.js'
 import { updateExpense } from '../../src/services/firebase/expenses.service.js'
 import { updateIncome } from '../../src/services/firebase/income.service.js'
 import { updateLiability } from '../../src/services/firebase/liabilities.service.js'
@@ -60,6 +61,69 @@ describe('financial model service payloads', () => {
       ownership,
       valueSource: 'manual',
     })
+  })
+
+  it('derives a modeled property value from its purchase parameters', async () => {
+    const realEstate = {
+      schemaVersion: 2,
+      purchasePrice: 134_000,
+      purchaseDate: '2022-04-01',
+      annualAppreciationRate: 2.5,
+    }
+
+    await updateAsset(
+      'workspace-a',
+      'property-a',
+      {
+        categoryId: 'real_estate',
+        subcategoryId: 'land',
+        itemName: 'Land',
+        notes: '',
+        currentValue: 134_000,
+        detail: { realEstate },
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'assets',
+      'property-a',
+      expect.objectContaining({
+        currentValue: annualRealEstateValue(realEstate),
+        valueSource: 'model',
+        detail: { realEstate },
+      }),
+    )
+  })
+
+  it('canonicalizes a real estate model and mortgage link', async () => {
+    await updateAsset(
+      'workspace-a',
+      'property-a',
+      {
+        categoryId: 'real_estate',
+        subcategoryId: 'primary_home',
+        itemName: 'Home',
+        notes: '',
+        currentValue: 350_000,
+        mortgageLiabilityId: ' mortgage-a ',
+        detail: { realEstate: { annualAppreciationRate: '-1.5' } },
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'assets',
+      'property-a',
+      expect.objectContaining({
+        mortgageLiabilityId: 'mortgage-a',
+        detail: { realEstate: { schemaVersion: 1, annualAppreciationRate: -1.5 } },
+      }),
+    )
   })
 
   it('canonicalizes liabilities before updating them', async () => {
@@ -135,6 +199,31 @@ describe('financial model service payloads', () => {
           },
         },
       }),
+    )
+  })
+
+  it('passes the selected mortgage expense as relationship metadata', async () => {
+    await updateLiability(
+      'workspace-a',
+      'mortgage-a',
+      {
+        categoryId: 'mortgage',
+        subcategoryId: 'mortgage',
+        itemName: 'Home loan',
+        notes: '',
+        balance: 100_000,
+        ownership,
+      },
+      ['member-a'],
+      { mortgageAssetId: ' property-a ', mortgageExpenseId: ' expense-a ' },
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'liabilities',
+      'mortgage-a',
+      expect.any(Object),
+      { mortgageAssetId: 'property-a', mortgageExpenseId: 'expense-a' },
     )
   })
 
@@ -256,6 +345,34 @@ describe('financial model service payloads', () => {
         entryMode: 'simple',
         ownership,
       }),
+    )
+  })
+
+  it('preserves a mortgage link on a mortgage expense', async () => {
+    await updateExpense(
+      'workspace-a',
+      'expense-a',
+      {
+        categoryId: 'housing',
+        subcategoryId: 'mortgage_rent',
+        itemName: 'Mortgage payment',
+        notes: '',
+        estimate: { amount: 800, frequency: 'monthly' },
+        monthlyAmounts: null,
+        variability: 'fixed',
+        recurrence: 'recurring',
+        necessity: 'essential',
+        liabilityId: 'mortgage-a',
+        ownership,
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'expenses',
+      'expense-a',
+      expect.objectContaining({ liabilityId: 'mortgage-a' }),
     )
   })
 })

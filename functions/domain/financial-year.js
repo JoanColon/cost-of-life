@@ -477,6 +477,7 @@ function assertMonth(month) {
 
 module.exports = {
   applyTrackingMonth,
+  buildPositionMonth,
   buildFinancialYear,
   updateFinancialYearProjection,
 }

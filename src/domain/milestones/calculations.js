@@ -28,7 +28,7 @@ export function calculateMilestoneProgress({
       .filter(({ status }) => status === 'pending')
       .map((achievement) => [achievement.milestoneId, achievement]),
   )
-  const history = withCurrentFinancialYear(financialHistory, financialYear)
+  const history = withCurrentFinancialYear(financialHistory, financialYear, month)
   const annualCostOfLife = financialYearValue(financialYear, 'expenses', memberId)
   const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash', memberId)
   const freedomAssets =
@@ -153,12 +153,22 @@ function historicalDebtMaximum(financialHistory, categoryIds, memberId) {
   )
 }
 
-function withCurrentFinancialYear(financialHistory, financialYear) {
+function withCurrentFinancialYear(financialHistory, financialYear, month) {
   if (!financialYear) return financialHistory.filter(Boolean)
   const year = Number(financialYear.year || financialYear.id)
+  const existing = financialHistory.find(
+    (candidate) => Number(candidate?.year || candidate?.id) === year,
+  )
   return [
     ...financialHistory.filter((candidate) => Number(candidate?.year || candidate?.id) !== year),
-    financialYear,
+    {
+      id: String(year),
+      year,
+      months: {
+        ...(existing?.months || {}),
+        ...(financialYear.months?.[month] ? { [month]: financialYear.months[month] } : {}),
+      },
+    },
   ]
 }
 
