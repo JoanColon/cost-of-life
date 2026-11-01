@@ -38,29 +38,37 @@ service cloud.firestore {
         && after.milestoneTracking.activatedAt == request.time;
     }
 
+    function hasValidUserPreferences(data) {
+      return (
+          !('activeWorkspaceId' in data)
+          || data.activeWorkspaceId == null
+          || data.activeWorkspaceId is string
+        )
+        && (
+          !('quickLinksByWorkspace' in data)
+          || data.quickLinksByWorkspace is map
+        );
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow create: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
           'activeWorkspaceId',
+          'quickLinksByWorkspace',
           'updatedAt'
         ])
-        && (
-          request.resource.data.activeWorkspaceId == null
-          || request.resource.data.activeWorkspaceId is string
-        )
+        && hasValidUserPreferences(request.resource.data)
         && request.resource.data.updatedAt == request.time;
       allow update: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'activeWorkspaceId',
+          'quickLinksByWorkspace',
           'updatedAt'
         ])
-        && (
-          request.resource.data.activeWorkspaceId == null
-          || request.resource.data.activeWorkspaceId is string
-        )
+        && hasValidUserPreferences(request.resource.data)
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
@@ -212,6 +220,7 @@ service cloud.firestore {
               request.resource.data.keys().hasOnly([
                 'schemaVersion',
                 'discretionaryReductionPercent',
+                'extraMonthlySavings',
                 'expectedAnnualReturnPercent',
                 'selectedLiabilityId',
                 'strategy',
@@ -222,6 +231,14 @@ service cloud.firestore {
               && request.resource.data.discretionaryReductionPercent is number
               && request.resource.data.discretionaryReductionPercent >= 0
               && request.resource.data.discretionaryReductionPercent <= 100
+              && (
+                !('extraMonthlySavings' in request.resource.data)
+                || (
+                  request.resource.data.extraMonthlySavings is number
+                  && request.resource.data.extraMonthlySavings >= 0
+                  && request.resource.data.extraMonthlySavings <= 100000
+                )
+              )
               && request.resource.data.expectedAnnualReturnPercent is number
               && request.resource.data.expectedAnnualReturnPercent >= 0
               && request.resource.data.expectedAnnualReturnPercent <= 100

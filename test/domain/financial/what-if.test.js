@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   calculateCashScenario,
   calculateInvestmentScenario,
+  calculateProjectionDelta,
+  calculateSafetyImpact,
   calculateWhatIf,
   normalizeWhatIfConfig,
   normalizeStrategyForOptions,
@@ -33,6 +35,24 @@ describe('What If calculations', () => {
         discretionary: 3_000,
       }).breakEvenReductionPercent,
     ).toBe(40)
+  })
+
+  it('combines direct extra savings with savings from lower spending', () => {
+    expect(
+      calculateWhatIf({
+        availableIncome: 36_000,
+        costOfLife: 28_320,
+        discretionary: 7_440,
+        reductionPercent: 10,
+        extraMonthlySavings: 100,
+      }),
+    ).toMatchObject({
+      spendingReductionSavings: 62,
+      directExtraSavings: 100,
+      extraSavings: 162,
+      simulatedSavingsCapacity: 802,
+      simulatedCostOfLife: 2298,
+    })
   })
 
   it('always compares the one-year emergency-fund milestone on both paths', () => {
@@ -73,6 +93,36 @@ describe('What If calculations', () => {
     })[0]
     expect(tenYears.projectedValue).toBeGreaterThan(tenYears.currentPathValue)
     expect(tenYears.difference).toBeGreaterThan(0)
+  })
+
+  it('keeps an existing portfolio in both paths so the reported result is a delta', () => {
+    const result = calculateInvestmentScenario({
+      startingValue: 50_000,
+      monthlyContribution: 600,
+      currentMonthlyContribution: 500,
+      annualReturnPercent: 7,
+    }).find(({ years }) => years === 20)
+    expect(result.projectedValue).toBeGreaterThan(result.currentPathValue)
+    expect(result.difference).toBe(
+      calculateProjectionDelta(result.projectedValue, result.currentPathValue),
+    )
+  })
+
+  it('reports additional emergency-fund safety against the baseline path', () => {
+    expect(
+      calculateSafetyImpact({
+        cash: 10_000,
+        currentMonthlyCost: 2_000,
+        simulatedMonthlyCost: 2_000,
+        currentMonthlySavings: 500,
+        simulatedMonthlySavings: 600,
+      }),
+    ).toMatchObject({
+      baselineSafetyMonths: 8,
+      scenarioSafetyMonths: 8.6,
+      additionalSafetyMonths: 0.6,
+      alreadyFunded: false,
+    })
   })
 
   it('moves allocations from unavailable options into Invest', () => {

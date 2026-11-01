@@ -105,9 +105,14 @@ const { t } = useI18n()
   }
 
   .breakdown-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      'dot value'
+      '. label';
     align-items: center;
-    gap: 0.8rem;
+    column-gap: 0.8rem;
+    row-gap: 0.2rem;
     min-width: 0;
     padding: 0;
     border: 0;
@@ -127,7 +132,7 @@ const { t } = useI18n()
   }
 
   .metric-dot {
-    flex: 0 0 1.15rem;
+    grid-area: dot;
     width: 1.15rem;
     height: 1.15rem;
     border-radius: 50%;
@@ -141,18 +146,19 @@ const { t } = useI18n()
     background: var(--color-danger);
   }
 
-  .breakdown-copy strong,
-  .breakdown-copy small {
-    display: block;
+  .breakdown-copy {
+    display: contents;
   }
 
   .breakdown-copy strong {
+    grid-area: value;
     font-size: 1.18rem;
+    line-height: 1;
     white-space: nowrap;
   }
 
   .breakdown-copy small {
-    margin-top: 0.2rem;
+    grid-area: label;
     color: var(--color-copy);
     font-size: 0.82rem;
   }
@@ -189,17 +195,21 @@ const { t } = useI18n()
     }
 
     .breakdown-row {
-      gap: 0.6rem;
+      column-gap: 0.6rem;
     }
 
     .breakdown-copy strong {
-      font-size: 1rem;
+      font-size: clamp(1.5rem, 2.7vh, 1.85rem);
+      letter-spacing: -0.025em;
+    }
+
+    .breakdown-copy small {
+      font-size: 0.92rem;
     }
 
     .metric-dot {
-      flex-basis: 1rem;
-      width: 1rem;
-      height: 1rem;
+      width: 1.1rem;
+      height: 1.1rem;
     }
 
     .metric-divider {
@@ -242,12 +252,12 @@ const { t } = useI18n()
     .breakdown-row {
       justify-content: center;
       flex: 1 1 50%;
-      gap: 0.55rem;
+      column-gap: 0.55rem;
       padding: 0.3rem 0.45rem;
     }
 
     .breakdown-copy strong {
-      font-size: 1rem;
+      font-size: 1.15rem;
     }
 
     .metric-divider {

@@ -24,6 +24,7 @@ export const defaultStrategyScenario = Object.freeze({
 
 export const defaultWhatIfConfig = Object.freeze({
   discretionaryReductionPercent: 0,
+  extraMonthlySavings: 0,
   activeScenarioId: defaultStrategyScenario.id,
   scenarios: Object.freeze([defaultStrategyScenario]),
 })
@@ -50,6 +51,7 @@ export function normalizeWhatIfConfig(config = {}) {
     : scenarios[0].id
   return {
     discretionaryReductionPercent: reduction ?? 0,
+    extraMonthlySavings: normalizeMoneyInput(config.extraMonthlySavings),
     activeScenarioId,
     scenarios,
   }
@@ -107,23 +109,31 @@ export function calculateWhatIf({
   costOfLife = 0,
   discretionary = 0,
   reductionPercent = 0,
+  extraMonthlySavings = 0,
 } = {}) {
   const reduction = normalizeDisposablePercentage(reductionPercent, 0) ?? 0
   const monthlyAvailableIncome = money(availableIncome / 12)
   const monthlyCostOfLife = money(costOfLife / 12)
   const monthlyDiscretionary = money(discretionary / 12)
   const currentSavingsCapacity = money(monthlyAvailableIncome - monthlyCostOfLife)
-  const extraSavings = money((monthlyDiscretionary * reduction) / 100)
+  const spendingReductionSavings = money((monthlyDiscretionary * reduction) / 100)
+  const directExtraSavings = normalizeMoneyInput(extraMonthlySavings)
+  const extraSavings = money(spendingReductionSavings + directExtraSavings)
   const simulatedSavingsCapacity = money(currentSavingsCapacity + extraSavings)
   return {
     monthlyAvailableIncome,
     monthlyCostOfLife,
     monthlyDiscretionary,
     currentSavingsCapacity,
+    spendingReductionSavings,
+    directExtraSavings,
     extraSavings,
-    simulatedCostOfLife: money(monthlyCostOfLife - extraSavings),
+    simulatedCostOfLife: money(monthlyCostOfLife - spendingReductionSavings),
     simulatedSavingsCapacity,
-    breakEvenReductionPercent: breakEvenReduction(currentSavingsCapacity, monthlyDiscretionary),
+    breakEvenReductionPercent: breakEvenReduction(
+      money(currentSavingsCapacity + directExtraSavings),
+      monthlyDiscretionary,
+    ),
   }
 }
 
@@ -158,22 +168,63 @@ export function calculateInvestmentScenario({
   monthlyContribution = 0,
   currentMonthlyContribution = 0,
   annualReturnPercent = 7,
+  startingValue = 0,
 } = {}) {
   const rate = normalizeReturn(annualReturnPercent) ?? 7
   return investmentHorizons.map((years) => {
-    const projectedValue = futureValueOfMonthlyContributions(monthlyContribution, rate, years)
-    const currentPathValue = futureValueOfMonthlyContributions(
-      Math.max(0, currentMonthlyContribution),
-      rate,
-      years,
+    const startingValueAtHorizon = futureValueOfPrincipal(startingValue, rate, years)
+    const projectedValue = money(
+      startingValueAtHorizon + futureValueOfMonthlyContributions(monthlyContribution, rate, years),
+    )
+    const currentPathValue = money(
+      startingValueAtHorizon +
+        futureValueOfMonthlyContributions(Math.max(0, currentMonthlyContribution), rate, years),
     )
     return {
       years,
       projectedValue,
       currentPathValue,
-      difference: money(projectedValue - currentPathValue),
+      difference: calculateProjectionDelta(projectedValue, currentPathValue),
     }
   })
+}
+
+export function calculateSafetyImpact({
+  cash = 0,
+  currentMonthlyCost = 0,
+  simulatedMonthlyCost = 0,
+  currentMonthlySavings = 0,
+  simulatedMonthlySavings = 0,
+  horizonMonths = 12,
+  targetMonths = 12,
+} = {}) {
+  const baselineCost = Math.max(0, Number(currentMonthlyCost) || 0)
+  const scenarioCost = Math.max(0, Number(simulatedMonthlyCost) || 0)
+  if (!(baselineCost > 0) || !(scenarioCost > 0)) return null
+  const months = Math.max(0, Math.round(Number(horizonMonths) || 0))
+  const startingCash = Math.max(0, Number(cash) || 0)
+  const baselineCash = money(
+    startingCash + Math.max(0, Number(currentMonthlySavings) || 0) * months,
+  )
+  const scenarioCash = money(
+    startingCash + Math.max(0, Number(simulatedMonthlySavings) || 0) * months,
+  )
+  const baselineSafetyMonths = money(baselineCash / baselineCost)
+  const scenarioSafetyMonths = money(scenarioCash / scenarioCost)
+  return {
+    horizonMonths: months,
+    baselineSafetyMonths,
+    scenarioSafetyMonths,
+    additionalSafetyMonths: Math.max(
+      0,
+      calculateProjectionDelta(scenarioSafetyMonths, baselineSafetyMonths),
+    ),
+    alreadyFunded: startingCash / baselineCost >= targetMonths,
+  }
+}
+
+export function calculateProjectionDelta(scenarioResult = 0, baselineResult = 0) {
+  return money((Number(scenarioResult) || 0) - (Number(baselineResult) || 0))
 }
 
 export function futureValueOfMonthlyContributions(monthlyContribution, annualReturnPercent, years) {
@@ -183,6 +234,13 @@ export function futureValueOfMonthlyContributions(monthlyContribution, annualRet
   if (!months || !contribution) return 0
   if (!monthlyRate) return money(contribution * months)
   return money(contribution * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate))
+}
+
+export function futureValueOfPrincipal(principal, annualReturnPercent, years) {
+  const value = Math.max(0, Number(principal) || 0)
+  const duration = Math.max(0, Number(years) || 0)
+  const annualRate = (Number(annualReturnPercent) || 0) / 100
+  return money(value * Math.pow(1 + annualRate, duration))
 }
 
 export function calculateDebtScenario(monthlyAmount = 0) {
@@ -225,6 +283,11 @@ function monthsToTarget(current, target, monthlyContribution) {
 function normalizeReturn(value) {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 && number <= 100 ? number : null
+}
+
+function normalizeMoneyInput(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? money(Math.min(100000, Math.max(0, number))) : 0
 }
 
 function money(value) {

@@ -159,6 +159,7 @@ import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useIncomeStore } from '@/stores/income-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
+import { useQuickLinksStore } from '@/stores/quick-links-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
@@ -173,6 +174,7 @@ const expenseTrackingStore = useExpenseTrackingStore()
 const liabilitiesStore = useLiabilitiesStore()
 const incomeStore = useIncomeStore()
 const milestonesStore = useMilestonesStore()
+const quickLinksStore = useQuickLinksStore()
 const scopeStore = useFinancialScopeStore()
 const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
@@ -350,6 +352,7 @@ function resetApplicationState() {
   liabilitiesStore.reset()
   incomeStore.reset()
   milestonesStore.reset()
+  quickLinksStore.reset()
   scopeStore.reset()
   financialYearsStore.reset()
   workspaceStore.reset()

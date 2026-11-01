@@ -301,29 +301,29 @@ const periodLabel = computed(() =>
       align-content: center;
       height: 100%;
       min-height: 0;
-      padding: 0.6rem 0.45rem;
+      padding: 0.35rem 0.45rem 1.25rem;
     }
 
     .equation-icon {
-      width: 2.45rem;
-      height: 2.45rem;
-      margin-bottom: 0.35rem;
-      font-size: 1.15rem;
+      width: 3.75rem;
+      height: 3.75rem;
+      margin-bottom: 0.7rem;
+      font-size: 1.7rem;
     }
 
     .equation-card strong {
-      font-size: clamp(1.2rem, 2vw, 1.75rem);
+      font-size: clamp(1.9rem, 3vw, 2.55rem);
     }
 
     .equation-card span {
-      margin-top: 0.25rem;
-      font-size: 0.82rem;
+      margin-top: 0.35rem;
+      font-size: 0.95rem;
     }
 
     .equation-card small {
-      font-size: 0.68rem;
+      margin-top: 0.2rem;
+      font-size: 0.76rem;
     }
-
   }
 
   @media (max-width: 599px) {
@@ -386,14 +386,14 @@ const periodLabel = computed(() =>
     }
 
     .equation-icon {
-      width: 2.35rem;
-      height: 2.35rem;
+      width: 2.8rem;
+      height: 2.8rem;
       margin-bottom: 0.3rem;
-      font-size: 1.1rem;
+      font-size: 1.3rem;
     }
 
     .equation-card strong {
-      font-size: clamp(1rem, 4.6vw, 1.35rem);
+      font-size: clamp(1.15rem, 5vw, 1.5rem);
     }
 
     .equation-card span {

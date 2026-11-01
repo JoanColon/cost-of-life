@@ -55,28 +55,18 @@
         </q-card-section>
 
         <q-card-section class="link-options">
-          <div v-for="group in filteredGroups" :key="group.label" class="link-group">
-            <h3>{{ group.label }}</h3>
-            <q-list separator>
-              <q-item v-for="link in group.links" :key="link.id" tag="label" clickable>
-                <q-item-section avatar>
-                  <span class="option-icon"><q-icon :name="link.icon" /></span>
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ link.label }}</q-item-label>
-                  <q-item-label v-if="link.description" caption>
-                    {{ link.description }}
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
-                  <q-checkbox v-model="draftIds" :val="link.id" color="primary" />
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-          <p v-if="!filteredGroups.length" class="no-results">
-            {{ t('dashboard.quickLinks.noResults') }}
-          </p>
+          <q-tree
+            v-if="treeNodes.length"
+            v-model:ticked="draftIds"
+            v-model:expanded="expandedIds"
+            :nodes="treeNodes"
+            :filter="search || ''"
+            :filter-method="filterNode"
+            node-key="id"
+            tick-strategy="leaf"
+            class="quick-links-tree"
+          />
+          <p v-else class="no-results">{{ t('dashboard.quickLinks.noResults') }}</p>
         </q-card-section>
 
         <q-card-actions align="right" class="dialog-actions">
@@ -117,6 +107,7 @@ const $q = useQuasar()
 const quickLinksStore = useQuickLinksStore()
 const dialogOpen = ref(false)
 const draftIds = ref([])
+const expandedIds = ref([])
 const search = ref('')
 
 const selectedIds = computed(() => quickLinksStore.linksFor(props.workspaceId))
@@ -124,22 +115,7 @@ const candidatesById = computed(() => new Map(props.candidates.map((link) => [li
 const selectedLinks = computed(() =>
   selectedIds.value.map((id) => candidatesById.value.get(id)).filter(Boolean),
 )
-const filteredGroups = computed(() => {
-  const query = String(search.value || '').trim().toLocaleLowerCase()
-  const links = query
-    ? props.candidates.filter((link) =>
-        `${link.label} ${link.description || ''}`.toLocaleLowerCase().includes(query),
-      )
-    : props.candidates
-  const groups = new Map()
-
-  links.forEach((link) => {
-    if (!groups.has(link.group)) groups.set(link.group, [])
-    groups.get(link.group).push(link)
-  })
-
-  return [...groups.entries()].map(([label, groupLinks]) => ({ label, links: groupLinks }))
-})
+const treeNodes = computed(() => buildTree(props.candidates))
 
 watch(
   () => props.workspaceId,
@@ -149,8 +125,49 @@ watch(
 
 function openDialog() {
   draftIds.value = [...selectedIds.value]
+  expandedIds.value = treeNodes.value.map(({ id }) => id)
   search.value = ''
   dialogOpen.value = true
+}
+
+function buildTree(links) {
+  const roots = []
+  const branches = new Map()
+
+  links.forEach((link) => {
+    const path = Array.isArray(link.path) && link.path.length ? link.path : [link.group]
+    let children = roots
+    let pathId = ''
+
+    path.filter(Boolean).forEach((label) => {
+      pathId = `${pathId}/${label}`
+      const id = `branch:${pathId}`
+      let branch = branches.get(id)
+      if (!branch) {
+        branch = { id, label, icon: link.sectionIcon, children: [] }
+        branches.set(id, branch)
+        children.push(branch)
+      }
+      children = branch.children
+    })
+
+    children.push({
+      id: link.id,
+      label: link.treeLabel || link.label,
+      icon: link.icon,
+      caption: link.description,
+    })
+  })
+
+  return roots
+}
+
+function filterNode(node, filter) {
+  const query = String(filter || '')
+    .trim()
+    .toLocaleLowerCase()
+  if (!query) return true
+  return `${node.label || ''} ${node.caption || ''}`.toLocaleLowerCase().includes(query)
 }
 
 async function save() {
@@ -292,26 +309,25 @@ h2 {
   overflow-y: auto;
 }
 
-.link-group + .link-group {
-  margin-top: 1.1rem;
+.quick-links-tree {
+  color: var(--color-ink);
 }
 
-.link-group h3 {
-  margin: 0 0 0.35rem;
-  color: var(--color-muted);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+.quick-links-tree :deep(.q-tree__node-header) {
+  min-height: 2.35rem;
+  border-radius: 0.5rem;
 }
 
-.option-icon {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  background: var(--color-blue-soft);
+.quick-links-tree :deep(.q-tree__node-header:hover) {
+  background: var(--color-page);
+}
+
+.quick-links-tree :deep(.q-tree__node-header-content) {
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.quick-links-tree :deep(.q-icon) {
   color: var(--color-primary);
 }
 
@@ -328,23 +344,86 @@ h2 {
 
 @media (min-width: 1024px) {
   .quick-links {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
     min-height: 2.75rem;
     margin-top: clamp(0.55rem, 1.3vh, 0.8rem);
     padding: 0.7rem 1rem;
   }
 
+  .quick-links-header {
+    display: contents;
+  }
+
+  .quick-links-header h2 {
+    grid-column: 1;
+  }
+
+  .configure-link {
+    grid-column: 3;
+  }
+
   .quick-link-chips {
-    margin-top: 0.55rem;
+    grid-row: 1;
+    grid-column: 2;
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin-top: 0;
+    padding: 0.1rem;
+    overflow-x: auto;
+  }
+
+  .quick-link-chip {
+    flex: 0 0 auto;
+  }
+
+  .quick-links-empty {
+    grid-row: 1;
+    grid-column: 2;
+    margin: 0;
   }
 }
 
 @media (max-width: 599px) {
   .quick-links {
-    padding: 0.9rem 1rem;
+    display: grid;
+    grid-template-rows: auto auto;
+    align-content: start;
+    row-gap: 0.35rem;
+    min-height: 0;
+    height: auto;
+    margin-top: 0.75rem;
+    padding: 0 0.8rem !important;
   }
 
   .quick-links-header {
-    align-items: baseline;
+    display: flex;
+    align-items: center;
+    min-height: 1.5rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .quick-links-header h2,
+  .configure-link {
+    line-height: 1.2;
+  }
+
+  .quick-link-chips {
+    gap: 0.4rem;
+    margin: 0 0 0.35rem;
+  }
+
+  .quick-link-chip {
+    min-height: 1.8rem;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.72rem;
+  }
+
+  .configure-link {
+    margin-top: 0;
   }
 
   .quick-links-dialog {

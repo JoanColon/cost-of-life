@@ -108,20 +108,14 @@
             </div>
             <div class="action-body">
               <div class="action-copy">
-                <p>{{ t('plan.whatIf.description') }}</p>
+                <p class="action-spacer" aria-hidden="true">&nbsp;</p>
                 <div class="action-result">
                   <span>{{ t('whatIf.result.label') }}</span>
                   <strong
-                    >{{ formatCurrency(simulation.simulatedSavingsCapacity)
+                    >+{{ formatCurrency(simulation.extraSavings)
                     }}<small>{{ t('whatIf.perMonth') }}</small></strong
                   >
-                  <small v-if="simulation.extraSavings > 0" class="positive-result">
-                    {{
-                      t('whatIf.result.extra', {
-                        amount: formatCurrency(simulation.extraSavings),
-                      })
-                    }}
-                  </small>
+                  <small class="positive-result">{{ t('whatIf.result.baseline') }}</small>
                 </div>
                 <ul class="allocation-summary" :aria-label="t('plan.outcomes.label')">
                   <li v-for="item in whatIfOutcomes" :key="item.id" :class="item.id">
@@ -130,15 +124,10 @@
                   </li>
                 </ul>
               </div>
-              <svg class="scenario-graphic" viewBox="0 0 300 110" aria-hidden="true">
-                <path d="M8 94 C95 94 166 86 292 35" class="line muted" />
-                <path d="M8 94 C115 94 205 79 292 13" class="line dashed" />
-                <path d="M8 94 C115 94 206 86 292 61" class="line primary" />
-                <circle cx="292" cy="61" r="5" />
-                <circle cx="292" cy="13" r="4" />
-              </svg>
             </div>
-            <b>{{ t('plan.whatIf.action') }} <q-icon name="arrow_forward" /></b>
+            <span class="card-cta">
+              {{ t('plan.whatIf.action') }} <q-icon name="arrow_forward" />
+            </span>
           </router-link>
 
           <router-link
@@ -154,7 +143,7 @@
             </div>
             <div class="action-body">
               <div class="action-copy">
-                <p>{{ t('plan.strategy.description') }}</p>
+                <p class="action-spacer" aria-hidden="true">&nbsp;</p>
                 <div class="action-result strategy-result">
                   <span>{{ activeScenario.name }}</span>
                   <strong
@@ -169,9 +158,10 @@
                   </li>
                 </ul>
               </div>
-              <span class="strategy-preview" :style="donutStyle" aria-hidden="true"></span>
             </div>
-            <b>{{ t('plan.strategy.action') }} <q-icon name="arrow_forward" /></b>
+            <span class="card-cta">
+              {{ t('plan.strategy.action') }} <q-icon name="arrow_forward" />
+            </span>
           </router-link>
         </section>
       </template>
@@ -196,7 +186,10 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { getLiabilityCategory } from '@/config/liability-categories'
-import { calculateDebtPayoffImpact, highestInterestModeledDebt } from '@/domain/financial/debt-payoff'
+import {
+  calculateDebtPayoffImpact,
+  highestInterestModeledDebt,
+} from '@/domain/financial/debt-payoff'
 import {
   currentFinancialMonth,
   currentFinancialYear,
@@ -210,7 +203,7 @@ import {
   strategyStartingPosition,
 } from '@/domain/financial/strategy-simulation'
 import { calculateWhatIf, normalizeStrategyForOptions } from '@/domain/financial/what-if'
-import { calculateCashScenario, calculateInvestmentScenario } from '@/domain/financial/what-if'
+import { calculateInvestmentScenario, calculateSafetyImpact } from '@/domain/financial/what-if'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -288,7 +281,9 @@ const activeScenario = computed(
     whatIfStore.config.scenarios.find(({ id }) => id === whatIfStore.config.activeScenarioId) ||
     whatIfStore.config.scenarios[0],
 )
-const positionMonth = computed(() => latestPositionMonth(financialYear.value, currentFinancialMonth()))
+const positionMonth = computed(() =>
+  latestPositionMonth(financialYear.value, currentFinancialMonth()),
+)
 const startingPosition = computed(() =>
   strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
 )
@@ -334,40 +329,44 @@ const simulation = computed(() =>
       'lifestyle',
       selectedMemberId.value,
     ),
-    reductionPercent: whatIfStore.config.discretionaryReductionPercent,
+    reductionPercent:
+      whatIfStore.config.extraMonthlySavings > 0
+        ? 0
+        : whatIfStore.config.discretionaryReductionPercent,
+    extraMonthlySavings: whatIfStore.config.extraMonthlySavings,
   }),
 )
-const strategyMonthlyAmount = computed(() => Math.max(0, simulation.value.simulatedSavingsCapacity))
+const strategyMonthlyAmount = computed(() => Math.max(0, simulation.value.currentSavingsCapacity))
 const projection = computed(() =>
   simulateStrategy({
     startingPosition: startingPosition.value,
     scenario: { ...activeScenario.value, allocation: allocation.value },
     simulatedMonthlySavings: strategyMonthlyAmount.value,
-    simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
+    simulatedMonthlyCost: simulation.value.monthlyCostOfLife,
     debtAvailable: debtAvailable.value,
   }),
 )
-const cashScenario = computed(() =>
-  calculateCashScenario({
+const safetyImpact = computed(() =>
+  calculateSafetyImpact({
     cash: startingPosition.value.cash,
     currentMonthlyCost: simulation.value.monthlyCostOfLife,
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
     currentMonthlySavings: simulation.value.currentSavingsCapacity,
-    simulatedMonthlySavings: strategyMonthlyAmount.value,
+    simulatedMonthlySavings: simulation.value.simulatedSavingsCapacity,
   }),
 )
-const featuredInvestment = computed(
-  () =>
-    calculateInvestmentScenario({
-      monthlyContribution: strategyMonthlyAmount.value,
-      currentMonthlyContribution: simulation.value.currentSavingsCapacity,
-      annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,
-    }).find(({ years }) => years === 20),
+const featuredInvestment = computed(() =>
+  calculateInvestmentScenario({
+    monthlyContribution: simulation.value.simulatedSavingsCapacity,
+    currentMonthlyContribution: simulation.value.currentSavingsCapacity,
+    annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,
+    startingValue: startingPosition.value.investmentTotal,
+  }).find(({ years }) => years === 20),
 )
 const whatIfDebtPayoff = computed(() =>
   calculateDebtPayoffImpact({
     liability: whatIfDebtModel.value,
-    extraMonthlyPayment: strategyMonthlyAmount.value,
+    extraMonthlyPayment: simulation.value.extraSavings,
     asOfDate: localToday(),
   }),
 )
@@ -382,14 +381,14 @@ const whatIfOutcomes = computed(() => [
   {
     id: 'cash',
     label: t('whatIf.cash.title'),
-    result: cashOutcome(cashScenario.value),
+    result: safetyOutcome(safetyImpact.value),
   },
   {
     id: 'invest',
     label: t('whatIf.invest.title'),
     result: featuredInvestment.value
       ? t('plan.outcomes.inYears', {
-          amount: formatCurrency(featuredInvestment.value.projectedValue),
+          amount: `+${formatCurrency(featuredInvestment.value.difference)}`,
           years: featuredInvestment.value.years,
         })
       : '—',
@@ -401,6 +400,7 @@ const whatIfOutcomes = computed(() => [
       whatIfDebtPayoff.value,
       Boolean(whatIfDebtModel.value),
       whatIfDebtModel.value?.name,
+      true,
     ),
   },
 ])
@@ -427,13 +427,6 @@ const strategyOutcomes = computed(() => [
         : t('plan.outcomes.notIncluded'),
   },
 ])
-const donutStyle = computed(() => {
-  const cashEnd = allocation.value.cash
-  const investEnd = cashEnd + allocation.value.invest
-  return {
-    background: `conic-gradient(var(--color-chart-cash) 0 ${cashEnd}%, var(--color-chart-investments) ${cashEnd}% ${investEnd}%, var(--color-chart-lifestyle) ${investEnd}% 100%)`,
-  }
-})
 const homeRoute = computed(() => ({
   name: 'workspace-dashboard',
   params: { workspaceId: workspaceId.value },
@@ -458,16 +451,12 @@ function monthlyFor(percent) {
   return (strategyMonthlyAmount.value * percent) / 100
 }
 
-function cashOutcome(scenario) {
-  if (!scenario) return '—'
-  if (scenario.achieved)
-    return t('plan.outcomes.fundReady', { amount: formatCurrency(scenario.simulatedTarget) })
-  if (scenario.simulatedMonths != null)
-    return t('plan.outcomes.fundInMonths', {
-      amount: formatCurrency(scenario.simulatedTarget),
-      months: scenario.simulatedMonths,
-    })
-  return t('plan.outcomes.fundTarget', { amount: formatCurrency(scenario.simulatedTarget) })
+function safetyOutcome(impact) {
+  if (!impact) return '—'
+  if (impact.alreadyFunded) return t('whatIf.cash.alreadyFunded')
+  return `+${new Intl.NumberFormat('en-IE', { maximumFractionDigits: 1 }).format(
+    impact.additionalSafetyMonths,
+  )} months of safety`
 }
 
 function strategyCashOutcome() {
@@ -483,9 +472,18 @@ function strategyCashOutcome() {
   return t('plan.outcomes.fundTarget', { amount: formatCurrency(strategy.cashTarget) })
 }
 
-function debtOutcome(payoff, hasDebt, debtName) {
+function debtOutcome(payoff, hasDebt, debtName, incremental = false) {
   if (!hasDebt) return t('plan.outcomes.noDebt')
   if (!payoff?.accelerated?.payoffDate) return t('plan.outcomes.modelUnavailable')
+  if (incremental) {
+    const months = payoff.accelerated.monthsEarlier || 0
+    if (months < 12) return t('whatIf.debt.monthsEarlier', { months })
+    const years = Math.floor(months / 12)
+    const remainder = months % 12
+    return remainder
+      ? t('whatIf.debt.durationEarlier', { years, months: remainder })
+      : t('whatIf.debt.yearsEarlier', { years })
+  }
   return t('plan.outcomes.paidOffNamed', {
     name: debtName || t('whatIf.debt.title'),
     date: formatMonthYear(payoff.accelerated.payoffDate),
@@ -708,10 +706,8 @@ h1 {
   color: var(--color-purple);
 }
 .action-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.65fr);
-  align-items: center;
-  gap: 1rem;
+  display: block;
+  min-height: 0;
 }
 .action-body p {
   margin: 0;
@@ -719,14 +715,24 @@ h1 {
   font-size: 0.95rem;
   line-height: 1.45;
 }
+.action-body .action-spacer {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  visibility: hidden;
+}
 .action-copy {
-  display: grid;
-  align-content: center;
-  gap: 0.8rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0.6rem;
 }
 .action-result {
   display: grid;
+  flex: 0 0 auto;
   gap: 0.15rem;
+  margin-block: auto;
   padding-left: 0.8rem;
   border-left: 3px solid var(--color-primary);
 }
@@ -759,8 +765,9 @@ h1 {
 }
 .allocation-summary {
   display: grid;
-  gap: 0.32rem;
-  margin: 0.35rem 0 0;
+  flex: 0 0 auto;
+  gap: 0.42rem;
+  margin: 0.25rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -771,9 +778,19 @@ h1 {
 }
 .allocation-summary li {
   justify-content: space-between;
-  gap: 0.65rem;
+  gap: 1rem;
+  min-height: 2.35rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--color-green-soft) 72%, var(--color-surface));
   color: var(--color-copy);
-  font-size: 0.76rem;
+  font-size: 0.82rem;
+}
+.allocation-summary li.invest {
+  background: color-mix(in srgb, var(--color-purple-soft) 68%, var(--color-surface));
+}
+.allocation-summary li.debt {
+  background: color-mix(in srgb, #fff0e8 78%, var(--color-surface));
 }
 .allocation-summary li > span {
   min-width: 0;
@@ -794,61 +811,25 @@ h1 {
 }
 .allocation-summary strong {
   color: var(--color-ink);
-  font-size: 0.76rem;
-  white-space: nowrap;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-align: right;
 }
 .strategy-result {
   border-left-color: var(--color-purple);
 }
-.plan-action > b {
+.plan-action > .card-cta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-self: end;
-  padding: 0.85rem 1rem;
-  border-radius: 0.7rem;
-  background: var(--color-blue-soft);
+  gap: 0.35rem;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.1rem 0;
   color: var(--color-primary);
   font-size: 0.9rem;
+  font-weight: 650;
 }
-.strategy > b {
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-.scenario-graphic {
-  width: 100%;
-  overflow: visible;
-  fill: var(--color-primary);
-}
-.scenario-graphic .line {
-  fill: none;
-  stroke-width: 2.5;
-}
-.scenario-graphic .muted {
-  stroke: var(--color-line);
-}
-.scenario-graphic .primary,
-.scenario-graphic .dashed {
-  stroke: var(--color-primary);
-}
-.scenario-graphic .dashed {
-  stroke-dasharray: 7 6;
-}
-.strategy-preview {
-  position: relative;
-  justify-self: center;
-  width: 6.8rem;
-  aspect-ratio: 1;
-  border-radius: 50%;
-}
-.strategy-preview::after {
-  position: absolute;
-  inset: 1.35rem;
-  border-radius: 50%;
-  background: var(--color-surface);
-  content: '';
-}
-
 .info-dialog {
   position: relative;
   width: min(34rem, calc(100vw - 2rem));
@@ -988,8 +969,6 @@ h1 {
   }
 
   .action-body {
-    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.5fr);
-    gap: 0.75rem;
     min-height: 0;
   }
 
@@ -1005,20 +984,14 @@ h1 {
     font-size: clamp(1.35rem, 3.2vh, 1.8rem);
   }
 
-  .scenario-graphic {
-    max-height: clamp(4.5rem, 12vh, 7rem);
+  .allocation-summary li {
+    min-height: 2.2rem;
+    padding: 0.45rem 0.65rem;
   }
 
-  .strategy-preview {
-    width: clamp(4.7rem, 10vh, 6rem);
-  }
-
-  .strategy-preview::after {
-    inset: 1.05rem;
-  }
-
-  .plan-action > b {
-    padding: 0.55rem 0.75rem;
+  .plan-action > .card-cta {
+    min-height: 1.45rem;
+    padding: 0.1rem 0 0;
     font-size: 0.82rem;
   }
 }
@@ -1093,12 +1066,14 @@ h1 {
     margin-top: 0.1rem;
     padding-top: 0.75rem;
   }
-  .action-body {
-    grid-template-columns: 1fr;
+  .allocation-summary li {
+    gap: 0.65rem;
+    min-height: 2.15rem;
+    padding: 0.42rem 0.55rem;
   }
-  .scenario-graphic,
-  .strategy-preview {
-    display: none;
+  .allocation-summary li,
+  .allocation-summary strong {
+    font-size: 0.74rem;
   }
 }
 </style>

@@ -32,18 +32,10 @@
       <span class="result-label">{{ t('dashboard.planSummary.whatIfLabel') }}</span>
       <strong class="result-value">{{ formatCurrency(data.monthlyAmount) }}</strong>
       <span class="primary-result">
-        {{
-          t('dashboard.planSummary.simulatedCapacity', {
-            amount: formatCurrency(data.monthlyAmount),
-          })
-        }}
+        {{ t('dashboard.planSummary.extraSavingsGenerated') }}
       </span>
       <span class="secondary-result positive">
-        {{
-          t('dashboard.planSummary.extraSavings', {
-            amount: formatCurrency(data.extraSavings),
-          })
-        }}
+        {{ t('dashboard.planSummary.comparedWithToday') }}
       </span>
     </div>
 
@@ -53,10 +45,7 @@
       <p>{{ t('dashboard.planSummary.emptyDescription') }}</p>
     </div>
 
-    <router-link
-      class="plan-action"
-      :to="data.state === 'empty' ? setupRoute : planRoute"
-    >
+    <router-link class="plan-action" :to="data.state === 'empty' ? setupRoute : planRoute">
       <span>
         {{
           data.state === 'empty'
@@ -288,14 +277,15 @@ const { t } = useI18n()
     }
 
     .card-heading p {
-      display: none;
+      display: block;
+      font-size: 0.84rem;
     }
 
     .card-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-      flex-basis: 2.5rem;
-      font-size: 1.15rem;
+      width: 2.8rem;
+      height: 2.8rem;
+      flex-basis: 2.8rem;
+      font-size: 1.25rem;
     }
 
     .plan-result,
@@ -304,9 +294,9 @@ const { t } = useI18n()
     }
 
     .strategy-plan-result {
-      flex: 0 0 auto;
-      padding-top: 0;
-      padding-bottom: 0.25rem;
+      flex: 1 1 auto;
+      justify-content: center;
+      padding: 0.45rem 0 0.25rem;
     }
 
     .strategy-context {
@@ -325,17 +315,18 @@ const { t } = useI18n()
     }
 
     .strategy-context .result-label {
-      font-size: 0.75rem;
+      font-size: 0.82rem;
     }
 
     .strategy-summary strong {
-      font-size: 1.45rem;
+      font-size: clamp(1.75rem, 2.7vw, 2.1rem);
       line-height: 1.05;
       letter-spacing: -0.035em;
     }
 
     .strategy-summary span {
-      font-size: 0.78rem;
+      margin-top: 0.15rem;
+      font-size: 0.9rem;
     }
 
     .strategy-name,
@@ -354,18 +345,18 @@ const { t } = useI18n()
     }
 
     .strategy-outcomes {
-      gap: 0.28rem;
-      margin-top: 0.65rem;
+      gap: 0.45rem;
+      margin-top: clamp(0.8rem, 1.8vh, 1.1rem);
     }
 
     .strategy-outcomes li {
-      min-height: 1.7rem;
-      padding: 0.22rem 0.4rem;
-      font-size: 0.68rem;
+      min-height: 2.4rem;
+      padding: 0.48rem 0.65rem;
+      font-size: 0.82rem;
     }
 
     .strategy-outcomes strong {
-      font-size: 0.7rem;
+      font-size: 0.84rem;
     }
 
     .secondary-result {
@@ -383,7 +374,7 @@ const { t } = useI18n()
       margin-top: auto;
       min-height: 1.25rem;
       padding-top: 0.45rem;
-      font-size: 0.76rem;
+      font-size: 0.84rem;
     }
   }
 }

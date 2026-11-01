@@ -116,12 +116,12 @@ p {
   }
 
   h2 {
-    font-size: clamp(1.15rem, 1.7vw, 1.4rem);
+    font-size: clamp(1.25rem, 1.8vw, 1.5rem);
   }
 
   p {
     margin-top: 0.2rem;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 }
 

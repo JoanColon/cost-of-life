@@ -183,23 +183,23 @@ const planData = computed(() => {
       'lifestyle',
       selectedMemberId.value,
     ),
-    reductionPercent: whatIfStore.config.discretionaryReductionPercent,
+    reductionPercent:
+      whatIfStore.config.extraMonthlySavings > 0
+        ? 0
+        : whatIfStore.config.discretionaryReductionPercent,
+    extraMonthlySavings: whatIfStore.config.extraMonthlySavings,
   })
 
   if (!hasSavedStrategy) {
     return {
       state: 'what-if',
-      monthlyAmount: simulation.simulatedSavingsCapacity,
+      monthlyAmount: simulation.extraSavings,
       extraSavings: simulation.extraSavings,
     }
   }
 
   const positionMonth = latestPositionMonth(financialYear.value, currentMonth.value)
-  const liabilities = extractLiabilities(
-    financialYear.value,
-    positionMonth,
-    selectedMemberId.value,
-  )
+  const liabilities = extractLiabilities(financialYear.value, positionMonth, selectedMemberId.value)
   const selectedDebt =
     liabilities.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
     liabilities.find(({ categoryId }) => categoryId === 'mortgage') ||
@@ -221,21 +221,20 @@ const planData = computed(() => {
       selectedMemberId.value,
     ),
     scenario: { ...activeScenario.value, allocation },
-    simulatedMonthlySavings: Math.max(0, simulation.simulatedSavingsCapacity),
-    simulatedMonthlyCost: simulation.simulatedCostOfLife,
+    simulatedMonthlySavings: Math.max(0, simulation.currentSavingsCapacity),
+    simulatedMonthlyCost: simulation.monthlyCostOfLife,
     debtAvailable,
   })
   const debtPayoff = calculateDebtPayoffImpact({
     liability: selectedDebtModel,
-    extraMonthlyPayment:
-      (Math.max(0, simulation.simulatedSavingsCapacity) * allocation.debt) / 100,
+    extraMonthlyPayment: (Math.max(0, simulation.currentSavingsCapacity) * allocation.debt) / 100,
     asOfDate: localToday(),
   })
 
   return {
     state: 'strategy',
     name: activeScenario.value.name,
-    monthlyAmount: Math.max(0, simulation.simulatedSavingsCapacity),
+    monthlyAmount: Math.max(0, simulation.currentSavingsCapacity),
     outcomes: [
       {
         id: 'cash',
@@ -325,34 +324,37 @@ function openSection(section) {
 }
 
 function generalQuickLinks() {
-  const group = t('dashboard.quickLinks.groups.pages')
+  const assetsGroup = t('dashboard.quickLinks.groups.assets')
+  const liabilitiesGroup = t('dashboard.quickLinks.groups.liabilities')
+  const incomeGroup = t('dashboard.quickLinks.groups.income')
+  const expensesGroup = t('dashboard.quickLinks.groups.expenses')
+  const planGroup = t('dashboard.quickLinks.groups.plan')
+  const progressGroup = t('dashboard.quickLinks.groups.progress')
+  const settingsGroup = t('dashboard.quickLinks.groups.settings')
   return [
-    quickLink('assets', 'inventory_2', 'dashboard.quickLinks.destinations.assets', group),
-    quickLink('liabilities', 'account_balance', 'dashboard.quickLinks.destinations.liabilities', group),
-    quickLink('income', 'payments', 'dashboard.quickLinks.destinations.income', group),
-    quickLink('expenses', 'receipt_long', 'dashboard.quickLinks.destinations.expenses', group),
-    quickLink(
-      'expense-tracker',
-      'add_card',
-      'dashboard.quickLinks.destinations.expenseTracker',
-      group,
-    ),
-    quickLink('plan', 'track_changes', 'dashboard.quickLinks.destinations.plan', group),
-    quickLink('what-if', 'tune', 'dashboard.quickLinks.destinations.whatIf', group),
-    quickLink(
-      'what-if-strategy',
-      'route',
-      'dashboard.quickLinks.destinations.strategy',
-      group,
-    ),
-    quickLink('progress', 'monitoring', 'dashboard.quickLinks.destinations.progress', group),
-    quickLink(
-      'achievements',
-      'emoji_events',
-      'dashboard.quickLinks.destinations.achievements',
-      group,
-    ),
-    quickLink('setup', 'settings', 'dashboard.quickLinks.destinations.setup', group),
+    quickLink('assets', 'inventory_2', 'dashboard.quickLinks.destinations.assets', [assetsGroup]),
+    quickLink('liabilities', 'account_balance', 'dashboard.quickLinks.destinations.liabilities', [
+      liabilitiesGroup,
+    ]),
+    quickLink('income', 'payments', 'dashboard.quickLinks.destinations.income', [incomeGroup]),
+    quickLink('expenses', 'receipt_long', 'dashboard.quickLinks.destinations.expenses', [
+      expensesGroup,
+    ]),
+    quickLink('expense-tracker', 'add_card', 'dashboard.quickLinks.destinations.expenseTracker', [
+      expensesGroup,
+    ]),
+    quickLink('plan', 'track_changes', 'dashboard.quickLinks.destinations.plan', [planGroup]),
+    quickLink('what-if', 'tune', 'dashboard.quickLinks.destinations.whatIf', [planGroup]),
+    quickLink('what-if-strategy', 'route', 'dashboard.quickLinks.destinations.strategy', [
+      planGroup,
+    ]),
+    quickLink('progress', 'monitoring', 'dashboard.quickLinks.destinations.progress', [
+      progressGroup,
+    ]),
+    quickLink('achievements', 'emoji_events', 'dashboard.quickLinks.destinations.achievements', [
+      progressGroup,
+    ]),
+    quickLink('setup', 'settings', 'dashboard.quickLinks.destinations.setup', [settingsGroup]),
   ]
 }
 
@@ -389,60 +391,85 @@ function enabledCategoryLinks(categories, enabledIds, routeName, groupKey) {
   const enabled = new Set(enabledIds)
   return categories
     .filter(({ id }) => enabled.has(id))
-    .map((category) => ({
-      id: `${routeName}:${category.id}`,
-      label: t(category.nameKey),
-      icon: category.icon,
-      group: t(groupKey),
-      to: {
-        name: routeName,
-        params: { workspaceId: workspaceId.value, category: category.id },
-      },
-    }))
+    .map((category) => {
+      const nestedGroup = categoryNestedGroup(routeName, category.id)
+      return {
+        id: `${routeName}:${category.id}`,
+        label: nestedGroup
+          ? t('dashboard.quickLinks.categoryOverview', { name: nestedGroup })
+          : t(category.nameKey),
+        icon: category.icon,
+        path: nestedGroup ? [t(groupKey), nestedGroup] : [t(groupKey)],
+        to: {
+          name: routeName,
+          params: { workspaceId: workspaceId.value, category: category.id },
+        },
+      }
+    })
 }
 
 function investmentPortfolioQuickLinks() {
-  const group = t('dashboard.quickLinks.groups.items')
-  return assetsStore.itemsForCategory('investment').map((asset) => ({
-    id: `investment-portfolio:${asset.id}`,
-    label: t('dashboard.quickLinks.portfolioLabel', {
-      name: itemName(asset, 'assets.subtypes', 'dashboard.quickLinks.destinations.portfolio'),
-    }),
-    icon: 'show_chart',
-    group,
-    to: {
-      name: 'investment-portfolio',
-      params: { workspaceId: workspaceId.value, assetId: asset.id },
-    },
-  }))
+  return assetsStore.itemsForCategory('investment').map((asset) => {
+    const name = itemName(asset, 'assets.subtypes', 'dashboard.quickLinks.destinations.investment')
+    return {
+      id: `investment-portfolio:${asset.id}`,
+      label: t('dashboard.quickLinks.portfolioLabel', { name }),
+      treeLabel: t('dashboard.quickLinks.destinations.portfolio'),
+      icon: 'show_chart',
+      path: [
+        t('dashboard.quickLinks.groups.assets'),
+        t('dashboard.quickLinks.groups.investments'),
+        name,
+      ],
+      to: {
+        name: 'investment-portfolio',
+        params: { workspaceId: workspaceId.value, assetId: asset.id },
+      },
+    }
+  })
 }
 
 function mortgageQuickLinks() {
-  const group = t('dashboard.quickLinks.groups.items')
-  return liabilitiesStore.itemsForCategory('mortgage').map((liability) => ({
-    id: `mortgage-detail:${liability.id}`,
-    label: t('dashboard.quickLinks.mortgageLabel', {
-      name: itemName(
-        liability,
-        'liabilities.categories',
-        'dashboard.quickLinks.destinations.mortgage',
-      ),
-    }),
-    icon: 'house_siding',
-    group,
-    to: {
-      name: 'mortgage-detail',
-      params: { workspaceId: workspaceId.value, liabilityId: liability.id },
-    },
-  }))
+  return liabilitiesStore.itemsForCategory('mortgage').map((liability) => {
+    const name = itemName(
+      liability,
+      'liabilities.categories',
+      'dashboard.quickLinks.destinations.mortgage',
+    )
+    return {
+      id: `mortgage-detail:${liability.id}`,
+      label: name,
+      treeLabel: t('dashboard.quickLinks.destinations.mortgageDetails'),
+      icon: 'house_siding',
+      path: [
+        t('dashboard.quickLinks.groups.liabilities'),
+        t('dashboard.quickLinks.groups.mortgages'),
+        name,
+      ],
+      to: {
+        name: 'mortgage-detail',
+        params: { workspaceId: workspaceId.value, liabilityId: liability.id },
+      },
+    }
+  })
 }
 
-function quickLink(routeName, icon, labelKey, group) {
+function categoryNestedGroup(routeName, categoryId) {
+  if (routeName === 'asset-category' && categoryId === 'investment') {
+    return t('dashboard.quickLinks.groups.investments')
+  }
+  if (routeName === 'liability-category' && categoryId === 'mortgage') {
+    return t('dashboard.quickLinks.groups.mortgages')
+  }
+  return null
+}
+
+function quickLink(routeName, icon, labelKey, path) {
   return {
     id: `route:${routeName}`,
     label: t(labelKey),
     icon,
-    group,
+    path,
     to: { name: routeName, params: { workspaceId: workspaceId.value } },
   }
 }
@@ -701,6 +728,12 @@ h1 {
 
   .dashboard-grid {
     gap: 1rem;
+  }
+}
+
+@media (max-width: 599px) {
+  .dashboard-header {
+    display: none;
   }
 }
 

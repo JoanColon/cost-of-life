@@ -66,8 +66,15 @@
                 v-for="percentage in reductionOptions"
                 :key="percentage"
                 type="button"
-                :class="{ selected: config.discretionaryReductionPercent === percentage }"
-                :aria-pressed="config.discretionaryReductionPercent === percentage"
+                :class="{
+                  selected:
+                    config.extraMonthlySavings === 0 &&
+                    config.discretionaryReductionPercent === percentage,
+                }"
+                :aria-pressed="
+                  config.extraMonthlySavings === 0 &&
+                  config.discretionaryReductionPercent === percentage
+                "
                 @click="saveReduction(percentage)"
               >
                 {{ percentage }}%
@@ -76,33 +83,60 @@
                 type="button"
                 :class="{ selected: customReductionSelected }"
                 :aria-pressed="customReductionSelected"
-                @click="openCustomReduction"
               >
-                {{
-                  customReductionSelected
-                    ? `${config.discretionaryReductionPercent}%`
-                    : t('whatIf.reduction.custom')
-                }}
+                {{ customSelectionLabel }}
+                <q-popup-edit
+                  :model-value="customEditorValue"
+                  buttons
+                  :title="t('whatIf.reduction.customAmountTitle')"
+                  :label-set="t('common.save')"
+                  :label-cancel="t('common.cancel')"
+                  @save="saveCustomScenario"
+                >
+                  <template #default="scope">
+                    <q-btn-toggle
+                      v-model="scope.value.mode"
+                      no-caps
+                      spread
+                      unelevated
+                      toggle-color="primary"
+                      color="grey-2"
+                      text-color="grey-8"
+                      :options="customModeOptions"
+                      class="custom-mode-toggle"
+                    />
+                    <q-input
+                      v-model.number="scope.value.value"
+                      autofocus
+                      dense
+                      outlined
+                      type="number"
+                      inputmode="decimal"
+                      min="0"
+                      :max="scope.value.mode === 'percentage' ? 100 : 100000"
+                      :step="scope.value.mode === 'percentage' ? 1 : 10"
+                      :prefix="scope.value.mode === 'amount' ? '€' : undefined"
+                      :suffix="
+                        scope.value.mode === 'percentage' ? '%' : t('whatIf.perMonth').trim()
+                      "
+                      @keyup.enter="scope.set"
+                    />
+                  </template>
+                </q-popup-edit>
               </button>
             </div>
           </div>
 
-          <div class="main-result" :class="{ negative: simulation.simulatedSavingsCapacity < 0 }">
+          <div class="main-result">
             <div>
               <span>{{ t('whatIf.result.label') }}</span>
               <strong
-                >{{ formatCurrency(simulation.simulatedSavingsCapacity)
+                >+{{ formatCurrency(simulation.extraSavings)
                 }}<small>{{ t('whatIf.perMonth') }}</small></strong
               >
-              <b>{{
-                t('whatIf.result.extra', { amount: formatCurrency(simulation.extraSavings) })
-              }}</b>
+              <b>{{ t('whatIf.result.baseline') }}</b>
             </div>
-            <q-icon
-              :name="
-                simulation.simulatedSavingsCapacity < 0 ? 'trending_down' : 'signal_cellular_alt'
-              "
-            />
+            <q-icon name="add_chart" />
           </div>
 
           <p v-if="unclassifiedMonthly > 0" class="notice">
@@ -137,71 +171,48 @@
           <div class="comparison-heading">
             <div>
               <h2>
-                {{ t('whatIf.compare.title') }}
+                {{ t('whatIf.compare.title', { amount: formatCurrency(simulation.extraSavings) }) }}
               </h2>
               <p>{{ t('whatIf.compare.description') }}</p>
             </div>
           </div>
 
           <div class="scenario-grid">
-            <article v-if="cashScenario" class="scenario-card cash-card">
-              <span class="scenario-heading">
-                <span class="scenario-icon cash"><q-icon name="paid" /></span>
-                <span class="scenario-copy">
-                  <strong>{{ t('whatIf.cash.cardTitle') }}</strong>
-                  <span>{{
-                    t('whatIf.cash.cardDescription', { months: cashScenario.targetMonths })
-                  }}</span>
-                </span>
-              </span>
-              <span class="scenario-outcome cash-outcome">
-                <q-linear-progress
-                  rounded
-                  size="0.7rem"
-                  color="positive"
-                  track-color="blue-grey-1"
-                  :value="cashProgress"
-                />
-                <strong>{{ cashProgressLabel }}</strong>
-                <small>{{ cashProgressDetail }}</small>
-              </span>
-            </article>
-
             <article class="scenario-card investment-card">
               <span class="scenario-heading">
                 <span class="scenario-icon invest"><q-icon name="trending_up" /></span>
                 <span class="scenario-copy">
                   <strong>{{ t('whatIf.invest.cardTitle') }}</strong>
-                  <span>{{
-                    t('whatIf.invest.description', {
-                      return: activeScenario.investmentMix.stockMarket?.annualReturnPercent || 7,
-                    })
-                  }}</span>
+                  <span>{{ t('whatIf.invest.incrementalDescription') }}</span>
                 </span>
               </span>
               <span class="scenario-outcome investment-outcome">
-                <span class="investment-value">
-                  <strong>{{ formatCurrency(featuredInvestment.projectedValue) }}</strong>
-                  <small>{{
-                    t('whatIf.invest.inYears', { years: featuredInvestment.years })
-                  }}</small>
+                <span class="impact-main investment-main">
+                  <span class="investment-value">
+                    <strong>+{{ formatCurrency(featuredInvestment.difference) }}</strong>
+                    <small>{{
+                      t('whatIf.invest.inYears', { years: featuredInvestment.years })
+                    }}</small>
+                  </span>
+                  <svg class="investment-chart" viewBox="0 0 240 72" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="investment-impact-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="var(--color-primary)" stop-opacity="0.2" />
+                        <stop offset="1" stop-color="var(--color-primary)" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      class="chart-area"
+                      d="M3 65 C64 61 119 51 157 36 C191 23 217 11 237 5 L237 69 L3 69 Z"
+                    />
+                    <path class="chart-line" d="M3 65 C64 61 119 51 157 36 C191 23 217 11 237 5" />
+                    <circle cx="237" cy="5" r="4" />
+                  </svg>
                 </span>
-                <svg class="investment-chart" viewBox="0 0 150 72" aria-hidden="true">
-                  <defs>
-                    <linearGradient id="what-if-chart-fill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stop-color="var(--color-primary)" stop-opacity="0.28" />
-                      <stop offset="1" stop-color="var(--color-primary)" stop-opacity="0.03" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M4 66 C42 61 72 49 96 36 C118 24 133 13 146 5 L146 68 L4 68 Z" />
-                  <path d="M4 66 C42 61 72 49 96 36 C118 24 133 13 146 5" />
-                  <circle cx="146" cy="5" r="4" />
-                </svg>
-                <small class="positive-comparison">{{
-                  t('whatIf.invest.difference', {
-                    amount: formatCurrency(featuredInvestment.difference),
-                  })
-                }}</small>
+                <span class="impact-footer">
+                  <span>{{ t('whatIf.invest.totalProjectedLabel') }}</span>
+                  <strong>{{ formatCurrency(featuredInvestment.projectedValue) }}</strong>
+                </span>
               </span>
             </article>
 
@@ -217,43 +228,73 @@
                       dense
                       size="sm"
                       icon="info_outline"
-                      :aria-label="t('whatIf.debt.infoAction')"
                       @click="debtInfoOpen = true"
                     />
                   </span>
-                  <span>{{ selectedDebt.name }}</span>
+                  <span>{{ t('whatIf.debt.incrementalDescription') }}</span>
                 </span>
               </span>
               <span v-if="debtPayoff" class="scenario-outcome debt-outcome modeled-debt-outcome">
-                <strong>
-                  {{
-                    t('whatIf.debt.paidOffIn', {
-                      duration: formatDuration(debtPayoff.accelerated.remainingPayments),
-                    })
-                  }}
-                </strong>
-                <small>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</small>
-                <small class="debt-saving">
-                  {{
+                <span class="impact-main debt-main">
+                  <strong>{{ earlierLabel(debtPayoff.accelerated.monthsEarlier) }}</strong>
+                  <small class="debt-saving">{{
                     t('whatIf.debt.interestSaved', {
                       amount: formatCurrency(debtPayoff.accelerated.interestSaved),
                     })
-                  }}
-                </small>
-                <small>
-                  {{
-                    t('whatIf.debt.extraPerMonth', {
-                      amount: formatCurrency(debtScenario.monthly),
-                    })
-                  }}
-                </small>
+                  }}</small>
+                </span>
+                <span class="impact-footer debt-footer">
+                  <q-icon name="calendar_month" />
+                  <span>{{ t('whatIf.debt.newPayoffLabel') }}</span>
+                  <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
+                </span>
               </span>
               <span v-else class="scenario-outcome debt-outcome">
-                <strong>
-                  <span>{{ formatCurrency(debtScenario.annual) }}</span
-                  >{{ t('whatIf.debt.perYearSuffix') }}
-                </strong>
-                <small>{{ t('whatIf.debt.additionalRepayments') }}</small>
+                <strong>{{ t('whatIf.debt.modelUnavailable') }}</strong>
+                <small>{{ t('whatIf.debt.fallbackInfo') }}</small>
+              </span>
+            </article>
+
+            <article v-if="safetyImpact" class="scenario-card cash-card">
+              <span class="scenario-heading">
+                <span class="scenario-icon cash"><q-icon name="health_and_safety" /></span>
+                <span class="scenario-copy">
+                  <strong>{{ t('whatIf.cash.cardTitle') }}</strong>
+                  <span>{{ t('whatIf.cash.incrementalDescription') }}</span>
+                </span>
+              </span>
+              <span class="scenario-outcome cash-outcome">
+                <span class="impact-main safety-main">
+                  <strong v-if="safetyImpact.alreadyFunded">{{
+                    t('whatIf.cash.alreadyFunded')
+                  }}</strong>
+                  <strong v-else
+                    >+{{ formatSafetyMonths(safetyImpact.additionalSafetyMonths) }}</strong
+                  >
+                  <small>{{
+                    safetyImpact.alreadyFunded
+                      ? t('whatIf.cash.fundedContext')
+                      : t('whatIf.cash.additionalSafety')
+                  }}</small>
+                  <span class="safety-meter" aria-hidden="true">
+                    <i
+                      v-for="month in 12"
+                      :key="month"
+                      :class="{ active: month <= safetyMeterMonths }"
+                    />
+                  </span>
+                </span>
+                <span class="impact-footer safety-footer">
+                  <q-icon name="lightbulb_outline" />
+                  <span>{{
+                    safetyImpact.alreadyFunded
+                      ? t('whatIf.cash.useElsewhere')
+                      : t('whatIf.cash.safetyComparison', {
+                          scenario: formatSafetyMonths(safetyImpact.scenarioSafetyMonths),
+                          baseline: formatSafetyMonths(safetyImpact.baselineSafetyMonths),
+                        })
+                  }}</span>
+                </span>
               </span>
             </article>
           </div>
@@ -307,37 +348,6 @@
         </q-card-section>
       </q-card>
     </q-dialog>
-
-    <q-dialog v-model="customReductionOpen">
-      <q-card class="custom-card">
-        <q-card-section>
-          <h2>{{ t('whatIf.reduction.customTitle') }}</h2>
-          <q-input
-            v-model.number="customReduction"
-            outlined
-            :dense="$q.screen.lt.sm"
-            autofocus
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            suffix="%"
-            :rules="[percentageRule]"
-          />
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat no-caps :label="t('common.cancel')" v-close-popup />
-          <q-btn
-            unelevated
-            no-caps
-            color="primary"
-            :label="t('common.save')"
-            :disable="percentageRule(customReduction) !== true"
-            @click="saveCustomReduction"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
@@ -359,11 +369,14 @@ import {
   financialYearUnclassifiedExpenseValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
-import { latestPositionMonth } from '@/domain/financial/strategy-simulation'
 import {
-  calculateCashScenario,
+  latestPositionMonth,
+  strategyStartingPosition,
+} from '@/domain/financial/strategy-simulation'
+import {
   calculateDebtScenario,
   calculateInvestmentScenario,
+  calculateSafetyImpact,
   calculateWhatIf,
 } from '@/domain/financial/what-if'
 import { authUser } from '@/services/auth'
@@ -383,11 +396,9 @@ const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
 const workspaceStore = useWorkspaceStore()
-const customReductionOpen = ref(false)
 const discretionaryInfoOpen = ref(false)
 const unclassifiedInfoOpen = ref(false)
 const debtInfoOpen = ref(false)
-const customReduction = ref(0)
 const pageError = ref(null)
 const reductionOptions = [0, 10, 25, 50]
 const currentYear = currentFinancialYear()
@@ -438,8 +449,13 @@ const simulation = computed(() =>
     availableIncome: annualAvailableIncome.value,
     costOfLife: annualCost.value,
     discretionary: annualDiscretionary.value,
-    reductionPercent: config.value.discretionaryReductionPercent,
+    reductionPercent:
+      config.value.extraMonthlySavings > 0 ? 0 : config.value.discretionaryReductionPercent,
+    extraMonthlySavings: config.value.extraMonthlySavings,
   }),
+)
+const startingPosition = computed(() =>
+  strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
 )
 const cash = computed(() =>
   financialYearMonthCategoryValue(
@@ -496,8 +512,8 @@ const recommendedDebt = computed(
     null,
 )
 const selectedDebt = computed(() => recommendedDebt.value)
-const cashScenario = computed(() =>
-  calculateCashScenario({
+const safetyImpact = computed(() =>
+  calculateSafetyImpact({
     cash: cash.value,
     currentMonthlyCost: simulation.value.monthlyCostOfLife,
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
@@ -505,25 +521,21 @@ const cashScenario = computed(() =>
     simulatedMonthlySavings: simulation.value.simulatedSavingsCapacity,
   }),
 )
+const safetyMeterMonths = computed(() =>
+  Math.min(12, Math.max(0, Math.floor(safetyImpact.value?.scenarioSafetyMonths || 0))),
+)
 const investmentScenario = computed(() =>
   calculateInvestmentScenario({
     monthlyContribution: simulation.value.simulatedSavingsCapacity,
     currentMonthlyContribution: simulation.value.currentSavingsCapacity,
     annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,
+    startingValue: startingPosition.value.investmentTotal,
   }),
 )
 const featuredInvestment = computed(
   () => investmentScenario.value.find(({ years }) => years === 20) || investmentScenario.value[0],
 )
-const cashProgress = computed(() => {
-  if (!cashScenario.value) return 0
-  if (cashScenario.value.achieved) return 1
-  if (!(cashScenario.value.simulatedMonths > 0)) return 0
-  return Math.min(1, 1 / cashScenario.value.simulatedMonths)
-})
-const debtScenario = computed(() =>
-  calculateDebtScenario(simulation.value.simulatedSavingsCapacity),
-)
+const debtScenario = computed(() => calculateDebtScenario(simulation.value.extraSavings))
 const debtPayoff = computed(() =>
   calculateDebtPayoffImpact({
     liability: selectedDebt.value,
@@ -531,24 +543,37 @@ const debtPayoff = computed(() =>
     asOfDate: localToday(),
   }),
 )
-const showScenarios = computed(() => simulation.value.simulatedSavingsCapacity > 0)
+const showScenarios = computed(() => simulation.value.extraSavings > 0)
 const breakEvenReachable = computed(
   () =>
     simulation.value.breakEvenReductionPercent != null &&
     simulation.value.breakEvenReductionPercent <= 100,
 )
 const customReductionSelected = computed(
-  () => !reductionOptions.includes(config.value.discretionaryReductionPercent),
+  () =>
+    config.value.extraMonthlySavings > 0 ||
+    !reductionOptions.includes(config.value.discretionaryReductionPercent),
 )
-const cashProgressLabel = computed(() =>
-  cashScenario.value.achieved
-    ? t('whatIf.cash.milestoneAchieved')
-    : t('whatIf.cash.monthsToMilestone', { months: cashScenario.value.simulatedMonths }),
-)
-const cashProgressDetail = computed(() =>
-  cashScenario.value.achieved ? t('whatIf.cash.yearCovered') : t('whatIf.cash.monthlyStep'),
-)
-
+const customEditorValue = computed(() => ({
+  mode: config.value.extraMonthlySavings > 0 ? 'amount' : 'percentage',
+  value:
+    config.value.extraMonthlySavings > 0
+      ? config.value.extraMonthlySavings
+      : !reductionOptions.includes(config.value.discretionaryReductionPercent)
+        ? config.value.discretionaryReductionPercent
+        : null,
+}))
+const customModeOptions = computed(() => [
+  { label: t('whatIf.reduction.percentageMode'), value: 'percentage' },
+  { label: t('whatIf.reduction.amountMode'), value: 'amount' },
+])
+const customSelectionLabel = computed(() => {
+  if (config.value.extraMonthlySavings > 0) return formatCurrency(config.value.extraMonthlySavings)
+  if (!reductionOptions.includes(config.value.discretionaryReductionPercent)) {
+    return `${config.value.discretionaryReductionPercent}%`
+  }
+  return t('whatIf.reduction.custom')
+})
 function scopedValue(item) {
   if (selectedMemberId.value !== 'all') {
     return Number(item?.memberValues?.[selectedMemberId.value] || 0)
@@ -582,17 +607,7 @@ async function persist(changes) {
 }
 
 function saveReduction(percentage) {
-  persist({ discretionaryReductionPercent: percentage })
-}
-function openCustomReduction() {
-  customReduction.value = config.value.discretionaryReductionPercent
-  customReductionOpen.value = true
-}
-function percentageRule(value) {
-  const number = Number(value)
-  return (
-    (Number.isFinite(number) && number >= 0 && number <= 100) || t('whatIf.validation.percentage')
-  )
+  persist({ discretionaryReductionPercent: percentage, extraMonthlySavings: 0 })
 }
 
 function localToday() {
@@ -602,13 +617,18 @@ function localToday() {
   ).padStart(2, '0')}`
 }
 
-function formatDuration(months) {
+function earlierLabel(months) {
   const total = Math.max(0, Number(months) || 0)
+  if (!total) return t('whatIf.debt.noEarlier')
   const years = Math.floor(total / 12)
   const remainingMonths = total % 12
-  if (!years) return t('liabilities.mortgage.durationMonths', { months: remainingMonths })
-  if (!remainingMonths) return t('liabilities.mortgage.durationYears', { years })
-  return t('liabilities.mortgage.duration', { years, months: remainingMonths })
+  if (!years) return t('whatIf.debt.monthsEarlier', { months: remainingMonths })
+  if (!remainingMonths) return t('whatIf.debt.yearsEarlier', { years })
+  return t('whatIf.debt.durationEarlier', { years, months: remainingMonths })
+}
+
+function formatSafetyMonths(value) {
+  return `${new Intl.NumberFormat('en-IE', { maximumFractionDigits: 1 }).format(value)} months`
 }
 
 function formatMonthYear(value) {
@@ -619,10 +639,15 @@ function formatMonthYear(value) {
     timeZone: 'UTC',
   }).format(new Date(`${value}T00:00:00Z`))
 }
-async function saveCustomReduction() {
-  if (percentageRule(customReduction.value) !== true) return
-  if (await persist({ discretionaryReductionPercent: Number(customReduction.value) }))
-    customReductionOpen.value = false
+async function saveCustomScenario(value) {
+  const mode = value?.mode === 'percentage' ? 'percentage' : 'amount'
+  const maximum = mode === 'percentage' ? 100 : 100000
+  const normalized = Math.min(maximum, Math.max(0, Number(value?.value) || 0))
+  await persist(
+    mode === 'percentage'
+      ? { discretionaryReductionPercent: normalized, extraMonthlySavings: 0 }
+      : { discretionaryReductionPercent: 0, extraMonthlySavings: normalized },
+  )
 }
 </script>
 
@@ -775,6 +800,11 @@ h1 {
   @include focus-ring;
 }
 
+.custom-mode-toggle {
+  min-width: 18rem;
+  margin-bottom: 0.75rem;
+}
+
 .main-result {
   display: flex;
   align-items: center;
@@ -841,7 +871,11 @@ h1 {
 
 .comparison-card {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
+  padding: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-line) 72%, transparent);
+  border-radius: var(--radius-card);
+  background: linear-gradient(145deg, #f7faff 0%, #f1f5fa 100%);
 }
 
 .comparison-heading {
@@ -866,41 +900,41 @@ h1 {
 
 .scenario-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
 .scenario-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   width: 100%;
   min-width: 0;
-  min-height: 11.25rem;
-  padding: 0.9rem 1rem;
+  min-height: 17rem;
+  padding: 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: white;
   color: var(--color-ink);
   font: inherit;
   text-align: left;
-  box-shadow: 0 0.15rem 0.6rem rgb(15 23 42 / 3%);
+  box-shadow: 0 0.35rem 1.2rem rgb(15 23 42 / 5%);
 }
 
 .scenario-heading {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
   width: 100%;
 }
 
 .scenario-icon {
   display: grid;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.35rem;
+  height: 2.35rem;
   border-radius: 50%;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
 }
 
 .scenario-icon.cash {
@@ -930,7 +964,8 @@ h1 {
 .scenario-copy span,
 .scenario-outcome small {
   color: var(--color-copy);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+  line-height: 1.3;
 }
 
 .debt-title {
@@ -947,9 +982,10 @@ h1 {
 
 .scenario-outcome {
   display: grid;
-  gap: 0.25rem;
-  margin-top: auto;
-  padding-top: 0.7rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.3rem;
+  min-height: 0;
+  padding-top: 0.75rem;
 }
 
 .cash-outcome > strong,
@@ -962,13 +998,11 @@ h1 {
 }
 
 .cash-outcome {
-  margin-top: 0.85rem;
+  min-height: 0;
 }
 
 .investment-outcome {
-  grid-template-columns: minmax(0, 1fr) 7.5rem;
-  align-items: center;
-  column-gap: 0.6rem;
+  min-height: 0;
 }
 
 .investment-value {
@@ -979,48 +1013,54 @@ h1 {
 .investment-value strong,
 .debt-outcome strong {
   color: var(--color-ink);
-  font-size: 1.55rem;
+  font-size: clamp(1.55rem, 3vw, 2rem);
   line-height: 1.1;
   letter-spacing: -0.035em;
 }
 
 .investment-chart {
   width: 100%;
-  height: 3.75rem;
+  height: 3.8rem;
+  margin-top: 0.35rem;
   overflow: visible;
 }
 
-.investment-chart path:first-of-type {
-  fill: url('#what-if-chart-fill');
+.investment-chart .chart-area {
+  fill: url('#investment-impact-fill');
+  stroke: none;
 }
 
-.investment-chart path:nth-of-type(2) {
+.investment-chart .chart-line {
   fill: none;
   stroke: var(--color-primary);
   stroke-linecap: round;
-  stroke-width: 3;
+  stroke-width: 2.5;
 }
 
 .investment-chart circle {
   fill: var(--color-primary);
 }
 
-.investment-outcome .positive-comparison {
-  grid-column: 1 / -1;
-  color: var(--color-success-dark);
+.impact-main {
+  display: grid;
+  align-content: center;
+  min-height: 0;
+}
+
+.investment-main {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  padding-top: 0.35rem;
 }
 
 .debt-outcome {
-  place-content: center;
-  flex: 1;
-  gap: 0.45rem;
-  padding: 0.9rem 0.25rem 0.35rem;
-  text-align: center;
+  gap: 0.3rem;
+  text-align: left;
 }
 
 .debt-outcome strong {
   color: var(--color-warning-dark);
-  font-size: 0.95rem;
+  font-size: clamp(1.3rem, 2.5vw, 1.75rem);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -1037,7 +1077,6 @@ h1 {
 
 .modeled-debt-outcome strong {
   color: var(--color-warning-dark);
-  font-size: 1.2rem;
 }
 
 .modeled-debt-outcome .debt-saving {
@@ -1045,13 +1084,67 @@ h1 {
   font-weight: 700;
 }
 
-.custom-card {
-  @include financial-simple-dialog;
-  width: min(26rem, calc(100vw - 2rem));
+.debt-main,
+.safety-main {
+  gap: 0.35rem;
 }
 
-.custom-card h2 {
-  margin: 0 0 1rem;
+.cash-outcome > strong {
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.impact-footer {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  margin-top: 0.45rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-copy);
+  font-size: 0.7rem;
+}
+
+.impact-footer strong {
+  margin-left: auto;
+  color: var(--color-ink);
+  font-size: 0.72rem;
+}
+
+.impact-footer .q-icon {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+
+.safety-meter {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.25rem;
+  margin-top: 0.65rem;
+}
+
+.safety-meter i {
+  width: 0.42rem;
+  height: 1.45rem;
+  flex: 0 0 0.42rem;
+  border-radius: 0.25rem;
+  background: var(--color-line);
+}
+
+.safety-meter i.active {
+  background: color-mix(in srgb, var(--color-chart-cash) 62%, white);
+}
+
+.safety-footer {
+  align-items: flex-start;
+}
+
+.safety-footer .q-icon {
+  color: var(--color-success-dark);
 }
 
 @media (max-width: 760px) {
@@ -1102,6 +1195,11 @@ h1 {
   }
 
   .simulator-card {
+    padding: 0.75rem;
+    border-radius: 0.9rem;
+  }
+
+  .comparison-card {
     padding: 0.75rem;
     border-radius: 0.9rem;
   }
@@ -1169,24 +1267,15 @@ h1 {
 
   .scenario-grid {
     grid-template-columns: 1fr;
-    gap: 0;
-    overflow: hidden;
-    border: 1px solid var(--color-line);
-    border-radius: 0.8rem;
-    background: white;
+    gap: 0.7rem;
   }
 
   .scenario-card {
-    min-height: auto;
-    padding: 0.8rem;
-    border: 0;
-    border-bottom: 1px solid var(--color-line);
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .scenario-card:last-child {
-    border-bottom: 0;
+    min-height: 13rem;
+    padding: 0.9rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.8rem;
+    box-shadow: 0 0.25rem 0.8rem rgb(15 23 42 / 4%);
   }
 
   .scenario-heading {
@@ -1199,46 +1288,29 @@ h1 {
   }
 
   .scenario-outcome {
-    margin-top: 0.2rem;
-    margin-left: 3.3rem;
-    padding-top: 0;
+    margin-left: 0;
+    padding-top: 0.75rem;
   }
 
   .investment-chart {
-    display: none;
+    height: 3.35rem;
   }
 
   .investment-outcome {
-    display: grid;
-    grid-template-columns: 1fr;
-    justify-items: start;
     text-align: left;
   }
 
   .investment-value strong {
-    font-size: 1.05rem;
-  }
-
-  .investment-value {
-    display: flex;
-    align-items: baseline;
-    justify-items: initial;
-    gap: 0.25rem;
-  }
-
-  .investment-outcome .positive-comparison {
-    grid-column: auto;
+    font-size: 1.55rem;
   }
 
   .debt-outcome {
-    place-content: initial;
-    gap: 0.2rem;
-    padding: 0;
+    gap: 0.35rem;
     text-align: left;
   }
 
   .debt-outcome strong {
-    font-size: 0.78rem;
+    font-size: 1.35rem;
   }
 
   .debt-outcome strong span {

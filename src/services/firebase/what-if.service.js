@@ -23,6 +23,7 @@ export async function saveWhatIfConfig(workspaceId, config) {
   batch.set(modelConfigRef(workspaceId, 'whatIf'), {
     schemaVersion: 1,
     discretionaryReductionPercent: normalized.discretionaryReductionPercent,
+    extraMonthlySavings: normalized.extraMonthlySavings,
     expectedAnnualReturnPercent: activeScenario.investmentMix.stockMarket?.annualReturnPercent || 7,
     selectedLiabilityId: activeScenario.selectedLiabilityId,
     strategy: activeScenario.allocation,
