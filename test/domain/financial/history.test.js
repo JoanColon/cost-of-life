@@ -3,6 +3,7 @@ import {
   buildAssetAnnualSeries,
   buildNetWorthBreakdownSeries,
   buildNetWorthSeries,
+  positionHistoryDocuments,
   withCurrentPosition,
 } from '../../../src/domain/financial/history'
 
@@ -27,6 +28,40 @@ function positionMonth(assets, liabilities = 0) {
 }
 
 describe('financial history series', () => {
+  it('uses only observed financial year months as position history', () => {
+    const history = {
+      year: 2026,
+      projectionState: { assetsInitializedMonth: '10', liabilitiesInitializedMonth: '11' },
+      months: {
+        '09': positionMonth(90),
+        10: positionMonth(100),
+        11: positionMonth(110),
+        12: positionMonth(120),
+      },
+    }
+
+    expect(
+      Object.keys(positionHistoryDocuments([history], { throughPeriod: '2026-11' })[0].months),
+    ).toEqual(['10', '11'])
+  })
+
+  it('excludes explicitly unobserved and projected position months', () => {
+    const history = {
+      year: 2026,
+      months: {
+        '09': { ...positionMonth(90), positionStatus: 'unobserved' },
+        10: { ...positionMonth(100), positionStatus: 'closed' },
+        11: { ...positionMonth(110), positionStatus: 'current' },
+        12: { ...positionMonth(120), positionStatus: 'projected' },
+      },
+    }
+
+    expect(buildNetWorthSeries([history])).toEqual([
+      { period: '2026-10', value: 100 },
+      { period: '2026-11', value: 110 },
+    ])
+  })
+
   it('keeps closed snapshots and replaces only the live current month', () => {
     const result = withCurrentPosition(
       [{ year: 2026, months: { '01': positionMonth(100), '02': positionMonth(110) } }],

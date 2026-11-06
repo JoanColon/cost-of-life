@@ -97,6 +97,22 @@ describe('strategy simulation', () => {
     expect(result.investmentContributions).toBe(11_500)
   })
 
+  it('compounds the configured cash return on the balance and new contributions', () => {
+    const result = projectPath({
+      startingPosition: { cash: 1_000, investmentBalances: {} },
+      allocation: { cash: 100, invest: 0, debt: 0 },
+      cashAnnualReturnPercent: 12,
+      horizonYears: 1,
+      monthlySavings: 100,
+      monthlyCost: 0,
+    })
+
+    expect(result.cash).toBe(2_395.08)
+    expect(result.cashContributions).toBe(1_200)
+    expect(result.cashGrowth).toBe(195.08)
+    expect(result.points.at(-1).cash).toBe(2_395.08)
+  })
+
   it('projects net worth from asset growth and capped debt reduction', () => {
     const points = strategyNetWorthPoints({
       currentNetWorth: 5_000,

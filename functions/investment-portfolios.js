@@ -3,6 +3,7 @@ const { HttpsError, onCall } = require('firebase-functions/https')
 const logger = require('firebase-functions/logger')
 const {
   syncInvestmentPortfolio: syncInvestmentPortfolioData,
+  syncWorkspaceInvestmentPortfolios: syncWorkspaceInvestmentPortfoliosData,
   updateInvestmentPortfolio: updateInvestmentPortfolioData,
 } = require('./services/investment-portfolios')
 
@@ -45,4 +46,31 @@ const readInvestmentPortfolioSheet = onCall({ region: 'europe-west1' }, async (r
   }
 })
 
-module.exports = { readInvestmentPortfolioSheet, updateInvestmentPortfolio }
+const syncWorkspaceInvestmentPortfolios = onCall(
+  { region: 'europe-west1', timeoutSeconds: 120 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
+
+    const workspaceId = String(request.data?.workspaceId || '').trim()
+    try {
+      return await syncWorkspaceInvestmentPortfoliosData(getFirestore(), {
+        workspaceId,
+        userId: request.auth.uid,
+        force: true,
+      })
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      logger.error('Workspace investment portfolios refresh failed', {
+        workspaceId,
+        error: error?.message || String(error),
+      })
+      throw new HttpsError('failed-precondition', error.message)
+    }
+  },
+)
+
+module.exports = {
+  readInvestmentPortfolioSheet,
+  syncWorkspaceInvestmentPortfolios,
+  updateInvestmentPortfolio,
+}

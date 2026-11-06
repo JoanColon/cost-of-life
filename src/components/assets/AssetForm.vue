@@ -66,7 +66,7 @@
               type="number"
               min="0"
               step="0.01"
-              prefix="€"
+              :prefix="currencySymbol"
               :disable="modelManagedValue"
               lazy-rules
               :rules="[
@@ -75,7 +75,7 @@
               ]"
             />
             <small v-if="modelManagedValue" class="model-managed-hint">
-              {{ t('assets.form.modelManagedValueHint') }}
+              {{ t(managedValueHint) }}
             </small>
           </div>
 
@@ -140,6 +140,7 @@ import {
   isValidOwnership,
 } from '@/domain/financial/ownership'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+import { currencySymbol } from '@/utils/formatters'
 
 const props = defineProps({
   category: { type: Object, required: true },
@@ -174,7 +175,17 @@ const linkedMortgage = computed(
   () =>
     props.mortgages.find((mortgage) => mortgage.id === props.asset?.mortgageLiabilityId) || null,
 )
-const modelManagedValue = computed(() => props.asset?.detail?.realEstate?.schemaVersion === 2)
+const portfolioManagedValue = computed(() =>
+  Boolean(props.asset?.detail?.portfolio?.spreadsheetUrl),
+)
+const modelManagedValue = computed(
+  () => props.asset?.detail?.realEstate?.schemaVersion === 2 || portfolioManagedValue.value,
+)
+const managedValueHint = computed(() =>
+  portfolioManagedValue.value
+    ? 'assets.form.portfolioManagedValueHint'
+    : 'assets.form.modelManagedValueHint',
+)
 
 watch(() => [props.asset, props.defaults, props.category.id], reset, { immediate: true })
 watch(

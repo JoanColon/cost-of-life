@@ -148,6 +148,21 @@ describe('milestones', () => {
     })
   })
 
+  it('does not treat a future projected debt as historical', () => {
+    const projected = financialYear({ year: 2026 })
+    projected.months['12'].liabilities.categories.mortgage = positionCategory('mortgage', 100_000)
+    const progress = calculateMilestoneProgress({
+      financialYear: financialYear({ year: 2026 }),
+      financialHistory: [projected],
+      month: '10',
+    })
+
+    expect(milestone(progress, 'debt_mortgage_free')).toMatchObject({
+      relevant: false,
+      reached: false,
+    })
+  })
+
   it('requires net worth to be greater than zero for positive net worth', () => {
     const progress = calculateMilestoneProgress({
       financialYear: financialYear({}),

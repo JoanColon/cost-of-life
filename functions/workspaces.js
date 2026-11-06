@@ -6,6 +6,7 @@ const {
   deleteWorkspaceData,
   getWorkspaceInvite: getWorkspaceInviteData,
   isWorkspaceOwner,
+  updateWorkspaceSettings: updateWorkspaceSettingsData,
 } = require('./services/workspaces')
 
 function callableError(error) {
@@ -85,9 +86,25 @@ const deleteWorkspace = onCall({ region: 'europe-west1' }, async (request) => {
   return deleteWorkspaceData(firestore, workspaceReference)
 })
 
+const updateWorkspaceSettings = onCall({ region: 'europe-west1' }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
+
+  try {
+    return await updateWorkspaceSettingsData(getFirestore(), {
+      workspaceId: String(request.data?.workspaceId || '').trim(),
+      userId: request.auth.uid,
+      currency: request.data?.currency,
+      memberNames: request.data?.memberNames,
+    })
+  } catch (error) {
+    throw callableError(error)
+  }
+})
+
 module.exports = {
   acceptWorkspaceInvite,
   createWorkspaceInvite,
   deleteWorkspace,
   getWorkspaceInvite,
+  updateWorkspaceSettings,
 }

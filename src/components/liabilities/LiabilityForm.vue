@@ -66,7 +66,7 @@
               type="number"
               min="0"
               step="0.01"
-              prefix="€"
+              :prefix="currencySymbol"
               :readonly="modelManaged"
               lazy-rules
               :rules="[
@@ -128,6 +128,7 @@ import {
   isValidOwnership,
 } from '@/domain/financial/ownership'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+import { currencySymbol } from '@/utils/formatters'
 
 const props = defineProps({
   category: { type: Object, required: true },

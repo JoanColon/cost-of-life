@@ -46,7 +46,7 @@
               inputmode="decimal"
               min="0.01"
               step="0.01"
-              prefix="€"
+              :prefix="currencySymbol"
               :rules="[(value) => Number(value) > 0 || t('expenseTracker.validation.amount')]"
             >
               <template #prepend><q-icon :name="subcategory.icon" /></template>
@@ -129,7 +129,7 @@ import {
   createSingleOwnership,
   isValidOwnership,
 } from '@/domain/financial/ownership'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
   modelValue: Boolean,

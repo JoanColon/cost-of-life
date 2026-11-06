@@ -3,6 +3,7 @@ import { functions } from '@/firebase/firebase'
 
 const updatePortfolio = httpsCallable(functions, 'updateInvestmentPortfolio')
 const syncPortfolioSheet = httpsCallable(functions, 'readInvestmentPortfolioSheet')
+const syncWorkspacePortfolios = httpsCallable(functions, 'syncWorkspaceInvestmentPortfolios')
 const spreadsheetPath = /^\/spreadsheets(?:\/u\/\d+)?\/d\/[A-Za-z0-9_-]+(?:\/|$)/
 const PORTFOLIO_SCHEMA_VERSION = 2
 
@@ -34,6 +35,11 @@ export async function disconnectInvestmentPortfolio(workspaceId, assetId) {
 
 export async function syncInvestmentPortfolio(workspaceId, assetId, force = false) {
   const result = await syncPortfolioSheet({ workspaceId, assetId, force })
+  return result.data
+}
+
+export async function syncWorkspaceInvestmentPortfolios(workspaceId) {
+  const result = await syncWorkspacePortfolios({ workspaceId })
   return result.data
 }
 

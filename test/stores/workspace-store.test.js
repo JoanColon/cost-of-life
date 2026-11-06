@@ -7,18 +7,21 @@ const {
   getActiveWorkspaceId,
   getUserWorkspaces,
   saveActiveWorkspaceId,
+  updateWorkspaceSettings,
 } = vi.hoisted(() => ({
   createWorkspace: vi.fn(),
   deleteWorkspace: vi.fn(),
   getActiveWorkspaceId: vi.fn(),
   getUserWorkspaces: vi.fn(),
   saveActiveWorkspaceId: vi.fn(),
+  updateWorkspaceSettings: vi.fn(),
 }))
 
 vi.mock('@/services/firebase/workspace.service', () => ({
   createWorkspace,
   deleteWorkspace,
   getUserWorkspaces,
+  updateWorkspaceSettings,
 }))
 
 vi.mock('@/services/firebase/user-preferences.service', () => ({
@@ -36,6 +39,7 @@ describe('workspace store', () => {
     getActiveWorkspaceId.mockReset().mockResolvedValue(null)
     getUserWorkspaces.mockReset()
     saveActiveWorkspaceId.mockReset().mockResolvedValue()
+    updateWorkspaceSettings.mockReset()
   })
 
   it('distinguishes a failed load from a successfully empty workspace list', async () => {
@@ -137,5 +141,28 @@ describe('workspace store', () => {
     await store.deleteWorkspace('workspace-c')
     expect(store.activeWorkspaceId).toBeNull()
     expect(saveActiveWorkspaceId).toHaveBeenLastCalledWith(null)
+  })
+
+  it('updates workspace settings in local state', async () => {
+    getUserWorkspaces.mockResolvedValueOnce([
+      { id: 'workspace-a', currency: 'EUR', members: { user: { displayName: 'Old' } } },
+    ])
+    updateWorkspaceSettings.mockResolvedValueOnce({
+      currency: 'USD',
+      members: { user: { displayName: 'Alex' } },
+    })
+    const store = useWorkspaceStore()
+    await store.load({ uid: 'user' })
+
+    await store.updateSettings('workspace-a', {
+      currency: 'USD',
+      memberNames: { user: 'Alex' },
+    })
+
+    expect(store.workspaces[0]).toMatchObject({
+      id: 'workspace-a',
+      currency: 'USD',
+      members: { user: { displayName: 'Alex' } },
+    })
   })
 })

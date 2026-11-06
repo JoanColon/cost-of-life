@@ -2,17 +2,16 @@ const { getFirestore } = require('firebase-admin/firestore')
 const { onDocumentWritten } = require('firebase-functions/firestore')
 const { HttpsError, onCall } = require('firebase-functions/https')
 const { onSchedule } = require('firebase-functions/scheduler')
+const { syncWorkspaceInvestmentPortfolios } = require('./services/investment-portfolios')
 const {
+  closePreviousFinancialPositionMonth,
   madridToday,
   currentYear,
   rebuildFinancialYear,
   refreshFinancialYearTrackingMonth,
   refreshModeledPositions,
+  synchronizeFinancialYearPositions,
 } = require('./services/financial-years')
-const {
-  closePreviousPositionMonth,
-  synchronizePositionSnapshots,
-} = require('./services/position-snapshots')
 
 const options = { region: 'europe-west1', retry: true }
 
@@ -40,11 +39,7 @@ async function handleFinancialYearRequest(request) {
     throw new HttpsError('permission-denied', 'Workspace membership is required')
   }
   const refresh = request.data?.refresh === true
-  const modeledPositions = await refreshModeledPositions(
-    firestore,
-    workspaceId,
-    request.auth.uid,
-  )
+  const modeledPositions = await refreshModeledPositions(firestore, workspaceId, request.auth.uid)
   const assetsChanged = modeledPositions.assetsUpdated > 0
   const liabilitiesChanged = modeledPositions.liabilitiesUpdated > 0
   const expensesChanged = modeledPositions.expensesUpdated > 0
@@ -68,15 +63,15 @@ async function handleFinancialYearRequest(request) {
     createOnly: !refresh && !assetsChanged && !liabilitiesChanged && !expensesChanged,
     sections,
   })
-  const positionSnapshot = await synchronizePositionSnapshots(
+  const financialPosition = await synchronizeFinancialYearPositions(
     firestore,
     workspaceId,
     madridToday(),
   )
-  return { ...financialYear, modeledPositions, positionSnapshot }
+  return { ...financialYear, modeledPositions, financialPosition }
 }
 
-const closeMonthlyPositionSnapshots = onSchedule(
+const closeMonthlyFinancialPositions = onSchedule(
   {
     schedule: '5 0 1 * *',
     timeZone: 'Europe/Madrid',
@@ -91,14 +86,19 @@ const closeMonthlyPositionSnapshots = onSchedule(
     for (const workspace of workspaces.docs || []) {
       if (workspace.data()?.deletionPendingAt) continue
       try {
-        await closePreviousPositionMonth(firestore, workspace.id, madridToday())
+        await syncWorkspaceInvestmentPortfolios(firestore, {
+          workspaceId: workspace.id,
+          force: true,
+          throwOnError: true,
+        })
+        await closePreviousFinancialPositionMonth(firestore, workspace.id, madridToday())
       } catch (error) {
         failures.push({ workspaceId: workspace.id, error })
       }
     }
     if (failures.length) {
-      console.error('Failed to close position snapshots', failures)
-      throw new Error(`Failed to close ${failures.length} position snapshots`)
+      console.error('Failed to close monthly financial positions', failures)
+      throw new Error(`Failed to close ${failures.length} monthly financial positions`)
     }
   },
 )
@@ -132,7 +132,7 @@ async function rebuildCurrent(workspaceId, sections) {
 }
 
 module.exports = {
-  closeMonthlyPositionSnapshots,
+  closeMonthlyFinancialPositions,
   ensureFinancialYear,
   onExpenseTrackingWritten,
   onModelConfigWritten,

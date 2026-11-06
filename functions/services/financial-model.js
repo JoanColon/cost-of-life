@@ -622,7 +622,9 @@ function assertMortgageManagedRelationship(section, previous, candidate) {
   if (!previous && candidate?.[linkField] != null) {
     throw new Error('Mortgage relationships must be managed from the mortgage model')
   }
-  if (previous && previous[linkField] !== candidate?.[linkField]) {
+  // Legacy unlinked items may not have the relationship field at all. Treat a
+  // missing field and an explicit null as the same unlinked state.
+  if (previous && (previous[linkField] ?? null) !== (candidate?.[linkField] ?? null)) {
     throw new Error('Mortgage relationships must be managed from the mortgage model')
   }
 }

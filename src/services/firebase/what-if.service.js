@@ -25,6 +25,7 @@ export async function saveWhatIfConfig(workspaceId, config) {
     discretionaryReductionPercent: normalized.discretionaryReductionPercent,
     extraMonthlySavings: normalized.extraMonthlySavings,
     expectedAnnualReturnPercent: activeScenario.investmentMix.stockMarket?.annualReturnPercent || 7,
+    cashAnnualReturnPercent: activeScenario.cashAnnualReturnPercent,
     selectedLiabilityId: activeScenario.selectedLiabilityId,
     strategy: activeScenario.allocation,
     updatedAt: serverTimestamp(),

@@ -3,6 +3,7 @@ const { FieldValue, Timestamp } = require('firebase-admin/firestore')
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
+const CURRENCY_PATTERN = /^[A-Z]{3}$/
 
 function workspaceError(code, message) {
   const error = new Error(message)
@@ -147,6 +148,52 @@ async function acceptWorkspaceInvite(
   })
 }
 
+async function updateWorkspaceSettings(
+  firestore,
+  { workspaceId, userId, currency, memberNames },
+) {
+  const workspaceReference = firestore.collection('workspaces').doc(workspaceId)
+  return firestore.runTransaction(async (transaction) => {
+    const workspaceSnapshot = await transaction.get(workspaceReference)
+    const workspace = workspaceSnapshot.data()
+    if (!workspaceSnapshot.exists || workspace?.deletionPendingAt) {
+      throw workspaceError('not-found', 'The workspace does not exist')
+    }
+    if (!isWorkspaceMember(workspace, userId)) {
+      throw workspaceError('permission-denied', 'Workspace membership is required')
+    }
+
+    const normalizedCurrency = String(currency || '').trim().toUpperCase()
+    if (!CURRENCY_PATTERN.test(normalizedCurrency)) {
+      throw workspaceError('invalid-argument', 'A valid workspace currency is required')
+    }
+    const names = memberNames && typeof memberNames === 'object' ? memberNames : {}
+    const memberIds = [...new Set((workspace.memberIds || []).filter(Boolean))]
+    if (
+      Object.keys(names).length !== memberIds.length ||
+      Object.keys(names).some((memberId) => !memberIds.includes(memberId))
+    ) {
+      throw workspaceError('invalid-argument', 'Names are required for every workspace member')
+    }
+
+    const members = { ...(workspace.members || {}) }
+    for (const memberId of memberIds) {
+      const displayName = String(names[memberId] || '').trim()
+      if (!displayName || displayName.length > 80) {
+        throw workspaceError('invalid-argument', 'Each member needs a valid name')
+      }
+      members[memberId] = { ...(members[memberId] || {}), displayName }
+    }
+
+    transaction.update(workspaceReference, {
+      currency: normalizedCurrency,
+      members,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    return { currency: normalizedCurrency, members }
+  })
+}
+
 async function deleteWorkspaceData(firestore, workspaceReference) {
   await workspaceReference.update({
     deletionPendingAt: FieldValue.serverTimestamp(),
@@ -187,4 +234,5 @@ module.exports = {
   inviteDocumentId,
   isWorkspaceMember,
   isWorkspaceOwner,
+  updateWorkspaceSettings,
 }

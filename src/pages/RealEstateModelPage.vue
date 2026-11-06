@@ -152,7 +152,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  prefix="€"
+                  :prefix="currencySymbol"
                   :rules="[purchasePriceRule]"
                 />
               </div>
@@ -219,7 +219,7 @@ import { useAssetsStore } from '@/stores/assets-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const $q = useQuasar()

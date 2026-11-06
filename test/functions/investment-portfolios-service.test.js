@@ -6,6 +6,7 @@ const {
   canonicalGoogleSheetsUrl,
   portfolioCacheIsFresh,
   syncInvestmentPortfolio,
+  syncWorkspaceInvestmentPortfolios,
   updateInvestmentPortfolio,
 } = investmentPortfolioService
 
@@ -95,7 +96,12 @@ describe('investment portfolio synchronization', () => {
         async () => ({ ok: false, status: 403 }),
       ),
     ).rejects.toThrow('Portfolio tab returned HTTP 403')
-    expect(writes).toEqual([])
+    expect(writes).toHaveLength(1)
+    expect(writes[0].data).not.toHaveProperty('currentValue')
+    expect(writes[0].data).not.toHaveProperty('detail.portfolio')
+    expect(writes[0].data['detail.portfolio.sync']).toMatchObject({
+      lastErrorMessage: 'The Portfolio tab returned HTTP 403',
+    })
   })
 
   it('returns a fresh cache without reading Google or writing Firestore', async () => {
@@ -236,7 +242,7 @@ describe('investment portfolio synchronization', () => {
     ).rejects.toThrow('projection unavailable')
 
     const portfolioWrite = writes.find((write) => write.data?.['detail.portfolio'])
-    expect(portfolioWrite.data['detail.portfolio'].sync).toEqual({
+    expect(portfolioWrite.data['detail.portfolio'].sync).toMatchObject({
       financialProjectionDirty: true,
       pendingSections: ['assets'],
     })
@@ -301,6 +307,40 @@ describe('investment portfolio synchronization', () => {
   it('recognizes cache freshness from the centralized TTL metadata', () => {
     expect(portfolioCacheIsFresh(canonicalPortfolio({ refreshAfter: 101 }), 100)).toBe(true)
     expect(portfolioCacheIsFresh(canonicalPortfolio({ refreshAfter: 100 }), 100)).toBe(false)
+  })
+
+  it('synchronizes connected portfolios when a workspace is opened', async () => {
+    const { firestore } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 999_999 }),
+      currentValue: 1000,
+    })
+    const fetchSpreadsheet = sheetFetch({ portfolioValue: '1.250,00' })
+
+    const result = await syncWorkspaceInvestmentPortfolios(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a' },
+      fetchSpreadsheet,
+      vi.fn(async () => ({ status: 'rebuilt' })),
+      () => 10_000,
+    )
+
+    expect(result.failures).toEqual([])
+    expect(result.results).toEqual([
+      expect.objectContaining({ assetId: 'investment-a', currentValue: 1250 }),
+    ])
+    expect(fetchSpreadsheet).toHaveBeenCalled()
+  })
+
+  it('fails a required workspace synchronization when Google cannot be read', async () => {
+    const { firestore } = createFirestore({ portfolio: canonicalPortfolio() })
+
+    await expect(
+      syncWorkspaceInvestmentPortfolios(
+        firestore,
+        { workspaceId: 'workspace-a', throwOnError: true },
+        async () => ({ ok: false, status: 503 }),
+      ),
+    ).rejects.toThrow('Portfolio tab returned HTTP 503')
   })
 })
 
@@ -462,6 +502,7 @@ function createFirestore({
                     data?.[field] === value,
                 )
                 .map(([recordPath, data]) => ({
+                  id: recordPath.slice(prefix.length),
                   data: () => data,
                   ref: reference(recordPath),
                 })),

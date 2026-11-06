@@ -72,7 +72,7 @@
               outlined
               :dense="$q.screen.lt.sm"
               hide-bottom-space
-              prefix="€"
+              :prefix="currencySymbol"
               :disable="managedByMortgage"
               :rules="[(value) => value >= 0 || t('expenses.validation.amount')]"
             />
@@ -196,7 +196,7 @@
                           type="number"
                           min="0"
                           step="0.01"
-                          prefix="€"
+                          :prefix="currencySymbol"
                           :label="
                             t('expenses.form.amountForMonth', {
                               month: t(`income.months.${month}`),
@@ -277,7 +277,7 @@ import {
   createEqualOwnership,
   isValidOwnership,
 } from '@/domain/financial/ownership'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
   category: { type: Object, required: true },

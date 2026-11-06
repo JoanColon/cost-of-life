@@ -231,9 +231,9 @@ Contiene gastos reales agrupados por `subcategoryId` y decisiones de reconciliac
 
 ### `financialYears/{YYYY}`
 
-Es una vista materializada de solo lectura para clientes. Contiene `months`, `totals`, estado y metadatos de generación. El año actual se crea bajo demanda con `ensureFinancialYear`; ese callable solo acepta el año actual. Las escrituras de configuración, modelo o tracking mantienen la proyección al día.
+Es una vista materializada de solo lectura para clientes y la única fuente del histórico financiero mensual. Contiene `months`, estado y metadatos de generación. El año actual se crea bajo demanda con `ensureFinancialYear`; ese callable solo acepta el año actual. Las escrituras de configuración, modelo o tracking mantienen la proyección al día.
 
-Los años anteriores se leen como historial y no se regeneran automáticamente desde la interfaz. Activos y pasivos conservan su último valor observado hacia los meses siguientes; ingresos y gastos se proyectan como flujos mensuales.
+Los años anteriores se leen como historial y no se regeneran automáticamente desde la interfaz. Activos y pasivos conservan su último valor observado hacia los meses siguientes; ingresos y gastos se proyectan como flujos mensuales. Cada posición mensual puede guardar `positionStatus`, `positionAsOf` y `positionCalculatedAt`. La función programada cierra el mes anterior dentro del mismo documento anual usando la valoración correspondiente a su último día. Los gráficos ignoran meses anteriores a la primera posición observada y meses futuros proyectados.
 
 ### `achievements/{milestoneId}`
 
@@ -259,16 +259,17 @@ Antes de mutar ítems detallados debe existir el documento del año actual. [`sr
 
 ## Cloud Functions
 
-| Export                     | Tipo              | Responsabilidad                                                                      |
-| -------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
-| `ensureFinancialYear`      | Callable          | Crea, si falta, la proyección del año actual para un miembro.                        |
-| `mutateFinancialModel`     | Callable          | Crea, edita o borra ítems/categorías y sincroniza tracking con atomicidad.           |
-| `onModelConfigWritten`     | Firestore trigger | Reproyecta la sección de configuración modificada.                                   |
-| `onExpenseTrackingWritten` | Firestore trigger | Inserta el mes registrado en la proyección anual.                                    |
-| `createWorkspaceInvite`    | Callable          | Crea una invitación de siete días para un miembro del workspace.                     |
-| `getWorkspaceInvite`       | Callable          | Valida token/estado y devuelve metadatos seguros.                                    |
-| `acceptWorkspaceInvite`    | Callable          | Añade al usuario autenticado y consume la invitación.                                |
-| `deleteWorkspace`          | Callable          | Verifica ownership, marca borrado y elimina workspace e invitaciones recursivamente. |
+| Export                           | Tipo              | Responsabilidad                                                                      |
+| -------------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| `ensureFinancialYear`            | Callable          | Crea, si falta, la proyección del año actual para un miembro.                        |
+| `mutateFinancialModel`           | Callable          | Crea, edita o borra ítems/categorías y sincroniza tracking con atomicidad.           |
+| `onModelConfigWritten`           | Firestore trigger | Reproyecta la sección de configuración modificada.                                   |
+| `onExpenseTrackingWritten`       | Firestore trigger | Inserta el mes registrado en la proyección anual.                                    |
+| `closeMonthlyFinancialPositions` | Scheduler         | Cierra activos y pasivos del mes anterior dentro de `financialYears`.                |
+| `createWorkspaceInvite`          | Callable          | Crea una invitación de siete días para un miembro del workspace.                     |
+| `getWorkspaceInvite`             | Callable          | Valida token/estado y devuelve metadatos seguros.                                    |
+| `acceptWorkspaceInvite`          | Callable          | Añade al usuario autenticado y consume la invitación.                                |
+| `deleteWorkspace`                | Callable          | Verifica ownership, marca borrado y elimina workspace e invitaciones recursivamente. |
 
 Todas se despliegan en `europe-west1`. `functions/index.js` inicializa Admin SDK una vez y agrega los exports de cada módulo. La lógica transaccional testeable vive en `functions/services`; los wrappers HTTP/evento deben permanecer pequeños.
 

@@ -100,6 +100,7 @@ export function simulateStrategy({
     startingPosition,
     allocation,
     investmentMix: scenario?.investmentMix || {},
+    cashAnnualReturnPercent: scenario?.cashAnnualReturnPercent || 0,
     horizonYears: scenario?.horizonYears || 20,
     cashTargetMonths: scenario?.cashTargetMonths || 12,
   }
@@ -138,6 +139,7 @@ export function projectPath({
   startingPosition = {},
   allocation = { cash: 0, invest: 100, debt: 0 },
   investmentMix = {},
+  cashAnnualReturnPercent = 0,
   horizonYears = 20,
   cashTargetMonths = 12,
   monthlySavings = 0,
@@ -145,17 +147,23 @@ export function projectPath({
 } = {}) {
   const months = Math.max(1, Math.round(Number(horizonYears) * 12))
   const savings = Math.max(0, Number(monthlySavings) || 0)
+  const monthlyCashReturn = Math.max(0, Number(cashAnnualReturnPercent) || 0) / 100 / 12
   const cashTarget = money(Math.max(0, Number(monthlyCost) || 0) * cashTargetMonths)
   let cash = Math.max(0, Number(startingPosition.cash) || 0)
   const balances = normalizedStartingBalances(startingPosition.investmentBalances)
   const startingValue = money(cash + Object.values(balances).reduce((sum, value) => sum + value, 0))
   let cashContributions = 0
+  let cashGrowth = 0
   let investmentContributions = 0
   let debtContributions = 0
   let cashTargetMonth = cashTarget > 0 && cash >= cashTarget ? 0 : null
   const points = [projectionPoint(0, cash, balances)]
 
   for (let month = 1; month <= months; month += 1) {
+    const cashBeforeGrowth = cash
+    cash *= 1 + monthlyCashReturn
+    cashGrowth += cash - cashBeforeGrowth
+
     for (const [type, balance] of Object.entries(balances)) {
       const defaultReturn =
         investmentTypeDefinitions.find((definition) => definition.id === type)?.returnPercent || 0
@@ -193,6 +201,7 @@ export function projectPath({
     cash: money(cash),
     investmentValue,
     cashContributions: money(cashContributions),
+    cashGrowth: money(cashGrowth),
     investmentContributions: money(investmentContributions),
     contributions: assetContributions,
     growth: money(finalValue - startingValue - assetContributions),

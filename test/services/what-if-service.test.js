@@ -68,6 +68,7 @@ describe('What If persistence', () => {
           investmentMix: {
             stockMarket: { allocation: 100, annualReturnPercent: 6 },
           },
+          cashAnnualReturnPercent: 2.5,
           horizonYears: 20,
           cashTargetMonths: 12,
           selectedLiabilityId: 'mortgage-a',
@@ -83,6 +84,7 @@ describe('What If persistence', () => {
         schemaVersion: 1,
         discretionaryReductionPercent: 25,
         expectedAnnualReturnPercent: 6,
+        cashAnnualReturnPercent: 2.5,
         strategy: { cash: 20, invest: 60, debt: 20 },
       }),
     )

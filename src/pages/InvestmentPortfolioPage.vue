@@ -353,6 +353,12 @@
             <small v-if="lastCheckedLabel" class="portfolio-last-checked">
               {{ t('assets.portfolio.lastChecked', { value: lastCheckedLabel }) }}
             </small>
+            <small v-if="dataUpdatedLabel" class="portfolio-last-checked">
+              {{ t('assets.portfolio.dataUpdated', { value: dataUpdatedLabel }) }}
+            </small>
+            <small v-if="lastSyncFailed" class="portfolio-sync-warning">
+              {{ t('assets.portfolio.lastSyncFailed') }}
+            </small>
           </div>
         </template>
       </template>
@@ -544,13 +550,25 @@ const allocationDetailMetricLabel = computed(() =>
   ),
 )
 const lastCheckedLabel = computed(() => {
-  const value = Number(portfolio.value?.cache?.lastCheckedAt)
+  return formatSyncDate(portfolio.value?.cache?.lastCheckedAt)
+})
+const dataUpdatedLabel = computed(() => {
+  return formatSyncDate(portfolio.value?.cache?.dataUpdatedAt)
+})
+const lastSyncFailed = computed(() => {
+  const errorAt = Number(portfolio.value?.sync?.lastErrorAt)
+  const successAt = Number(portfolio.value?.sync?.lastSuccessAt)
+  return Number.isFinite(errorAt) && (!Number.isFinite(successAt) || errorAt > successAt)
+})
+
+function formatSyncDate(timestamp) {
+  const value = Number(timestamp)
   if (!Number.isFinite(value)) return ''
   return new Intl.DateTimeFormat('en-IE', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
-})
+}
 const tableRows = computed(() =>
   portfolioTableRows(portfolioHoldings.value, activePortfolioSummary.value.baseCurrency),
 )
@@ -1151,6 +1169,12 @@ h1 {
   font-size: 0.7rem;
   text-align: right;
 }
+.portfolio-sync-warning {
+  width: 100%;
+  color: var(--color-danger);
+  font-size: 0.72rem;
+  text-align: right;
+}
 .confirm-card {
   @include financial-simple-dialog(28rem);
 }
@@ -1258,7 +1282,8 @@ h1 {
     padding-inline: 0.35rem;
     font-size: 0.72rem;
   }
-  .portfolio-last-checked {
+  .portfolio-last-checked,
+  .portfolio-sync-warning {
     grid-column: 1 / -1;
     text-align: center;
   }

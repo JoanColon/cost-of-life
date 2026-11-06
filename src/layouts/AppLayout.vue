@@ -151,6 +151,7 @@ import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
 import { currentFinancialDate, currentFinancialYear } from '@/domain/financial/financial-year'
 import { authUser, signOut } from '@/services/auth'
+import { syncWorkspaceInvestmentPortfolios } from '@/services/firebase/investment-portfolios.service'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
@@ -162,6 +163,7 @@ import { useMilestonesStore } from '@/stores/milestones-store'
 import { useQuickLinksStore } from '@/stores/quick-links-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
+import { setWorkspaceCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const $q = useQuasar()
@@ -185,6 +187,7 @@ const loggingOut = ref(false)
 const financialPeriodKey = ref(currentPeriodKey())
 const expandedNavigationNodes = ref(['your-money'])
 let periodTimer = null
+const portfolioSyncStarted = new Set()
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace)
 const members = computed(() => getWorkspaceMembers(activeWorkspace.value, authUser.value))
@@ -220,7 +223,7 @@ const activeNavigationNode = computed(() => {
     'what-if-strategy': 'plan',
     progress: 'progress',
     achievements: 'progress',
-    setup: 'your-money',
+    setup: 'setup',
   }
 
   return routeNodes[route.name] || null
@@ -244,6 +247,7 @@ const workspaceNavigationNodes = computed(() => {
     },
     navigationLeaf('plan', 'navigation.plan', 'route', 'plan'),
     navigationLeaf('progress', 'navigation.progress', 'bar_chart', 'progress'),
+    navigationLeaf('setup', 'navigation.setup', 'tune', 'setup'),
   ]
 })
 
@@ -258,6 +262,11 @@ onBeforeUnmount(() => clearInterval(periodTimer))
 
 watch(() => route.fullPath, syncWorkspaceFromRoute)
 watch(authUser, handleAuthChange)
+watch(
+  () => activeWorkspace.value?.currency,
+  (currency) => setWorkspaceCurrency(currency),
+  { immediate: true },
+)
 watch(
   [routeWorkspaceId, financialPeriodKey],
   ([workspaceId]) => synchronizeWorkspace(workspaceId),
@@ -353,6 +362,8 @@ async function logout() {
 }
 
 function resetApplicationState() {
+  setWorkspaceCurrency('EUR')
+  portfolioSyncStarted.clear()
   assetsStore.reset()
   expensesStore.reset()
   expenseTrackingStore.reset()
@@ -372,14 +383,29 @@ function refreshFinancialPeriod() {
 
 async function synchronizeWorkspace(workspaceId) {
   if (!workspaceId || !authUser.value) return
+  const portfolioSync = syncPortfoliosOnOpen(workspaceId)
   try {
     await financialYearsStore.load(workspaceId, currentFinancialYear())
+    const result = await portfolioSync
+    for (const portfolio of result?.results || []) {
+      assetsStore.applyInvestmentPortfolioSync(portfolio.assetId, portfolio)
+    }
     await Promise.all([
       assetsStore.refreshLoadedCategories(workspaceId),
       liabilitiesStore.refreshLoadedCategories(workspaceId),
     ])
   } catch {
     // The destination page exposes the financial-year error and retry action.
+  }
+}
+
+async function syncPortfoliosOnOpen(workspaceId) {
+  if (portfolioSyncStarted.has(workspaceId)) return null
+  portfolioSyncStarted.add(workspaceId)
+  try {
+    return await syncWorkspaceInvestmentPortfolios(workspaceId)
+  } catch {
+    return null
   }
 }
 

@@ -4,6 +4,7 @@ import {
   createWorkspace,
   deleteWorkspace as deleteWorkspaceDocument,
   getUserWorkspaces,
+  updateWorkspaceSettings as updateWorkspaceSettingsDocument,
 } from '@/services/firebase/workspace.service'
 import {
   getActiveWorkspaceId,
@@ -60,6 +61,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       await clearActiveWorkspace()
       await selectOnlyWorkspace()
     }
+  }
+
+  async function updateSettings(workspaceId, settings) {
+    const updated = await updateWorkspaceSettingsDocument(workspaceId, settings)
+    const index = workspaces.value.findIndex((workspace) => workspace.id === workspaceId)
+    if (index < 0) throw new Error('Workspace not found')
+    workspaces.value[index] = { ...workspaces.value[index], ...updated }
+    return workspaces.value[index]
   }
 
   async function setActiveWorkspace(workspaceId) {
@@ -131,6 +140,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     load,
     create,
     deleteWorkspace,
+    updateSettings,
     setActiveWorkspace,
     clearActiveWorkspace,
     setMilestoneTracking,

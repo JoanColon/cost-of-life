@@ -1,5 +1,9 @@
 const { FieldPath, FieldValue } = require('firebase-admin/firestore')
-const { applyTrackingMonth, updateFinancialYearProjection } = require('../domain/financial-year')
+const {
+  applyTrackingMonth,
+  buildPositionMonth,
+  updateFinancialYearProjection,
+} = require('../domain/financial-year')
 const { calculatePositionsAt } = require('../domain/positions')
 
 const PROJECTION_SECTIONS = ['assets', 'liabilities', 'income', 'expenses']
@@ -136,6 +140,146 @@ async function refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
   return { status: 'updated', workspaceId, year }
 }
 
+async function writeFinancialYearPositionMonth(
+  firestore,
+  workspaceId,
+  { period, asOfDate, status },
+) {
+  assertWorkspaceId(workspaceId)
+  assertPeriod(period)
+  assertDate(asOfDate)
+  if (!['current', 'closed'].includes(status)) {
+    throw new Error('A valid financial position status is required')
+  }
+
+  const year = Number(period.slice(0, 4))
+  const month = period.slice(5, 7)
+  const workspace = firestore.collection('workspaces').doc(workspaceId)
+  const target = workspace.collection('financialYears').doc(String(year))
+  let result = null
+  await firestore.runTransaction(async (transaction) => {
+    const [workspaceSnapshot, targetSnapshot] = await Promise.all([
+      transaction.get(workspace),
+      transaction.get(target),
+    ])
+    if (!workspaceSnapshot.exists || workspaceSnapshot.data()?.deletionPendingAt) {
+      result = { status: 'skipped', period }
+      return
+    }
+    if (!targetSnapshot.exists || !targetSnapshot.data()?.months?.[month]) {
+      result = { status: 'missing', period }
+      return
+    }
+    const financialYear = targetSnapshot.data()
+    if (financialYear.months[month]?.positionStatus === 'closed') {
+      result = { status: 'existing', period }
+      return
+    }
+    const [assetsConfig, liabilitiesConfig, assets, liabilities] = await Promise.all([
+      transaction.get(workspace.collection('modelConfig').doc('assets')),
+      transaction.get(workspace.collection('modelConfig').doc('liabilities')),
+      transaction.get(workspace.collection('modelAssets')),
+      transaction.get(workspace.collection('modelLiabilities')),
+    ])
+
+    const positions = calculatePositionsAt({
+      assets: documents(assets),
+      liabilities: documents(liabilities),
+      asOfDate,
+    })
+    const assetsPosition = buildPositionMonth(
+      assetsConfig.data()?.categories || {},
+      positions.assets,
+      'currentValue',
+    )
+    const liabilitiesPosition = buildPositionMonth(
+      liabilitiesConfig.data()?.categories || {},
+      positions.liabilities,
+      'balance',
+    )
+    const previousMonth = financialYear.months[month]
+    transaction.set(target, {
+      ...financialYear,
+      status: year < currentYear() ? 'closed' : 'active',
+      months: {
+        ...financialYear.months,
+        [month]: {
+          ...previousMonth,
+          assets: assetsPosition,
+          liabilities: liabilitiesPosition,
+          positionStatus: status,
+          positionAsOf: asOfDate,
+          positionCalculatedAt: FieldValue.serverTimestamp(),
+        },
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    result = { status: 'written', period }
+  })
+  return result || { status: 'skipped', period }
+}
+
+async function synchronizeFinancialYearPositions(firestore, workspaceId, asOfDate) {
+  assertWorkspaceId(workspaceId)
+  assertDate(asOfDate)
+  const year = Number(asOfDate.slice(0, 4))
+  const month = asOfDate.slice(5, 7)
+  const workspace = firestore.collection('workspaces').doc(workspaceId)
+  const [currentSnapshot, previousSnapshot] = await Promise.all([
+    workspace.collection('financialYears').doc(String(year)).get(),
+    workspace.collection('financialYears').doc(String(year - 1)).get(),
+  ])
+
+  if (
+    previousSnapshot.exists &&
+    firstObservedPositionMonth(previousSnapshot.data()) &&
+    previousSnapshot.data()?.months?.['12']?.positionStatus !== 'closed'
+  ) {
+    await writeFinancialYearPositionMonth(firestore, workspaceId, {
+      period: `${year - 1}-12`,
+      asOfDate: `${year - 1}-12-31`,
+      status: 'closed',
+    })
+  }
+
+  if (!currentSnapshot.exists) return { status: 'missing', period: `${year}-${month}` }
+  const currentFinancialYear = currentSnapshot.data()
+  const firstMonth = firstObservedPositionMonth(currentFinancialYear)
+  if (!firstMonth) return { status: 'skipped', period: `${year}-${month}` }
+
+  const currentPeriod = `${year}-${month}`
+  for (const period of periodsBetween(`${year}-${firstMonth}`, previousPeriod(currentPeriod))) {
+    if (currentFinancialYear.months?.[period.slice(5, 7)]?.positionStatus === 'closed') continue
+    await writeFinancialYearPositionMonth(firestore, workspaceId, {
+      period,
+      asOfDate: lastDateOfPeriod(period),
+      status: 'closed',
+    })
+  }
+  return writeFinancialYearPositionMonth(firestore, workspaceId, {
+    period: currentPeriod,
+    asOfDate,
+    status: 'current',
+  })
+}
+
+async function closePreviousFinancialPositionMonth(firestore, workspaceId, today) {
+  assertDate(today)
+  const period = previousPeriod(today.slice(0, 7))
+  const request = {
+    period,
+    asOfDate: lastDateOfPeriod(period),
+    status: 'closed',
+  }
+  const result = await writeFinancialYearPositionMonth(firestore, workspaceId, request)
+  if (result.status !== 'missing') return result
+
+  await rebuildFinancialYear(firestore, workspaceId, Number(period.slice(0, 4)), {
+    positionMonth: period.slice(5, 7),
+  })
+  return writeFinancialYearPositionMonth(firestore, workspaceId, request)
+}
+
 async function refreshModeledPositions(
   firestore,
   workspaceId,
@@ -252,6 +396,46 @@ function documents(snapshot) {
   return (snapshot?.docs || []).map((document) => ({ id: document.id, ...document.data() }))
 }
 
+function firstObservedPositionMonth(financialYear) {
+  const months = [
+    financialYear?.projectionState?.assetsInitializedMonth,
+    financialYear?.projectionState?.liabilitiesInitializedMonth,
+  ].filter((value) => /^(0[1-9]|1[0-2])$/.test(String(value || '')))
+  if (months.length) return months.sort()[0]
+  return (
+    Object.entries(financialYear?.months || {})
+      .filter(([, month]) =>
+        ['assets', 'liabilities'].some(
+          (section) => Object.keys(month?.[section]?.categories || {}).length > 0,
+        ),
+      )
+      .map(([month]) => month)
+      .sort()[0] || null
+  )
+}
+
+function periodsBetween(first, last) {
+  if (first > last) return []
+  const periods = []
+  let period = first
+  while (period <= last) {
+    periods.push(period)
+    const [year, month] = period.split('-').map(Number)
+    period = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7)
+  }
+  return periods
+}
+
+function previousPeriod(period) {
+  const [year, month] = period.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7)
+}
+
+function lastDateOfPeriod(period) {
+  const [year, month] = period.split('-').map(Number)
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
+}
+
 function positionStartMonth(financialYear, section, observedMonth) {
   const initializedMonth = financialYear?.projectionState?.[`${section}InitializedMonth`]
   return !initializedMonth || initializedMonth === observedMonth ? '01' : observedMonth
@@ -296,7 +480,27 @@ function assertYear(value) {
   }
 }
 
+function assertPeriod(value) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || ''))) {
+    throw new Error('A valid financial position period is required')
+  }
+}
+
+function assertDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) throw new Error('A valid financial position date is required')
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  if (
+    date.getUTCFullYear() !== Number(match[1]) ||
+    date.getUTCMonth() !== Number(match[2]) - 1 ||
+    date.getUTCDate() !== Number(match[3])
+  ) {
+    throw new Error('A valid financial position date is required')
+  }
+}
+
 module.exports = {
+  closePreviousFinancialPositionMonth,
   madridToday,
   currentMonth,
   currentYear,
@@ -304,4 +508,6 @@ module.exports = {
   rebuildFinancialYear,
   refreshFinancialYearTrackingMonth,
   refreshModeledPositions,
+  synchronizeFinancialYearPositions,
+  writeFinancialYearPositionMonth,
 }

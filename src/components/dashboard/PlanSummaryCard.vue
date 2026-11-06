@@ -8,7 +8,6 @@
   >
     <div v-if="data.state === 'strategy'" class="plan-result strategy-plan-result">
       <div class="strategy-context">
-        <span class="result-label">{{ t('dashboard.planSummary.strategyLabel') }}</span>
         <div class="strategy-summary">
           <strong>{{ data.name }}</strong>
           <span>
@@ -303,7 +302,6 @@ const { t } = useI18n()
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.1rem;
       text-align: center;
       transform: none;
     }
@@ -312,10 +310,6 @@ const { t } = useI18n()
       flex-direction: column;
       align-items: center;
       gap: 0.05rem;
-    }
-
-    .strategy-context .result-label {
-      font-size: 0.82rem;
     }
 
     .strategy-summary strong {
@@ -346,7 +340,7 @@ const { t } = useI18n()
 
     .strategy-outcomes {
       gap: 0.45rem;
-      margin-top: clamp(0.8rem, 1.8vh, 1.1rem);
+      margin-top: clamp(1rem, 2.2vh, 1.35rem);
     }
 
     .strategy-outcomes li {

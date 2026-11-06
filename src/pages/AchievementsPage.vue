@@ -147,7 +147,7 @@
                     <q-icon :name="milestoneStatusIcon(milestone)" />
                   </span>
                   <div>
-                    <strong>{{ t(`milestones.items.${milestone.id}`) }}</strong>
+                    <strong>{{ milestoneTitle(milestone) }}</strong>
                     <p>{{ descriptionFor(milestone) }}</p>
                     <small v-if="milestone.pending">{{
                       t('milestones.status.pendingConfirmation')
@@ -364,6 +364,12 @@ function descriptionFor(milestone) {
       : t('milestones.descriptions.netWorth', { target: formatCurrency(milestone.target) })
   }
   return t(`milestones.descriptions.${milestone.id}`)
+}
+
+function milestoneTitle(milestone) {
+  return t(`milestones.items.${milestone.id}`, {
+    amount: formatCurrency(milestone.target),
+  })
 }
 
 function achievedDateLabel(milestoneId) {

@@ -152,6 +152,8 @@ describe('server financial year projection', () => {
 
   it('does not rewrite closed position months when assets change in December', () => {
     const original = projection()
+    original.months['11'].positionStatus = 'closed'
+    original.months['11'].positionAsOf = '2026-11-30'
     const updated = updateFinancialYearProjection(original, {
       year: 2026,
       config: { assets: { categories: { cash: { enabled: true } } } },
@@ -176,6 +178,10 @@ describe('server financial year projection', () => {
     expect(updated.months['01'].expenses).toEqual(original.months['01'].expenses)
     expect(financialYearMonthValue(updated, '01', 'netWorth')).toBe(600)
     expect(financialYearMonthValue(updated, '12', 'netWorth')).toBe(800)
+    expect(updated.months['11']).toMatchObject({
+      positionStatus: 'closed',
+      positionAsOf: '2026-11-30',
+    })
   })
 
   it('updates a historical tracked month without changing its stored estimates', () => {

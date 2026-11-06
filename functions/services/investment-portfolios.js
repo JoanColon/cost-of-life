@@ -54,6 +54,57 @@ async function syncInvestmentPortfolio(
   )
 }
 
+async function syncWorkspaceInvestmentPortfolios(
+  firestore,
+  { workspaceId, userId = null, force = true, throwOnError = false },
+  fetchImpl = fetch,
+  rebuildFinancialYearImpl = rebuildFinancialYear,
+  nowImpl = Date.now,
+) {
+  assertText(workspaceId, 'A workspace is required')
+  const workspaceReference = firestore.collection('workspaces').doc(workspaceId)
+  const workspaceSnapshot = await workspaceReference.get()
+  const workspace = workspaceSnapshot.data()
+  if (!workspaceSnapshot.exists || workspace?.deletionPendingAt) {
+    throw new Error('Workspace membership is required')
+  }
+  if (userId && !workspace?.memberIds?.includes(userId)) {
+    throw new Error('Workspace membership is required')
+  }
+
+  const investments = await workspaceReference
+    .collection('modelAssets')
+    .where('categoryId', '==', 'investment')
+    .get()
+  const connected = (investments.docs || []).filter(
+    (document) => document.data()?.detail?.portfolio?.spreadsheetUrl,
+  )
+  const results = []
+  const failures = []
+  for (const document of connected) {
+    try {
+      const result = await synchronizeInvestmentPortfolio(
+        firestore,
+        { workspaceId, userId: userId || 'system:portfolio-sync', assetId: document.id, force },
+        fetchImpl,
+        rebuildFinancialYearImpl,
+        nowImpl,
+        null,
+        {
+          workspaceReference,
+          assetReference: document.ref,
+          asset: document.data(),
+        },
+      )
+      results.push({ assetId: document.id, ...result })
+    } catch (error) {
+      failures.push({ assetId: document.id, error: error?.message || String(error) })
+      if (throwOnError) throw error
+    }
+  }
+  return { results, failures }
+}
+
 async function synchronizeInvestmentPortfolio(
   firestore,
   { workspaceId, userId, assetId, force },
@@ -61,103 +112,133 @@ async function synchronizeInvestmentPortfolio(
   rebuildFinancialYearImpl,
   nowImpl,
   spreadsheetUrlOverride = null,
+  contextOverride = null,
 ) {
-  const context = await portfolioContext(firestore, { workspaceId, userId, assetId })
+  const context =
+    contextOverride || (await portfolioContext(firestore, { workspaceId, userId, assetId }))
   const existingPortfolio = context.asset?.detail?.portfolio || null
   const now = Number(nowImpl())
+  let nextPortfolio = null
 
-  if (!spreadsheetUrlOverride && !force && portfolioCacheIsFresh(existingPortfolio, now)) {
-    return portfolioResult(existingPortfolio, context.asset.currentValue, 'fresh')
-  }
+  try {
+    if (!spreadsheetUrlOverride && !force && portfolioCacheIsFresh(existingPortfolio, now)) {
+      return portfolioResult(existingPortfolio, context.asset.currentValue, 'fresh')
+    }
 
-  const spreadsheetUrl = spreadsheetUrlOverride || existingPortfolio?.spreadsheetUrl
-  const spreadsheetId = spreadsheetIdFromUrl(spreadsheetUrl)
-  const normalized = await fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl)
-  const cacheBytes = Buffer.byteLength(JSON.stringify(normalized.holdings), 'utf8')
-  if (cacheBytes > MAXIMUM_CACHE_BYTES) {
-    throw new Error('The Google Sheet is too large to cache safely')
-  }
+    const spreadsheetUrl = spreadsheetUrlOverride || existingPortfolio?.spreadsheetUrl
+    const spreadsheetId = spreadsheetIdFromUrl(spreadsheetUrl)
+    const normalized = await fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl)
+    const cacheBytes = Buffer.byteLength(JSON.stringify(normalized.holdings), 'utf8')
+    if (cacheBytes > MAXIMUM_CACHE_BYTES) {
+      throw new Error('The Google Sheet is too large to cache safely')
+    }
 
-  const linkedIncomeSnapshot = await context.workspaceReference
-    .collection('modelIncome')
-    .where('portfolioAssetId', '==', assetId)
-    .get()
-  const linkedIncomeDocuments = (linkedIncomeSnapshot.docs || []).filter((document) => {
-    const income = document.data()
-    return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
-  })
-  const incomeDocumentsToUpdate = linkedIncomeDocuments.filter(
-    (document) => !incomeMatchesAnnualDividends(document.data(), normalized.summary),
-  )
+    const linkedIncomeSnapshot = await context.workspaceReference
+      .collection('modelIncome')
+      .where('portfolioAssetId', '==', assetId)
+      .get()
+    const linkedIncomeDocuments = (linkedIncomeSnapshot.docs || []).filter((document) => {
+      const income = document.data()
+      return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
+    })
+    const incomeDocumentsToUpdate = linkedIncomeDocuments.filter(
+      (document) => !incomeMatchesAnnualDividends(document.data(), normalized.summary),
+    )
 
-  const assetValueChanged =
-    roundMoney(context.asset.currentValue) !== normalized.summary.totalPortfolioValue
-  const summaryChanged = !sameValue(existingPortfolio?.summary, normalized.summary)
-  const holdingsChanged = !sameValue(existingPortfolio?.cache?.holdings, normalized.holdings)
-  const pendingSections = existingPortfolio?.sync?.financialProjectionDirty ?
-    existingPortfolio.sync.pendingSections || [] :
-    []
-  const sections = [
-    ...new Set([
-      ...pendingSections,
-      ...(assetValueChanged ? ['assets'] : []),
-      ...(incomeDocumentsToUpdate.length ? ['income'] : []),
-    ]),
-  ]
-  const contentChanged = summaryChanged || holdingsChanged
-  const nextPortfolio = {
-    schemaVersion: PORTFOLIO_SCHEMA.version,
-    source: 'google_sheets',
-    spreadsheetId,
-    spreadsheetUrl: canonicalGoogleSheetsUrl(spreadsheetUrl),
-    summary: normalized.summary,
-    cache: {
+    const assetValueChanged =
+      roundMoney(context.asset.currentValue) !== normalized.summary.totalPortfolioValue
+    const summaryChanged = !sameValue(existingPortfolio?.summary, normalized.summary)
+    const holdingsChanged = !sameValue(existingPortfolio?.cache?.holdings, normalized.holdings)
+    const pendingSections = existingPortfolio?.sync?.financialProjectionDirty ?
+      existingPortfolio.sync.pendingSections || [] :
+      []
+    const sections = [
+      ...new Set([
+        ...pendingSections,
+        ...(assetValueChanged ? ['assets'] : []),
+        ...(incomeDocumentsToUpdate.length ? ['income'] : []),
+      ]),
+    ]
+    const contentChanged = summaryChanged || holdingsChanged
+    nextPortfolio = {
       schemaVersion: PORTFOLIO_SCHEMA.version,
-      holdings: normalized.holdings,
-      lastCheckedAt: now,
-      dataUpdatedAt: contentChanged ? now : existingPortfolio?.cache?.dataUpdatedAt || now,
-      refreshAfter: now + PORTFOLIO_CACHE_TTL_MS,
-    },
-    sync: {
-      financialProjectionDirty: sections.length > 0,
-      pendingSections: sections,
-    },
-  }
-
-  const batch = firestore.batch()
-  batch.update(context.assetReference, {
-    ...(assetValueChanged ? { currentValue: normalized.summary.totalPortfolioValue } : {}),
-    'detail.portfolio': nextPortfolio,
-    updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: userId,
-  })
-  for (const document of incomeDocumentsToUpdate) {
-    batch.update(document.ref, {
-      calculation: {
-        mode: 'recurring',
-        amount: normalized.summary.annualDividendIncome,
-        frequency: 'yearly',
+      source: 'google_sheets',
+      spreadsheetId,
+      spreadsheetUrl: canonicalGoogleSheetsUrl(spreadsheetUrl),
+      summary: normalized.summary,
+      cache: {
+        schemaVersion: PORTFOLIO_SCHEMA.version,
+        holdings: normalized.holdings,
+        lastCheckedAt: now,
+        dataUpdatedAt: contentChanged ? now : existingPortfolio?.cache?.dataUpdatedAt || now,
+        refreshAfter: now + PORTFOLIO_CACHE_TTL_MS,
       },
+      sync: {
+        financialProjectionDirty: sections.length > 0,
+        pendingSections: sections,
+        lastSuccessAt: sections.length ? existingPortfolio?.sync?.lastSuccessAt || null : now,
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      },
+    }
+
+    const batch = firestore.batch()
+    batch.update(context.assetReference, {
+      ...(assetValueChanged ? { currentValue: normalized.summary.totalPortfolioValue } : {}),
+      'detail.portfolio': nextPortfolio,
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: userId,
     })
-  }
-  await batch.commit()
+    for (const document of incomeDocumentsToUpdate) {
+      batch.update(document.ref, {
+        calculation: {
+          mode: 'recurring',
+          amount: normalized.summary.annualDividendIncome,
+          frequency: 'yearly',
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: userId,
+      })
+    }
+    await batch.commit()
 
-  if (sections.length) {
-    await rebuildFinancialYearImpl(firestore, workspaceId, currentYear(), { sections })
-    nextPortfolio.sync = { financialProjectionDirty: false, pendingSections: [] }
-    await context.assetReference.update({
-      'detail.portfolio.sync': nextPortfolio.sync,
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: userId,
+    if (sections.length) {
+      await rebuildFinancialYearImpl(firestore, workspaceId, currentYear(), { sections })
+      nextPortfolio.sync = {
+        ...nextPortfolio.sync,
+        financialProjectionDirty: false,
+        pendingSections: [],
+        lastSuccessAt: now,
+      }
+      await context.assetReference.update({
+        'detail.portfolio.sync': nextPortfolio.sync,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: userId,
+      })
+    }
+
+    return portfolioResult(nextPortfolio, normalized.summary.totalPortfolioValue, 'refreshed', {
+      contentChanged,
+      financialSections: sections,
     })
+  } catch (error) {
+    if (existingPortfolio?.spreadsheetUrl) {
+      try {
+        await context.assetReference.update({
+          'detail.portfolio.sync': {
+            ...(nextPortfolio?.sync || existingPortfolio.sync || {}),
+            lastErrorAt: now,
+            lastErrorMessage: error?.message || String(error),
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: userId,
+        })
+      } catch {
+        // Preserve the synchronization error when its diagnostic metadata cannot be stored.
+      }
+    }
+    throw error
   }
-
-  return portfolioResult(nextPortfolio, normalized.summary.totalPortfolioValue, 'refreshed', {
-    contentChanged,
-    financialSections: sections,
-  })
 }
 
 async function disconnectInvestmentPortfolio(firestore, { workspaceId, userId, assetId }) {
@@ -206,13 +287,16 @@ async function portfolioContext(firestore, { workspaceId, userId, assetId }) {
 }
 
 async function fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl) {
+  const requestId = Date.now()
   const portfolioUrl = googleSheetQueryUrl(spreadsheetId, {
     tqx: 'out:csv',
     sheet: PORTFOLIO_SCHEMA.sheets.portfolio,
+    _: requestId,
   })
   const summaryUrl = googleSheetQueryUrl(spreadsheetId, {
     tqx: 'out:csv',
     sheet: PORTFOLIO_SCHEMA.sheets.summary,
+    _: requestId,
   })
   let lastError
   for (let attempt = 0; attempt < SHEET_READ_ATTEMPTS; attempt += 1) {
@@ -254,11 +338,11 @@ async function fetchGoogleSheet(
 function portfolioCacheIsFresh(portfolio, now = Date.now()) {
   return Boolean(
     portfolio?.schemaVersion === PORTFOLIO_SCHEMA.version &&
-      portfolio?.summary &&
-      portfolio?.cache?.schemaVersion === PORTFOLIO_SCHEMA.version &&
-      Array.isArray(portfolio.cache.holdings) &&
-      !portfolio?.sync?.financialProjectionDirty &&
-      Number(portfolio.cache.refreshAfter) > Number(now),
+    portfolio?.summary &&
+    portfolio?.cache?.schemaVersion === PORTFOLIO_SCHEMA.version &&
+    Array.isArray(portfolio.cache.holdings) &&
+    !portfolio?.sync?.financialProjectionDirty &&
+    Number(portfolio.cache.refreshAfter) > Number(now),
   )
 }
 
@@ -344,5 +428,6 @@ module.exports = {
   canonicalGoogleSheetsUrl,
   portfolioCacheIsFresh,
   syncInvestmentPortfolio,
+  syncWorkspaceInvestmentPortfolios,
   updateInvestmentPortfolio,
 }

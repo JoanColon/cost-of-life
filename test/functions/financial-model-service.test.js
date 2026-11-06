@@ -322,6 +322,52 @@ describe('atomic financial model mutations', () => {
     expect(financialYearValue(financialYear, 'savings')).toBe(-240)
   })
 
+  it('updates a legacy unlinked expense when the client normalizes its missing liability to null', async () => {
+    const existing = {
+      id: 'property-tax-a',
+      categoryId: 'housing',
+      subcategoryId: 'property_taxes',
+      itemName: 'Property taxes',
+      notes: '',
+      estimate: { amount: 90, frequency: 'yearly' },
+      variability: 'fixed',
+      recurrence: 'recurring',
+      necessity: 'essential',
+      monthlyAmounts: monthlyAmounts(0),
+      ownership,
+    }
+    const { firestore, writes } = createFirestore({
+      section: 'expenses',
+      collection: 'modelExpenses',
+      category: 'housing',
+      items: [existing],
+      configCategory: { enabled: true },
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'expenses',
+      operation: 'update',
+      itemId: existing.id,
+      item: {
+        ...existing,
+        estimate: { amount: 94, frequency: 'yearly' },
+        monthlyAmounts: { ...monthlyAmounts(0), july: 94 },
+        liabilityId: null,
+      },
+    })
+
+    expect(result.expense).toMatchObject({
+      id: existing.id,
+      estimate: { amount: 94, frequency: 'yearly' },
+      liabilityId: null,
+    })
+    expect(
+      writes.find(({ path }) => path.endsWith(`/modelExpenses/${existing.id}`)).data.liabilityId,
+    ).toBeNull()
+  })
+
   it('allows multiple named items in the same expense subcategory', async () => {
     const first = {
       id: 'subscription-a',

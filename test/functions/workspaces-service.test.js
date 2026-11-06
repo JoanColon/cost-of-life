@@ -9,6 +9,7 @@ const {
   inviteDocumentId,
   isWorkspaceMember,
   isWorkspaceOwner,
+  updateWorkspaceSettings,
 } = workspaceService
 
 const validToken = 'a'.repeat(43)
@@ -252,5 +253,61 @@ describe('workspace invitations', () => {
       acceptWorkspaceInvite(firestore, { token: validToken, userId: 'member', now }),
     ).rejects.toMatchObject({ code: 'deadline-exceeded' })
     expect(writes).toEqual([])
+  })
+})
+
+describe('workspace settings', () => {
+  it('updates currency and member names without replacing member metadata', async () => {
+    const { firestore, records } = createInviteFirestore({
+      workspace: {
+        memberIds: ['owner', 'member'],
+        members: {
+          owner: { displayName: 'Old owner', role: 'owner', photoURL: 'owner-photo' },
+          member: { displayName: 'Old member', role: 'member', photoURL: 'member-photo' },
+        },
+      },
+    })
+
+    await expect(
+      updateWorkspaceSettings(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'member',
+        currency: 'usd',
+        memberNames: { owner: 'Alex', member: 'Sam' },
+      }),
+    ).resolves.toMatchObject({ currency: 'USD' })
+
+    expect(records.get('workspaces/workspace-a')).toMatchObject({
+      currency: 'USD',
+      members: {
+        owner: { displayName: 'Alex', role: 'owner', photoURL: 'owner-photo' },
+        member: { displayName: 'Sam', role: 'member', photoURL: 'member-photo' },
+      },
+    })
+  })
+
+  it('rejects incomplete names and non-members', async () => {
+    const workspace = {
+      memberIds: ['owner', 'member'],
+      members: { owner: { role: 'owner' }, member: { role: 'member' } },
+    }
+    const { firestore } = createInviteFirestore({ workspace })
+
+    await expect(
+      updateWorkspaceSettings(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'owner',
+        currency: 'EUR',
+        memberNames: { owner: 'Owner' },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
+    await expect(
+      updateWorkspaceSettings(firestore, {
+        workspaceId: 'workspace-a',
+        userId: 'other',
+        currency: 'EUR',
+        memberNames: { owner: 'Owner', member: 'Member' },
+      }),
+    ).rejects.toMatchObject({ code: 'permission-denied' })
   })
 })

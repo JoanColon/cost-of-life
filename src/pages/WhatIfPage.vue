@@ -115,7 +115,7 @@
                       min="0"
                       :max="scope.value.mode === 'percentage' ? 100 : 100000"
                       :step="scope.value.mode === 'percentage' ? 1 : 10"
-                      :prefix="scope.value.mode === 'amount' ? '€' : undefined"
+                      :prefix="scope.value.mode === 'amount' ? currencySymbol : undefined"
                       :suffix="
                         scope.value.mode === 'percentage' ? '%' : t('whatIf.perMonth').trim()
                       "
@@ -385,7 +385,7 @@ import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const $q = useQuasar()

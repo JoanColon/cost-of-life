@@ -110,11 +110,6 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      match /positionSnapshots/{period} {
-        allow read: if isWorkspaceMemberById(workspaceId);
-        allow write: if false;
-      }
-
       match /achievements/{milestoneId} {
         allow read: if isWorkspaceMemberById(workspaceId);
         allow create: if isWorkspaceMemberById(workspaceId)

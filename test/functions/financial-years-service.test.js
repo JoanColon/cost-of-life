@@ -2,14 +2,30 @@ import { describe, expect, it } from 'vitest'
 import financialYearsService from '../../functions/services/financial-years.js'
 import { financialYearMonthValue } from '../../src/domain/financial/financial-year.js'
 
-const { rebuildFinancialYear, refreshModeledPositions } = financialYearsService
+const {
+  closePreviousFinancialPositionMonth,
+  rebuildFinancialYear,
+  refreshModeledPositions,
+  synchronizeFinancialYearPositions,
+  writeFinancialYearPositionMonth,
+} = financialYearsService
 
 function documentSnapshot(data) {
   return { exists: data != null, data: () => data ?? undefined }
 }
 
-function createFirestore({ workspace = {}, financialYear = null, configs = {}, models = {} } = {}) {
+function createFirestore({
+  workspace = {},
+  financialYear = null,
+  financialYears = {},
+  configs = {},
+  models = {},
+} = {}) {
   const writes = []
+  const storedFinancialYears = { ...financialYears }
+  if (financialYear != null && storedFinancialYears['2026'] == null) {
+    storedFinancialYears['2026'] = financialYear
+  }
 
   function reference(path, type = 'document') {
     const value = {
@@ -26,7 +42,10 @@ function createFirestore({ workspace = {}, financialYear = null, configs = {}, m
       },
       async get() {
         if (path === 'workspaces/workspace-a') return documentSnapshot(workspace)
-        if (path.endsWith('/financialYears/2026')) return documentSnapshot(financialYear)
+        if (path.includes('/financialYears/')) {
+          const year = path.split('/').at(-1)
+          return documentSnapshot(storedFinancialYears[year] ?? null)
+        }
         if (path.includes('/modelConfig/')) {
           return documentSnapshot(configs[path.split('/').at(-1)] || { categories: {} })
         }
@@ -50,6 +69,9 @@ function createFirestore({ workspace = {}, financialYear = null, configs = {}, m
         get: (target) => target.get(),
         set(target, data) {
           writes.push({ path: target.path, data })
+          if (target.path.includes('/financialYears/')) {
+            storedFinancialYears[target.path.split('/').at(-1)] = data
+          }
         },
       })
     },
@@ -100,6 +122,153 @@ function createPositionRefreshFirestore({ assets = [], mortgages = [], expenses 
 }
 
 describe('financial year persistence', () => {
+  it('closes a monthly position inside financialYears without changing its cash-flow data', async () => {
+    const financialYear = {
+      schemaVersion: 1,
+      year: 2026,
+      status: 'active',
+      projectionState: { assetsInitializedMonth: '10', liabilitiesInitializedMonth: '10' },
+      months: {
+        '10': {
+          assets: { categories: {} },
+          liabilities: { categories: {} },
+          income: { categories: { employment: { subcategories: {} } } },
+          expenses: { categories: { housing: { subcategories: {} } } },
+        },
+      },
+    }
+    const ownership = { mode: 'single', shares: [{ memberId: 'member-a', percentage: 100 }] }
+    const { firestore, writes } = createFirestore({
+      workspace: { memberIds: ['member-a'] },
+      financialYear,
+      configs: {
+        assets: { categories: { cash: { enabled: true } } },
+        liabilities: { categories: { loan: { enabled: true } } },
+      },
+      models: {
+        assets: [asset('account', 'current_account', 'Account', 1200, ownership)],
+        liabilities: [
+          {
+            id: 'loan-a',
+            categoryId: 'loan',
+            subcategoryId: 'personal_loan',
+            itemName: 'Loan',
+            balance: 300,
+            ownership,
+          },
+        ],
+      },
+    })
+
+    const result = await writeFinancialYearPositionMonth(firestore, 'workspace-a', {
+      period: '2026-10',
+      asOfDate: '2026-10-31',
+      status: 'closed',
+    })
+
+    expect(result).toEqual({ status: 'written', period: '2026-10' })
+    expect(financialYearMonthValue(writes[0].data, '10', 'netWorth')).toBe(900)
+    expect(writes[0].data.months['10']).toMatchObject({
+      income: financialYear.months['10'].income,
+      expenses: financialYear.months['10'].expenses,
+      positionStatus: 'closed',
+      positionAsOf: '2026-10-31',
+    })
+  })
+
+  it('closes every observed past month and refreshes the current one in financialYears', async () => {
+    const month = {
+      assets: { categories: {} },
+      liabilities: { categories: {} },
+      income: { categories: {} },
+      expenses: { categories: {} },
+    }
+    const { firestore, writes } = createFirestore({
+      workspace: { memberIds: ['member-a'] },
+      financialYear: {
+        schemaVersion: 1,
+        year: 2026,
+        status: 'active',
+        projectionState: { assetsInitializedMonth: '10' },
+        months: { '10': month, '11': month },
+      },
+      configs: { assets: { categories: {} }, liabilities: { categories: {} } },
+    })
+
+    await synchronizeFinancialYearPositions(firestore, 'workspace-a', '2026-11-07')
+
+    expect(writes.map(({ data }) => data.months['10']?.positionStatus).filter(Boolean)).toContain(
+      'closed',
+    )
+    expect(writes.map(({ data }) => data.months['11']?.positionStatus).filter(Boolean)).toContain(
+      'current',
+    )
+  })
+
+  it('closes December in the previous financial year when January starts', async () => {
+    const month = {
+      assets: { categories: {} },
+      liabilities: { categories: {} },
+      income: { categories: {} },
+      expenses: { categories: {} },
+    }
+    const { firestore, writes } = createFirestore({
+      workspace: { memberIds: ['member-a'] },
+      financialYears: {
+        2025: {
+          schemaVersion: 1,
+          year: 2025,
+          status: 'active',
+          projectionState: { assetsInitializedMonth: '10' },
+          months: { 12: month },
+        },
+        2026: {
+          schemaVersion: 1,
+          year: 2026,
+          status: 'active',
+          projectionState: { assetsInitializedMonth: '01' },
+          months: { '01': month },
+        },
+      },
+      configs: { assets: { categories: {} }, liabilities: { categories: {} } },
+    })
+
+    await synchronizeFinancialYearPositions(firestore, 'workspace-a', '2026-01-07')
+
+    const previousYearWrite = writes.find(({ path }) => path.endsWith('/financialYears/2025'))
+    expect(previousYearWrite.data.status).toBe('closed')
+    expect(previousYearWrite.data.months['12']).toMatchObject({
+      positionStatus: 'closed',
+      positionAsOf: '2025-12-31',
+    })
+    expect(
+      writes.find(({ path }) => path.endsWith('/financialYears/2026')).data.months['01'],
+    ).toMatchObject({ positionStatus: 'current', positionAsOf: '2026-01-07' })
+  })
+
+  it('creates the annual document before closing a month for an inactive workspace', async () => {
+    const ownership = { mode: 'single', shares: [{ memberId: 'member-a', percentage: 100 }] }
+    const { firestore, writes } = createFirestore({
+      workspace: { memberIds: ['member-a'] },
+      configs: { assets: { categories: { cash: { enabled: true } } } },
+      models: { assets: [asset('account', 'current_account', 'Account', 1200, ownership)] },
+    })
+
+    const result = await closePreviousFinancialPositionMonth(
+      firestore,
+      'workspace-a',
+      '2026-02-01',
+    )
+
+    expect(result).toEqual({ status: 'written', period: '2026-01' })
+    const closed = writes.at(-1).data
+    expect(financialYearMonthValue(closed, '01', 'assets')).toBe(1200)
+    expect(closed.months['01']).toMatchObject({
+      positionStatus: 'closed',
+      positionAsOf: '2026-01-31',
+    })
+  })
+
   it('materializes a changed annual property value for Layer 2', async () => {
     const updates = []
     const assetReference = { path: 'workspaces/workspace-a/modelAssets/property-a' }

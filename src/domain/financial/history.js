@@ -39,6 +39,21 @@ export function buildNetWorthSeries(
   }))
 }
 
+export function positionHistoryDocuments(historyDocuments = [], { throughPeriod = null } = {}) {
+  return historyDocuments
+    .map((history) => {
+      const year = Number(history?.year || history?.id)
+      if (!Number.isInteger(year)) return null
+      const months = Object.fromEntries(
+        Object.entries(history.months || {}).filter(([month, projection]) =>
+          isHistoricalPositionMonth(history, month, projection, throughPeriod),
+        ),
+      )
+      return { ...history, id: history.id || String(year), year, months }
+    })
+    .filter(Boolean)
+}
+
 export function buildNetWorthBreakdownSeries(
   historyDocuments = [],
   { throughPeriod = null, memberId = 'all' } = {},
@@ -76,7 +91,7 @@ export function buildAssetAnnualSeries(
 }
 
 function positionPeriods(historyDocuments, throughPeriod) {
-  return historyDocuments
+  return positionHistoryDocuments(historyDocuments, { throughPeriod })
     .flatMap((history) => {
       const year = Number(history.year || history.id)
       if (!Number.isInteger(year)) return []
@@ -96,6 +111,21 @@ function positionPeriods(historyDocuments, throughPeriod) {
         (!throughPeriod || period <= throughPeriod),
     )
     .sort((first, second) => first.period.localeCompare(second.period))
+}
+
+function isHistoricalPositionMonth(history, month, projection, throughPeriod) {
+  const year = Number(history?.year || history?.id)
+  const period = `${year}-${month}`
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return false
+  if (!projection?.assets || !projection?.liabilities) return false
+  if (throughPeriod && period > throughPeriod) return false
+  if (['unobserved', 'projected'].includes(projection.positionStatus)) return false
+  const initializedMonths = [
+    history.projectionState?.assetsInitializedMonth,
+    history.projectionState?.liabilitiesInitializedMonth,
+  ].filter((value) => /^(0[1-9]|1[0-2])$/.test(String(value || '')))
+  const firstObservedMonth = initializedMonths.sort()[0] || '01'
+  return month >= firstObservedMonth
 }
 
 function categoryValues(history, month, projection, section, memberId, multiplier = 1) {

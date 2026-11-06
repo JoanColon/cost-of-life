@@ -153,13 +153,6 @@
                   }}
                 </p>
               </div>
-              <button
-                type="button"
-                class="text-link overview-heading-link"
-                @click="outcomesSheetOpen = true"
-              >
-                {{ t('whatIf.strategy.viewDetails') }} <q-icon name="arrow_forward" />
-              </button>
             </div>
 
             <div class="overview-outcome-list">
@@ -168,6 +161,9 @@
                 :key="outcome.id"
                 type="button"
                 class="overview-outcome"
+                :aria-pressed="
+                  $q.screen.gt.sm ? selectedDesktopOutcomeKind === outcomeKind(outcome) : undefined
+                "
                 @click="openOutcomeDetail(outcome)"
               >
                 <span :class="['mini-icon', outcome.tone]"><q-icon :name="outcome.icon" /></span>
@@ -183,13 +179,13 @@
         </div>
 
         <div class="desktop-projections">
-          <section v-if="allocation.invest > 0" class="panel desktop-projection-panel">
-            <div class="desktop-projection-heading">
-              <div>
-                <h2>{{ t('whatIf.strategy.projectionPreview') }}</h2>
-                <p>{{ t('whatIf.strategy.projectionPreviewDescription') }}</p>
-              </div>
-              <div class="desktop-projection-controls">
+          <section class="panel desktop-projection-panel">
+            <template v-if="selectedDesktopOutcomeKind === 'cash'">
+              <div class="desktop-projection-heading">
+                <div>
+                  <h2>{{ t('whatIf.strategy.cashDetails') }}</h2>
+                  <p>{{ selectedDesktopOutcome?.description }}</p>
+                </div>
                 <div class="horizon-options">
                   <button
                     v-for="years in [10, 20, 30]"
@@ -208,106 +204,226 @@
                     {{ t('whatIf.reduction.custom') }}
                   </button>
                 </div>
-                <div class="projection-view-switch">
+              </div>
+              <div class="desktop-projection-value">
+                <span>{{ t('whatIf.strategy.projectedCashLabel') }}</span>
+                <strong>{{ formatCurrency(projection.strategy.cash) }}</strong>
+                <small>{{
+                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
+                }}</small>
+              </div>
+              <StrategyProjectionChart
+                :strategy-points="cashProjectionPoints"
+                :baseline-points="baselineCashProjectionPoints"
+                :baseline-label="t('whatIf.strategy.currentPath')"
+                :strategy-label="t('whatIf.strategy.strategyPath')"
+                :aria-label="t('whatIf.strategy.cashChartAria')"
+                class="desktop-strategy-chart"
+              />
+              <div class="result-breakdown desktop-result-breakdown">
+                <span>
+                  <small>{{ t('whatIf.strategy.startingValue') }}</small>
+                  <strong>{{ formatCurrency(startingPosition.cash) }}</strong>
+                </span>
+                <span>
+                  <small>{{ t('whatIf.strategy.cashContributions') }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.cashContributions) }}</strong>
+                </span>
+                <span>
+                  <small>{{ t('whatIf.strategy.cashGrowth') }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.cashGrowth) }}</strong>
+                </span>
+                <span>
+                  <small>{{ t('whatIf.strategy.target') }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.cashTarget) }}</strong>
+                </span>
+              </div>
+            </template>
+
+            <template v-else-if="selectedDesktopOutcomeKind === 'investment'">
+              <div class="desktop-projection-heading">
+                <div>
+                  <h2>{{ t('whatIf.strategy.projectionPreview') }}</h2>
+                  <p>{{ t('whatIf.strategy.projectionPreviewDescription') }}</p>
+                </div>
+                <div class="desktop-projection-controls">
+                  <div class="horizon-options">
+                    <button
+                      v-for="years in [10, 20, 30]"
+                      :key="years"
+                      type="button"
+                      :class="{ selected: activeScenario.horizonYears === years }"
+                      @click="updateScenario({ horizonYears: years })"
+                    >
+                      {{ years }} years
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                      @click="setCustomHorizon"
+                    >
+                      {{ t('whatIf.reduction.custom') }}
+                    </button>
+                  </div>
+                  <div class="projection-view-switch">
+                    <button
+                      type="button"
+                      :class="{ selected: projectionChartMode === 'total' }"
+                      @click="projectionChartMode = 'total'"
+                    >
+                      {{ t('whatIf.strategy.chartView.total') }}
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ selected: projectionChartMode === 'breakdown' }"
+                      @click="projectionChartMode = 'breakdown'"
+                    >
+                      {{ t('whatIf.strategy.chartView.breakdown') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="desktop-projection-value">
+                <span>{{ t('whatIf.strategy.projectedInvestmentValue') }}</span>
+                <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
+                <small>{{
+                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
+                }}</small>
+              </div>
+              <StrategyProjectionChart
+                :strategy-points="investmentProjectionPoints"
+                :baseline-points="baselineInvestmentProjectionPoints"
+                :mode="projectionChartMode"
+                class="desktop-strategy-chart"
+              />
+              <div class="result-breakdown desktop-result-breakdown">
+                <span>
+                  <small>{{ t('whatIf.strategy.startingValue') }}</small>
+                  <strong>{{ formatCurrency(startingPosition.investmentTotal) }}</strong>
+                </span>
+                <span>
+                  <small>{{ t('whatIf.strategy.contributions') }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.investmentContributions) }}</strong>
+                </span>
+                <span>
+                  <small>{{ t('whatIf.strategy.growth') }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.growth) }}</strong>
+                </span>
+              </div>
+            </template>
+
+            <template v-else-if="selectedDesktopOutcomeKind === 'netWorth'">
+              <div class="desktop-projection-heading">
+                <div>
+                  <h2>{{ t('whatIf.strategy.netWorthDetails') }}</h2>
+                  <p>{{ selectedDesktopOutcome?.description }}</p>
+                </div>
+                <div class="horizon-options">
                   <button
+                    v-for="years in [10, 20, 30]"
+                    :key="years"
                     type="button"
-                    :class="{ selected: projectionChartMode === 'total' }"
-                    @click="projectionChartMode = 'total'"
+                    :class="{ selected: activeScenario.horizonYears === years }"
+                    @click="updateScenario({ horizonYears: years })"
                   >
-                    {{ t('whatIf.strategy.chartView.total') }}
+                    {{ years }} years
                   </button>
                   <button
                     type="button"
-                    :class="{ selected: projectionChartMode === 'breakdown' }"
-                    @click="projectionChartMode = 'breakdown'"
+                    :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                    @click="setCustomHorizon"
                   >
-                    {{ t('whatIf.strategy.chartView.breakdown') }}
+                    {{ t('whatIf.reduction.custom') }}
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div class="desktop-projection-value">
-              <span>{{ t('whatIf.strategy.projectedInvestmentValue') }}</span>
-              <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
-              <small>{{
-                t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-              }}</small>
-            </div>
-            <StrategyProjectionChart
-              :strategy-points="investmentProjectionPoints"
-              :baseline-points="baselineInvestmentProjectionPoints"
-              :mode="projectionChartMode"
-              class="desktop-strategy-chart"
-            />
-            <div class="result-breakdown desktop-result-breakdown">
-              <span>
-                <small>{{ t('whatIf.strategy.startingValue') }}</small>
-                <strong>{{ formatCurrency(startingPosition.investmentTotal) }}</strong>
-              </span>
-              <span>
-                <small>{{ t('whatIf.strategy.contributions') }}</small>
-                <strong>{{ formatCurrency(projection.strategy.investmentContributions) }}</strong>
-              </span>
-              <span>
-                <small>{{ t('whatIf.strategy.growth') }}</small>
-                <strong>{{ formatCurrency(projection.strategy.growth) }}</strong>
-              </span>
-            </div>
-          </section>
-
-          <section
-            v-if="selectedDebt && allocation.debt > 0"
-            class="panel desktop-projection-panel desktop-mortgage-panel"
-          >
-            <div class="desktop-projection-heading">
-              <div>
-                <h2>{{ t('whatIf.strategy.debtProjection.title') }}</h2>
-                <p>{{ debtInfoText }}</p>
+              <div class="desktop-projection-value">
+                <span>{{ t('whatIf.strategy.projectedNetWorthLabel') }}</span>
+                <strong>{{ formatCurrency(projectedNetWorth) }}</strong>
+                <small>{{
+                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
+                }}</small>
               </div>
-              <q-select
-                :model-value="selectedDebt.id"
-                :options="liabilityOptions"
-                emit-value
-                map-options
-                dense
-                outlined
-                options-dense
-                class="desktop-debt-select"
-                @update:model-value="updateScenario({ selectedLiabilityId: $event })"
+              <StrategyProjectionChart
+                :strategy-points="netWorthPoints"
+                :baseline-points="baselineNetWorthPoints"
+                :baseline-label="t('whatIf.strategy.currentPath')"
+                :strategy-label="t('whatIf.strategy.strategyPath')"
+                :aria-label="t('whatIf.strategy.netWorthChartAria')"
+                class="desktop-strategy-chart"
               />
-            </div>
-
-            <template v-if="debtPayoff">
-              <MortgageComparisonChart
-                :normal-schedule="debtPayoff.schedule"
-                :accelerated-schedule="debtPayoff.accelerated.schedule"
-                :starting-balance="selectedDebtModel.balance"
-                :start-date="localToday()"
-                :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
-                :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
-                :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
-                class="desktop-mortgage-chart"
-              />
-              <div class="result-breakdown debt-result-breakdown desktop-result-breakdown">
+              <div class="result-breakdown desktop-result-breakdown">
                 <span>
-                  <small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small>
-                  <strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong>
+                  <small>{{ t('whatIf.strategy.currentNetWorth') }}</small>
+                  <strong>{{ formatCurrency(currentNetWorth) }}</strong>
                 </span>
                 <span>
-                  <small>{{ t('whatIf.strategy.debtProjection.strategyPayoff') }}</small>
-                  <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
-                </span>
-                <span>
-                  <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
-                  <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
-                </span>
-                <span>
-                  <small>{{ t('whatIf.strategy.interestSaved') }}</small>
+                  <small>{{ t('whatIf.strategy.projectedGrowthLabel') }}</small>
                   <strong class="positive">{{
-                    formatCurrency(debtPayoff.accelerated.interestSaved)
+                    formatCurrency(projectedNetWorth - currentNetWorth)
                   }}</strong>
                 </span>
+              </div>
+            </template>
+
+            <template v-else-if="selectedDebt">
+              <div class="desktop-projection-heading">
+                <div>
+                  <h2>{{ t('whatIf.strategy.debtProjection.title') }}</h2>
+                  <p>{{ debtInfoText }}</p>
+                </div>
+                <q-select
+                  :model-value="selectedDebt.id"
+                  :options="liabilityOptions"
+                  emit-value
+                  map-options
+                  dense
+                  outlined
+                  options-dense
+                  class="desktop-debt-select"
+                  @update:model-value="updateScenario({ selectedLiabilityId: $event })"
+                />
+              </div>
+
+              <template v-if="debtPayoff">
+                <MortgageComparisonChart
+                  :normal-schedule="debtPayoff.schedule"
+                  :accelerated-schedule="debtPayoff.accelerated.schedule"
+                  :starting-balance="selectedDebtModel.balance"
+                  :start-date="localToday()"
+                  :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
+                  :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
+                  :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
+                  class="desktop-mortgage-chart"
+                />
+                <div class="result-breakdown debt-result-breakdown desktop-result-breakdown">
+                  <span>
+                    <small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small>
+                    <strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong>
+                  </span>
+                  <span>
+                    <small>{{ t('whatIf.strategy.debtProjection.strategyPayoff') }}</small>
+                    <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
+                  </span>
+                  <span>
+                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
+                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
+                  </span>
+                  <span>
+                    <small>{{ t('whatIf.strategy.interestSaved') }}</small>
+                    <strong class="positive">{{
+                      formatCurrency(debtPayoff.accelerated.interestSaved)
+                    }}</strong>
+                  </span>
+                </div>
+              </template>
+              <div v-else class="debt-projection-fallback">
+                <q-icon name="info_outline" />
+                <div>
+                  <strong>{{ t('whatIf.strategy.debtProjection.title') }}</strong>
+                  <p>{{ t('whatIf.strategy.debtDisclaimer') }}</p>
+                </div>
               </div>
             </template>
           </section>
@@ -800,6 +916,45 @@
           </div>
 
           <div class="sheet-subheading">
+            <h3>{{ t('whatIf.strategy.cashReturn') }}</h3>
+            <p>{{ t('whatIf.strategy.cashReturnDescription') }}</p>
+          </div>
+          <article class="investment-mix-card cash-return-card">
+            <span class="mix-card-icon cash-return"><q-icon name="savings" /></span>
+            <div class="mix-card-identity">
+              <strong>{{ t('whatIf.cash.title') }}</strong>
+              <small>{{ t('whatIf.strategy.cashDescription') }}</small>
+            </div>
+            <button type="button" class="mix-card-metric editable-metric return-metric">
+              <strong>{{ Number(activeScenario.cashAnnualReturnPercent).toFixed(1) }}%</strong>
+              <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
+              <q-popup-edit
+                :model-value="activeScenario.cashAnnualReturnPercent"
+                buttons
+                :title="t('whatIf.strategy.cashAnnualReturn')"
+                :label-set="t('common.save')"
+                :label-cancel="t('common.cancel')"
+                @save="setCashReturn"
+              >
+                <template #default="scope">
+                  <q-input
+                    v-model.number="scope.value"
+                    autofocus
+                    dense
+                    outlined
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    suffix="%"
+                    @keyup.enter="scope.set"
+                  />
+                </template>
+              </q-popup-edit>
+            </button>
+          </article>
+
+          <div class="sheet-subheading">
             <h3>{{ t('whatIf.strategy.investmentMix') }}</h3>
             <p>{{ t('whatIf.strategy.investmentMixDescription') }}</p>
           </div>
@@ -903,52 +1058,6 @@
             color="primary"
             :label="t('common.save')"
             @click="allocationSheetOpen = false"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="outcomesSheetOpen" :position="$q.screen.lt.md ? 'bottom' : undefined">
-      <q-card class="strategy-sheet outcomes-sheet">
-        <span class="strategy-sheet-handle" aria-hidden="true" />
-        <q-card-section class="strategy-sheet-heading">
-          <div>
-            <h2>{{ t('whatIf.strategy.projectedOutcomes') }}</h2>
-            <p>
-              {{
-                t('whatIf.strategy.projectedOutcomesDescription', {
-                  years: activeScenario.horizonYears,
-                })
-              }}
-            </p>
-          </div>
-          <q-btn flat round dense icon="close" v-close-popup :aria-label="t('common.close')" />
-        </q-card-section>
-        <q-card-section class="strategy-sheet-scroll outcome-sheet-list">
-          <button
-            v-for="outcome in strategyOutcomes"
-            :key="outcome.id"
-            type="button"
-            class="sheet-outcome-card"
-            @click="openOutcomeDetail(outcome)"
-          >
-            <span :class="['mini-icon', outcome.tone]"><q-icon :name="outcome.icon" /></span>
-            <span class="outcome-copy">
-              <strong>{{ outcome.title }}</strong>
-              <small>{{ outcome.description }}</small>
-            </span>
-            <b :class="outcome.status">{{ outcome.result }}</b>
-            <q-icon name="chevron_right" />
-          </button>
-        </q-card-section>
-        <q-card-actions class="strategy-sheet-actions single-action">
-          <q-btn
-            unelevated
-            no-caps
-            color="primary"
-            icon="bar_chart"
-            :label="t('whatIf.strategy.viewProjectionDetails')"
-            @click="openProjectionDetails"
           />
         </q-card-actions>
       </q-card>
@@ -1301,9 +1410,9 @@ const initialScenarioDialogOpen = ref(false)
 const initialScenarioName = ref('')
 const projectionChartMode = ref('total')
 const allocationSheetOpen = ref(false)
-const outcomesSheetOpen = ref(false)
 const detailSheetOpen = ref(false)
 const detailSheetKind = ref('projection')
+const selectedDesktopOutcomeKind = ref('investment')
 const year = currentFinancialYear()
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspace = computed(
@@ -1415,6 +1524,12 @@ const baselineInvestmentProjectionPoints = computed(() =>
     value: investmentValue,
   })),
 )
+const cashProjectionPoints = computed(() =>
+  projection.value.strategy.points.map(({ month, cash }) => ({ month, value: cash })),
+)
+const baselineCashProjectionPoints = computed(() =>
+  baselineProjection.value.strategy.points.map(({ month, cash }) => ({ month, value: cash })),
+)
 
 const scenarioOptions = computed(() =>
   config.value.scenarios.map(({ id, name }) => ({ value: id, label: name })),
@@ -1479,6 +1594,14 @@ const currentNetWorth = computed(() =>
     selectedMemberId.value,
   ),
 )
+const baselineNetWorthPoints = computed(() =>
+  strategyNetWorthPoints({
+    currentNetWorth: currentNetWorth.value,
+    strategy: baselineProjection.value.strategy,
+    monthlyDebtContribution: 0,
+    debtBalance: selectedDebt.value?.balance || 0,
+  }),
+)
 const projectedNetWorth = computed(() => netWorthPoints.value.at(-1)?.value || 0)
 const detailSheetTitle = computed(() => {
   const titleKeys = {
@@ -1500,7 +1623,7 @@ const strategyOutcomes = computed(() => {
     id: safetyId,
     icon: 'health_and_safety',
     tone: 'cash',
-    title: t(`milestones.items.${safetyId}`),
+    title: t('milestones.families.safety.title'),
     description: t('whatIf.strategy.projectedCashAgainstTarget', {
       value: formatCurrency(projection.value.strategy.cash),
       target: formatCurrency(projection.value.strategy.cashTarget),
@@ -1535,7 +1658,7 @@ const strategyOutcomes = computed(() => {
       icon: 'flight_takeoff',
       tone: 'freedom',
       showInfo: true,
-      title: t(`milestones.items.${freedom.id}`),
+      title: t('milestones.families.freedom.title'),
       description: t('whatIf.strategy.freedomProjected', { years: formatNumber(fundedYears) }),
       result: reachedAt
         ? reachedAt.month === 0
@@ -1560,7 +1683,7 @@ const strategyOutcomes = computed(() => {
       id: netWorth.id,
       icon: 'trending_up',
       tone: 'net-worth',
-      title: t(`milestones.items.${netWorth.id}`),
+      title: t('milestones.families.netWorth.title'),
       description: t('whatIf.strategy.projectedNetWorth', {
         value: formatCurrency(finalNetWorth),
       }),
@@ -1605,7 +1728,7 @@ const strategyOutcomes = computed(() => {
       id,
       icon: 'credit_score',
       tone: 'debt',
-      title: t(`milestones.items.${id}`),
+      title: t('milestones.families.debt.title'),
       description: t('whatIf.strategy.projectedDebtBalance', {
         name: selectedDebt.value.name,
         value: formatCurrency(projectedBalance),
@@ -1636,22 +1759,43 @@ const strategyOutcomes = computed(() => {
   return outcomes
 })
 
+const selectedDesktopOutcome = computed(() =>
+  strategyOutcomes.value.find(
+    (outcome) => outcomeKind(outcome) === selectedDesktopOutcomeKind.value,
+  ),
+)
+
+watch(
+  strategyOutcomes,
+  (outcomes) => {
+    if (outcomes.some((outcome) => outcomeKind(outcome) === selectedDesktopOutcomeKind.value))
+      return
+    const fallback =
+      outcomes.find((outcome) => outcomeKind(outcome) === 'investment') || outcomes[0]
+    if (fallback) selectedDesktopOutcomeKind.value = outcomeKind(fallback)
+  },
+  { immediate: true },
+)
+
 function openOutcomeDetail(outcome) {
+  const kind = outcomeKind(outcome)
+  if ($q.screen.gt.sm) {
+    selectedDesktopOutcomeKind.value = kind
+    return
+  }
+
+  detailSheetKind.value = kind
+  detailSheetOpen.value = true
+}
+
+function outcomeKind(outcome) {
   const detailByTone = {
     cash: 'cash',
     debt: 'debt',
     freedom: 'investment',
     'net-worth': 'netWorth',
   }
-  detailSheetKind.value = detailByTone[outcome.tone] || 'projection'
-  outcomesSheetOpen.value = false
-  detailSheetOpen.value = true
-}
-
-function openProjectionDetails() {
-  outcomesSheetOpen.value = false
-  detailSheetKind.value = 'projection'
-  detailSheetOpen.value = true
+  return detailByTone[outcome?.tone] || 'investment'
 }
 
 watch(workspaceId, () => prepare(), { immediate: true })
@@ -1843,6 +1987,11 @@ function setReturn(id, value) {
   const mix = cloneMix()
   mix[id] = { ...mix[id], annualReturnPercent: numeric }
   updateScenario({ investmentMix: mix })
+}
+
+function setCashReturn(value) {
+  const numeric = Math.min(100, Math.max(0, Number(value) || 0))
+  updateScenario({ cashAnnualReturnPercent: numeric })
 }
 
 function cloneMix() {
@@ -2547,6 +2696,10 @@ h1 {
   border-radius: 0.8rem;
   background: white;
 }
+.cash-return-card {
+  grid-template-columns: 2.5rem minmax(5.5rem, 1fr) 5.1rem;
+  margin-top: 0.7rem;
+}
 .mix-card-icon {
   display: grid;
   place-items: center;
@@ -2554,6 +2707,10 @@ h1 {
   height: 2.5rem;
   border-radius: 50%;
   font-size: 1.3rem;
+}
+.mix-card-icon.cash-return {
+  background: var(--color-green-soft);
+  color: var(--color-success-dark);
 }
 .mix-card-icon.stock-market {
   background: var(--color-blue-soft);
@@ -3203,6 +3360,10 @@ h1 {
       'icon allocation return'
       'icon amount amount';
     gap: 0.45rem 0.7rem;
+  }
+  .cash-return-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'icon identity return';
   }
   .mix-card-icon {
     grid-area: icon;

@@ -152,4 +152,25 @@ describe('What If calculations', () => {
       ],
     })
   })
+
+  it('keeps cash return settings while defaulting older scenarios to zero', () => {
+    const configured = normalizeWhatIfConfig({
+      activeScenarioId: 'cash-return',
+      scenarios: [
+        {
+          id: 'cash-return',
+          name: 'Cash return',
+          allocation: { cash: 100, invest: 0, debt: 0 },
+          investmentMix: { stockMarket: { allocation: 100, annualReturnPercent: 7 } },
+          cashAnnualReturnPercent: 2.5,
+        },
+      ],
+    })
+    const legacy = normalizeWhatIfConfig({
+      strategy: { cash: 100, invest: 0, debt: 0 },
+    })
+
+    expect(configured.scenarios[0].cashAnnualReturnPercent).toBe(2.5)
+    expect(legacy.scenarios[0].cashAnnualReturnPercent).toBe(0)
+  })
 })

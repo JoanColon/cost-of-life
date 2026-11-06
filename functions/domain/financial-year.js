@@ -85,6 +85,7 @@ function updateFinancialYearProjection(
       return [
         monthKey,
         {
+          ...positionMetadata(previous),
           assets: assetsValue,
           liabilities: liabilitiesValue,
           income: incomeValue,
@@ -392,6 +393,7 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
   }
   const expenses = { categories }
   const month = {
+    ...positionMetadata(previous),
     assets: canonicalSection(previous.assets),
     liabilities: canonicalSection(previous.liabilities),
     income: canonicalSection(previous.income),
@@ -404,6 +406,14 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
     projectionState: { ...(financialYear.projectionState || {}) },
     months,
   }
+}
+
+function positionMetadata(month) {
+  return Object.fromEntries(
+    ['positionStatus', 'positionAsOf', 'positionCalculatedAt']
+      .filter((field) => month?.[field] != null)
+      .map((field) => [field, month[field]]),
+  )
 }
 
 function financialYearMetadata(financialYear) {

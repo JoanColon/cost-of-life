@@ -37,7 +37,7 @@
                 outlined
                 :dense="$q.screen.lt.sm"
                 hide-bottom-space
-                prefix="€"
+                :prefix="currencySymbol"
                 autofocus
               />
             </div>
@@ -81,7 +81,7 @@ import {
   normalizeExpenseEstimate,
   expenseFrequencies,
 } from '@/domain/financial/expense-calculations'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
   estimate: { type: Object, required: true },

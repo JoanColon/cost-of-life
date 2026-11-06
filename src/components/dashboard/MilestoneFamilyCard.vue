@@ -10,7 +10,7 @@
 
     <template v-if="family.milestone">
       <div class="target-heading">
-        <strong>{{ t(`milestones.items.${family.milestone.id}`) }}</strong>
+        <strong>{{ milestoneTitle }}</strong>
         <b :class="{ completed: family.completed, pending: family.milestone.pending }">
           <q-icon v-if="family.milestone.pending" name="schedule" />
           <q-icon v-if="family.completed" name="check_circle" />
@@ -45,6 +45,11 @@ const progressValue = computed(() =>
   props.family.completed ? 1 : props.family.milestone?.progress || 0,
 )
 const percentage = computed(() => Math.round(progressValue.value * 100))
+const milestoneTitle = computed(() =>
+  t(`milestones.items.${props.family.milestone.id}`, {
+    amount: formatCurrency(props.family.milestone.target),
+  }),
+)
 const currentTargetLabel = computed(() => {
   const milestone = props.family.milestone
   if (!milestone) return ''

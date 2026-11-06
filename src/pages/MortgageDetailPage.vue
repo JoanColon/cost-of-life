@@ -70,7 +70,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  prefix="€"
+                  :prefix="currencySymbol"
                   lazy-rules
                   :rules="[nonNegativeMoneyRule]"
                 />
@@ -83,7 +83,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  prefix="€"
+                  :prefix="currencySymbol"
                   lazy-rules
                   :rules="[currentBalanceRule]"
                 />
@@ -110,7 +110,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  prefix="€"
+                  :prefix="currencySymbol"
                   :hint="t('liabilities.mortgage.monthlyPaymentHint')"
                   lazy-rules
                   :rules="[optionalPositiveMoneyRule]"
@@ -315,7 +315,7 @@
                 type="number"
                 min="0"
                 step="10"
-                prefix="€"
+                :prefix="currencySymbol"
                 :suffix="t('liabilities.mortgage.perMonth')"
               />
             </div>
@@ -403,7 +403,7 @@ import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 const $q = useQuasar()

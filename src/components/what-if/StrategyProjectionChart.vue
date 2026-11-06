@@ -9,7 +9,7 @@ import { LineChart } from 'echarts/charts'
 import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { formatCurrency } from '@/utils/formatters'
+import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent, CanvasRenderer])
 
@@ -17,6 +17,9 @@ const props = defineProps({
   strategyPoints: { type: Array, required: true },
   baselinePoints: { type: Array, default: () => [] },
   mode: { type: String, default: 'total' },
+  baselineLabel: { type: String, default: '' },
+  strategyLabel: { type: String, default: '' },
+  ariaLabel: { type: String, default: '' },
 })
 
 const { t } = useI18n()
@@ -51,7 +54,15 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.strategyPoints, props.baselinePoints, props.mode],
+  () => [
+    props.strategyPoints,
+    props.baselinePoints,
+    props.mode,
+    props.baselineLabel,
+    props.strategyLabel,
+    props.ariaLabel,
+    workspaceCurrency.value,
+  ],
   () => nextTick(renderChart),
   { deep: true },
 )
@@ -65,11 +76,13 @@ function renderChart() {
       aria: {
         enabled: true,
         label: {
-          description: t(
-            props.mode === 'breakdown'
-              ? 'whatIf.strategy.chartBreakdownAria'
-              : 'whatIf.strategy.chartTotalAria',
-          ),
+          description:
+            props.ariaLabel ||
+            t(
+              props.mode === 'breakdown'
+                ? 'whatIf.strategy.chartBreakdownAria'
+                : 'whatIf.strategy.chartTotalAria',
+            ),
         },
       },
       grid: { top: 50, right: 18, bottom: 28, left: 62 },
@@ -122,7 +135,7 @@ function renderChart() {
 function totalChartSeries() {
   return [
     {
-      name: t('whatIf.strategy.regularInvestment'),
+      name: props.baselineLabel || t('whatIf.strategy.regularInvestment'),
       type: 'line',
       data: props.baselinePoints.map(({ value }) => value),
       smooth: 0.25,
@@ -132,7 +145,7 @@ function totalChartSeries() {
       emphasis: { focus: 'series', lineStyle: { width: 4 } },
     },
     {
-      name: t('whatIf.strategy.strategyInvestment'),
+      name: props.strategyLabel || t('whatIf.strategy.strategyInvestment'),
       type: 'line',
       data: props.strategyPoints.map(({ value }) => value),
       smooth: 0.25,
@@ -163,7 +176,7 @@ function compactValue(value) {
   return new Intl.NumberFormat('en', {
     notation: 'compact',
     style: 'currency',
-    currency: 'EUR',
+    currency: workspaceCurrency.value,
     maximumFractionDigits: 1,
   }).format(value)
 }

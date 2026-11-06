@@ -47,16 +47,7 @@ const activeItem = computed(() => {
   if (route.name === 'progress' || route.name === 'achievements') return 'progress'
   if (route.name === 'plan' || route.name === 'what-if' || route.name === 'what-if-strategy')
     return 'plan'
-  if (
-    route.name === 'setup' ||
-    route.name === 'assets' ||
-    route.name === 'asset-category' ||
-    route.name === 'liabilities' ||
-    route.name === 'liability-category' ||
-    route.name === 'income' ||
-    route.name === 'income-category'
-  )
-    return 'setup'
+  if (route.name === 'setup') return 'setup'
   return null
 })
 

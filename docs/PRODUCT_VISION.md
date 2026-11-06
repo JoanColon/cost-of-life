@@ -148,7 +148,9 @@ Previous years are closed history. The current year is the active annual model:
 changing a base income or expense updates all twelve months, while the monthly
 table stores explicit month-specific exceptions. Expense Tracker entries and
 reconciliations remain separate period data and must stay consultable even when
-the active model changes.
+the active model changes. Monthly asset and liability positions are closed in
+the same annual document; a separate position-history collection must not be
+maintained as a second source of truth.
 
 ### 3.4 Prevent financial double counting
 

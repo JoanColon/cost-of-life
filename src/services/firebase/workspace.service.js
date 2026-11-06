@@ -32,6 +32,7 @@ export async function createWorkspace({ name }) {
     milestoneTracking: {
       status: 'setup',
     },
+    currency: 'EUR',
     memberIds: [user.uid],
     members: {
       [user.uid]: {
@@ -50,6 +51,7 @@ export async function createWorkspace({ name }) {
     milestoneTracking: {
       status: 'setup',
     },
+    currency: 'EUR',
     memberIds: [user.uid],
     members: {
       [user.uid]: {
@@ -62,6 +64,18 @@ export async function createWorkspace({ name }) {
 
 export async function deleteWorkspace(workspaceId) {
   await httpsCallable(functions, 'deleteWorkspace')({ workspaceId })
+}
+
+export async function updateWorkspaceSettings(workspaceId, settings) {
+  const result = await httpsCallable(
+    functions,
+    'updateWorkspaceSettings',
+  )({
+    workspaceId,
+    currency: settings.currency,
+    memberNames: settings.memberNames,
+  })
+  return result.data
 }
 
 export async function createWorkspaceInvite(workspaceId) {

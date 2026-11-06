@@ -9,7 +9,7 @@ import { LineChart } from 'echarts/charts'
 import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { formatCurrency } from '@/utils/formatters'
+import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent, CanvasRenderer])
 
@@ -50,6 +50,7 @@ watch(
     props.acceleratedLabel,
     props.ariaLabel,
     locale.value,
+    workspaceCurrency.value,
   ],
   () => nextTick(renderChart),
   { deep: true },
@@ -166,7 +167,7 @@ function compactCurrency(value) {
   return new Intl.NumberFormat(locale.value, {
     notation: 'compact',
     style: 'currency',
-    currency: 'EUR',
+    currency: workspaceCurrency.value,
     maximumFractionDigits: 1,
   }).format(value)
 }

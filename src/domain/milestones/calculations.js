@@ -5,6 +5,7 @@ import {
   financialYearMonthValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
+import { positionHistoryDocuments } from '@/domain/financial/history'
 import {
   FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS,
   INVESTABLE_ASSET_CATEGORY_IDS,
@@ -28,7 +29,13 @@ export function calculateMilestoneProgress({
       .filter(({ status }) => status === 'pending')
       .map((achievement) => [achievement.milestoneId, achievement]),
   )
-  const history = withCurrentFinancialYear(financialHistory, financialYear, month)
+  const currentYear = Number(financialYear?.year || financialYear?.id)
+  const history = positionHistoryDocuments(
+    withCurrentFinancialYear(financialHistory, financialYear, month),
+    {
+      throughPeriod: Number.isInteger(currentYear) ? `${currentYear}-${month}` : null,
+    },
+  )
   const annualCostOfLife = financialYearValue(financialYear, 'expenses', memberId)
   const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash', memberId)
   const freedomAssets =

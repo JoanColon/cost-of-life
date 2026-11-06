@@ -15,7 +15,7 @@ import {
 } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { formatCurrency } from '@/utils/formatters'
+import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([
   LineChart,
@@ -53,7 +53,13 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.projection, props.showMortgage, props.showEquity, locale.value],
+  () => [
+    props.projection,
+    props.showMortgage,
+    props.showEquity,
+    locale.value,
+    workspaceCurrency.value,
+  ],
   () => nextTick(renderChart),
   { deep: true },
 )
@@ -198,7 +204,7 @@ function compactCurrency(value) {
   return new Intl.NumberFormat(locale.value, {
     notation: 'compact',
     style: 'currency',
-    currency: 'EUR',
+    currency: workspaceCurrency.value,
     maximumFractionDigits: 1,
   }).format(value)
 }
