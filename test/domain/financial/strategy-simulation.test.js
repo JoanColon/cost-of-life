@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  inflationAdjustedCoverage,
   latestPositionMonth,
   projectPath,
   simulateStrategy,
@@ -8,6 +9,25 @@ import {
 } from '../../../src/domain/financial/strategy-simulation'
 
 describe('strategy simulation', () => {
+  it('uses the same inflation-adjusted coverage calculation for months and years', () => {
+    expect(
+      inflationAdjustedCoverage({
+        projectedValue: 24_000,
+        currentPeriodCost: 1_000,
+        annualInflationPercent: 2,
+        month: 120,
+      }),
+    ).toBe(19.69)
+
+    expect(
+      inflationAdjustedCoverage({
+        projectedValue: 240_000,
+        currentPeriodCost: 12_000,
+        annualInflationPercent: 2,
+        month: 120,
+      }),
+    ).toBe(16.41)
+  })
   it('uses the current month or latest available financial position', () => {
     const financialYear = { months: { '01': {}, '03': {} } }
     expect(latestPositionMonth(financialYear, '03')).toBe('03')
@@ -81,7 +101,7 @@ describe('strategy simulation', () => {
     })
   })
 
-  it('redirects cash contributions into investments after reaching the emergency fund target', () => {
+  it('keeps the configured monthly cash contribution after reaching the emergency fund target', () => {
     const result = projectPath({
       startingPosition: { cash: 1_000, investmentBalances: {} },
       allocation: { cash: 50, invest: 50, debt: 0 },
@@ -92,9 +112,32 @@ describe('strategy simulation', () => {
       monthlyCost: 500,
     })
 
-    expect(result.cash).toBe(1_500)
+    expect(result.cash).toBe(7_000)
     expect(result.cashTargetMonth).toBe(1)
-    expect(result.investmentContributions).toBe(11_500)
+    expect(result.cashContributions).toBe(6_000)
+    expect(result.investmentContributions).toBe(6_000)
+  })
+
+  it('inflates the future safety target while retaining today’s target', () => {
+    const result = projectPath({
+      startingPosition: { cash: 0, investmentBalances: {} },
+      allocation: { cash: 100, invest: 0, debt: 0 },
+      horizonYears: 10,
+      cashTargetMonths: 12,
+      monthlySavings: 100,
+      monthlyCost: 1_000,
+      inflationAnnualPercent: 2,
+    })
+
+    expect(result.cashContributions).toBe(12_000)
+    expect(result.initialCashTarget).toBe(12_000)
+    expect(result.cashTarget).toBe(14_627.93)
+    expect(result.points.at(-1)).toMatchObject({
+      annualCost: 12_000,
+      inflationAdjustedAnnualCost: 14_627.93,
+      cashTarget: 14_627.93,
+      realCash: 9_844.18,
+    })
   })
 
   it('compounds the configured cash return on the balance and new contributions', () => {
@@ -133,6 +176,75 @@ describe('strategy simulation', () => {
       { month: 12, value: 24_000 },
       { month: 24, value: 41_000 },
     ])
+  })
+
+  it('projects net worth from modeled property appreciation and mortgage amortization', () => {
+    const points = strategyNetWorthPoints({
+      currentNetWorth: 110_000,
+      currentAssets: 160_000,
+      currentLiabilities: 50_000,
+      currentRealEstate: 100_000,
+      strategy: {
+        startingValue: 40_000,
+        points: [
+          {
+            month: 0,
+            cash: 10_000,
+            investmentValue: 30_000,
+            investmentBalances: { stockMarket: 30_000, realEstate: 0 },
+            investmentContributionBalances: { stockMarket: 0, realEstate: 0 },
+          },
+          {
+            month: 12,
+            cash: 22_000,
+            investmentValue: 42_000,
+            investmentBalances: { stockMarket: 42_000, realEstate: 0 },
+            investmentContributionBalances: { stockMarket: 12_000, realEstate: 0 },
+          },
+        ],
+      },
+      monthlyDebtContribution: 500,
+      debtBalance: 50_000,
+      selectedDebtId: 'home',
+      realEstateAssets: [
+        {
+          currentValue: 100_000,
+          model: { schemaVersion: 1, annualAppreciationRate: 10 },
+        },
+      ],
+      mortgages: [
+        {
+          id: 'home',
+          currentBalance: 50_000,
+          annualInterestRate: 0,
+          monthlyPayment: 1_000,
+        },
+      ],
+      asOfDate: '2026-01-01',
+    })
+
+    expect(points[0]).toEqual({
+      month: 0,
+      value: 110_000,
+      breakdown: {
+        cash: 10_000,
+        investments: 30_000,
+        realEstate: 100_000,
+        otherAssets: 20_000,
+        liabilities: -50_000,
+      },
+    })
+    expect(points[1]).toEqual({
+      month: 12,
+      value: 162_000,
+      breakdown: {
+        cash: 22_000,
+        investments: 42_000,
+        realEstate: 110_000,
+        otherAssets: 20_000,
+        liabilities: -32_000,
+      },
+    })
   })
 
   it('counts non-primary real estate toward freedom while keeping cash separate', () => {

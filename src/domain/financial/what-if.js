@@ -18,6 +18,7 @@ export const defaultStrategyScenario = Object.freeze({
     stockMarket: Object.freeze({ allocation: 100, annualReturnPercent: 7 }),
   }),
   cashAnnualReturnPercent: 0,
+  inflationAnnualPercent: 2,
   horizonYears: 20,
   cashTargetMonths: 12,
   selectedLiabilityId: null,
@@ -42,6 +43,7 @@ export function normalizeWhatIfConfig(config = {}) {
       },
     },
     cashAnnualReturnPercent: normalizeReturn(config.cashAnnualReturnPercent) ?? 0,
+    inflationAnnualPercent: normalizeReturn(config.inflationAnnualPercent) ?? 2,
     selectedLiabilityId:
       typeof config.selectedLiabilityId === 'string' ? config.selectedLiabilityId : null,
   }
@@ -78,6 +80,7 @@ export function normalizeStrategyScenario(scenario = {}) {
     allocation: allocation || { ...defaultStrategyScenario.allocation },
     investmentMix,
     cashAnnualReturnPercent: normalizeReturn(scenario.cashAnnualReturnPercent) ?? 0,
+    inflationAnnualPercent: normalizeReturn(scenario.inflationAnnualPercent) ?? 2,
     horizonYears: Number.isFinite(horizon) ? Math.min(50, Math.max(1, Math.round(horizon))) : 20,
     cashTargetMonths: [3, 6, 12].includes(cashTarget) ? cashTarget : 12,
     selectedLiabilityId:

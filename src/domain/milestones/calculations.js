@@ -6,6 +6,7 @@ import {
   financialYearValue,
 } from '@/domain/financial/financial-year'
 import { positionHistoryDocuments } from '@/domain/financial/history'
+import { applyOwnership } from '@/domain/financial/ownership'
 import {
   FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS,
   INVESTABLE_ASSET_CATEGORY_IDS,
@@ -16,6 +17,7 @@ export function calculateMilestoneProgress({
   financialYear,
   financialHistory = [],
   achievements = [],
+  liabilities = [],
   month = currentFinancialMonth(),
   memberId = 'all',
 } = {}) {
@@ -63,6 +65,7 @@ export function calculateMilestoneProgress({
       financialYear,
       fundedYears,
       history,
+      liabilities,
       memberId,
       month,
       netWorth,
@@ -102,27 +105,54 @@ function calculateDefinition(definition, context) {
     }
   }
 
-  const currentValue = categoryTotal(
-    context.financialYear,
-    context.month,
-    'liabilities',
-    definition.liabilityCategoryIds,
-    context.memberId,
-  )
-  const relevant = hasHistoricalDebt(
-    context.history,
-    definition.liabilityCategoryIds,
-    context.memberId,
-  )
+  return calculateLiabilityProgress({
+    categoryIds: definition.liabilityCategoryIds,
+    financialYear: context.financialYear,
+    history: context.history,
+    liabilities: context.liabilities,
+    memberId: context.memberId,
+    month: context.month,
+  })
+}
+
+export function calculateLiabilityProgress({
+  categoryIds = [],
+  financialYear,
+  history = [],
+  liabilities = [],
+  memberId = 'all',
+  month,
+} = {}) {
+  const currentBalances = liabilityBalancesById(financialYear, month, categoryIds, memberId)
+  const historicalMaximums = historicalLiabilityMaximums(history, categoryIds, memberId)
+  const modeledInitialValues = modeledLiabilityInitialValues(liabilities, categoryIds, memberId)
+  const liabilityIds = new Set([
+    ...currentBalances.keys(),
+    ...historicalMaximums.keys(),
+    ...modeledInitialValues.keys(),
+  ])
+  let currentValue = 0
+  let startingValue = 0
+
+  for (const id of liabilityIds) {
+    const currentBalance = currentBalances.get(id) || 0
+    const initialValue = modeledInitialValues.has(id)
+      ? modeledInitialValues.get(id)
+      : historicalMaximums.get(id) || currentBalance
+    currentValue += currentBalance
+    startingValue += Math.max(0, Number(initialValue) || 0)
+  }
+
+  const relevant = startingValue > 0
   const reached = relevant && currentValue <= 0
-  const startingValue = historicalDebtMaximum(
-    context.history,
-    definition.liabilityCategoryIds,
-    context.memberId,
-  )
-  const progress =
-    relevant && startingValue > 0 ? ratio(startingValue - currentValue, startingValue) : 0
-  return { currentValue, progress, reached, relevant }
+  const progress = relevant ? ratio(startingValue - currentValue, startingValue) : 0
+  return {
+    currentValue: money(currentValue),
+    progress,
+    reached,
+    relevant,
+    startingValue: money(startingValue),
+  }
 }
 
 function targetProgress(currentValue, target, relevant) {
@@ -143,21 +173,56 @@ function categoryTotal(financialYear, month, section, categoryIds, memberId = 'a
   )
 }
 
-function hasHistoricalDebt(financialHistory, categoryIds, memberId) {
-  return historicalDebtMaximum(financialHistory, categoryIds, memberId) > 0
+function historicalLiabilityMaximums(financialHistory, categoryIds, memberId) {
+  const maximums = new Map()
+  for (const financialYear of financialHistory) {
+    for (const month of Object.keys(financialYear?.months || {})) {
+      for (const [id, balance] of liabilityBalancesById(
+        financialYear,
+        month,
+        categoryIds,
+        memberId,
+      )) {
+        maximums.set(id, Math.max(maximums.get(id) || 0, balance))
+      }
+    }
+  }
+  return maximums
 }
 
-function historicalDebtMaximum(financialHistory, categoryIds, memberId) {
-  return financialHistory.reduce(
-    (maximum, financialYear) =>
-      Math.max(
-        maximum,
-        ...Object.keys(financialYear?.months || {}).map((month) =>
-          categoryTotal(financialYear, month, 'liabilities', categoryIds, memberId),
-        ),
-      ),
-    0,
+function modeledLiabilityInitialValues(liabilities, categoryIds, memberId) {
+  const allowedCategories = new Set(categoryIds)
+  return new Map(
+    liabilities
+      .filter(({ id, categoryId }) => id && allowedCategories.has(categoryId))
+      .map((liability) => {
+        const originalPrincipal = Number(liability.detail?.mortgage?.originalPrincipal)
+        if (!(originalPrincipal > 0)) return null
+        return [liability.id, applyOwnership(originalPrincipal, liability.ownership, memberId)]
+      })
+      .filter(Boolean),
   )
+}
+
+function liabilityBalancesById(financialYear, month, categoryIds, memberId) {
+  const balances = new Map()
+  for (const categoryId of categoryIds) {
+    const subcategories =
+      financialYear?.months?.[month]?.liabilities?.categories?.[categoryId]?.subcategories || {}
+    for (const [subcategoryId, subcategory] of Object.entries(subcategories)) {
+      const items = Object.entries(subcategory?.items || {})
+      if (items.length) {
+        for (const [id, item] of items) balances.set(id, scopedPositionValue(item, memberId))
+      } else {
+        balances.set(`${categoryId}:${subcategoryId}`, scopedPositionValue(subcategory, memberId))
+      }
+    }
+  }
+  return balances
+}
+
+function scopedPositionValue(item, memberId) {
+  return Math.max(0, Number(memberId !== 'all' ? item?.memberValues?.[memberId] : item?.total) || 0)
 }
 
 function withCurrentFinancialYear(financialHistory, financialYear, month) {
@@ -182,4 +247,8 @@ function withCurrentFinancialYear(financialHistory, financialYear, month) {
 function ratio(value, target) {
   if (!(target > 0)) return 0
   return Math.min(1, Math.max(0, Number(value || 0) / target))
+}
+
+function money(value) {
+  return Math.round(((Number(value) || 0) + Number.EPSILON) * 100) / 100
 }

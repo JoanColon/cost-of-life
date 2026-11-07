@@ -17,6 +17,7 @@ const props = defineProps({
   strategyPoints: { type: Array, required: true },
   baselinePoints: { type: Array, default: () => [] },
   mode: { type: String, default: 'total' },
+  breakdownTypes: { type: Array, default: () => [] },
   baselineLabel: { type: String, default: '' },
   strategyLabel: { type: String, default: '' },
   ariaLabel: { type: String, default: '' },
@@ -26,6 +27,11 @@ const { t } = useI18n()
 const chartElement = ref(null)
 const investmentSeries = computed(() =>
   INVESTMENT_TYPES.filter(({ id }) =>
+    props.strategyPoints.some((point) => Number(point.breakdown?.[id] || 0) !== 0),
+  ),
+)
+const breakdownSeriesTypes = computed(() =>
+  (props.breakdownTypes.length ? props.breakdownTypes : investmentSeries.value).filter(({ id }) =>
     props.strategyPoints.some((point) => Number(point.breakdown?.[id] || 0) !== 0),
   ),
 )
@@ -58,6 +64,7 @@ watch(
     props.strategyPoints,
     props.baselinePoints,
     props.mode,
+    props.breakdownTypes,
     props.baselineLabel,
     props.strategyLabel,
     props.ariaLabel,
@@ -158,8 +165,8 @@ function totalChartSeries() {
 }
 
 function breakdownChartSeries() {
-  return investmentSeries.value.map(({ id, color }) => ({
-    name: t(`plan.investments.${id}`),
+  return breakdownSeriesTypes.value.map(({ id, color, label }) => ({
+    name: label || t(`plan.investments.${id}`),
     type: 'line',
     data: props.strategyPoints.map((point) => point.breakdown?.[id] || 0),
     smooth: 0.2,

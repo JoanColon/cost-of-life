@@ -169,7 +169,7 @@
                 <span :class="['mini-icon', outcome.tone]"><q-icon :name="outcome.icon" /></span>
                 <span class="outcome-copy">
                   <strong>{{ outcome.title }}</strong>
-                  <small>{{ outcome.description }}</small>
+                  <small>{{ outcome.summary }}</small>
                 </span>
                 <b :class="outcome.status">{{ outcome.result }}</b>
                 <q-icon name="chevron_right" class="outcome-arrow" />
@@ -184,7 +184,6 @@
               <div class="desktop-projection-heading">
                 <div>
                   <h2>{{ t('whatIf.strategy.cashDetails') }}</h2>
-                  <p>{{ selectedDesktopOutcome?.description }}</p>
                 </div>
                 <div class="horizon-options">
                   <button
@@ -205,13 +204,6 @@
                   </button>
                 </div>
               </div>
-              <div class="desktop-projection-value">
-                <span>{{ t('whatIf.strategy.projectedCashLabel') }}</span>
-                <strong>{{ formatCurrency(projection.strategy.cash) }}</strong>
-                <small>{{
-                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-                }}</small>
-              </div>
               <StrategyProjectionChart
                 :strategy-points="cashProjectionPoints"
                 :baseline-points="baselineCashProjectionPoints"
@@ -220,7 +212,20 @@
                 :aria-label="t('whatIf.strategy.cashChartAria')"
                 class="desktop-strategy-chart"
               />
-              <div class="result-breakdown desktop-result-breakdown">
+              <div class="result-breakdown desktop-result-breakdown four-values">
+                <span class="projected-value-kpi">
+                  <small>{{
+                    t('whatIf.strategy.projectedCashAtHorizon', {
+                      years: activeScenario.horizonYears,
+                    })
+                  }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.cash) }}</strong>
+                  <small>{{
+                    t('whatIf.strategy.inTodaysMoney', {
+                      value: formatCurrency(finalProjectionPoint.realCash),
+                    })
+                  }}</small>
+                </span>
                 <span>
                   <small>{{ t('whatIf.strategy.startingValue') }}</small>
                   <strong>{{ formatCurrency(startingPosition.cash) }}</strong>
@@ -233,10 +238,6 @@
                   <small>{{ t('whatIf.strategy.cashGrowth') }}</small>
                   <strong>{{ formatCurrency(projection.strategy.cashGrowth) }}</strong>
                 </span>
-                <span>
-                  <small>{{ t('whatIf.strategy.target') }}</small>
-                  <strong>{{ formatCurrency(projection.strategy.cashTarget) }}</strong>
-                </span>
               </div>
             </template>
 
@@ -244,7 +245,6 @@
               <div class="desktop-projection-heading">
                 <div>
                   <h2>{{ t('whatIf.strategy.projectionPreview') }}</h2>
-                  <p>{{ t('whatIf.strategy.projectionPreviewDescription') }}</p>
                 </div>
                 <div class="desktop-projection-controls">
                   <div class="horizon-options">
@@ -284,20 +284,26 @@
                 </div>
               </div>
 
-              <div class="desktop-projection-value">
-                <span>{{ t('whatIf.strategy.projectedInvestmentValue') }}</span>
-                <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
-                <small>{{
-                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-                }}</small>
-              </div>
               <StrategyProjectionChart
                 :strategy-points="investmentProjectionPoints"
                 :baseline-points="baselineInvestmentProjectionPoints"
                 :mode="projectionChartMode"
                 class="desktop-strategy-chart"
               />
-              <div class="result-breakdown desktop-result-breakdown">
+              <div class="result-breakdown desktop-result-breakdown four-values">
+                <span class="projected-value-kpi">
+                  <small>{{
+                    t('whatIf.strategy.projectedInvestmentAtHorizon', {
+                      years: activeScenario.horizonYears,
+                    })
+                  }}</small>
+                  <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
+                  <small>{{
+                    t('whatIf.strategy.inTodaysMoney', {
+                      value: formatCurrency(finalProjectionPoint.realInvestmentValue),
+                    })
+                  }}</small>
+                </span>
                 <span>
                   <small>{{ t('whatIf.strategy.startingValue') }}</small>
                   <strong>{{ formatCurrency(startingPosition.investmentTotal) }}</strong>
@@ -317,37 +323,51 @@
               <div class="desktop-projection-heading">
                 <div>
                   <h2>{{ t('whatIf.strategy.netWorthDetails') }}</h2>
-                  <p>{{ selectedDesktopOutcome?.description }}</p>
                 </div>
-                <div class="horizon-options">
-                  <button
-                    v-for="years in [10, 20, 30]"
-                    :key="years"
-                    type="button"
-                    :class="{ selected: activeScenario.horizonYears === years }"
-                    @click="updateScenario({ horizonYears: years })"
-                  >
-                    {{ years }} years
-                  </button>
-                  <button
-                    type="button"
-                    :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
-                    @click="setCustomHorizon"
-                  >
-                    {{ t('whatIf.reduction.custom') }}
-                  </button>
+                <div class="desktop-projection-controls">
+                  <div class="horizon-options">
+                    <button
+                      v-for="years in [10, 20, 30]"
+                      :key="years"
+                      type="button"
+                      :class="{ selected: activeScenario.horizonYears === years }"
+                      @click="updateScenario({ horizonYears: years })"
+                    >
+                      {{ years }} years
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                      @click="setCustomHorizon"
+                    >
+                      {{ t('whatIf.reduction.custom') }}
+                    </button>
+                  </div>
+                  <div class="projection-view-switch">
+                    <button
+                      type="button"
+                      :class="{ selected: netWorthChartMode === 'total' }"
+                      :aria-pressed="netWorthChartMode === 'total'"
+                      @click="netWorthChartMode = 'total'"
+                    >
+                      {{ t('whatIf.strategy.chartView.total') }}
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ selected: netWorthChartMode === 'breakdown' }"
+                      :aria-pressed="netWorthChartMode === 'breakdown'"
+                      @click="netWorthChartMode = 'breakdown'"
+                    >
+                      {{ t('whatIf.strategy.chartView.breakdown') }}
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div class="desktop-projection-value">
-                <span>{{ t('whatIf.strategy.projectedNetWorthLabel') }}</span>
-                <strong>{{ formatCurrency(projectedNetWorth) }}</strong>
-                <small>{{
-                  t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-                }}</small>
               </div>
               <StrategyProjectionChart
                 :strategy-points="netWorthPoints"
                 :baseline-points="baselineNetWorthPoints"
+                :mode="netWorthChartMode"
+                :breakdown-types="netWorthBreakdownTypes"
                 :baseline-label="t('whatIf.strategy.currentPath')"
                 :strategy-label="t('whatIf.strategy.strategyPath')"
                 :aria-label="t('whatIf.strategy.netWorthChartAria')"
@@ -371,7 +391,6 @@
               <div class="desktop-projection-heading">
                 <div>
                   <h2>{{ t('whatIf.strategy.debtProjection.title') }}</h2>
-                  <p>{{ debtInfoText }}</p>
                 </div>
                 <q-select
                   :model-value="selectedDebt.id"
@@ -390,8 +409,11 @@
                 <MortgageComparisonChart
                   :normal-schedule="debtPayoff.schedule"
                   :accelerated-schedule="debtPayoff.accelerated.schedule"
+                  :history-schedule="debtPayoff.historySchedule"
+                  :original-balance="debtPayoff.originalPrincipal"
                   :starting-balance="selectedDebtModel.balance"
-                  :start-date="localToday()"
+                  :start-date="debtPayoff.startDate"
+                  :current-date="debtPayoff.currentDate"
                   :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
                   :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
                   :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
@@ -426,6 +448,60 @@
                 </div>
               </div>
             </template>
+
+            <aside
+              v-if="selectedDesktopOutcome"
+              :class="['desktop-milestone-highlight', selectedDesktopOutcome.tone]"
+            >
+              <span :class="['mini-icon', selectedDesktopOutcome.tone]">
+                <q-icon :name="selectedDesktopOutcome.icon" />
+              </span>
+              <div class="milestone-highlight-copy">
+                <span class="milestone-highlight-eyebrow">
+                  <small>{{ t('whatIf.strategy.milestoneProjection') }}</small>
+                  <q-btn
+                    v-if="selectedDesktopOutcome.showCalculationInfo"
+                    flat
+                    round
+                    dense
+                    size="xs"
+                    icon="info_outline"
+                    :aria-label="t('whatIf.strategy.calculationInfoAction')"
+                    @click="calculationInfoDialogOpen = true"
+                  />
+                </span>
+                <strong class="milestone-highlight-title">
+                  {{ selectedDesktopOutcome.milestoneTitle }}
+                </strong>
+                <p>{{ selectedDesktopOutcome.milestoneDescription }}</p>
+                <div
+                  class="milestone-highlight-progress"
+                  role="progressbar"
+                  :aria-label="t('whatIf.strategy.milestoneProgress')"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-valuenow="selectedDesktopOutcome.progressPercent"
+                >
+                  <span>
+                    <i :style="{ width: `${selectedDesktopOutcome.progressPercent}%` }" />
+                  </span>
+                  <b>{{ selectedDesktopOutcome.progressPercent }}%</b>
+                </div>
+                <b :class="['milestone-highlight-reach', selectedDesktopOutcome.status]">
+                  <q-icon name="calendar_month" />
+                  <span>{{ selectedDesktopOutcome.badgeResult }}</span>
+                </b>
+              </div>
+              <div class="milestone-highlight-result">
+                <div class="milestone-highlight-value">
+                  <small>{{ t('whatIf.strategy.projectedResult') }}</small>
+                  <strong>{{ selectedDesktopOutcome.resultValue }}</strong>
+                  <span v-if="selectedDesktopOutcome.resultQualifier">
+                    {{ selectedDesktopOutcome.resultQualifier }}
+                  </span>
+                </div>
+              </div>
+            </aside>
           </section>
         </div>
 
@@ -633,7 +709,6 @@
                   :label="t('whatIf.strategy.emergencyFundTarget')"
                   @update:model-value="updateScenario({ cashTargetMonths: $event })"
                 />
-                <small class="redirect-note">{{ t('whatIf.strategy.redirectCash') }}</small>
               </section>
             </div>
           </div>
@@ -698,6 +773,11 @@
                   <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
                   <span>{{
                     t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
+                  }}</span>
+                  <span>{{
+                    t('whatIf.strategy.inTodaysMoney', {
+                      value: formatCurrency(finalProjectionPoint.realInvestmentValue),
+                    })
                   }}</span>
                 </div>
                 <div
@@ -779,8 +859,11 @@
                 <MortgageComparisonChart
                   :normal-schedule="debtPayoff.schedule"
                   :accelerated-schedule="debtPayoff.accelerated.schedule"
+                  :history-schedule="debtPayoff.historySchedule"
+                  :original-balance="debtPayoff.originalPrincipal"
                   :starting-balance="selectedDebtModel.balance"
-                  :start-date="localToday()"
+                  :start-date="debtPayoff.startDate"
+                  :current-date="debtPayoff.currentDate"
                   :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
                   :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
                   :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
@@ -878,131 +961,82 @@
         </q-card-section>
 
         <q-card-section class="strategy-sheet-scroll">
-          <div class="sheet-allocation-list">
-            <StrategyAllocationRow
-              icon="paid"
-              tone="cash"
-              :title="t('whatIf.cash.title')"
-              :description="t('whatIf.strategy.cashDescription')"
-              :percent="allocation.cash"
-              :amount="monthlyFor(allocation.cash)"
-              @change="setAllocation('cash', $event)"
-            />
-            <StrategyAllocationRow
-              icon="trending_up"
-              tone="invest"
-              :title="t('whatIf.strategy.investments')"
-              :description="t('whatIf.strategy.investDescription')"
-              :percent="allocation.invest"
-              :amount="monthlyFor(allocation.invest)"
-              @change="setAllocation('invest', $event)"
-            />
-            <StrategyAllocationRow
-              v-if="selectedDebt"
-              icon="home"
-              tone="debt"
-              :title="t('whatIf.debt.title')"
-              :description="t('whatIf.strategy.debtDescription')"
-              :percent="allocation.debt"
-              :amount="monthlyFor(allocation.debt)"
-              @change="setAllocation('debt', $event)"
-            />
-          </div>
-
-          <div class="allocation-total sheet-allocation-total">
-            <span>{{ t('whatIf.strategy.total') }}</span>
-            <strong>100%</strong>
-            <strong>{{ formatCurrency(monthlySavings) }}{{ t('whatIf.perMonth') }}</strong>
-          </div>
-
-          <div class="sheet-subheading">
-            <h3>{{ t('whatIf.strategy.cashReturn') }}</h3>
-            <p>{{ t('whatIf.strategy.cashReturnDescription') }}</p>
-          </div>
-          <article class="investment-mix-card cash-return-card">
-            <span class="mix-card-icon cash-return"><q-icon name="savings" /></span>
-            <div class="mix-card-identity">
-              <strong>{{ t('whatIf.cash.title') }}</strong>
-              <small>{{ t('whatIf.strategy.cashDescription') }}</small>
-            </div>
-            <button type="button" class="mix-card-metric editable-metric return-metric">
-              <strong>{{ Number(activeScenario.cashAnnualReturnPercent).toFixed(1) }}%</strong>
-              <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
-              <q-popup-edit
-                :model-value="activeScenario.cashAnnualReturnPercent"
-                buttons
-                :title="t('whatIf.strategy.cashAnnualReturn')"
-                :label-set="t('common.save')"
-                :label-cancel="t('common.cancel')"
-                @save="setCashReturn"
-              >
-                <template #default="scope">
-                  <q-input
-                    v-model.number="scope.value"
-                    autofocus
-                    dense
-                    outlined
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    suffix="%"
-                    @keyup.enter="scope.set"
-                  />
-                </template>
-              </q-popup-edit>
-            </button>
-          </article>
-
-          <div class="sheet-subheading">
-            <h3>{{ t('whatIf.strategy.investmentMix') }}</h3>
-            <p>{{ t('whatIf.strategy.investmentMixDescription') }}</p>
-          </div>
-          <div class="mix-list sheet-mix-list">
-            <article v-for="entry in activeMix" :key="entry.id" class="investment-mix-card">
-              <span :class="['mix-card-icon', entry.tone]">
-                <q-icon :name="entry.icon" />
-              </span>
-              <div class="mix-card-identity">
-                <strong>{{ entry.label }}</strong>
-                <small>{{ entry.description }}</small>
+          <section class="sheet-settings-section allocation-settings-section">
+            <div class="sheet-settings-heading">
+              <span><q-icon name="account_balance_wallet" /></span>
+              <div>
+                <h3>{{ t('whatIf.strategy.allocation') }}</h3>
+                <p>{{ t('whatIf.strategy.allocationSettingsDescription') }}</p>
               </div>
-              <button type="button" class="mix-card-metric editable-metric allocation-metric">
-                <strong>{{ entry.allocation }}%</strong>
-                <small>{{ t('whatIf.strategy.ofInvestments') }}</small>
-                <q-popup-edit
-                  :model-value="entry.allocation"
-                  buttons
-                  :title="t('whatIf.strategy.investmentAllocation')"
-                  :label-set="t('common.save')"
-                  :label-cancel="t('common.cancel')"
-                  @save="setMixAllocation(entry.id, $event)"
-                >
-                  <template #default="scope">
-                    <q-input
-                      v-model.number="scope.value"
-                      autofocus
-                      dense
-                      outlined
-                      type="number"
-                      min="0"
-                      max="100"
-                      suffix="%"
-                      @keyup.enter="scope.set"
-                    />
-                  </template>
-                </q-popup-edit>
-              </button>
+            </div>
+
+            <div class="sheet-allocation-list">
+              <StrategyAllocationRow
+                icon="paid"
+                tone="cash"
+                :title="t('whatIf.cash.title')"
+                :description="t('whatIf.strategy.cashDescription')"
+                :percent="allocation.cash"
+                :amount="monthlyFor(allocation.cash)"
+                @change="setAllocation('cash', $event)"
+              />
+              <StrategyAllocationRow
+                icon="trending_up"
+                tone="invest"
+                :title="t('whatIf.strategy.investments')"
+                :description="t('whatIf.strategy.investDescription')"
+                :percent="allocation.invest"
+                :amount="monthlyFor(allocation.invest)"
+                @change="setAllocation('invest', $event)"
+              />
+              <StrategyAllocationRow
+                v-if="selectedDebt"
+                icon="home"
+                tone="debt"
+                :title="t('whatIf.debt.title')"
+                :description="t('whatIf.strategy.debtDescription')"
+                :percent="allocation.debt"
+                :amount="monthlyFor(allocation.debt)"
+                @change="setAllocation('debt', $event)"
+              />
+            </div>
+
+            <div class="allocation-total sheet-allocation-total">
+              <span>{{ t('whatIf.strategy.total') }}</span>
+              <strong>100%</strong>
+              <strong>{{ formatCurrency(monthlySavings) }}{{ t('whatIf.perMonth') }}</strong>
+            </div>
+          </section>
+
+          <section class="sheet-settings-section model-parameters-section">
+            <div class="sheet-settings-heading">
+              <span><q-icon name="tune" /></span>
+              <div>
+                <h3>{{ t('whatIf.strategy.modelParameters') }}</h3>
+                <p>{{ t('whatIf.strategy.modelParametersDescription') }}</p>
+              </div>
+            </div>
+
+            <div class="sheet-subheading first-parameter-heading">
+              <h3>{{ t('whatIf.strategy.inflation') }}</h3>
+              <p>{{ t('whatIf.strategy.inflationDescription') }}</p>
+            </div>
+            <article class="investment-mix-card cash-return-card">
+              <span class="mix-card-icon cash-return"><q-icon name="trending_up" /></span>
+              <div class="mix-card-identity">
+                <strong>{{ t('whatIf.strategy.costOfLife') }}</strong>
+                <small>{{ t('whatIf.strategy.inflationAdjusted') }}</small>
+              </div>
               <button type="button" class="mix-card-metric editable-metric return-metric">
-                <strong>{{ Number(entry.annualReturnPercent).toFixed(1) }}%</strong>
-                <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
+                <strong>{{ Number(activeScenario.inflationAnnualPercent).toFixed(1) }}%</strong>
+                <small>{{ t('whatIf.strategy.perYear') }}</small>
                 <q-popup-edit
-                  :model-value="entry.annualReturnPercent"
+                  :model-value="activeScenario.inflationAnnualPercent"
                   buttons
-                  :title="t('whatIf.strategy.expectedAnnualReturn')"
+                  :title="t('whatIf.strategy.inflationAnnualPercent')"
                   :label-set="t('common.save')"
                   :label-cancel="t('common.cancel')"
-                  @save="setReturn(entry.id, $event)"
+                  @save="setInflation"
                 >
                   <template #default="scope">
                     <q-input
@@ -1020,34 +1054,142 @@
                   </template>
                 </q-popup-edit>
               </button>
-              <span class="mix-card-amount">
-                <strong>
-                  {{ formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100) }}
-                </strong>
-                <small>{{ t('whatIf.perMonth').trim() }}</small>
-              </span>
-              <q-btn
-                v-if="activeMix.length > 1"
-                flat
-                round
-                dense
-                icon="delete_outline"
-                color="negative"
-                size="sm"
-                class="mix-card-remove"
-                @click="removeMix(entry.id)"
-              />
             </article>
-          </div>
-          <button
-            v-if="availableMixOptions.length"
-            type="button"
-            class="add-investment-card"
-            @click="openInvestmentTypeDialog"
-          >
-            <q-icon name="add" />
-            {{ t('whatIf.strategy.addInvestmentType') }}
-          </button>
+
+            <div class="sheet-subheading">
+              <h3>{{ t('whatIf.strategy.cashReturn') }}</h3>
+              <p>{{ t('whatIf.strategy.cashReturnDescription') }}</p>
+            </div>
+            <article class="investment-mix-card cash-return-card">
+              <span class="mix-card-icon cash-return"><q-icon name="savings" /></span>
+              <div class="mix-card-identity">
+                <strong>{{ t('whatIf.cash.title') }}</strong>
+                <small>{{ t('whatIf.strategy.cashDescription') }}</small>
+              </div>
+              <button type="button" class="mix-card-metric editable-metric return-metric">
+                <strong>{{ Number(activeScenario.cashAnnualReturnPercent).toFixed(1) }}%</strong>
+                <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
+                <q-popup-edit
+                  :model-value="activeScenario.cashAnnualReturnPercent"
+                  buttons
+                  :title="t('whatIf.strategy.cashAnnualReturn')"
+                  :label-set="t('common.save')"
+                  :label-cancel="t('common.cancel')"
+                  @save="setCashReturn"
+                >
+                  <template #default="scope">
+                    <q-input
+                      v-model.number="scope.value"
+                      autofocus
+                      dense
+                      outlined
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      suffix="%"
+                      @keyup.enter="scope.set"
+                    />
+                  </template>
+                </q-popup-edit>
+              </button>
+            </article>
+
+            <div class="sheet-subheading">
+              <h3>{{ t('whatIf.strategy.investmentMix') }}</h3>
+              <p>{{ t('whatIf.strategy.investmentMixDescription') }}</p>
+            </div>
+            <div class="mix-list sheet-mix-list">
+              <article v-for="entry in activeMix" :key="entry.id" class="investment-mix-card">
+                <span :class="['mix-card-icon', entry.tone]">
+                  <q-icon :name="entry.icon" />
+                </span>
+                <div class="mix-card-identity">
+                  <strong>{{ entry.label }}</strong>
+                  <small>{{ entry.description }}</small>
+                </div>
+                <button type="button" class="mix-card-metric editable-metric allocation-metric">
+                  <strong>{{ entry.allocation }}%</strong>
+                  <small>{{ t('whatIf.strategy.ofInvestments') }}</small>
+                  <q-popup-edit
+                    :model-value="entry.allocation"
+                    buttons
+                    :title="t('whatIf.strategy.investmentAllocation')"
+                    :label-set="t('common.save')"
+                    :label-cancel="t('common.cancel')"
+                    @save="setMixAllocation(entry.id, $event)"
+                  >
+                    <template #default="scope">
+                      <q-input
+                        v-model.number="scope.value"
+                        autofocus
+                        dense
+                        outlined
+                        type="number"
+                        min="0"
+                        max="100"
+                        suffix="%"
+                        @keyup.enter="scope.set"
+                      />
+                    </template>
+                  </q-popup-edit>
+                </button>
+                <button type="button" class="mix-card-metric editable-metric return-metric">
+                  <strong>{{ Number(entry.annualReturnPercent).toFixed(1) }}%</strong>
+                  <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
+                  <q-popup-edit
+                    :model-value="entry.annualReturnPercent"
+                    buttons
+                    :title="t('whatIf.strategy.expectedAnnualReturn')"
+                    :label-set="t('common.save')"
+                    :label-cancel="t('common.cancel')"
+                    @save="setReturn(entry.id, $event)"
+                  >
+                    <template #default="scope">
+                      <q-input
+                        v-model.number="scope.value"
+                        autofocus
+                        dense
+                        outlined
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        suffix="%"
+                        @keyup.enter="scope.set"
+                      />
+                    </template>
+                  </q-popup-edit>
+                </button>
+                <span class="mix-card-amount">
+                  <strong>
+                    {{ formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100) }}
+                  </strong>
+                  <small>{{ t('whatIf.perMonth').trim() }}</small>
+                </span>
+                <q-btn
+                  v-if="activeMix.length > 1"
+                  flat
+                  round
+                  dense
+                  icon="delete_outline"
+                  color="negative"
+                  size="sm"
+                  class="mix-card-remove"
+                  @click="removeMix(entry.id)"
+                />
+              </article>
+            </div>
+            <button
+              v-if="availableMixOptions.length"
+              type="button"
+              class="add-investment-card"
+              @click="openInvestmentTypeDialog"
+            >
+              <q-icon name="add" />
+              {{ t('whatIf.strategy.addInvestmentType') }}
+            </button>
+          </section>
         </q-card-section>
 
         <q-card-actions class="strategy-sheet-actions">
@@ -1139,6 +1281,11 @@
               <span>{{
                 t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
               }}</span>
+              <span>{{
+                t('whatIf.strategy.inTodaysMoney', {
+                  value: formatCurrency(finalProjectionPoint.realInvestmentValue),
+                })
+              }}</span>
             </div>
             <StrategyProjectionChart
               :strategy-points="investmentProjectionPoints"
@@ -1169,6 +1316,11 @@
               <strong>{{ formatCurrency(projectedNetWorth) }}</strong>
               <small>{{
                 t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
+              }}</small>
+              <small>{{
+                t('whatIf.strategy.inTodaysMoney', {
+                  value: formatCurrency(projectedRealNetWorth),
+                })
               }}</small>
             </div>
             <div class="detail-values large-detail-values two-values">
@@ -1205,8 +1357,11 @@
               <MortgageComparisonChart
                 :normal-schedule="debtPayoff.schedule"
                 :accelerated-schedule="debtPayoff.accelerated.schedule"
+                :history-schedule="debtPayoff.historySchedule"
+                :original-balance="debtPayoff.originalPrincipal"
                 :starting-balance="selectedDebtModel.balance"
-                :start-date="localToday()"
+                :start-date="debtPayoff.startDate"
+                :current-date="debtPayoff.currentDate"
                 :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
                 :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
                 :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
@@ -1268,6 +1423,30 @@
             <strong>{{ t('whatIf.strategy.freedomInfoExcludedTitle') }}</strong>
             <p>{{ t('whatIf.strategy.freedomInfoExcluded') }}</p>
           </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog
+      v-model="calculationInfoDialogOpen"
+      :position="$q.screen.lt.sm ? 'bottom' : undefined"
+    >
+      <q-card class="strategy-sheet info-sheet">
+        <q-card-section class="strategy-sheet-heading">
+          <div>
+            <h2>{{ t('whatIf.strategy.calculationInfoTitle') }}</h2>
+          </div>
+          <q-btn flat round dense icon="close" v-close-popup :aria-label="t('common.close')" />
+        </q-card-section>
+        <q-card-section class="info-sheet-content">
+          <p>
+            {{
+              t('whatIf.strategy.calculationInfoDescription', {
+                inflation: Number(activeScenario.inflationAnnualPercent).toFixed(1),
+              })
+            }}
+          </p>
+          <p>{{ t('whatIf.strategy.calculationInfoFormula') }}</p>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -1367,11 +1546,16 @@ import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
+  financialYearMonthCategoryValue,
   financialYearMonthValue,
   financialYearValue,
 } from '@/domain/financial/financial-year'
+import { applyOwnership } from '@/domain/financial/ownership'
 import {
+  inflationAdjustedCoverage,
+  inflationFactorAtMonth,
   latestPositionMonth,
+  presentValue,
   simulateStrategy,
   strategyNetWorthPoints,
   strategyStartingPosition,
@@ -1387,6 +1571,7 @@ import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useAssetsStore } from '@/stores/assets-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -1397,18 +1582,21 @@ const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
+const assetsStore = useAssetsStore()
 const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
 const workspaceStore = useWorkspaceStore()
 const pageError = ref(null)
 const freedomInfoDialogOpen = ref(false)
+const calculationInfoDialogOpen = ref(false)
 const debtInfoDialogOpen = ref(false)
 const investmentTypeDialogOpen = ref(false)
 const pendingInvestmentType = ref(null)
 const initialScenarioDialogOpen = ref(false)
 const initialScenarioName = ref('')
 const projectionChartMode = ref('total')
+const netWorthChartMode = ref('total')
 const allocationSheetOpen = ref(false)
 const detailSheetOpen = ref(false)
 const detailSheetKind = ref('projection')
@@ -1428,13 +1616,18 @@ const financialYear = computed(() => financialYearsStore.get(workspaceId.value, 
 const loading = computed(
   () =>
     financialYearsStore.loading ||
+    assetsStore.loading ||
+    assetsStore.categoryLoading ||
     whatIfStore.loading ||
     liabilitiesStore.loading ||
     liabilitiesStore.categoryLoading,
 )
 const error = computed(
   () =>
-    pageError.value || whatIfStore.error || financialYearsStore.errorFor(workspaceId.value, year),
+    pageError.value ||
+    assetsStore.error ||
+    whatIfStore.error ||
+    financialYearsStore.errorFor(workspaceId.value, year),
 )
 const activeScenario = computed(
   () =>
@@ -1569,22 +1762,79 @@ const availableMixOptions = computed(() =>
 const currentMilestones = computed(() =>
   calculateMilestoneProgress({
     financialYear: financialYear.value,
+    liabilities: liabilitiesStore.itemsForCategory('mortgage'),
     month: positionMonth.value,
     memberId: selectedMemberId.value,
   }),
 )
-const netWorthPoints = computed(() =>
-  strategyNetWorthPoints({
-    currentNetWorth: financialYearMonthValue(
-      financialYear.value,
-      positionMonth.value,
-      'netWorth',
-      selectedMemberId.value,
-    ),
-    strategy: projection.value.strategy,
-    monthlyDebtContribution: monthlyFor(allocation.value.debt),
-    debtBalance: selectedDebt.value?.balance || 0,
-  }),
+const currentAssets = computed(() =>
+  financialYearMonthValue(
+    financialYear.value,
+    positionMonth.value,
+    'assets',
+    selectedMemberId.value,
+  ),
+)
+const currentLiabilities = computed(() =>
+  financialYearMonthValue(
+    financialYear.value,
+    positionMonth.value,
+    'liabilities',
+    selectedMemberId.value,
+  ),
+)
+const currentRealEstate = computed(() =>
+  financialYearMonthCategoryValue(
+    financialYear.value,
+    positionMonth.value,
+    'assets',
+    'real_estate',
+    selectedMemberId.value,
+  ),
+)
+const modeledRealEstateAssets = computed(() =>
+  assetsStore
+    .itemsForCategory('real_estate')
+    .filter((asset) => asset.detail?.realEstate)
+    .map((asset) => {
+      const model = asset.detail.realEstate
+      return {
+        currentValue: applyOwnership(asset.currentValue, asset.ownership, selectedMemberId.value),
+        model: {
+          ...model,
+          ...(model.schemaVersion === 2
+            ? {
+                purchasePrice: applyOwnership(
+                  model.purchasePrice,
+                  asset.ownership,
+                  selectedMemberId.value,
+                ),
+              }
+            : {}),
+        },
+      }
+    })
+    .filter(({ currentValue }) => currentValue > 0),
+)
+const modeledMortgages = computed(() =>
+  liabilitiesStore
+    .itemsForCategory('mortgage')
+    .filter(({ detail }) => detail?.mortgage?.amortizationType === 'french')
+    .map((liability) => ({
+      id: liability.id,
+      currentBalance: applyOwnership(
+        liability.balance,
+        liability.ownership,
+        selectedMemberId.value,
+      ),
+      annualInterestRate: liability.detail.mortgage.annualInterestRate,
+      monthlyPayment: applyOwnership(
+        liability.detail.mortgage.monthlyPayment,
+        liability.ownership,
+        selectedMemberId.value,
+      ),
+    }))
+    .filter(({ currentBalance, monthlyPayment }) => currentBalance > 0 && monthlyPayment > 0),
 )
 const currentNetWorth = computed(() =>
   financialYearMonthValue(
@@ -1594,15 +1844,70 @@ const currentNetWorth = computed(() =>
     selectedMemberId.value,
   ),
 )
+const netWorthPoints = computed(() =>
+  strategyNetWorthPoints({
+    currentNetWorth: currentNetWorth.value,
+    currentAssets: currentAssets.value,
+    currentLiabilities: currentLiabilities.value,
+    currentRealEstate: currentRealEstate.value,
+    strategy: projection.value.strategy,
+    monthlyDebtContribution: monthlyFor(allocation.value.debt),
+    debtBalance: selectedDebt.value?.balance || 0,
+    selectedDebtId: selectedDebt.value?.id,
+    realEstateAssets: modeledRealEstateAssets.value,
+    mortgages: modeledMortgages.value,
+    asOfDate: localToday(),
+  }),
+)
 const baselineNetWorthPoints = computed(() =>
   strategyNetWorthPoints({
     currentNetWorth: currentNetWorth.value,
+    currentAssets: currentAssets.value,
+    currentLiabilities: currentLiabilities.value,
+    currentRealEstate: currentRealEstate.value,
     strategy: baselineProjection.value.strategy,
     monthlyDebtContribution: 0,
     debtBalance: selectedDebt.value?.balance || 0,
+    selectedDebtId: selectedDebt.value?.id,
+    realEstateAssets: modeledRealEstateAssets.value,
+    mortgages: modeledMortgages.value,
+    asOfDate: localToday(),
   }),
 )
+const netWorthBreakdownTypes = computed(() => [
+  { id: 'cash', label: t('whatIf.strategy.netWorthBreakdown.cash'), color: '#0870d8' },
+  {
+    id: 'investments',
+    label: t('whatIf.strategy.netWorthBreakdown.investments'),
+    color: '#8754ed',
+  },
+  {
+    id: 'realEstate',
+    label: t('whatIf.strategy.netWorthBreakdown.realEstate'),
+    color: '#0c6b4d',
+  },
+  {
+    id: 'otherAssets',
+    label: t('whatIf.strategy.netWorthBreakdown.otherAssets'),
+    color: '#39a8a3',
+  },
+  {
+    id: 'liabilities',
+    label: t('whatIf.strategy.netWorthBreakdown.liabilities'),
+    color: '#dc4c64',
+  },
+])
 const projectedNetWorth = computed(() => netWorthPoints.value.at(-1)?.value || 0)
+const finalProjectionPoint = computed(() => projection.value.strategy.points.at(-1))
+const horizonInflationFactor = computed(() =>
+  inflationFactorAtMonth(
+    activeScenario.value.inflationAnnualPercent,
+    activeScenario.value.horizonYears * 12,
+  ),
+)
+const projectedRealNetWorth = computed(() =>
+  presentValue(projectedNetWorth.value, horizonInflationFactor.value),
+)
 const detailSheetTitle = computed(() => {
   const titleKeys = {
     cash: 'cashDetails',
@@ -1618,15 +1923,39 @@ const strategyOutcomes = computed(() => {
   const horizonMonths = activeScenario.value.horizonYears * 12
 
   const safetyId = `safety_${activeScenario.value.cashTargetMonths}_months`
+  const safety = currentMilestones.value.find(({ id }) => id === safetyId)
   const cashTargetMonth = projection.value.strategy.cashTargetMonth
+  const finalPoint = projection.value.strategy.points.at(-1)
+  const inflationAdjustedSafetyMonths = inflationAdjustedCoverage({
+    projectedValue: finalPoint.cash,
+    currentPeriodCost: simulation.value.monthlyCostOfLife,
+    annualInflationPercent: activeScenario.value.inflationAnnualPercent,
+    month: horizonMonths,
+  })
   outcomes.push({
     id: safetyId,
     icon: 'health_and_safety',
     tone: 'cash',
+    showCalculationInfo: true,
     title: t('milestones.families.safety.title'),
-    description: t('whatIf.strategy.projectedCashAgainstTarget', {
+    milestoneTitle: t('whatIf.strategy.safetyMilestoneTitle', {
+      months: activeScenario.value.cashTargetMonths,
+    }),
+    milestoneDescription: t('whatIf.strategy.safetyMilestoneDescription', {
+      months: activeScenario.value.cashTargetMonths,
+    }),
+    progressPercent: milestoneProgressPercent(safety),
+    resultValue: t('whatIf.strategy.monthsValue', {
+      months: formatNumber(inflationAdjustedSafetyMonths),
+    }),
+    resultQualifier: t('whatIf.strategy.inflationAdjustedQualifier'),
+    summary: t('whatIf.strategy.projectedCashSummary', {
+      value: formatCurrency(projection.value.strategy.cash),
+    }),
+    description: t('whatIf.strategy.projectedCashWithInflationKpi', {
       value: formatCurrency(projection.value.strategy.cash),
       target: formatCurrency(projection.value.strategy.cashTarget),
+      months: formatNumber(inflationAdjustedSafetyMonths),
     }),
     result:
       cashTargetMonth === 0
@@ -1641,25 +1970,52 @@ const strategyOutcomes = computed(() => {
     status:
       cashTargetMonth != null ? 'positive' : allocation.value.cash > 0 ? 'progress' : 'negative',
   })
+  outcomes.at(-1).badgeResult = outcomes.at(-1).result
 
   const freedom =
     currentMilestones.value.find(({ family, reached }) => family === 'freedom' && !reached) ||
     currentMilestones.value.findLast(({ family }) => family === 'freedom')
   if (freedom) {
     const annualCost = simulation.value.monthlyCostOfLife * 12
-    const targetValue = freedom.target * annualCost
     const reachedAt = projection.value.strategy.points.find(
-      ({ investableValue }) => investableValue >= targetValue,
+      ({ month, investableValue }) =>
+        inflationAdjustedCoverage({
+          projectedValue: investableValue,
+          currentPeriodCost: annualCost,
+          annualInflationPercent: activeScenario.value.inflationAnnualPercent,
+          month,
+        }) >= freedom.target,
     )
-    const finalPoint = projection.value.strategy.points.at(-1)
-    const fundedYears = annualCost > 0 ? finalPoint.investableValue / annualCost : 0
+    const inflationAdjustedFundedYears = inflationAdjustedCoverage({
+      projectedValue: finalPoint.investableValue,
+      currentPeriodCost: annualCost,
+      annualInflationPercent: activeScenario.value.inflationAnnualPercent,
+      month: horizonMonths,
+    })
     outcomes.push({
       id: freedom.id,
       icon: 'flight_takeoff',
       tone: 'freedom',
       showInfo: true,
+      showCalculationInfo: true,
       title: t('milestones.families.freedom.title'),
-      description: t('whatIf.strategy.freedomProjected', { years: formatNumber(fundedYears) }),
+      milestoneTitle: t('whatIf.strategy.freedomMilestoneTitle', {
+        years: freedom.target,
+      }),
+      milestoneDescription: t('whatIf.strategy.freedomMilestoneDescription', {
+        years: freedom.target,
+      }),
+      progressPercent: milestoneProgressPercent(freedom),
+      resultValue: t('whatIf.strategy.yearsValue', {
+        years: formatNumber(inflationAdjustedFundedYears),
+      }),
+      resultQualifier: t('whatIf.strategy.inflationAdjustedQualifier'),
+      summary: t('whatIf.strategy.fundedYearsSummary', {
+        years: formatNumber(inflationAdjustedFundedYears),
+      }),
+      description: t('whatIf.strategy.freedomProjectedWithInflationKpi', {
+        adjustedYears: formatNumber(inflationAdjustedFundedYears),
+      }),
       result: reachedAt
         ? reachedAt.month === 0
           ? t('whatIf.cash.milestoneAchieved')
@@ -1669,6 +2025,7 @@ const strategyOutcomes = computed(() => {
           }),
       status: reachedAt ? 'positive' : allocation.value.invest > 0 ? 'progress' : 'negative',
     })
+    outcomes.at(-1).badgeResult = outcomes.at(-1).result
   }
 
   const netWorth =
@@ -1684,6 +2041,27 @@ const strategyOutcomes = computed(() => {
       icon: 'trending_up',
       tone: 'net-worth',
       title: t('milestones.families.netWorth.title'),
+      milestoneTitle:
+        netWorth.id === 'net_worth_positive'
+          ? t('whatIf.strategy.positiveNetWorthMilestoneTitle')
+          : t('whatIf.strategy.netWorthMilestoneTitle', {
+              value: formatCurrency(netWorth.target),
+            }),
+      milestoneDescription:
+        netWorth.id === 'net_worth_positive'
+          ? t('whatIf.strategy.positiveNetWorthMilestoneDescription')
+          : t('whatIf.strategy.netWorthMilestoneDescription', {
+              value: formatCurrency(netWorth.target),
+            }),
+      progressPercent: milestoneProgressPercent(netWorth),
+      resultValue: formatCurrency(finalNetWorth),
+      resultQualifier: t('whatIf.strategy.projectedResultContext', {
+        years: activeScenario.value.horizonYears,
+        value: formatCurrency(projectedRealNetWorth.value),
+      }),
+      summary: t('whatIf.strategy.projectedNetWorthSummary', {
+        value: formatCurrency(finalNetWorth),
+      }),
       description: t('whatIf.strategy.projectedNetWorth', {
         value: formatCurrency(finalNetWorth),
       }),
@@ -1701,6 +2079,7 @@ const strategyOutcomes = computed(() => {
             : 'progress'
           : 'negative',
     })
+    outcomes.at(-1).badgeResult = outcomes.at(-1).result
   }
 
   if (selectedDebt.value && allocation.value.debt > 0) {
@@ -1729,6 +2108,20 @@ const strategyOutcomes = computed(() => {
       icon: 'credit_score',
       tone: 'debt',
       title: t('milestones.families.debt.title'),
+      milestoneTitle: t(`milestones.items.${id}`),
+      milestoneDescription: t('whatIf.strategy.debtMilestoneDescription', {
+        name: selectedDebt.value.name,
+      }),
+      progressPercent: debtPayoff.value
+        ? Math.round(debtPayoff.value.progress * 100)
+        : milestoneProgressPercent(
+            currentMilestones.value.find((milestone) => milestone.id === id),
+          ),
+      resultValue: formatCurrency(projectedBalance),
+      resultQualifier: t('whatIf.strategy.projectedBalanceQualifier'),
+      summary: t('whatIf.strategy.projectedDebtSummary', {
+        value: formatCurrency(projectedBalance),
+      }),
       description: t('whatIf.strategy.projectedDebtBalance', {
         name: selectedDebt.value.name,
         value: formatCurrency(projectedBalance),
@@ -1739,7 +2132,6 @@ const strategyOutcomes = computed(() => {
           : debtPayoff.value
             ? t('whatIf.strategy.modeledDebtResult', {
                 date: formatMonthYear(debtPayoff.value.accelerated.payoffDate),
-                amount: formatCurrency(debtPayoff.value.accelerated.interestSaved),
               })
             : payoffMonth <= horizonMonths
               ? reachEstimate(payoffMonth)
@@ -1754,6 +2146,10 @@ const strategyOutcomes = computed(() => {
             ? 'positive'
             : 'progress',
     })
+    outcomes.at(-1).badgeResult =
+      monthlyDebtContribution > 0 && payoffMonth <= horizonMonths
+        ? reachEstimate(payoffMonth)
+        : outcomes.at(-1).result
   }
 
   return outcomes
@@ -1806,6 +2202,7 @@ async function prepare(force = false) {
     await Promise.all([
       financialYearsStore.load(workspaceId.value, year, force),
       whatIfStore.load(workspaceId.value, force),
+      assetsStore.loadCategory(workspaceId.value, 'real_estate', force),
       liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force),
     ])
     if (activeScenario.value.id === defaultStrategyScenario.id) {
@@ -1994,6 +2391,11 @@ function setCashReturn(value) {
   updateScenario({ cashAnnualReturnPercent: numeric })
 }
 
+function setInflation(value) {
+  const numeric = Math.min(100, Math.max(0, Number(value) || 0))
+  updateScenario({ inflationAnnualPercent: numeric })
+}
+
 function cloneMix() {
   return Object.fromEntries(
     Object.entries(activeScenario.value.investmentMix).map(([id, value]) => [id, { ...value }]),
@@ -2002,6 +2404,10 @@ function cloneMix() {
 
 function monthlyFor(percent) {
   return (monthlySavings.value * percent) / 100
+}
+
+function milestoneProgressPercent(milestone) {
+  return Math.round(Math.min(1, Math.max(0, Number(milestone?.progress) || 0)) * 100)
 }
 
 function reachEstimate(months) {
@@ -2343,27 +2749,180 @@ h1 {
 .desktop-projection-controls .horizon-options button {
   min-width: 4.5rem;
 }
-.desktop-projection-value {
-  display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  margin-top: 0.85rem;
-}
-.desktop-projection-value span,
-.desktop-projection-value small {
-  color: var(--color-copy);
-  font-size: 0.72rem;
-}
-.desktop-projection-value strong {
-  color: var(--color-primary);
-  font-size: 1.35rem;
-}
 .desktop-strategy-chart,
 .desktop-mortgage-chart {
   margin-top: 0.25rem;
 }
 .desktop-result-breakdown {
   margin-top: 0.35rem;
+}
+.desktop-milestone-highlight {
+  --milestone-accent: var(--color-primary);
+  --milestone-accent-soft: var(--color-blue-soft);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.35fr) minmax(16rem, 0.9fr);
+  align-items: center;
+  column-gap: 1.4rem;
+  margin-top: 1rem;
+  min-height: 10.5rem;
+  padding: 1.55rem 1.65rem;
+  border: 1px solid color-mix(in srgb, var(--milestone-accent) 18%, var(--color-line));
+  border-radius: 1.15rem;
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--milestone-accent) 5%, var(--color-surface)) 0%,
+    var(--color-surface) 72%
+  );
+  box-shadow: 0 0.5rem 1.4rem rgb(15 61 102 / 9%);
+}
+.desktop-milestone-highlight.cash {
+  --milestone-accent: var(--color-success-dark);
+  --milestone-accent-soft: var(--color-green-soft);
+}
+.desktop-milestone-highlight.freedom {
+  --milestone-accent: var(--color-purple);
+  --milestone-accent-soft: var(--color-purple-soft);
+}
+.desktop-milestone-highlight.debt {
+  --milestone-accent: var(--color-warning);
+  --milestone-accent-soft: var(--color-warning-soft);
+}
+.desktop-milestone-highlight > .mini-icon {
+  align-self: start;
+  width: 3.65rem;
+  height: 3.65rem;
+  margin-top: 0.45rem;
+  border-radius: 1rem;
+  background: var(--milestone-accent-soft);
+  color: var(--milestone-accent);
+  font-size: 1.75rem;
+}
+.milestone-highlight-copy {
+  display: grid;
+  align-self: stretch;
+  align-content: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.milestone-highlight-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.milestone-highlight-eyebrow .q-btn {
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  color: var(--milestone-accent);
+  font-size: 0.85rem;
+}
+.desktop-milestone-highlight small {
+  color: var(--color-copy);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.milestone-highlight-title {
+  color: var(--color-ink);
+  font-size: 1.55rem;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+.desktop-milestone-highlight p {
+  margin: 0;
+  color: var(--color-copy);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.milestone-highlight-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.milestone-highlight-progress > span {
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--milestone-accent) 10%, var(--color-line));
+}
+.milestone-highlight-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--milestone-accent),
+    color-mix(in srgb, var(--milestone-accent) 65%, white)
+  );
+}
+.milestone-highlight-progress b {
+  color: var(--milestone-accent);
+  font-size: 0.95rem;
+}
+.milestone-highlight-result {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  align-self: stretch;
+  min-width: 0;
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--color-line);
+  text-align: center;
+}
+.milestone-highlight-value {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+.milestone-highlight-value > strong {
+  color: var(--color-ink);
+  margin-top: 0.55rem;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+.milestone-highlight-value > span {
+  margin-top: 0.35rem;
+  color: var(--color-copy);
+  font-size: 0.82rem;
+}
+.desktop-milestone-highlight .milestone-highlight-reach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  margin-top: 0.35rem;
+  min-width: 0;
+  max-width: none;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  background: var(--milestone-accent-soft);
+  box-shadow: 0 0.2rem 0.65rem rgb(15 61 102 / 8%);
+  color: var(--milestone-accent);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
+}
+.desktop-milestone-highlight .milestone-highlight-reach .q-icon {
+  flex: 0 0 auto;
+  font-size: 1.15rem;
+}
+.info-sheet-content {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.5rem 1.25rem 1.25rem;
+}
+.info-sheet-content p {
+  margin: 0;
+  color: var(--color-copy);
+  line-height: 1.55;
 }
 .desktop-debt-select {
   width: min(17rem, 32vw);
@@ -2436,6 +2995,58 @@ h1 {
   min-height: 0;
   padding: 0.6rem 1.35rem 1.25rem;
   overflow-y: auto;
+}
+.sheet-settings-section {
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  background: var(--color-surface-soft);
+}
+.sheet-settings-section + .sheet-settings-section {
+  margin-top: 1rem;
+}
+.sheet-settings-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+.sheet-settings-heading > span {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.7rem;
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
+  font-size: 1.15rem;
+}
+.sheet-settings-heading h3,
+.sheet-settings-heading p {
+  margin: 0;
+}
+.sheet-settings-heading h3 {
+  color: var(--color-ink);
+  font-size: 1.05rem;
+}
+.sheet-settings-heading p {
+  margin-top: 0.15rem;
+  color: var(--color-copy);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.model-parameters-section {
+  background: var(--color-surface);
+}
+.model-parameters-section .sheet-subheading {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+}
+.model-parameters-section .first-parameter-heading {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 .sheet-allocation-list {
   display: grid;
@@ -3081,7 +3692,14 @@ h1 {
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
+.result-breakdown .projected-value-kpi strong {
+  color: var(--color-primary);
+  font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+}
 .result-breakdown.debt-result-breakdown {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.result-breakdown.four-values {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .scenario-name-dialog {
@@ -3171,6 +3789,17 @@ h1 {
 }
 
 @media (max-width: 1180px) {
+  .desktop-milestone-highlight {
+    grid-template-columns: auto minmax(0, 1fr) minmax(14rem, 0.8fr);
+    column-gap: 1rem;
+    padding: 1.3rem;
+  }
+  .milestone-highlight-result {
+    padding-left: 1rem;
+  }
+  .milestone-highlight-value > strong {
+    font-size: 2rem;
+  }
   .strategy-layout {
     grid-template-columns: 1fr;
     grid-template-areas:

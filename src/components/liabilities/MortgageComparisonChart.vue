@@ -6,18 +6,35 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { LineChart } from 'echarts/charts'
-import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import {
+  AriaComponent,
+  GridComponent,
+  LegendComponent,
+  MarkLineComponent,
+  TooltipComponent,
+} from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
-use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent, CanvasRenderer])
+use([
+  LineChart,
+  GridComponent,
+  LegendComponent,
+  MarkLineComponent,
+  TooltipComponent,
+  AriaComponent,
+  CanvasRenderer,
+])
 
 const props = defineProps({
   normalSchedule: { type: Array, default: () => [] },
   acceleratedSchedule: { type: Array, default: () => [] },
+  historySchedule: { type: Array, default: () => [] },
+  originalBalance: { type: Number, default: 0 },
   startingBalance: { type: Number, default: 0 },
   startDate: { type: String, default: '' },
+  currentDate: { type: String, default: '' },
   normalLabel: { type: String, required: true },
   acceleratedLabel: { type: String, required: true },
   ariaLabel: { type: String, required: true },
@@ -44,8 +61,11 @@ watch(
   () => [
     props.normalSchedule,
     props.acceleratedSchedule,
+    props.historySchedule,
+    props.originalBalance,
     props.startingBalance,
     props.startDate,
+    props.currentDate,
     props.normalLabel,
     props.acceleratedLabel,
     props.ariaLabel,
@@ -63,16 +83,39 @@ function renderChart() {
     return
   }
 
-  const periods = [props.startDate, ...props.normalSchedule.map(({ date }) => date)]
+  const historicalPoints = []
+  appendPoint(historicalPoints, props.startDate, props.originalBalance || props.startingBalance)
+  props.historySchedule.forEach(({ date, remainingBalance }) =>
+    appendPoint(historicalPoints, date, remainingBalance),
+  )
+  appendPoint(historicalPoints, props.currentDate, props.startingBalance)
+
+  const periods = [
+    ...historicalPoints.map(({ date }) => date),
+    ...props.normalSchedule.map(({ date }) => date),
+  ]
+  const historicalValues = historicalPoints.map(({ balance }) => balance)
   const normalValues = [
-    props.startingBalance,
+    ...historicalValues,
     ...props.normalSchedule.map(({ remainingBalance }) => remainingBalance),
   ]
   const acceleratedValues = [
-    props.startingBalance,
+    ...historicalValues.slice(0, -1).map(() => null),
+    historicalValues.at(-1),
     ...props.acceleratedSchedule.map(({ remainingBalance }) => remainingBalance),
   ]
   while (acceleratedValues.length < periods.length) acceleratedValues.push(null)
+
+  const normalSeries = payoffSeries(props.normalLabel, normalValues, '#0870d8')
+  if (props.currentDate) {
+    normalSeries.markLine = {
+      silent: true,
+      symbol: 'none',
+      label: { show: false },
+      lineStyle: { color: '#7f90a5', type: 'dashed', width: 1.5 },
+      data: [{ xAxis: props.currentDate }],
+    }
+  }
 
   chart.setOption(
     {
@@ -115,13 +158,17 @@ function renderChart() {
         axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
         splitLine: { lineStyle: { color: '#edf2f5' } },
       },
-      series: [
-        payoffSeries(props.normalLabel, normalValues, '#0870d8'),
-        payoffSeries(props.acceleratedLabel, acceleratedValues, '#0c6b4d'),
-      ],
+      series: [normalSeries, payoffSeries(props.acceleratedLabel, acceleratedValues, '#0c6b4d')],
     },
     true,
   )
+}
+
+function appendPoint(points, date, balance) {
+  if (!date) return
+  const point = { date, balance: Number(balance) || 0 }
+  if (points.at(-1)?.date === date) points[points.length - 1] = point
+  else points.push(point)
 }
 
 function payoffSeries(name, data, color) {

@@ -188,6 +188,7 @@ const {
   historyDocuments,
   historyError,
   historyLoading,
+  liabilities,
   loading,
   trackingActive,
 } = storeToRefs(milestonesStore)
@@ -256,6 +257,7 @@ const progress = computed(() =>
   calculateMilestoneProgress({
     financialYear: financialYear.value,
     financialHistory: historyDocuments.value,
+    liabilities: liabilities.value,
     achievements: trackingActive.value ? achievements.value : [],
     month: currentMonth.value,
     memberId: selectedMemberId.value,

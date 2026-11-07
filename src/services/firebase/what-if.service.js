@@ -20,12 +20,13 @@ export async function saveWhatIfConfig(workspaceId, config) {
   const updatedAt = serverTimestamp()
   const updatedBy = currentUserId()
   const batch = writeBatch(db)
+  // Keep this legacy payload within the fixed field allowlist in firestore.rules.
+  // Scenario-only assumptions such as cash return and inflation are stored below.
   batch.set(modelConfigRef(workspaceId, 'whatIf'), {
     schemaVersion: 1,
     discretionaryReductionPercent: normalized.discretionaryReductionPercent,
     extraMonthlySavings: normalized.extraMonthlySavings,
     expectedAnnualReturnPercent: activeScenario.investmentMix.stockMarket?.annualReturnPercent || 7,
-    cashAnnualReturnPercent: activeScenario.cashAnnualReturnPercent,
     selectedLiabilityId: activeScenario.selectedLiabilityId,
     strategy: activeScenario.allocation,
     updatedAt: serverTimestamp(),

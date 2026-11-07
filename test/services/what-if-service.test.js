@@ -69,6 +69,7 @@ describe('What If persistence', () => {
             stockMarket: { allocation: 100, annualReturnPercent: 6 },
           },
           cashAnnualReturnPercent: 2.5,
+          inflationAnnualPercent: 2,
           horizonYears: 20,
           cashTargetMonths: 12,
           selectedLiabilityId: 'mortgage-a',
@@ -84,7 +85,6 @@ describe('What If persistence', () => {
         schemaVersion: 1,
         discretionaryReductionPercent: 25,
         expectedAnnualReturnPercent: 6,
-        cashAnnualReturnPercent: 2.5,
         strategy: { cash: 20, invest: 60, debt: 20 },
       }),
     )
@@ -93,9 +93,17 @@ describe('What If persistence', () => {
       expect.objectContaining({
         schemaVersion: 1,
         activeScenarioId: 'default',
-        scenarios: expect.any(Array),
+        scenarios: [
+          expect.objectContaining({
+            cashAnnualReturnPercent: 2.5,
+            inflationAnnualPercent: 2,
+          }),
+        ],
       }),
     )
+    const legacyPayload = mocks.set.mock.calls.find(([reference]) => reference.id === 'whatIf')[1]
+    expect(legacyPayload).not.toHaveProperty('cashAnnualReturnPercent')
+    expect(legacyPayload).not.toHaveProperty('inflationAnnualPercent')
     expect(mocks.commit).toHaveBeenCalledOnce()
   })
 })

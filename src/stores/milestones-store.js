@@ -9,10 +9,12 @@ import {
 } from '@/services/firebase/achievements.service'
 import { getFinancialHistory } from '@/services/firebase/history.service'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 export const useMilestonesStore = defineStore('milestones', () => {
   const financialYearsStore = useFinancialYearsStore()
+  const liabilitiesStore = useLiabilitiesStore()
   const workspaceStore = useWorkspaceStore()
   const workspaceId = ref(null)
   const loadedKey = ref(null)
@@ -37,26 +39,34 @@ export const useMilestonesStore = defineStore('milestones', () => {
     () => workspaceStore.workspaces.find((candidate) => candidate.id === workspaceId.value) || null,
   )
   const trackingActive = computed(() => workspace.value?.milestoneTracking?.status === 'active')
+  const liabilities = computed(() => liabilitiesStore.itemsForCategory('mortgage'))
   const progress = computed(() => {
     if (!financialYear.value || !achievementsReady.value) return []
     return calculateMilestoneProgress({
       financialYear: financialYear.value,
       financialHistory: historyDocuments.value,
+      liabilities: liabilities.value,
       achievements: trackingActive.value ? achievements.value : [],
       month: currentMonth.value,
     })
   })
   const loading = computed(
-    () => financialYearsStore.loading || historyLoading.value || achievementsLoading.value,
+    () =>
+      financialYearsStore.loading ||
+      liabilitiesStore.loading ||
+      liabilitiesStore.categoryLoading ||
+      historyLoading.value ||
+      achievementsLoading.value,
   )
   const error = computed(
     () =>
       (workspaceId.value && financialYearsStore.errorFor(workspaceId.value, currentYear.value)) ||
+      liabilitiesStore.error ||
       historyError.value ||
       achievementsError.value,
   )
 
-  watch([financialYear, trackingActive], () => syncAchievements(progress.value))
+  watch([financialYear, liabilities, trackingActive], () => syncAchievements(progress.value))
 
   async function load(id, force = false) {
     if (!id) return
@@ -69,7 +79,10 @@ export const useMilestonesStore = defineStore('milestones', () => {
     currentMonth.value = month
 
     if (!force && loadedKey.value === key) {
-      await financialYearsStore.load(id, year)
+      await Promise.all([
+        financialYearsStore.load(id, year),
+        liabilitiesStore.loadCategory(id, 'mortgage'),
+      ])
       await syncAchievements(progress.value)
       return
     }
@@ -83,7 +96,10 @@ export const useMilestonesStore = defineStore('milestones', () => {
     historyLoading.value = true
     achievementsLoading.value = true
 
-    await financialYearsStore.load(id, year, force)
+    await Promise.all([
+      financialYearsStore.load(id, year, force),
+      liabilitiesStore.loadCategory(id, 'mortgage', force),
+    ])
     const [historyResult, achievementsResult] = await Promise.allSettled([
       getFinancialHistory(id),
       getAchievements(id),
@@ -183,6 +199,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
     historyDocuments,
     historyError,
     historyLoading,
+    liabilities,
     load,
     loading,
     progress,

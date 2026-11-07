@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
+import {
+  calculateLiabilityProgress,
+  calculateMilestoneProgress,
+} from '@/domain/milestones/calculations'
 
 describe('milestones', () => {
   it('uses the simplified net worth and freedom milestone sets', () => {
@@ -191,6 +194,40 @@ describe('milestones', () => {
     })
   })
 
+  it('uses each liability model initial value before falling back to its snapshot maximum', () => {
+    const current = liabilityYear(2026, '10', {
+      modeled: 60_000,
+      unmodeled: 20_000,
+    })
+    const historical = liabilityYear(2025, '12', {
+      modeled: 90_000,
+      unmodeled: 30_000,
+      repaid: 10_000,
+    })
+
+    const result = calculateLiabilityProgress({
+      categoryIds: ['mortgage'],
+      financialYear: current,
+      history: [historical, current],
+      liabilities: [
+        {
+          id: 'modeled',
+          categoryId: 'mortgage',
+          detail: { mortgage: { originalPrincipal: 100_000 } },
+        },
+      ],
+      month: '10',
+    })
+
+    expect(result).toEqual({
+      currentValue: 80_000,
+      startingValue: 140_000,
+      progress: 60_000 / 140_000,
+      reached: false,
+      relevant: true,
+    })
+  })
+
   it('calculates milestone values for the selected member scope', () => {
     const financialYear = {
       id: '2026',
@@ -309,4 +346,30 @@ function financialYear({
 
 function positionCategory(id, value) {
   return { subcategories: { [id]: { total: value } } }
+}
+
+function liabilityYear(year, month, balances) {
+  return {
+    id: String(year),
+    year,
+    months: {
+      [month]: {
+        assets: { categories: {} },
+        liabilities: {
+          categories: {
+            mortgage: {
+              subcategories: {
+                mortgage: {
+                  total: Object.values(balances).reduce((sum, value) => sum + value, 0),
+                  items: Object.fromEntries(
+                    Object.entries(balances).map(([id, value]) => [id, { total: value }]),
+                  ),
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }
 }
