@@ -318,7 +318,7 @@ describe('investment portfolio synchronization', () => {
 
     const result = await syncWorkspaceInvestmentPortfolios(
       firestore,
-      { workspaceId: 'workspace-a', userId: 'member-a' },
+      { workspaceId: 'workspace-a', userId: 'member-a', force: true },
       fetchSpreadsheet,
       vi.fn(async () => ({ status: 'rebuilt' })),
       () => 10_000,
@@ -329,6 +329,32 @@ describe('investment portfolio synchronization', () => {
       expect.objectContaining({ assetId: 'investment-a', currentValue: 1250 }),
     ])
     expect(fetchSpreadsheet).toHaveBeenCalled()
+  })
+
+  it('reuses fresh connected portfolio caches during automatic workspace synchronization', async () => {
+    const { firestore } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 999_999 }),
+      currentValue: 1000,
+    })
+    const fetchSpreadsheet = sheetFetch({ portfolioValue: '1.250,00' })
+
+    const result = await syncWorkspaceInvestmentPortfolios(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a' },
+      fetchSpreadsheet,
+      vi.fn(async () => ({ status: 'rebuilt' })),
+      () => 10_000,
+    )
+
+    expect(result.failures).toEqual([])
+    expect(result.results).toEqual([
+      expect.objectContaining({
+        assetId: 'investment-a',
+        cacheStatus: 'fresh',
+        currentValue: 1000,
+      }),
+    ])
+    expect(fetchSpreadsheet).not.toHaveBeenCalled()
   })
 
   it('fails a required workspace synchronization when Google cannot be read', async () => {

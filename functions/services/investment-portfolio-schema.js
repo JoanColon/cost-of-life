@@ -240,7 +240,7 @@ function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }
 
-module.exports = {
+const investmentPortfolioSchema = {
   PORTFOLIO_SCHEMA,
   normalizeInvestmentPortfolio,
   normalizeSummary,
@@ -248,3 +248,13 @@ module.exports = {
   parseCsv,
   parseLocalizedNumber,
 }
+
+export {
+  PORTFOLIO_SCHEMA,
+  normalizeInvestmentPortfolio,
+  normalizeSummary,
+  normalizeHoldings,
+  parseCsv,
+  parseLocalizedNumber,
+}
+export default investmentPortfolioSchema

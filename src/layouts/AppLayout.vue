@@ -253,12 +253,18 @@ const workspaceNavigationNodes = computed(() => {
 
 onMounted(async () => {
   periodTimer = setInterval(refreshFinancialPeriod, 60_000)
+  document.addEventListener('visibilitychange', revalidateMilestonesOnResume)
+  window.addEventListener('focus', revalidateMilestonesOnResume)
   if (!authUser.value) return
 
   await loadWorkspaces()
 })
 
-onBeforeUnmount(() => clearInterval(periodTimer))
+onBeforeUnmount(() => {
+  clearInterval(periodTimer)
+  document.removeEventListener('visibilitychange', revalidateMilestonesOnResume)
+  window.removeEventListener('focus', revalidateMilestonesOnResume)
+})
 
 watch(() => route.fullPath, syncWorkspaceFromRoute)
 watch(authUser, handleAuthChange)
@@ -403,10 +409,18 @@ async function syncPortfoliosOnOpen(workspaceId) {
   if (portfolioSyncStarted.has(workspaceId)) return null
   portfolioSyncStarted.add(workspaceId)
   try {
-    return await syncWorkspaceInvestmentPortfolios(workspaceId)
+    const result = await syncWorkspaceInvestmentPortfolios(workspaceId)
+    if (result?.failures?.length) portfolioSyncStarted.delete(workspaceId)
+    return result
   } catch {
+    portfolioSyncStarted.delete(workspaceId)
     return null
   }
+}
+
+function revalidateMilestonesOnResume() {
+  if (document.visibilityState !== 'visible' || !authUser.value) return
+  milestonesStore.revalidateAchievements()
 }
 
 function currentPeriodKey() {

@@ -1,3 +1,8 @@
+import {
+  frenchMortgagePaymentStep,
+  roundMoney,
+} from '../shared/financial-core.js'
+
 const MAX_SCHEDULE_MONTHS = 1_200
 
 function effectiveMortgageBalance(mortgage, asOfDate) {
@@ -13,18 +18,32 @@ function effectiveMortgageBalance(mortgage, asOfDate) {
   if (valuationDate <= anchorDate || anchorAmount === 0) return roundMoney(anchorAmount)
   if (payment === 0) throw new Error('A positive monthly payment is required')
 
-  const monthlyRate = annualRate / 100 / 12
   let balance = roundMoney(anchorAmount)
   for (let paymentNumber = 1; paymentNumber <= MAX_SCHEDULE_MONTHS; paymentNumber += 1) {
     const paymentDate = addMonths(startDate, paymentNumber)
     if (paymentDate <= anchorDate) continue
     if (paymentDate > valuationDate || balance === 0) return balance
-    const interest = roundMoney(balance * monthlyRate)
-    const principal = roundMoney(Math.min(balance, payment - interest))
-    if (principal <= 0) throw new Error('The monthly payment does not cover accrued interest')
-    balance = roundMoney(Math.max(0, balance - principal))
+    balance = frenchMortgagePaymentStep({
+      balance,
+      annualInterestRate: annualRate,
+      monthlyPayment: payment,
+    }).remainingBalance
   }
   throw new Error('The mortgage cannot be repaid within the supported projection period')
+}
+
+function isMortgagePaymentDueInMonth(mortgage, year, monthIndex) {
+  const startDate = canonicalDate(mortgage?.startDate, 'start date')
+  const firstPaymentDate = addMonths(startDate, 1)
+  const monthEnd = new Date(Date.UTC(Number(year), Number(monthIndex) + 1, 0))
+    .toISOString()
+    .slice(0, 10)
+  if (monthEnd < firstPaymentDate) return false
+
+  const beforeMonth = new Date(Date.UTC(Number(year), Number(monthIndex), 0))
+    .toISOString()
+    .slice(0, 10)
+  return effectiveMortgageBalance(mortgage, beforeMonth) > 0
 }
 
 function addMonths(value, months) {
@@ -62,8 +81,5 @@ function nonNegativeNumber(value, label) {
   return number
 }
 
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
-}
-
-module.exports = { effectiveMortgageBalance }
+export { effectiveMortgageBalance, isMortgagePaymentDueInMonth }
+export default { effectiveMortgageBalance, isMortgagePaymentDueInMonth }

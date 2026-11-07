@@ -35,6 +35,7 @@ describe('debt payoff projections', () => {
     expect(result.currentDate).toBe('2026-10-28')
     expect(result.historySchedule[0].date).toBe('2020-02-01')
     expect(result.historySchedule.at(-1).date < result.currentDate).toBe(true)
+    expect(result.schedule[0].date).toBe('2026-11-01')
     expect(result.progress).toBeCloseTo(0.26885, 5)
     expect(result.accelerated.remainingPayments).toBeLessThan(result.remainingPayments)
     expect(result.accelerated.interestSaved).toBeGreaterThan(0)

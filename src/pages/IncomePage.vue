@@ -23,21 +23,11 @@
         @save="completeSetup"
       />
       <template v-else>
-        <header class="income-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('navigation.backToWorkspaceHome')"
-              :to="workspaceHomeRoute"
-              class="back-button"
-            />
-            <h1>{{ t('income.title') }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t('income.title')"
+          :back-label="t('navigation.backToWorkspaceHome')"
+          :back-to="workspaceHomeRoute"
+        />
         <section class="total-card">
           <div class="total-card-heading">
             <span>{{ t('income.availableIncome') }}</span>
@@ -220,12 +210,13 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
 import IncomeCategorySetup from '@/components/income/IncomeCategorySetup.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { incomeCategories } from '@/config/income-categories'
 import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
-  financialYearCategoryValue,
-  financialYearValue,
+  financialYearFlowCategoryValue,
+  financialYearFlowValue,
 } from '@/domain/financial/financial-year'
 import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
@@ -285,7 +276,7 @@ const pageLoading = computed(
     financialYearsStore.loading,
 )
 const total = computed(() =>
-  financialYearValue(financialYear.value, 'income', selectedMemberId.value),
+  financialYearFlowValue(financialYear.value, 'income', selectedMemberId.value),
 )
 const availableIncome = computed(() =>
   financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
@@ -444,7 +435,7 @@ function simpleCalculation(mode, annualValue) {
   return { mode: 'recurring', amount: annualValue, frequency: 'yearly' }
 }
 function categoryAnnualValue(id) {
-  return financialYearCategoryValue(financialYear.value, 'income', id, selectedMemberId.value)
+  return financialYearFlowCategoryValue(financialYear.value, 'income', id, selectedMemberId.value)
 }
 function openCategory(id) {
   router.push({ name: 'income-category', params: { workspaceId: workspaceId.value, category: id } })
@@ -469,7 +460,7 @@ async function persist(action) {
   @include financial-page;
 }
 .income-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 .state {
   display: grid;

@@ -1,9 +1,9 @@
-const { getFirestore } = require('firebase-admin/firestore')
-const { onDocumentWritten } = require('firebase-functions/firestore')
-const { HttpsError, onCall } = require('firebase-functions/https')
-const { onSchedule } = require('firebase-functions/scheduler')
-const { syncWorkspaceInvestmentPortfolios } = require('./services/investment-portfolios')
-const {
+import { getFirestore } from 'firebase-admin/firestore'
+import { onDocumentWritten } from 'firebase-functions/firestore'
+import { HttpsError, onCall } from 'firebase-functions/https'
+import { onSchedule } from 'firebase-functions/scheduler'
+import { syncWorkspaceInvestmentPortfolios } from './services/investment-portfolios.js'
+import {
   closePreviousFinancialPositionMonth,
   madridToday,
   currentYear,
@@ -11,7 +11,7 @@ const {
   refreshFinancialYearTrackingMonth,
   refreshModeledPositions,
   synchronizeFinancialYearPositions,
-} = require('./services/financial-years')
+} from './services/financial-years.js'
 
 const options = { region: 'europe-west1', retry: true }
 
@@ -131,7 +131,7 @@ async function rebuildCurrent(workspaceId, sections) {
   await rebuildFinancialYear(getFirestore(), workspaceId, currentYear(), { sections })
 }
 
-module.exports = {
+export {
   closeMonthlyFinancialPositions,
   ensureFinancialYear,
   onExpenseTrackingWritten,

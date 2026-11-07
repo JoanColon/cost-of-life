@@ -1,5 +1,5 @@
-const { effectiveMortgageBalance } = require('./mortgage')
-const { effectiveRealEstateValue } = require('./real-estate')
+import { effectiveMortgageBalance, isMortgagePaymentDueInMonth } from './mortgage.js'
+import { effectiveRealEstateValue } from './real-estate.js'
 
 function calculatePositionsAt({ assets = [], liabilities = [], asOfDate }) {
   return {
@@ -22,4 +22,11 @@ function effectiveLiabilityBalance(liability, asOfDate) {
   return effectiveMortgageBalance(mortgage, asOfDate)
 }
 
-module.exports = { calculatePositionsAt, effectiveLiabilityBalance }
+function isLiabilityPaymentDueInMonth(liability, year, monthIndex) {
+  const mortgage = liability?.detail?.mortgage
+  if (liability?.categoryId !== 'mortgage' || mortgage?.schemaVersion !== 2) return null
+  return isMortgagePaymentDueInMonth(mortgage, year, monthIndex)
+}
+
+export { calculatePositionsAt, effectiveLiabilityBalance, isLiabilityPaymentDueInMonth }
+export default { calculatePositionsAt, effectiveLiabilityBalance, isLiabilityPaymentDueInMonth }

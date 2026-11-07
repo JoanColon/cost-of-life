@@ -131,15 +131,12 @@ function save() {
 @use '@/css/mixins' as *;
 
 .estimate-button {
+  @include button-reset;
   display: grid;
   justify-items: end;
   min-width: 8.5rem;
   padding: 0.45rem 0.65rem;
-  border: 0;
-  border-radius: 0.65rem;
-  background: transparent;
   color: var(--color-ink);
-  cursor: pointer;
 }
 
 .estimate-button:hover:not(:disabled) {

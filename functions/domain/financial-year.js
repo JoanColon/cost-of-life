@@ -1,3 +1,6 @@
+import { allocateValueByOwnership } from '../shared/financial-core.js'
+import { isLiabilityPaymentDueInMonth } from './positions.js'
+
 const MONTHS = [
   'january',
   'february',
@@ -63,23 +66,27 @@ function updateFinancialYearProjection(
     MONTHS.map((monthName, monthIndex) => {
       const monthKey = String(monthIndex + 1).padStart(2, '0')
       const previous = financialYear?.months?.[monthKey] || {}
+      const closed = previous.positionStatus === 'closed'
       const assetsValue =
-        affected.has('assets') && monthKey >= assetStartMonth ?
+        affected.has('assets') && monthKey >= assetStartMonth && !closed ?
           buildPositionMonth(config.assets?.categories || {}, assets, 'currentValue') :
           canonicalSection(previous.assets)
       const liabilitiesValue =
-        affected.has('liabilities') && monthKey >= liabilityStartMonth ?
+        affected.has('liabilities') && monthKey >= liabilityStartMonth && !closed ?
           buildPositionMonth(config.liabilities?.categories || {}, liabilities, 'balance') :
           canonicalSection(previous.liabilities)
-      const expensesValue = affected.has('expenses') ?
+      const expensesValue = affected.has('expenses') && !closed ?
         buildExpenseMonth(
             config.expenses?.categories || {},
             expenses,
             trackingMonths[`${year}-${monthKey}`],
             monthName,
+            liabilities,
+            year,
+            monthIndex,
           ) :
         canonicalSection(previous.expenses)
-      const incomeValue = affected.has('income') ?
+      const incomeValue = affected.has('income') && !closed ?
         buildIncomeMonth(config.income?.categories || {}, income, monthIndex) :
         canonicalSection(previous.income)
       return [
@@ -178,7 +185,15 @@ function buildPositionMonth(categoryConfig, items, valueField) {
   return { categories }
 }
 
-function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
+function buildExpenseMonth(
+  categoryConfig,
+  expenses,
+  trackingMonth,
+  monthName,
+  liabilities = [],
+  year = null,
+  monthIndex = 0,
+) {
   const grouped = groupBy(expenses, 'categoryId')
   const categories = {}
   for (const [categoryId, category] of Object.entries(categoryConfig)) {
@@ -192,7 +207,13 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
       const applied = tracked.applied === true
       const items = Object.fromEntries(
         modelItems.map((expense) => {
-          const estimated = expenseMonth(expense, monthName)
+          const estimated = effectiveExpenseMonth(
+            expense,
+            monthName,
+            liabilities,
+            year,
+            monthIndex,
+          )
           const actual = tracked.items[expense.id]
           const estimatedMemberValues = allocate(estimated, expense.ownership)
           return [
@@ -234,6 +255,25 @@ function buildExpenseMonth(categoryConfig, expenses, trackingMonth, monthName) {
     categories[categoryId] = { subcategories }
   }
   return { categories }
+}
+
+function effectiveExpenseMonth(expense, monthName, liabilities, year, monthIndex) {
+  const estimated = expenseMonth(expense, monthName)
+  if (!expense.liabilityId || !year) return estimated
+
+  const liability = liabilities.find(({ id }) => id === expense.liabilityId)
+  if (
+    liability?.categoryId !== 'mortgage' ||
+    liability?.detail?.mortgage?.schemaVersion !== 2
+  ) {
+    return estimated
+  }
+
+  try {
+    return isLiabilityPaymentDueInMonth(liability, year, monthIndex) ? estimated : 0
+  } catch {
+    return estimated
+  }
 }
 
 function buildIncomeMonth(categoryConfig, income, monthIndex) {
@@ -436,19 +476,7 @@ function canonicalSection(section) {
 }
 
 function allocate(value, ownership) {
-  const result = {}
-  const amountInCents = Math.round(moneyOrZero(value) * 100)
-  const shares = (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
-  let assignedCents = 0
-  shares.forEach((share, index) => {
-    const cents =
-      index === shares.length - 1 ?
-        amountInCents - assignedCents :
-        Math.round((amountInCents * Number(share.percentage)) / 100)
-    assignedCents += cents
-    result[share.memberId] = moneyOrZero((result[share.memberId] || 0) + cents / 100)
-  })
-  return result
+  return allocateValueByOwnership(value, ownership)
 }
 
 function groupBy(items, field) {
@@ -485,9 +513,17 @@ function assertMonth(month) {
   }
 }
 
-module.exports = {
+const financialYearDomain = {
   applyTrackingMonth,
   buildPositionMonth,
   buildFinancialYear,
   updateFinancialYearProjection,
 }
+
+export {
+  applyTrackingMonth,
+  buildPositionMonth,
+  buildFinancialYear,
+  updateFinancialYearProjection,
+}
+export default financialYearDomain

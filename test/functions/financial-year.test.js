@@ -184,8 +184,117 @@ describe('server financial year projection', () => {
     })
   })
 
+  it('does not rewrite closed flow months when income and expense models change', () => {
+    const original = projection()
+    original.months['02'].positionStatus = 'closed'
+    const previousExpense = original.months['02'].expenses
+    const previousIncome = original.months['02'].income
+    const updated = updateFinancialYearProjection(original, {
+      year: 2026,
+      config: {
+        expenses: { categories: { food: { enabled: true } } },
+        income: { categories: { employment: { enabled: true } } },
+      },
+      expenses: [
+        {
+          id: 'groceries',
+          categoryId: 'food',
+          subcategoryId: 'groceries',
+          itemName: 'Weekly groceries',
+          notes: '',
+          estimate: { amount: 900, frequency: 'monthly' },
+          ownership,
+        },
+      ],
+      income: [
+        {
+          id: 'salary',
+          categoryId: 'employment',
+          subcategoryId: 'salary',
+          itemName: 'Salary',
+          notes: '',
+          calculation: { mode: 'monthly_schedule', monthlyAmount: 3000 },
+          ownership,
+        },
+      ],
+      sections: ['expenses', 'income'],
+    })
+
+    expect(updated.months['02'].expenses).toEqual(previousExpense)
+    expect(updated.months['02'].income).toEqual(previousIncome)
+    expect(financialYearMonthValue(updated, '03', 'expenses')).toBe(900)
+    expect(financialYearMonthValue(updated, '03', 'income')).toBe(3000)
+  })
+
+  it('stops a linked mortgage expense after payoff without changing its model amount', () => {
+    const result = buildFinancialYear({
+      year: 2026,
+      config: {
+        expenses: { categories: { housing: { enabled: true } } },
+        liabilities: { categories: { mortgage: { enabled: true } } },
+      },
+      liabilities: [
+        {
+          id: 'mortgage-a',
+          categoryId: 'mortgage',
+          subcategoryId: 'mortgage',
+          itemName: 'Home loan',
+          balance: 500,
+          ownership,
+          detail: {
+            mortgage: {
+              schemaVersion: 2,
+              originalPrincipal: 500,
+              annualInterestRate: 0,
+              monthlyPayment: 500,
+              startDate: '2026-01-01',
+              termMonths: 12,
+              amortizationType: 'french',
+              fixedRate: true,
+              balanceAnchor: { amount: 500, date: '2026-01-01' },
+            },
+          },
+        },
+      ],
+      expenses: [
+        {
+          id: 'mortgage-expense',
+          categoryId: 'housing',
+          subcategoryId: 'mortgage_rent',
+          itemName: 'Mortgage payment',
+          notes: '',
+          estimate: { amount: 500, frequency: 'monthly' },
+          monthlyAmounts: Object.fromEntries(
+            [
+              'january',
+              'february',
+              'march',
+              'april',
+              'may',
+              'june',
+              'july',
+              'august',
+              'september',
+              'october',
+              'november',
+              'december',
+            ].map((month) => [month, 500]),
+          ),
+          liabilityId: 'mortgage-a',
+          ownership,
+        },
+      ],
+    })
+
+    expect(financialYearMonthValue(result, '01', 'expenses')).toBe(0)
+    expect(financialYearMonthValue(result, '02', 'expenses')).toBe(500)
+    expect(financialYearMonthValue(result, '03', 'expenses')).toBe(0)
+    expect(financialYearValue(result, 'expenses')).toBe(500)
+  })
+
   it('updates a historical tracked month without changing its stored estimates', () => {
     const original = projection()
+    original.months['10'].positionStatus = 'closed'
     const updated = applyTrackingMonth(original, '10', {
       categories: {
         groceries: { items: [{ itemId: 'groceries', amount: 437, ownership }] },
@@ -199,6 +308,7 @@ describe('server financial year projection', () => {
       effective: 437,
       source: 'tracked',
     })
+    expect(updated.months['10'].positionStatus).toBe('closed')
     expect(financialYearValue(updated, 'expenses')).toBe(5937)
     expect(
       updated.months['10'].expenses.categories.food.subcategories.groceries.items.groceries.actual,

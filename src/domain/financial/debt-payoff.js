@@ -20,6 +20,7 @@ export function calculateDebtPayoffImpact({
       monthlyPayment: mortgage.monthlyPayment,
       extraMonthlyPayment,
       asOfDate,
+      startDate: mortgage.startDate,
     })
     return {
       modelType: 'mortgage',
@@ -58,6 +59,7 @@ function mortgageHistorySchedule(mortgage, asOfDate) {
       annualInterestRate: mortgage.annualInterestRate,
       monthlyPayment: mortgage.monthlyPayment,
       asOfDate: mortgage.startDate,
+      startDate: mortgage.startDate,
     }).filter(({ date }) => date < dateString(asOfDate))
   } catch {
     return []

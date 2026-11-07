@@ -505,7 +505,7 @@ export default {
       modeledInfo:
         'The payoff date and interest saving use the fixed-rate French amortization model saved with this mortgage.',
       fallbackInfo:
-        'No supported debt model is available, so this card shows additional repayments as it did before.',
+        'Without debt details, the projected balance stays unchanged because interest and contractual repayments cannot be calculated reliably.',
     },
     strategy: {
       title: 'Your Strategy',
@@ -611,7 +611,8 @@ export default {
       emergencyFundTarget: 'Emergency fund target',
       debtInfoAction: 'About extra debt repayments',
       debtInfoTitle: 'About extra debt repayments',
-      debtDisclaimer: 'Extra repayments only; payoff dates need loan details.',
+      debtDisclaimer:
+        'The balance stays unchanged until loan details are added; payoff dates require a debt model.',
       modeledDebtDisclaimer:
         'Extra repayments reduce the term while the regular payment stays unchanged.',
       finishEarlier: 'Finish earlier',
@@ -1712,7 +1713,6 @@ export default {
     detail: {
       average: 'Average per transaction',
       transactions: 'Transactions',
-      addTransaction: 'Add transaction',
     },
     review: {
       month: 'Month',
@@ -1720,6 +1720,14 @@ export default {
       modelTotal: 'Planned',
       tracked: 'Actually spent',
       model: 'Planned',
+      actual: 'Actual',
+      planned: 'Planned',
+      spentThisMonth: 'Spent this month',
+      ofPlan: 'of plan',
+      subcategories: 'Subcategories',
+      chooseAmount: 'Choose which amount to use in your plan',
+      updateNote: 'The selected amounts will be used to update your expense plan.',
+      updatePlan: 'Update plan',
       view: 'View',
       useTracked: 'Use actual',
       keepModel: 'Keep planned',
@@ -1731,7 +1739,9 @@ export default {
           'This will replace the planned amounts with the actual totals for {period} in every category that has tracked entries.',
         action: 'Use actual amounts',
       },
+      categoryCount: '{count} categories',
       itemCount: '{count} entries',
+      backToGroup: 'Back to category overview',
       noChanges: 'No changes',
       noItems: 'No expenses tracked in this category yet.',
     },

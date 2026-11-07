@@ -5,6 +5,45 @@
   box-shadow: var(--shadow-card);
 }
 
+@mixin button-reset {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+@mixin interactive-button-surface($radius: var(--radius-button)) {
+  @include button-reset;
+  border: 1px solid var(--color-line);
+  border-radius: $radius !important;
+  background: var(--color-surface);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+
+  &:focus-visible {
+    outline: 3px solid var(--color-primary-focus);
+    outline-offset: 2px;
+  }
+}
+
+@mixin segmented-button {
+  @include button-reset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--button-height-sm);
+  border-radius: 999px !important;
+  font-weight: var(--button-font-weight);
+  text-align: center;
+}
+
 @mixin financial-page {
   min-height: calc(100dvh - 64px);
   padding: clamp(0.75rem, 1.8vh, 1.15rem) clamp(1rem, 2vw, 1.75rem);
@@ -15,10 +54,17 @@
   }
 }
 
-@mixin financial-shell {
+@mixin financial-shell($width: standard) {
   width: 100%;
-  max-width: 72rem;
   margin: 0 auto;
+
+  @if $width == analytical {
+    max-width: var(--layout-width-analytical);
+  } @else if $width == wide {
+    max-width: var(--layout-width-wide);
+  } @else {
+    max-width: var(--layout-width-standard);
+  }
 }
 
 @mixin financial-header {
@@ -339,7 +385,7 @@
 
   .primary-actions .q-btn {
     min-width: 6rem;
-    min-height: 2.75rem;
+    min-height: var(--button-height-md);
   }
 
   @media (max-width: 599px) {
@@ -352,7 +398,7 @@
 
     .primary-actions .q-btn {
       min-width: 4.75rem;
-      min-height: 2.5rem;
+      min-height: var(--button-height-md);
     }
   }
 }
@@ -443,7 +489,7 @@
   }
 
   > .q-card__actions .q-btn {
-    min-height: 2.6rem;
+    min-height: var(--button-height-md);
   }
 
   > .q-card__actions .q-btn--flat:not(.text-negative) {

@@ -1,4 +1,7 @@
 import { normalizeNonNegativeMoney } from './money'
+import { allocateValueByOwnership } from '../../../functions/shared/financial-core.js'
+
+export { allocateValueByOwnership }
 
 export function createSingleOwnership(memberId) {
   return {
@@ -68,25 +71,6 @@ export function isValidOwnership(ownership, memberIds = []) {
   }, 0)
 
   return Number.isFinite(total) && Math.abs(total - 100) < 0.001
-}
-
-export function allocateValueByOwnership(value, ownership, memberIds = []) {
-  const amountInCents = Math.round((normalizeNonNegativeMoney(value) || 0) * 100)
-  const shares = (ownership?.shares || []).filter((share) => Number(share.percentage) > 0)
-  const values = Object.fromEntries(memberIds.filter(Boolean).map((memberId) => [memberId, 0]))
-  let assignedCents = 0
-
-  shares.forEach((share, index) => {
-    // The final positive share receives any remaining cent so allocations always match the total.
-    const cents =
-      index === shares.length - 1
-        ? amountInCents - assignedCents
-        : Math.round((amountInCents * Number(share.percentage)) / 100)
-    assignedCents += cents
-    values[share.memberId] = Math.round(((values[share.memberId] || 0) + cents / 100) * 100) / 100
-  })
-
-  return values
 }
 
 export function applyOwnership(value, ownership, memberId) {

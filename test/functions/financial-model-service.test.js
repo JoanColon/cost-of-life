@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import financialModelService from '../../functions/services/financial-model.js'
+import mortgageDomain from '../../functions/domain/mortgage.js'
 import realEstateDomain from '../../functions/domain/real-estate.js'
 import financialYearDomain from '../../functions/domain/financial-year.js'
 import financialYearsService from '../../functions/services/financial-years.js'
-import { financialYearValue } from '../../src/domain/financial/financial-year.js'
+import {
+  financialYearMonthValue,
+  financialYearValue,
+} from '../../src/domain/financial/financial-year.js'
 
 const { financialModelMutationInput, mutateFinancialModel } = financialModelService
 const { annualRealEstateValue } = realEstateDomain
+const { effectiveMortgageBalance } = mortgageDomain
 const { buildFinancialYear } = financialYearDomain
 const { currentYear } = financialYearsService
 
@@ -177,6 +182,60 @@ describe('atomic financial model mutations', () => {
       path.endsWith(`/financialYears/${currentYear()}`),
     )
     expect(financialYearValue(financialYearWrite.data, 'liabilities')).toBe(146_230)
+  })
+
+  it('materializes the effective mortgage balance during the model mutation', async () => {
+    const today = madridToday()
+    const anchorDate = shiftUtcMonths(today, -2)
+    const mortgage = {
+      id: 'mortgage-a',
+      categoryId: 'mortgage',
+      subcategoryId: 'mortgage',
+      itemName: 'Home mortgage',
+      notes: '',
+      balance: 10_000,
+      ownership,
+      detail: {
+        mortgage: {
+          schemaVersion: 2,
+          originalPrincipal: 20_000,
+          annualInterestRate: 0,
+          monthlyPayment: 1_000,
+          startDate: '2020-01-01',
+          termMonths: 360,
+          amortizationType: 'french',
+          fixedRate: true,
+          balanceAnchor: { amount: 10_000, date: anchorDate },
+        },
+      },
+    }
+    const expectedBalance = effectiveMortgageBalance(mortgage.detail.mortgage, today)
+    const { firestore, writes } = createFirestore({
+      section: 'liabilities',
+      collection: 'modelLiabilities',
+      category: 'mortgage',
+      items: [mortgage],
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'liabilities',
+      operation: 'update',
+      itemId: mortgage.id,
+      item: mortgage,
+    })
+
+    expect(result.liability.balance).toBe(expectedBalance)
+    expect(
+      writes.find(({ path }) => path.endsWith('/modelLiabilities/mortgage-a')).data.balance,
+    ).toBe(expectedBalance)
+    const financialYearWrite = writes.find(({ path }) =>
+      path.endsWith(`/financialYears/${currentYear()}`),
+    )
+    expect(
+      financialYearMonthValue(financialYearWrite.data, madridToday().slice(5, 7), 'liabilities'),
+    ).toBe(expectedBalance)
   })
 
   it('derives a property root value from its Layer 3 model', async () => {
@@ -982,4 +1041,10 @@ function madridToday() {
       .map(({ type, value }) => [type, value]),
   )
   return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+function shiftUtcMonths(value, months) {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1 + months, day))
+  return date.toISOString().slice(0, 10)
 }

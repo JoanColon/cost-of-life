@@ -1,27 +1,12 @@
-const { FieldPath, FieldValue } = require('firebase-admin/firestore')
-const {
+import { FieldPath, FieldValue } from 'firebase-admin/firestore'
+import {
   applyTrackingMonth,
   buildPositionMonth,
   updateFinancialYearProjection,
-} = require('../domain/financial-year')
-const { calculatePositionsAt } = require('../domain/positions')
+} from '../domain/financial-year.js'
+import { calculatePositionsAt } from '../domain/positions.js'
 
 const PROJECTION_SECTIONS = ['assets', 'liabilities', 'income', 'expenses']
-const MONTHS = [
-  'january',
-  'february',
-  'march',
-  'april',
-  'may',
-  'june',
-  'july',
-  'august',
-  'september',
-  'october',
-  'november',
-  'december',
-]
-
 async function rebuildFinancialYear(
   firestore,
   workspaceId,
@@ -54,7 +39,7 @@ async function rebuildFinancialYear(
         affectedSections.includes('assets') ?
           transaction.get(workspace.collection('modelAssets')) :
           null,
-        affectedSections.includes('liabilities') ?
+        affectedSections.includes('liabilities') || affectedSections.includes('expenses') ?
           transaction.get(workspace.collection('modelLiabilities')) :
           null,
         affectedSections.includes('income') ?
@@ -292,7 +277,6 @@ async function refreshModeledPositions(
   const mortgages = workspace
     .collection('modelLiabilities')
     .where('categoryId', '==', 'mortgage')
-  const expenses = workspace.collection('modelExpenses')
   const result = {
     assetsUpdated: 0,
     liabilitiesUpdated: 0,
@@ -300,10 +284,9 @@ async function refreshModeledPositions(
     mortgagesMigrated: 0,
   }
   await firestore.runTransaction(async (transaction) => {
-    const [assetsSnapshot, mortgagesSnapshot, expensesSnapshot] = await Promise.all([
+    const [assetsSnapshot, mortgagesSnapshot] = await Promise.all([
       transaction.get(assets),
       transaction.get(mortgages),
-      transaction.get(expenses),
     ])
     const positions = calculatePositionsAt({
       assets: documents(assetsSnapshot),
@@ -353,17 +336,6 @@ async function refreshModeledPositions(
         updatedBy: userId,
       })
       result.liabilitiesUpdated += 1
-      if (balance !== 0) continue
-      for (const expense of expensesSnapshot.docs || []) {
-        if (expense.data()?.liabilityId !== document.id) continue
-        transaction.update(expense.ref, {
-          estimate: { amount: 0, frequency: 'monthly' },
-          monthlyAmounts: Object.fromEntries(MONTHS.map((month) => [month, 0])),
-          updatedAt: FieldValue.serverTimestamp(),
-          updatedBy: userId,
-        })
-        result.expensesUpdated += 1
-      }
     }
   })
   return result
@@ -499,7 +471,7 @@ function assertDate(value) {
   }
 }
 
-module.exports = {
+const financialYearsService = {
   closePreviousFinancialPositionMonth,
   madridToday,
   currentMonth,
@@ -511,3 +483,17 @@ module.exports = {
   synchronizeFinancialYearPositions,
   writeFinancialYearPositionMonth,
 }
+
+export {
+  closePreviousFinancialPositionMonth,
+  madridToday,
+  currentMonth,
+  currentYear,
+  positionStartMonth,
+  rebuildFinancialYear,
+  refreshFinancialYearTrackingMonth,
+  refreshModeledPositions,
+  synchronizeFinancialYearPositions,
+  writeFinancialYearPositionMonth,
+}
+export default financialYearsService

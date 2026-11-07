@@ -38,7 +38,7 @@
         unelevated
         no-caps
         color="primary"
-        class="continue-button"
+        class="app-btn--wide app-btn--mobile-block"
         :label="editMode ? t('common.save') : t('common.continue')"
         :disable="selected.length === 0"
         :loading="saving"
@@ -152,11 +152,6 @@ p {
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1.5rem;
-}
-.continue-button {
-  min-width: 10rem;
-  min-height: 3rem;
-  border-radius: 0.8rem;
 }
 @media (max-width: 699px) {
   .category-grid {

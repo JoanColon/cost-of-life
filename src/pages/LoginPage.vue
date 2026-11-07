@@ -76,7 +76,7 @@
                 no-caps
                 size="md"
                 color="primary"
-                class="full-width auth-submit"
+                class="full-width app-btn--large"
                 type="submit"
                 :label="isRegistering ? t('auth.register') : t('auth.signIn')"
                 :loading="loading === 'email'"
@@ -91,7 +91,7 @@
             <q-btn
               outline
               no-caps
-              class="full-width google-button"
+              class="full-width app-btn--large google-button"
               :loading="loading === 'google'"
               :disable="Boolean(loading)"
               @click="submitGoogle"
@@ -339,12 +339,6 @@ h1 {
   font-size: 0.9rem;
 }
 
-.auth-submit {
-  min-height: 3.25rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
-}
-
 .separator {
   display: flex;
   align-items: center;
@@ -363,8 +357,6 @@ h1 {
 }
 
 .google-button {
-  min-height: 3.25rem;
-  border-radius: 0.75rem;
   color: var(--color-ink);
 }
 

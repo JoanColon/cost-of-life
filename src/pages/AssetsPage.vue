@@ -30,21 +30,11 @@
       />
 
       <template v-else>
-        <header class="assets-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('navigation.backToWorkspaceHome')"
-              :to="workspaceHomeRoute"
-              class="back-button"
-            />
-            <h1>{{ t('assets.title') }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t('assets.title')"
+          :back-label="t('navigation.backToWorkspaceHome')"
+          :back-to="workspaceHomeRoute"
+        />
 
         <section class="total-card">
           <span>{{ t('assets.totalAssets') }}</span>
@@ -258,6 +248,7 @@ import { useRoute, useRouter } from 'vue-router'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import PositionCategorySetup from '@/components/financial/PositionCategorySetup.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { assetCategories } from '@/config/asset-categories'
 import {
   currentFinancialMonth,
@@ -503,7 +494,7 @@ async function persist(action) {
 }
 
 .assets-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 
 .loading-state {

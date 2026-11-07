@@ -1,5 +1,5 @@
-const crypto = require('node:crypto')
-const { FieldValue, Timestamp } = require('firebase-admin/firestore')
+import crypto from 'node:crypto'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -226,7 +226,7 @@ function isWorkspaceMember(workspace, userId) {
   return workspace?.memberIds?.includes(userId) === true
 }
 
-module.exports = {
+const workspacesService = {
   acceptWorkspaceInvite,
   createWorkspaceInvite,
   deleteWorkspaceData,
@@ -236,3 +236,15 @@ module.exports = {
   isWorkspaceOwner,
   updateWorkspaceSettings,
 }
+
+export {
+  acceptWorkspaceInvite,
+  createWorkspaceInvite,
+  deleteWorkspaceData,
+  getWorkspaceInvite,
+  inviteDocumentId,
+  isWorkspaceMember,
+  isWorkspaceOwner,
+  updateWorkspaceSettings,
+}
+export default workspacesService

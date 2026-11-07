@@ -21,6 +21,7 @@ vi.mock('@/domain/milestones/calculations', () => ({ calculateMilestoneProgress 
 vi.mock('@/services/firebase/achievements.service', () => ({
   activateMilestoneTracking,
   getAchievements,
+  milestoneConfirmationDueAt: vi.fn(() => null),
   syncMilestoneAchievements,
 }))
 vi.mock('@/services/firebase/history.service', () => ({ getFinancialHistory }))
@@ -74,6 +75,20 @@ describe('milestones store', () => {
     expect(store.achievements).toEqual([])
     expect(store.historyDocuments).toEqual([])
     expect(store.progress).toEqual([])
+  })
+
+  it('clears loading state and can retry when the initial financial load fails', async () => {
+    getFinancialYear.mockRejectedValueOnce(new Error('Temporary Firestore error'))
+    const store = useMilestonesStore()
+
+    await expect(store.load('workspace-a')).rejects.toThrow('Temporary Firestore error')
+    expect(store.historyLoading).toBe(false)
+    expect(store.achievementsLoading).toBe(false)
+
+    await store.load('workspace-a')
+
+    expect(getFinancialYear).toHaveBeenCalledTimes(2)
+    expect(store.progress).toHaveLength(1)
   })
 
   it('keeps setup progress as a preview until tracking is explicitly activated', async () => {

@@ -39,7 +39,7 @@
             unelevated
             no-caps
             color="primary"
-            class="create-button"
+            class="app-btn--wide app-btn--large app-btn--mobile-block"
             type="submit"
             :label="t('workspace.create')"
             :loading="loading"
@@ -136,13 +136,6 @@ h1 {
   gap: 0.75rem;
 }
 
-.create-button {
-  min-height: 3rem;
-  min-width: 10rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
-}
-
 @media (max-width: 480px) {
   .workspace-card {
     padding: 1.35rem;
@@ -153,10 +146,8 @@ h1 {
     flex-direction: column-reverse;
   }
 
-  .form-actions .q-btn,
-  .create-button {
+  .form-actions .q-btn {
     width: 100%;
-    min-height: 3rem;
   }
 }
 </style>

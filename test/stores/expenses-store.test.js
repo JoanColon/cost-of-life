@@ -58,4 +58,28 @@ describe('expenses store', () => {
     expect(store.itemsForCategory('housing')).toEqual([{ id: 'rent', categoryId: 'housing' }])
     expect(store.categoryLoading).toBe(false)
   })
+
+  it('retries the same workspace after a config load fails', async () => {
+    getExpensesConfig.mockRejectedValueOnce(new Error('Temporary Firestore error'))
+    const store = useExpensesStore()
+
+    await store.loadConfig('workspace-a')
+    await store.loadConfig('workspace-a')
+
+    expect(getExpensesConfig).toHaveBeenCalledTimes(2)
+    expect(store.error).toBeNull()
+    expect(store.config).toEqual(expect.objectContaining({ setupCompleted: true }))
+  })
+
+  it('invalidates a previous successful load when a forced reload fails', async () => {
+    const store = useExpensesStore()
+    await store.loadConfig('workspace-a')
+    getExpensesConfig.mockRejectedValueOnce(new Error('Temporary Firestore error'))
+
+    await store.loadConfig('workspace-a', true)
+    await store.loadConfig('workspace-a')
+
+    expect(getExpensesConfig).toHaveBeenCalledTimes(3)
+    expect(store.error).toBeNull()
+  })
 })

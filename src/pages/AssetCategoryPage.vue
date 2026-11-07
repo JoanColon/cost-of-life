@@ -26,21 +26,11 @@
       </section>
 
       <template v-else-if="category && categoryConfig?.enabled">
-        <header class="category-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('assets.backToAssets')"
-              :to="assetsRoute"
-              class="back-button"
-            />
-            <h1>{{ t(category.nameKey) }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t(category.nameKey)"
+          :back-label="t('assets.backToAssets')"
+          :back-to="assetsRoute"
+        />
 
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
@@ -183,6 +173,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AssetForm from '@/components/assets/AssetForm.vue'
 import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { getAssetCategory } from '@/config/asset-categories'
 import {
   currentFinancialMonth,

@@ -244,7 +244,7 @@
             <template v-else-if="selectedDesktopOutcomeKind === 'investment'">
               <div class="desktop-projection-heading">
                 <div>
-                  <h2>{{ t('whatIf.strategy.projectionPreview') }}</h2>
+                  <h2>{{ t('whatIf.strategy.investmentDetails') }}</h2>
                 </div>
                 <div class="desktop-projection-controls">
                   <div class="horizon-options">
@@ -374,15 +374,26 @@
                 class="desktop-strategy-chart"
               />
               <div class="result-breakdown desktop-result-breakdown">
+                <span class="projected-value-kpi">
+                  <small>{{
+                    t('whatIf.strategy.projectedInvestmentAtHorizon', {
+                      years: activeScenario.horizonYears,
+                    })
+                  }}</small>
+                  <strong>{{ formatCurrency(projectedNetWorth) }}</strong>
+                  <small>{{
+                    t('whatIf.strategy.inTodaysMoney', {
+                      value: formatCurrency(projectedRealNetWorth),
+                    })
+                  }}</small>
+                </span>
                 <span>
                   <small>{{ t('whatIf.strategy.currentNetWorth') }}</small>
                   <strong>{{ formatCurrency(currentNetWorth) }}</strong>
                 </span>
                 <span>
                   <small>{{ t('whatIf.strategy.projectedGrowthLabel') }}</small>
-                  <strong class="positive">{{
-                    formatCurrency(projectedNetWorth - currentNetWorth)
-                  }}</strong>
+                  <strong>{{ formatCurrency(projectedNetWorth - currentNetWorth) }}</strong>
                 </span>
               </div>
             </template>
@@ -420,6 +431,10 @@
                   class="desktop-mortgage-chart"
                 />
                 <div class="result-breakdown debt-result-breakdown desktop-result-breakdown">
+                  <span class="projected-value-kpi">
+                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
+                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
+                  </span>
                   <span>
                     <small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small>
                     <strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong>
@@ -429,14 +444,8 @@
                     <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
                   </span>
                   <span>
-                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
-                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
-                  </span>
-                  <span>
                     <small>{{ t('whatIf.strategy.interestSaved') }}</small>
-                    <strong class="positive">{{
-                      formatCurrency(debtPayoff.accelerated.interestSaved)
-                    }}</strong>
+                    <strong>{{ formatCurrency(debtPayoff.accelerated.interestSaved) }}</strong>
                   </span>
                 </div>
               </template>
@@ -870,6 +879,10 @@
                   class="embedded-debt-chart"
                 />
                 <div class="result-breakdown debt-result-breakdown">
+                  <span class="projected-value-kpi">
+                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
+                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
+                  </span>
                   <span>
                     <small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small>
                     <strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong>
@@ -879,14 +892,8 @@
                     <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
                   </span>
                   <span>
-                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
-                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
-                  </span>
-                  <span>
                     <small>{{ t('whatIf.strategy.interestSaved') }}</small>
-                    <strong class="positive">
-                      {{ formatCurrency(debtPayoff.accelerated.interestSaved) }}
-                    </strong>
+                    <strong>{{ formatCurrency(debtPayoff.accelerated.interestSaved) }}</strong>
                   </span>
                 </div>
               </template>
@@ -1211,25 +1218,62 @@
         <q-card-section class="strategy-sheet-heading">
           <div>
             <h2>{{ detailSheetTitle }}</h2>
-            <p>{{ t('whatIf.strategy.strategyVsCurrent') }}</p>
           </div>
           <q-btn flat round dense icon="close" v-close-popup :aria-label="t('common.close')" />
         </q-card-section>
         <q-card-section class="strategy-sheet-scroll detail-sheet-content">
           <section v-if="detailSheetKind === 'cash'" class="detail-sheet-section">
-            <div class="detail-values large-detail-values">
-              <span
-                ><small>{{ t('whatIf.strategy.current') }}</small
-                ><strong>{{ formatCurrency(startingPosition.cash) }}</strong></span
+            <div class="horizon-options detail-horizon-options">
+              <button
+                v-for="years in [10, 20, 30]"
+                :key="years"
+                type="button"
+                :class="{ selected: activeScenario.horizonYears === years }"
+                @click="updateScenario({ horizonYears: years })"
               >
-              <span
-                ><small>{{ t('whatIf.strategy.target') }}</small
-                ><strong>{{ formatCurrency(projection.strategy.cashTarget) }}</strong></span
+                {{ years }}y
+              </button>
+              <button
+                type="button"
+                :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                @click="setCustomHorizon"
               >
-              <span
-                ><small>{{ t('whatIf.strategy.allocatedMonthly') }}</small
-                ><strong>{{ formatCurrency(monthlyFor(allocation.cash)) }}</strong></span
-              >
+                {{ t('whatIf.reduction.custom') }}
+              </button>
+            </div>
+            <StrategyProjectionChart
+              :strategy-points="cashProjectionPoints"
+              :baseline-points="baselineCashProjectionPoints"
+              :baseline-label="t('whatIf.strategy.currentPath')"
+              :strategy-label="t('whatIf.strategy.strategyPath')"
+              :aria-label="t('whatIf.strategy.cashChartAria')"
+            />
+            <div class="result-breakdown four-values">
+              <span class="projected-value-kpi">
+                <small>{{
+                  t('whatIf.strategy.projectedCashAtHorizon', {
+                    years: activeScenario.horizonYears,
+                  })
+                }}</small>
+                <strong>{{ formatCurrency(projection.strategy.cash) }}</strong>
+                <small>{{
+                  t('whatIf.strategy.inTodaysMoney', {
+                    value: formatCurrency(finalProjectionPoint.realCash),
+                  })
+                }}</small>
+              </span>
+              <span>
+                <small>{{ t('whatIf.strategy.startingValue') }}</small>
+                <strong>{{ formatCurrency(startingPosition.cash) }}</strong>
+              </span>
+              <span>
+                <small>{{ t('whatIf.strategy.cashContributions') }}</small>
+                <strong>{{ formatCurrency(projection.strategy.cashContributions) }}</strong>
+              </span>
+              <span>
+                <small>{{ t('whatIf.strategy.cashGrowth') }}</small>
+                <strong>{{ formatCurrency(projection.strategy.cashGrowth) }}</strong>
+              </span>
             </div>
             <q-select
               :model-value="activeScenario.cashTargetMonths"
@@ -1275,24 +1319,33 @@
               >
                 {{ years }}y
               </button>
-            </div>
-            <div class="projected-total detail-projected-total">
-              <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
-              <span>{{
-                t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-              }}</span>
-              <span>{{
-                t('whatIf.strategy.inTodaysMoney', {
-                  value: formatCurrency(finalProjectionPoint.realInvestmentValue),
-                })
-              }}</span>
+              <button
+                type="button"
+                :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                @click="setCustomHorizon"
+              >
+                {{ t('whatIf.reduction.custom') }}
+              </button>
             </div>
             <StrategyProjectionChart
               :strategy-points="investmentProjectionPoints"
               :baseline-points="baselineInvestmentProjectionPoints"
               :mode="projectionChartMode"
             />
-            <div class="result-breakdown">
+            <div class="result-breakdown four-values">
+              <span class="projected-value-kpi">
+                <small>{{
+                  t('whatIf.strategy.projectedInvestmentAtHorizon', {
+                    years: activeScenario.horizonYears,
+                  })
+                }}</small>
+                <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
+                <small>{{
+                  t('whatIf.strategy.inTodaysMoney', {
+                    value: formatCurrency(finalProjectionPoint.realInvestmentValue),
+                  })
+                }}</small>
+              </span>
               <span
                 ><small>{{ t('whatIf.strategy.startingValue') }}</small
                 ><strong>{{ formatCurrency(startingPosition.investmentTotal) }}</strong></span
@@ -1311,28 +1364,72 @@
           </section>
 
           <section v-if="detailSheetKind === 'netWorth'" class="detail-sheet-section">
-            <div class="net-worth-detail-hero">
-              <span>{{ t('whatIf.strategy.projectedNetWorthLabel') }}</span>
-              <strong>{{ formatCurrency(projectedNetWorth) }}</strong>
-              <small>{{
-                t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-              }}</small>
-              <small>{{
-                t('whatIf.strategy.inTodaysMoney', {
-                  value: formatCurrency(projectedRealNetWorth),
-                })
-              }}</small>
+            <div class="detail-section-heading net-worth-detail-controls">
+              <div class="horizon-options detail-horizon-options">
+                <button
+                  v-for="years in [10, 20, 30]"
+                  :key="years"
+                  type="button"
+                  :class="{ selected: activeScenario.horizonYears === years }"
+                  @click="updateScenario({ horizonYears: years })"
+                >
+                  {{ years }}y
+                </button>
+                <button
+                  type="button"
+                  :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
+                  @click="setCustomHorizon"
+                >
+                  {{ t('whatIf.reduction.custom') }}
+                </button>
+              </div>
+              <div class="projection-view-switch detail-view-switch">
+                <button
+                  type="button"
+                  :class="{ selected: netWorthChartMode === 'total' }"
+                  @click="netWorthChartMode = 'total'"
+                >
+                  {{ t('whatIf.strategy.chartView.total') }}
+                </button>
+                <button
+                  type="button"
+                  :class="{ selected: netWorthChartMode === 'breakdown' }"
+                  @click="netWorthChartMode = 'breakdown'"
+                >
+                  {{ t('whatIf.strategy.chartView.breakdown') }}
+                </button>
+              </div>
             </div>
-            <div class="detail-values large-detail-values two-values">
+            <StrategyProjectionChart
+              :strategy-points="netWorthPoints"
+              :baseline-points="baselineNetWorthPoints"
+              :mode="netWorthChartMode"
+              :breakdown-types="netWorthBreakdownTypes"
+              :baseline-label="t('whatIf.strategy.currentPath')"
+              :strategy-label="t('whatIf.strategy.strategyPath')"
+              :aria-label="t('whatIf.strategy.netWorthChartAria')"
+            />
+            <div class="detail-values large-detail-values">
+              <span class="projected-value-kpi">
+                <small>{{
+                  t('whatIf.strategy.projectedInvestmentAtHorizon', {
+                    years: activeScenario.horizonYears,
+                  })
+                }}</small>
+                <strong>{{ formatCurrency(projectedNetWorth) }}</strong>
+                <small>{{
+                  t('whatIf.strategy.inTodaysMoney', {
+                    value: formatCurrency(projectedRealNetWorth),
+                  })
+                }}</small>
+              </span>
               <span
                 ><small>{{ t('whatIf.strategy.currentNetWorth') }}</small
                 ><strong>{{ formatCurrency(currentNetWorth) }}</strong></span
               >
               <span
                 ><small>{{ t('whatIf.strategy.projectedGrowthLabel') }}</small
-                ><strong class="positive">{{
-                  formatCurrency(projectedNetWorth - currentNetWorth)
-                }}</strong></span
+                ><strong>{{ formatCurrency(projectedNetWorth - currentNetWorth) }}</strong></span
               >
             </div>
           </section>
@@ -1367,6 +1464,10 @@
                 :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
               />
               <div class="result-breakdown debt-result-breakdown">
+                <span class="projected-value-kpi"
+                  ><small>{{ t('whatIf.strategy.finishEarlier') }}</small
+                  ><strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong></span
+                >
                 <span
                   ><small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small
                   ><strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong></span
@@ -1376,18 +1477,73 @@
                   ><strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong></span
                 >
                 <span
-                  ><small>{{ t('whatIf.strategy.finishEarlier') }}</small
-                  ><strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong></span
-                >
-                <span
                   ><small>{{ t('whatIf.strategy.interestSaved') }}</small
-                  ><strong class="positive">{{
-                    formatCurrency(debtPayoff.accelerated.interestSaved)
-                  }}</strong></span
+                  ><strong>{{ formatCurrency(debtPayoff.accelerated.interestSaved) }}</strong></span
                 >
               </div>
             </template>
+            <div v-else class="debt-projection-fallback">
+              <q-icon name="info_outline" />
+              <div>
+                <strong>{{ t('whatIf.strategy.debtProjection.title') }}</strong>
+                <p>{{ t('whatIf.strategy.debtDisclaimer') }}</p>
+              </div>
+            </div>
           </section>
+
+          <aside
+            v-if="detailSheetOutcome"
+            :class="['detail-milestone-highlight', detailSheetOutcome.tone]"
+          >
+            <div class="detail-milestone-heading">
+              <span :class="['mini-icon', detailSheetOutcome.tone]">
+                <q-icon :name="detailSheetOutcome.icon" />
+              </span>
+              <div class="milestone-highlight-copy">
+                <span class="milestone-highlight-eyebrow">
+                  <small>{{ t('whatIf.strategy.milestoneProjection') }}</small>
+                  <q-btn
+                    v-if="detailSheetOutcome.showCalculationInfo"
+                    flat
+                    round
+                    dense
+                    size="xs"
+                    icon="info_outline"
+                    :aria-label="t('whatIf.strategy.calculationInfoAction')"
+                    @click="calculationInfoDialogOpen = true"
+                  />
+                </span>
+                <strong class="milestone-highlight-title">
+                  {{ detailSheetOutcome.milestoneTitle }}
+                </strong>
+                <p>{{ detailSheetOutcome.milestoneDescription }}</p>
+              </div>
+            </div>
+            <div
+              class="milestone-highlight-progress"
+              role="progressbar"
+              :aria-label="t('whatIf.strategy.milestoneProgress')"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-valuenow="detailSheetOutcome.progressPercent"
+            >
+              <span><i :style="{ width: `${detailSheetOutcome.progressPercent}%` }" /></span>
+              <b>{{ detailSheetOutcome.progressPercent }}%</b>
+            </div>
+            <b :class="['milestone-highlight-reach', detailSheetOutcome.status]">
+              <q-icon name="calendar_month" />
+              <span>{{ detailSheetOutcome.badgeResult }}</span>
+            </b>
+            <div class="milestone-highlight-result">
+              <div class="milestone-highlight-value">
+                <small>{{ t('whatIf.strategy.projectedResult') }}</small>
+                <strong>{{ detailSheetOutcome.resultValue }}</strong>
+                <span v-if="detailSheetOutcome.resultQualifier">
+                  {{ detailSheetOutcome.resultQualifier }}
+                </span>
+              </div>
+            </div>
+          </aside>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -1541,16 +1697,17 @@ import MortgageComparisonChart from '@/components/liabilities/MortgageComparison
 import StrategyAllocationRow from '@/components/what-if/StrategyAllocationRow.vue'
 import StrategyProjectionChart from '@/components/what-if/StrategyProjectionChart.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
+import {
+  buildStrategyCalculationContext,
+  modeledLiabilitiesForPositions,
+} from '@/domain/financial/calculation-context'
 import { calculateDebtPayoffImpact } from '@/domain/financial/debt-payoff'
 import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
-  financialYearMonthCategoryValue,
-  financialYearMonthValue,
-  financialYearValue,
+  financialYearFlowValue,
 } from '@/domain/financial/financial-year'
-import { applyOwnership } from '@/domain/financial/ownership'
 import {
   inflationAdjustedCoverage,
   inflationFactorAtMonth,
@@ -1558,7 +1715,6 @@ import {
   presentValue,
   simulateStrategy,
   strategyNetWorthPoints,
-  strategyStartingPosition,
 } from '@/domain/financial/strategy-simulation'
 import {
   calculateWhatIf,
@@ -1635,13 +1791,20 @@ const activeScenario = computed(
     config.value.scenarios[0],
 )
 const positionMonth = computed(() => latestPositionMonth(financialYear.value))
-const startingPosition = computed(() =>
-  strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
+const calculationContext = computed(() =>
+  buildStrategyCalculationContext({
+    financialYear: financialYear.value,
+    month: positionMonth.value,
+    memberId: selectedMemberId.value,
+    realEstateAssets: assetsStore.itemsForCategory('real_estate'),
+    mortgageLiabilities: liabilitiesStore.itemsForCategory('mortgage'),
+  }),
 )
+const startingPosition = computed(() => calculationContext.value.startingPosition)
 const simulation = computed(() =>
   calculateWhatIf({
     availableIncome: financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
-    costOfLife: financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+    costOfLife: financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value),
     discretionary: financialYearExpenseNecessityValue(
       financialYear.value,
       'lifestyle',
@@ -1652,7 +1815,10 @@ const simulation = computed(() =>
 )
 const monthlySavings = computed(() => Math.max(0, simulation.value.currentSavingsCapacity))
 const liabilities = computed(() =>
-  extractLiabilities(financialYear.value, positionMonth.value, selectedMemberId.value),
+  calculationContext.value.liabilities.map((liability) => ({
+    ...liability,
+    name: liability.name || liabilityCategoryName(liability.categoryId),
+  })),
 )
 const selectedDebt = computed(
   () =>
@@ -1663,10 +1829,13 @@ const selectedDebt = computed(
 )
 const selectedDebtModel = computed(() => {
   if (!selectedDebt.value) return null
-  const model = liabilitiesStore
-    .itemsForCategory('mortgage')
-    .find(({ id }) => id === selectedDebt.value.id)
-  return model ? { ...model, name: selectedDebt.value.name } : selectedDebt.value
+  return (
+    modeledLiabilitiesForPositions(
+      [selectedDebt.value],
+      liabilitiesStore.itemsForCategory('mortgage'),
+      selectedMemberId.value,
+    )[0] || selectedDebt.value
+  )
 })
 const allocation = computed(() =>
   normalizeStrategyForOptions(activeScenario.value.allocation, {
@@ -1767,83 +1936,12 @@ const currentMilestones = computed(() =>
     memberId: selectedMemberId.value,
   }),
 )
-const currentAssets = computed(() =>
-  financialYearMonthValue(
-    financialYear.value,
-    positionMonth.value,
-    'assets',
-    selectedMemberId.value,
-  ),
-)
-const currentLiabilities = computed(() =>
-  financialYearMonthValue(
-    financialYear.value,
-    positionMonth.value,
-    'liabilities',
-    selectedMemberId.value,
-  ),
-)
-const currentRealEstate = computed(() =>
-  financialYearMonthCategoryValue(
-    financialYear.value,
-    positionMonth.value,
-    'assets',
-    'real_estate',
-    selectedMemberId.value,
-  ),
-)
-const modeledRealEstateAssets = computed(() =>
-  assetsStore
-    .itemsForCategory('real_estate')
-    .filter((asset) => asset.detail?.realEstate)
-    .map((asset) => {
-      const model = asset.detail.realEstate
-      return {
-        currentValue: applyOwnership(asset.currentValue, asset.ownership, selectedMemberId.value),
-        model: {
-          ...model,
-          ...(model.schemaVersion === 2
-            ? {
-                purchasePrice: applyOwnership(
-                  model.purchasePrice,
-                  asset.ownership,
-                  selectedMemberId.value,
-                ),
-              }
-            : {}),
-        },
-      }
-    })
-    .filter(({ currentValue }) => currentValue > 0),
-)
-const modeledMortgages = computed(() =>
-  liabilitiesStore
-    .itemsForCategory('mortgage')
-    .filter(({ detail }) => detail?.mortgage?.amortizationType === 'french')
-    .map((liability) => ({
-      id: liability.id,
-      currentBalance: applyOwnership(
-        liability.balance,
-        liability.ownership,
-        selectedMemberId.value,
-      ),
-      annualInterestRate: liability.detail.mortgage.annualInterestRate,
-      monthlyPayment: applyOwnership(
-        liability.detail.mortgage.monthlyPayment,
-        liability.ownership,
-        selectedMemberId.value,
-      ),
-    }))
-    .filter(({ currentBalance, monthlyPayment }) => currentBalance > 0 && monthlyPayment > 0),
-)
-const currentNetWorth = computed(() =>
-  financialYearMonthValue(
-    financialYear.value,
-    positionMonth.value,
-    'netWorth',
-    selectedMemberId.value,
-  ),
-)
+const currentAssets = computed(() => calculationContext.value.currentAssets)
+const currentLiabilities = computed(() => calculationContext.value.currentLiabilities)
+const currentRealEstate = computed(() => calculationContext.value.currentRealEstate)
+const modeledRealEstateAssets = computed(() => calculationContext.value.modeledRealEstateAssets)
+const modeledMortgages = computed(() => calculationContext.value.modeledMortgages)
+const currentNetWorth = computed(() => calculationContext.value.currentNetWorth)
 const netWorthPoints = computed(() =>
   strategyNetWorthPoints({
     currentNetWorth: currentNetWorth.value,
@@ -1868,6 +1966,23 @@ const baselineNetWorthPoints = computed(() =>
     strategy: baselineProjection.value.strategy,
     monthlyDebtContribution: 0,
     debtBalance: selectedDebt.value?.balance || 0,
+    selectedDebtId: selectedDebt.value?.id,
+    realEstateAssets: modeledRealEstateAssets.value,
+    mortgages: modeledMortgages.value,
+    asOfDate: localToday(),
+  }),
+)
+const monthlyNetWorthPoints = computed(() =>
+  strategyNetWorthPoints({
+    currentNetWorth: currentNetWorth.value,
+    currentAssets: currentAssets.value,
+    currentLiabilities: currentLiabilities.value,
+    currentRealEstate: currentRealEstate.value,
+    strategy: {
+      ...projection.value.strategy,
+      points: projection.value.strategy.monthlyPoints,
+    },
+    monthlyDebtContribution: monthlyFor(allocation.value.debt),
     selectedDebtId: selectedDebt.value?.id,
     realEstateAssets: modeledRealEstateAssets.value,
     mortgages: modeledMortgages.value,
@@ -1977,7 +2092,7 @@ const strategyOutcomes = computed(() => {
     currentMilestones.value.findLast(({ family }) => family === 'freedom')
   if (freedom) {
     const annualCost = simulation.value.monthlyCostOfLife * 12
-    const reachedAt = projection.value.strategy.points.find(
+    const reachedAt = projection.value.strategy.monthlyPoints.find(
       ({ month, investableValue }) =>
         inflationAdjustedCoverage({
           projectedValue: investableValue,
@@ -2032,7 +2147,7 @@ const strategyOutcomes = computed(() => {
     currentMilestones.value.find(({ family, reached }) => family === 'netWorth' && !reached) ||
     currentMilestones.value.findLast(({ family }) => family === 'netWorth')
   if (netWorth) {
-    const reachedAt = netWorthPoints.value.find(({ value }) =>
+    const reachedAt = monthlyNetWorthPoints.value.find(({ value }) =>
       netWorth.id === 'net_worth_positive' ? value > 0 : value >= netWorth.target,
     )
     const finalNetWorth = netWorthPoints.value.at(-1)?.value || 0
@@ -2085,24 +2200,12 @@ const strategyOutcomes = computed(() => {
   if (selectedDebt.value && allocation.value.debt > 0) {
     const id = debtMilestoneId(selectedDebt.value.categoryId)
     const monthlyDebtContribution = monthlyFor(allocation.value.debt)
-    const payoffMonth = debtPayoff.value
-      ? debtPayoff.value.accelerated.remainingPayments
-      : monthlyDebtContribution > 0
-        ? Math.ceil(selectedDebt.value.balance / monthlyDebtContribution)
-        : null
+    const payoffMonth = debtPayoff.value?.accelerated.remainingPayments ?? null
     const modeledHorizonPayment = debtPayoff.value?.accelerated.schedule[horizonMonths - 1]
-    const projectedReduction = debtPayoff.value
-      ? Math.max(
-          0,
-          selectedDebtModel.value.balance -
-            (modeledHorizonPayment?.remainingBalance ??
-              (payoffMonth <= horizonMonths ? 0 : selectedDebtModel.value.balance)),
-        )
-      : Math.min(selectedDebt.value.balance, monthlyDebtContribution * horizonMonths)
     const projectedBalance = debtPayoff.value
       ? (modeledHorizonPayment?.remainingBalance ??
         (payoffMonth <= horizonMonths ? 0 : selectedDebtModel.value.balance))
-      : Math.max(0, selectedDebt.value.balance - projectedReduction)
+      : selectedDebt.value.balance
     outcomes.push({
       id,
       icon: 'credit_score',
@@ -2133,21 +2236,16 @@ const strategyOutcomes = computed(() => {
             ? t('whatIf.strategy.modeledDebtResult', {
                 date: formatMonthYear(debtPayoff.value.accelerated.payoffDate),
               })
-            : payoffMonth <= horizonMonths
-              ? reachEstimate(payoffMonth)
-              : t('whatIf.strategy.extraDebtReduction', {
-                  value: formatCurrency(projectedReduction),
-                  years: activeScenario.value.horizonYears,
-                }),
+            : t('whatIf.debt.modelUnavailable'),
       status:
-        monthlyDebtContribution <= 0
+        monthlyDebtContribution <= 0 || !debtPayoff.value
           ? 'negative'
           : payoffMonth <= horizonMonths
             ? 'positive'
             : 'progress',
     })
     outcomes.at(-1).badgeResult =
-      monthlyDebtContribution > 0 && payoffMonth <= horizonMonths
+      monthlyDebtContribution > 0 && payoffMonth != null && payoffMonth <= horizonMonths
         ? reachEstimate(payoffMonth)
         : outcomes.at(-1).result
   }
@@ -2159,6 +2257,9 @@ const selectedDesktopOutcome = computed(() =>
   strategyOutcomes.value.find(
     (outcome) => outcomeKind(outcome) === selectedDesktopOutcomeKind.value,
   ),
+)
+const detailSheetOutcome = computed(() =>
+  strategyOutcomes.value.find((outcome) => outcomeKind(outcome) === detailSheetKind.value),
 )
 
 watch(
@@ -2456,37 +2557,8 @@ function formatNumber(value) {
   return new Intl.NumberFormat('en', { maximumFractionDigits: 1 }).format(value)
 }
 
-function extractLiabilities(document, month, memberId) {
-  const categories = document?.months?.[month]?.liabilities?.categories || {}
-  return Object.entries(categories)
-    .flatMap(([categoryId, category]) =>
-      Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
-        const items = Object.entries(subcategory.items || {})
-        if (!items.length)
-          return [
-            {
-              id: subcategoryId,
-              categoryId,
-              name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-              balance: scopedValue(subcategory, memberId),
-            },
-          ]
-        return items.map(([id, item]) => ({
-          id,
-          categoryId,
-          name:
-            item.itemName || t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-          balance: scopedValue(item, memberId),
-        }))
-      }),
-    )
-    .filter(({ balance }) => balance > 0)
-    .sort((left, right) => right.balance - left.balance)
-}
-
-function scopedValue(item, memberId) {
-  if (memberId !== 'all') return Number(item?.memberValues?.[memberId] || 0)
-  return Number(item?.total || 0)
+function liabilityCategoryName(categoryId) {
+  return t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title')
 }
 </script>
 
@@ -2914,6 +2986,101 @@ h1 {
   flex: 0 0 auto;
   font-size: 1.15rem;
 }
+.detail-milestone-highlight {
+  --milestone-accent: var(--color-primary);
+  --milestone-accent-soft: var(--color-blue-soft);
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--milestone-accent) 20%, var(--color-line));
+  border-radius: 1rem;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--milestone-accent) 5%, var(--color-surface)) 0%,
+    var(--color-surface) 78%
+  );
+  box-shadow: 0 0.4rem 1.1rem rgb(15 61 102 / 8%);
+}
+.detail-milestone-highlight.cash {
+  --milestone-accent: var(--color-success-dark);
+  --milestone-accent-soft: var(--color-green-soft);
+}
+.detail-milestone-highlight.freedom {
+  --milestone-accent: var(--color-purple);
+  --milestone-accent-soft: var(--color-purple-soft);
+}
+.detail-milestone-highlight.debt {
+  --milestone-accent: var(--color-warning);
+  --milestone-accent-soft: var(--color-warning-soft);
+}
+.detail-milestone-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.8rem;
+}
+.detail-milestone-heading > .mini-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 0.85rem;
+  background: var(--milestone-accent-soft);
+  color: var(--milestone-accent);
+  font-size: 1.35rem;
+}
+.detail-milestone-highlight small {
+  color: var(--color-copy);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.detail-milestone-highlight .milestone-highlight-eyebrow .q-btn {
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  color: var(--milestone-accent);
+}
+.detail-milestone-highlight .milestone-highlight-title {
+  font-size: 1.25rem;
+}
+.detail-milestone-highlight p {
+  margin: 0;
+  color: var(--color-copy);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.detail-milestone-highlight .milestone-highlight-progress {
+  margin-top: 0;
+}
+.detail-milestone-highlight .milestone-highlight-progress b {
+  color: var(--milestone-accent);
+}
+.detail-milestone-highlight .milestone-highlight-reach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border-radius: 999px;
+  background: var(--milestone-accent-soft);
+  color: var(--milestone-accent);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  text-align: center;
+}
+.detail-milestone-highlight .milestone-highlight-result {
+  min-height: 8rem;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--color-line);
+  border-left: 0;
+}
+.detail-milestone-highlight .milestone-highlight-value > strong {
+  margin-top: 0.4rem;
+  font-size: clamp(2rem, 11vw, 2.75rem);
+}
+.detail-milestone-highlight .milestone-highlight-value > span {
+  text-align: center;
+}
 .info-sheet-content {
   display: grid;
   gap: 0.75rem;
@@ -3125,6 +3292,13 @@ h1 {
   min-width: 4.6rem;
   padding: 0.4rem 0.6rem;
   font-size: 0.7rem;
+}
+.net-worth-detail-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.net-worth-detail-controls .detail-horizon-options {
+  min-width: 0;
 }
 .detail-horizon-options {
   width: 100%;
@@ -3514,6 +3688,7 @@ h1 {
   font-size: 0.65rem;
 }
 .detail-values strong {
+  color: var(--color-ink);
   font-size: 0.78rem;
 }
 .positive {
@@ -3688,11 +3863,13 @@ h1 {
   line-height: 1.25;
 }
 .result-breakdown strong {
+  color: var(--color-ink);
   font-size: clamp(0.95rem, 1.6vw, 1.1rem);
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
-.result-breakdown .projected-value-kpi strong {
+.result-breakdown .projected-value-kpi strong,
+.detail-values .projected-value-kpi strong {
   color: var(--color-primary);
   font-size: clamp(1.05rem, 1.8vw, 1.25rem);
 }
@@ -3862,6 +4039,24 @@ h1 {
     font-size: 0.95rem;
     text-align: right;
   }
+  .projection-detail-sheet .result-breakdown .projected-value-kpi,
+  .projection-detail-sheet .detail-values .projected-value-kpi {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 1rem;
+    row-gap: 0.25rem;
+  }
+  .projection-detail-sheet .projected-value-kpi > strong {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: none;
+    white-space: nowrap;
+  }
+  .projection-detail-sheet .projected-value-kpi > strong + small {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    text-align: right;
+  }
 }
 
 @media (max-width: 760px) {
@@ -3972,6 +4167,15 @@ h1 {
   .investment-detail-heading .detail-view-switch {
     align-self: center;
     margin-left: auto;
+  }
+  .net-worth-detail-controls {
+    grid-template-columns: 1fr;
+  }
+  .net-worth-detail-controls .detail-view-switch {
+    width: 100%;
+  }
+  .net-worth-detail-controls .detail-view-switch button {
+    flex: 1;
   }
   .large-detail-values {
     grid-template-columns: 1fr;

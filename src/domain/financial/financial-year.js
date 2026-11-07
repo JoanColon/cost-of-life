@@ -36,19 +36,29 @@ export function financialYearValue(financialYear, section, memberId = 'all') {
   if (!financialYear) return 0
   if (section === 'netWorth') {
     return moneyOrZero(
-      financialYearValue(financialYear, 'assets', memberId) -
-        financialYearValue(financialYear, 'liabilities', memberId),
+      financialYearPositionValue(financialYear, '12', 'assets', memberId) -
+        financialYearPositionValue(financialYear, '12', 'liabilities', memberId),
     )
   }
   if (section === 'savings') {
     return moneyOrZero(
       financialYearAvailableIncomeValue(financialYear, memberId) -
-        financialYearValue(financialYear, 'expenses', memberId),
+        financialYearFlowValue(financialYear, 'expenses', memberId),
     )
   }
   if (POSITION_SECTIONS.has(section)) {
-    return financialYearMonthValue(financialYear, '12', section, memberId)
+    return financialYearPositionValue(financialYear, '12', section, memberId)
   }
+  return financialYearFlowValue(financialYear, section, memberId)
+}
+
+export function financialYearPositionValue(financialYear, month, section, memberId = 'all') {
+  if (!POSITION_SECTIONS.has(section) && section !== 'netWorth') return 0
+  return financialYearMonthValue(financialYear, month, section, memberId)
+}
+
+export function financialYearFlowValue(financialYear, section, memberId = 'all') {
+  if (POSITION_SECTIONS.has(section) || section === 'netWorth') return 0
   return moneyOrZero(
     Object.keys(financialYear.months || {}).reduce(
       (sum, month) => sum + financialYearMonthValue(financialYear, month, section, memberId),
@@ -161,6 +171,16 @@ export function financialYearCategoryValue(financialYear, section, categoryId, m
   if (POSITION_SECTIONS.has(section)) {
     return financialYearMonthCategoryValue(financialYear, '12', section, categoryId, memberId)
   }
+  return financialYearFlowCategoryValue(financialYear, section, categoryId, memberId)
+}
+
+export function financialYearFlowCategoryValue(
+  financialYear,
+  section,
+  categoryId,
+  memberId = 'all',
+) {
+  if (POSITION_SECTIONS.has(section)) return 0
   return moneyOrZero(
     Object.keys(financialYear?.months || {}).reduce(
       (sum, month) =>

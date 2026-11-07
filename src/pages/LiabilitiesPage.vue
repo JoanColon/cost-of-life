@@ -30,21 +30,11 @@
       />
 
       <template v-else>
-        <header class="liabilities-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('navigation.backToWorkspaceHome')"
-              :to="workspaceHomeRoute"
-              class="back-button"
-            />
-            <h1>{{ t('liabilities.title') }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t('liabilities.title')"
+          :back-label="t('navigation.backToWorkspaceHome')"
+          :back-to="workspaceHomeRoute"
+        />
 
         <section class="total-card">
           <span>{{ t('liabilities.totalLiabilities') }}</span>
@@ -260,6 +250,7 @@ import { useRoute, useRouter } from 'vue-router'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import PositionCategorySetup from '@/components/financial/PositionCategorySetup.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { liabilityCategories } from '@/config/liability-categories'
 import {
   currentFinancialMonth,
@@ -494,7 +485,7 @@ async function persist(action) {
   @include financial-page;
 }
 .liabilities-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 .loading-state,
 .error-state {

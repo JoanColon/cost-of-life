@@ -26,88 +26,28 @@
         class="review-group"
         :class="`tracking-category--${group.id}`"
       >
-        <button
-          type="button"
-          class="review-group-toggle"
-          :aria-expanded="isOpen(group.id)"
-          :aria-controls="`review-group-${group.id}`"
-          @click="toggleGroup(group.id)"
-        >
+        <button type="button" class="review-group-button" @click="$emit('view-group', group)">
           <span class="review-group-icon"><q-icon :name="group.icon" /></span>
           <span class="review-group-copy">
             <strong>{{ t(group.nameKey) }}</strong>
             <small>
-              {{ formatCurrency(groupModelTotal(group)) }}
-              {{ t('expenseTracker.review.model').toLowerCase() }} ·
-              {{ formatCurrency(groupTrackedTotal(group)) }}
-              {{ t('expenseTracker.review.tracked').toLowerCase() }}
+              {{
+                t('expenseTracker.review.categoryCount', {
+                  count: group.subcategories.length,
+                })
+              }}
             </small>
           </span>
-          <q-icon name="expand_more" class="review-chevron" :class="{ open: isOpen(group.id) }" />
+          <span class="review-group-total">
+            <small>{{ t('expenseTracker.review.tracked') }}</small>
+            <strong>{{ formatCurrency(groupTrackedTotal(group)) }}</strong>
+          </span>
+          <span class="review-group-total">
+            <small>{{ t('expenseTracker.review.model') }}</small>
+            <strong>{{ formatCurrency(groupModelTotal(group)) }}</strong>
+          </span>
+          <q-icon name="chevron_right" class="review-chevron" />
         </button>
-        <div v-show="isOpen(group.id)" :id="`review-group-${group.id}`" class="review-list">
-          <article
-            v-for="subcategory in group.subcategories"
-            :key="subcategory.id"
-            class="review-row"
-          >
-            <button type="button" class="review-name" @click="$emit('view', subcategory)">
-              <span>
-                <strong>{{ t(subcategory.nameKey) }}</strong>
-              </span>
-              <small>
-                {{
-                  t('expenseTracker.review.itemCount', {
-                    count: subcategory.itemCount,
-                  })
-                }}
-              </small>
-            </button>
-            <div class="review-values">
-              <div class="review-value">
-                <span>{{ t('expenseTracker.review.tracked') }}</span>
-                <strong>{{ formatCurrency(subcategory.trackedTotal) }}</strong>
-              </div>
-              <div class="review-value">
-                <span>{{ t('expenseTracker.review.model') }}</span>
-                <strong>{{ formatCurrency(subcategory.modelValue) }}</strong>
-              </div>
-            </div>
-            <q-btn
-              class="review-view"
-              flat
-              round
-              dense
-              color="primary"
-              icon="search"
-              :aria-label="t('expenseTracker.review.view')"
-              @click="$emit('view', subcategory)"
-            />
-            <div
-              v-if="hasChanges(subcategory)"
-              class="review-decisions"
-              role="group"
-              :aria-label="t(subcategory.nameKey)"
-            >
-              <button
-                v-for="option in decisionOptions"
-                :key="option.value"
-                type="button"
-                class="review-decision"
-                :class="{ selected: subcategory.decision === option.value }"
-                :disabled="subcategory.decisionDisabled"
-                @click="$emit('decision', subcategory, option.value)"
-              >
-                <q-icon v-if="subcategory.decision === option.value" name="check" />
-                {{ option.label }}
-              </button>
-            </div>
-            <span v-else class="review-no-changes">
-              <q-icon name="check" />
-              {{ t('expenseTracker.review.noChanges') }}
-            </span>
-          </article>
-        </div>
       </section>
     </div>
 
@@ -126,7 +66,6 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatCurrency } from '@/utils/formatters'
 
@@ -135,24 +74,11 @@ defineProps({
   groups: { type: Array, required: true },
   trackedTotal: { type: Number, default: 0 },
   modelTotal: { type: Number, default: 0 },
-  decisionOptions: { type: Array, required: true },
   canUseAllTracked: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
 })
-defineEmits(['view', 'decision', 'use-all-tracked'])
+defineEmits(['view-group', 'use-all-tracked'])
 const { t } = useI18n()
-const openGroupIds = ref(new Set())
-
-function isOpen(groupId) {
-  return openGroupIds.value.has(groupId)
-}
-
-function toggleGroup(groupId) {
-  const next = new Set(openGroupIds.value)
-  if (next.has(groupId)) next.delete(groupId)
-  else next.add(groupId)
-  openGroupIds.value = next
-}
 
 function groupTrackedTotal(group) {
   return group.subcategories.reduce(
@@ -165,13 +91,6 @@ function groupModelTotal(group) {
   return group.subcategories.reduce(
     (total, subcategory) => total + Number(subcategory.modelValue || 0),
     0,
-  )
-}
-
-function hasChanges(subcategory) {
-  return (
-    Math.round(Number(subcategory.trackedTotal || 0) * 100) !==
-    Math.round(Number(subcategory.modelValue || 0) * 100)
   )
 }
 </script>
@@ -211,8 +130,7 @@ function hasChanges(subcategory) {
   gap: 0.15rem;
 }
 
-.month-total span,
-.review-value span {
+.month-total span {
   color: var(--color-copy);
   font-size: 0.75rem;
 }
@@ -251,26 +169,24 @@ function hasChanges(subcategory) {
   border-bottom: 0;
 }
 
-.review-group-toggle {
+.review-group-button {
+  @include button-reset;
   display: grid;
-  grid-template-columns: 3.1rem minmax(0, 1fr) auto;
+  grid-template-columns: 3.1rem minmax(0, 1fr) minmax(7rem, auto) minmax(7rem, auto) auto;
   align-items: center;
   gap: 0.9rem;
   width: 100%;
   min-height: 5.2rem;
   padding: 0.85rem 1rem;
-  border: 0;
   background: var(--color-surface);
   color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
 }
 
-.review-group-toggle:hover {
+.review-group-button:hover {
   background: color-mix(in srgb, var(--tracking-soft, var(--color-blue-soft)) 28%, white);
 }
 
-.review-group-toggle:focus-visible {
+.review-group-button:focus-visible {
   @include focus-ring;
 }
 
@@ -298,6 +214,22 @@ function hasChanges(subcategory) {
   white-space: nowrap;
 }
 
+.review-group-total {
+  display: grid;
+  gap: 0.15rem;
+  text-align: right;
+}
+
+.review-group-total small {
+  color: var(--color-copy);
+  font-size: 0.72rem;
+}
+
+.review-group-total strong {
+  color: var(--color-ink);
+  font-size: 0.95rem;
+}
+
 .review-group-copy strong {
   font-size: 1.04rem;
 }
@@ -310,150 +242,15 @@ function hasChanges(subcategory) {
 .review-chevron {
   color: var(--color-ink);
   font-size: 1.4rem;
-  transition: transform 160ms ease;
-}
-
-.review-chevron.open {
-  transform: rotate(180deg);
-}
-
-.review-list {
-  background: inherit;
-  border-top: 1px solid var(--color-line);
-}
-
-.review-row {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) 13rem auto minmax(15rem, auto);
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 4.6rem;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--color-line);
-}
-
-.review-values {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.review-row:last-child {
-  border-bottom: 0;
-}
-
-.review-name {
-  display: grid;
-  justify-items: start;
-  min-width: 10rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.review-name > span {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.review-name small {
-  color: var(--color-copy);
-  font-size: 0.78rem;
-}
-
-.review-value {
-  display: grid;
-  gap: 0.15rem;
-  text-align: left;
-}
-
-.review-value strong {
-  font-size: 0.95rem;
-}
-
-.review-decisions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-
-.review-decision {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.4rem;
-  padding: 0.45rem 0.8rem;
-  border: 0;
-  border-radius: 999px !important;
-  background: transparent;
-  color: var(--color-copy);
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.review-decision.selected {
-  background: var(--color-blue-soft);
-  color: #0759b8;
-}
-
-.review-decision:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.review-decision:not(:disabled):focus-visible {
-  @include focus-ring;
-}
-
-.review-no-changes {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.3rem;
-  color: var(--color-copy);
-  font-size: 0.78rem;
-  white-space: nowrap;
 }
 
 @media (max-width: 899px) {
-  .review-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 0.45rem 0.4rem;
-    min-height: 0;
-    padding: 0.6rem 0.75rem;
+  .review-group-button {
+    grid-template-columns: 3.1rem minmax(0, 1fr) minmax(6rem, auto) auto;
   }
 
-  .review-name {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .review-view {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .review-values {
-    grid-column: 2;
-    grid-row: 1;
-    gap: 1rem;
-    margin-left: 0.7rem;
-  }
-
-  .review-decisions,
-  .review-no-changes {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
+  .review-group-total:last-of-type {
+    display: none;
   }
 }
 
@@ -490,8 +287,8 @@ function hasChanges(subcategory) {
     padding: 0;
   }
 
-  .review-group-toggle {
-    grid-template-columns: 2.65rem minmax(0, 1fr) auto;
+  .review-group-button {
+    grid-template-columns: 2.65rem minmax(0, 1fr) minmax(5.5rem, auto) auto;
     gap: 0.75rem;
     min-height: 4.6rem;
     padding: 0.65rem 0.75rem;
@@ -511,34 +308,8 @@ function hasChanges(subcategory) {
     font-size: 0.72rem;
   }
 
-  .review-name {
-    min-width: 0;
-  }
-
-  .review-name strong,
-  .review-value strong {
+  .review-group-total strong {
     font-size: 0.86rem;
-  }
-
-  .review-name small,
-  .review-value span {
-    font-size: 0.68rem;
-  }
-
-  .review-values {
-    gap: 0.55rem;
-  }
-
-  .review-view {
-    min-width: 1.9rem;
-    min-height: 1.9rem;
-    font-size: 0.85rem;
-  }
-
-  .review-decision {
-    min-height: 2rem;
-    padding: 0.3rem 0.5rem;
-    font-size: 0.7rem;
   }
 }
 </style>

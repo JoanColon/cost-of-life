@@ -69,32 +69,20 @@ const { t } = useI18n()
 }
 
 .tracking-button {
+  @include interactive-button-surface(0.7rem);
   display: grid;
   grid-template-columns: 3.1rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
   min-height: 5.2rem;
   padding: 0.85rem 1rem;
-  border: 1px solid var(--color-line);
-  border-radius: 0.7rem !important;
-  background: var(--color-surface);
   color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
 }
 
 .tracking-button:hover {
   border-color: color-mix(in srgb, var(--tracking-color, var(--color-primary)) 45%, white);
   box-shadow: 0 8px 22px rgb(34 55 78 / 8%);
   transform: translateY(-1px);
-}
-
-.tracking-button:focus-visible {
-  @include focus-ring;
 }
 
 .tracking-icon {

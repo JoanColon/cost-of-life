@@ -19,33 +19,24 @@
       </section>
 
       <template v-else>
-        <header class="page-header">
-          <div>
+        <AppPageHeader
+          :title="t('plan.title')"
+          :subtitle="t('plan.subtitle')"
+          :back-label="t('navigation.backToWorkspaceHome')"
+          :back-to="homeRoute"
+        >
+          <template #title-action>
             <q-btn
               flat
+              round
               dense
-              no-caps
+              icon="info_outline"
               color="grey-7"
-              icon="arrow_back"
-              :label="t('navigation.backToWorkspaceHome')"
-              :to="homeRoute"
-              class="back-button"
+              :aria-label="t('plan.info.action')"
+              @click="infoOpen = true"
             />
-            <div class="title-row">
-              <h1>{{ t('plan.title') }}</h1>
-              <q-btn
-                flat
-                round
-                dense
-                icon="info_outline"
-                color="grey-7"
-                :aria-label="t('plan.info.action')"
-                @click="infoOpen = true"
-              />
-            </div>
-            <p>{{ t('plan.subtitle') }}</p>
-          </div>
-        </header>
+          </template>
+        </AppPageHeader>
 
         <section class="capacity-card" :class="{ negative: annualSavings < 0 }">
           <div class="capacity-main">
@@ -185,7 +176,12 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
+import {
+  extractPositionLiabilities,
+  modeledLiabilitiesForPositions,
+} from '@/domain/financial/calculation-context'
 import {
   calculateDebtPayoffImpact,
   highestInterestModeledDebt,
@@ -195,7 +191,7 @@ import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
-  financialYearValue,
+  financialYearFlowValue,
 } from '@/domain/financial/financial-year'
 import {
   latestPositionMonth,
@@ -254,7 +250,7 @@ const annualIncome = computed(() =>
   financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
 )
 const annualCostOfLife = computed(() =>
-  financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+  financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value),
 )
 const annualSavings = computed(() => annualIncome.value - annualCostOfLife.value)
 const monthlySavings = computed(() => annualSavings.value / 12)
@@ -288,7 +284,12 @@ const startingPosition = computed(() =>
   strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
 )
 const liabilities = computed(() =>
-  extractLiabilities(financialYear.value, positionMonth.value, selectedMemberId.value),
+  extractPositionLiabilities(
+    financialYear.value,
+    positionMonth.value,
+    selectedMemberId.value,
+    liabilityCategoryName,
+  ),
 )
 const selectedDebt = computed(
   () =>
@@ -298,13 +299,11 @@ const selectedDebt = computed(
     null,
 )
 const modeledDebts = computed(() => {
-  const mortgageModels = new Map(
-    liabilitiesStore.itemsForCategory('mortgage').map((liability) => [liability.id, liability]),
+  return modeledLiabilitiesForPositions(
+    liabilities.value,
+    liabilitiesStore.itemsForCategory('mortgage'),
+    selectedMemberId.value,
   )
-  return liabilities.value.flatMap((liability) => {
-    const model = mortgageModels.get(liability.id)
-    return model ? [{ ...model, name: liability.name }] : []
-  })
 })
 const selectedDebtModel = computed(() => {
   if (!selectedDebt.value) return null
@@ -353,6 +352,8 @@ const safetyImpact = computed(() =>
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
     currentMonthlySavings: simulation.value.currentSavingsCapacity,
     simulatedMonthlySavings: simulation.value.simulatedSavingsCapacity,
+    cashAnnualReturnPercent: activeScenario.value.cashAnnualReturnPercent,
+    inflationAnnualPercent: activeScenario.value.inflationAnnualPercent,
   }),
 )
 const featuredInvestment = computed(() =>
@@ -461,15 +462,10 @@ function safetyOutcome(impact) {
 
 function strategyCashOutcome() {
   const strategy = projection.value.strategy
-  if (allocation.value.cash <= 0) return t('plan.outcomes.notIncluded')
-  if (strategy.cashTargetMonth === 0)
-    return t('plan.outcomes.fundReady', { amount: formatCurrency(strategy.cashTarget) })
-  if (strategy.cashTargetMonth != null)
-    return t('plan.outcomes.fundInMonths', {
-      amount: formatCurrency(strategy.cashTarget),
-      months: strategy.cashTargetMonth,
-    })
-  return t('plan.outcomes.fundTarget', { amount: formatCurrency(strategy.cashTarget) })
+  return t('plan.outcomes.inYears', {
+    amount: formatCurrency(strategy.cash),
+    years: activeScenario.value.horizonYears,
+  })
 }
 
 function debtOutcome(payoff, hasDebt, debtName, incremental = false) {
@@ -506,36 +502,8 @@ function formatMonthYear(value) {
   }).format(new Date(`${value}T00:00:00Z`))
 }
 
-function extractLiabilities(document, month, memberId) {
-  const categories = document?.months?.[month]?.liabilities?.categories || {}
-  return Object.entries(categories)
-    .flatMap(([categoryId, category]) =>
-      Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
-        const items = Object.entries(subcategory.items || {})
-        if (!items.length)
-          return [
-            {
-              id: subcategoryId,
-              categoryId,
-              name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-              balance: scopedValue(subcategory, memberId),
-            },
-          ]
-        return items.map(([id, item]) => ({
-          id,
-          categoryId,
-          name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-          balance: scopedValue(item, memberId),
-        }))
-      }),
-    )
-    .filter(({ balance }) => balance > 0)
-    .sort((left, right) => right.balance - left.balance)
-}
-
-function scopedValue(item, memberId) {
-  if (memberId !== 'all') return Number(item?.memberValues?.[memberId] || 0)
-  return Number(item?.total || 0)
+function liabilityCategoryName(categoryId) {
+  return t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title')
 }
 </script>
 

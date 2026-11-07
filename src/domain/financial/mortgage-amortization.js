@@ -1,8 +1,13 @@
+import {
+  frenchMortgagePaymentStep,
+  nominalMonthlyRate,
+  roundMoney,
+} from '../../../functions/shared/financial-core.js'
+
 const MAX_SCHEDULE_MONTHS = 1_200
 
 export function monthlyInterestRate(annualInterestRate) {
-  const annualRate = finiteNonNegativeNumber(annualInterestRate, 'annual interest rate')
-  return annualRate / 100 / 12
+  return nominalMonthlyRate(annualInterestRate)
 }
 
 export function calculateFrenchMonthlyPayment({ principal, annualInterestRate, termMonths }) {
@@ -29,7 +34,6 @@ export function buildFrenchAmortizationSchedule({
   const extraPayment = roundMoney(
     finiteNonNegativeNumber(extraMonthlyPayment, 'extra monthly payment'),
   )
-  const rate = monthlyInterestRate(annualInterestRate)
   const projectionDate = canonicalDate(asOfDate)
   const contractualStartDate = startDate ? canonicalDate(startDate) : null
   const firstContractualPayment = contractualStartDate
@@ -41,24 +45,21 @@ export function buildFrenchAmortizationSchedule({
 
   const schedule = []
   for (let paymentNumber = 1; paymentNumber <= MAX_SCHEDULE_MONTHS; paymentNumber += 1) {
-    const interest = roundMoney(balance * rate)
-    const plannedPayment = roundMoney(regularPayment + extraPayment)
-    const payment = roundMoney(Math.min(plannedPayment, balance + interest))
-    const principal = roundMoney(Math.min(balance, payment - interest))
-
-    if (principal <= 0) {
-      throw new RangeError('The monthly payment does not cover the accrued interest')
-    }
-
-    balance = roundMoney(Math.max(0, balance - principal))
+    const step = frenchMortgagePaymentStep({
+      balance,
+      annualInterestRate,
+      monthlyPayment: regularPayment,
+      extraMonthlyPayment: extraPayment,
+    })
+    balance = step.remainingBalance
     schedule.push({
       paymentNumber,
       date: contractualStartDate
         ? addUtcMonths(contractualStartDate, firstContractualPayment + paymentNumber - 1)
         : addUtcMonths(projectionDate, paymentNumber),
-      payment,
-      interest,
-      principal,
+      payment: step.payment,
+      interest: step.interest,
+      principal: step.principal,
       remainingBalance: balance,
     })
 
@@ -135,10 +136,6 @@ function positiveInteger(value, label) {
   const number = Number(value)
   if (!Number.isInteger(number) || number <= 0) throw new RangeError(`A valid ${label} is required`)
   return number
-}
-
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }
 
 function canonicalDate(value) {

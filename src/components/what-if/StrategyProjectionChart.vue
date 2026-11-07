@@ -9,6 +9,8 @@ import { LineChart } from 'echarts/charts'
 import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { currentFinancialYear } from '@/domain/financial/financial-year'
+import { calendarYearAtMonth } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([LineChart, GridComponent, LegendComponent, TooltipComponent, AriaComponent, CanvasRenderer])
@@ -76,7 +78,8 @@ watch(
 
 function renderChart() {
   if (!chart) return
-  const years = props.strategyPoints.map(({ month }) => month / 12)
+  const startYear = currentFinancialYear()
+  const years = props.strategyPoints.map(({ month }) => calendarYearAtMonth(startYear, month))
   chart.setOption(
     {
       animationDuration: 350,
@@ -109,7 +112,7 @@ function renderChart() {
         borderWidth: 0,
         textStyle: { color: '#fff' },
         formatter: (points) =>
-          `<strong>Year ${points[0]?.axisValue || 0}</strong><br/>${points
+          `<strong>${points[0]?.axisValue || startYear}</strong><br/>${points
             .map(
               ({ marker, seriesName, data }) => `${marker}${seriesName}: ${formatCurrency(data)}`,
             )
@@ -124,7 +127,12 @@ function renderChart() {
         axisLabel: {
           color: '#7f90a5',
           formatter: (value, index) =>
-            years.length <= 12 || index === 0 || Number(value) % 5 === 0 ? `${value}` : '',
+            years.length <= 12 ||
+            index === 0 ||
+            index === years.length - 1 ||
+            (Number(value) - startYear) % 5 === 0
+              ? `${value}`
+              : '',
         },
       },
       yAxis: {

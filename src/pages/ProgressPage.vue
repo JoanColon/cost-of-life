@@ -1,22 +1,12 @@
 <template>
   <q-page class="progress-page">
     <main class="progress-shell">
-      <header class="page-header">
-        <div>
-          <q-btn
-            flat
-            dense
-            no-caps
-            color="grey-7"
-            icon="arrow_back"
-            :label="t('navigation.backToWorkspaceHome')"
-            :to="homeRoute"
-            class="back-button"
-          />
-          <h1>{{ t('progress.title') }}</h1>
-          <p>{{ t('progress.subtitle') }}</p>
-        </div>
-      </header>
+      <AppPageHeader
+        :title="t('progress.title')"
+        :subtitle="t('progress.subtitle')"
+        :back-label="t('navigation.backToWorkspaceHome')"
+        :back-to="homeRoute"
+      />
 
       <div v-if="loading && !financialYear" class="state">
         <q-spinner color="primary" size="2rem" />
@@ -154,6 +144,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import NetWorthHistoryChart from '@/components/dashboard/NetWorthHistoryChart.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import {
   buildNetWorthBreakdownSeries,
   buildNetWorthSeries,
@@ -162,8 +153,8 @@ import {
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {
   financialYearAvailableIncomeValue,
+  financialYearFlowValue,
   financialYearMonthValue,
-  financialYearValue,
 } from '@/domain/financial/financial-year'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
@@ -220,7 +211,7 @@ const availableIncome = computed(() =>
 const annualSavings = computed(
   () =>
     availableIncome.value -
-    financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+    financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value),
 )
 const monthlySavings = computed(() => annualSavings.value / 12)
 const savingsRate = computed(() =>
@@ -288,7 +279,7 @@ function signedPercentage(value) {
 }
 
 .progress-shell {
-  @include financial-shell;
+  @include financial-shell(analytical);
 }
 
 .page-header {

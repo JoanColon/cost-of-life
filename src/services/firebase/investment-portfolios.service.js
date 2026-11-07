@@ -38,8 +38,8 @@ export async function syncInvestmentPortfolio(workspaceId, assetId, force = fals
   return result.data
 }
 
-export async function syncWorkspaceInvestmentPortfolios(workspaceId) {
-  const result = await syncWorkspacePortfolios({ workspaceId })
+export async function syncWorkspaceInvestmentPortfolios(workspaceId, force = false) {
+  const result = await syncWorkspacePortfolios({ workspaceId, force })
   return result.data
 }
 

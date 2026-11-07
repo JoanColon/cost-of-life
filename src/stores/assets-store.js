@@ -44,6 +44,7 @@ export const useAssetsStore = defineStore('assets', () => {
 
     loading.value = true
     error.value = null
+    loadedWorkspaceId.value = null
     config.value = null
     assetsByCategory.value = {}
     loadedCategoryIds.value = new Set()
@@ -61,7 +62,6 @@ export const useAssetsStore = defineStore('assets', () => {
     } catch (loadError) {
       if (requestId !== configRequestId) return
       error.value = loadError
-      loadedWorkspaceId.value = workspaceId
     } finally {
       if (requestId === configRequestId) loading.value = false
     }

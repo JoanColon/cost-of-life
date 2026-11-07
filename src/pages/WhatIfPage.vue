@@ -19,25 +19,12 @@
         />
       </section>
       <template v-else>
-        <header class="page-header">
-          <div class="page-heading">
-            <div class="page-nav">
-              <q-btn
-                flat
-                dense
-                no-caps
-                color="grey-7"
-                icon="arrow_back"
-                :label="t('navigation.plan')"
-                :to="{ name: 'plan', params: { workspaceId } }"
-                class="back-button"
-              />
-              <strong class="mobile-section-title">{{ t('navigation.plan') }}</strong>
-            </div>
-            <h1>{{ t('whatIf.title') }}</h1>
-            <p>{{ t('whatIf.subtitle') }}</p>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t('whatIf.title')"
+          :subtitle="t('whatIf.subtitle')"
+          :back-label="t('navigation.plan')"
+          :back-to="{ name: 'plan', params: { workspaceId } }"
+        />
 
         <section class="simulator-card">
           <div class="simulator-controls">
@@ -356,7 +343,12 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
+import {
+  extractPositionLiabilities,
+  modeledLiabilitiesForPositions,
+} from '@/domain/financial/calculation-context'
 import {
   calculateDebtPayoffImpact,
   highestInterestModeledDebt,
@@ -365,9 +357,9 @@ import {
   currentFinancialYear,
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
+  financialYearFlowValue,
   financialYearMonthCategoryValue,
   financialYearUnclassifiedExpenseValue,
-  financialYearValue,
 } from '@/domain/financial/financial-year'
 import {
   latestPositionMonth,
@@ -433,7 +425,7 @@ const error = computed(
     financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
 const annualCost = computed(() =>
-  financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+  financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value),
 )
 const annualAvailableIncome = computed(() =>
   financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
@@ -466,44 +458,21 @@ const cash = computed(() =>
     selectedMemberId.value,
   ),
 )
-const liabilities = computed(() => {
-  const categories =
-    financialYear.value?.months?.[positionMonth.value]?.liabilities?.categories || {}
-  return Object.entries(categories)
-    .flatMap(([categoryId, category]) =>
-      Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
-        const items = Object.entries(subcategory.items || {})
-        if (!items.length) {
-          return [
-            {
-              id: subcategoryId,
-              categoryId,
-              name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-              balance: scopedValue(subcategory),
-            },
-          ]
-        }
-        return items.map(([id, item]) => ({
-          id,
-          categoryId,
-          name:
-            item.itemName || t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-          balance: scopedValue(item),
-        }))
-      }),
-    )
-    .filter(({ balance }) => balance > 0)
-    .sort((left, right) => right.balance - left.balance)
-})
-const modeledDebts = computed(() => {
-  const mortgageModels = new Map(
-    liabilitiesStore.itemsForCategory('mortgage').map((liability) => [liability.id, liability]),
-  )
-  return liabilities.value.flatMap((liability) => {
-    const model = mortgageModels.get(liability.id)
-    return model ? [{ ...model, name: liability.name }] : []
-  })
-})
+const liabilities = computed(() =>
+  extractPositionLiabilities(
+    financialYear.value,
+    positionMonth.value,
+    selectedMemberId.value,
+    liabilityCategoryName,
+  ),
+)
+const modeledDebts = computed(() =>
+  modeledLiabilitiesForPositions(
+    liabilities.value,
+    liabilitiesStore.itemsForCategory('mortgage'),
+    selectedMemberId.value,
+  ),
+)
 const recommendedDebt = computed(
   () =>
     highestInterestModeledDebt(modeledDebts.value) ||
@@ -519,6 +488,8 @@ const safetyImpact = computed(() =>
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
     currentMonthlySavings: simulation.value.currentSavingsCapacity,
     simulatedMonthlySavings: simulation.value.simulatedSavingsCapacity,
+    cashAnnualReturnPercent: activeScenario.value.cashAnnualReturnPercent,
+    inflationAnnualPercent: activeScenario.value.inflationAnnualPercent,
   }),
 )
 const safetyMeterMonths = computed(() =>
@@ -574,11 +545,8 @@ const customSelectionLabel = computed(() => {
   }
   return t('whatIf.reduction.custom')
 })
-function scopedValue(item) {
-  if (selectedMemberId.value !== 'all') {
-    return Number(item?.memberValues?.[selectedMemberId.value] || 0)
-  }
-  return Number(item?.total || 0)
+function liabilityCategoryName(categoryId) {
+  return t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title')
 }
 
 watch(workspaceId, () => prepare(), { immediate: true })
@@ -660,7 +628,6 @@ async function saveCustomScenario(value) {
 
 .what-if-shell {
   @include financial-shell;
-  max-width: 68rem;
 }
 
 .page-header {

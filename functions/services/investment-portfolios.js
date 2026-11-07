@@ -1,10 +1,10 @@
-const { FieldValue } = require('firebase-admin/firestore')
-const { currentYear, rebuildFinancialYear } = require('./financial-years')
-const {
+import { FieldValue } from 'firebase-admin/firestore'
+import { currentYear, rebuildFinancialYear } from './financial-years.js'
+import {
   PORTFOLIO_SCHEMA,
   normalizeInvestmentPortfolio,
   parseCsv,
-} = require('./investment-portfolio-schema')
+} from './investment-portfolio-schema.js'
 
 const GOOGLE_SHEETS_HOST = 'docs.google.com'
 const SPREADSHEET_PATH = /^\/spreadsheets(?:\/u\/\d+)?\/d\/([A-Za-z0-9_-]+)(?:\/|$)/
@@ -56,7 +56,7 @@ async function syncInvestmentPortfolio(
 
 async function syncWorkspaceInvestmentPortfolios(
   firestore,
-  { workspaceId, userId = null, force = true, throwOnError = false },
+  { workspaceId, userId = null, force = false, throwOnError = false },
   fetchImpl = fetch,
   rebuildFinancialYearImpl = rebuildFinancialYear,
   nowImpl = Date.now,
@@ -423,7 +423,7 @@ function assertText(value, message) {
   if (!String(value || '').trim()) throw new Error(message)
 }
 
-module.exports = {
+const investmentPortfoliosService = {
   PORTFOLIO_CACHE_TTL_MS,
   canonicalGoogleSheetsUrl,
   portfolioCacheIsFresh,
@@ -431,3 +431,13 @@ module.exports = {
   syncWorkspaceInvestmentPortfolios,
   updateInvestmentPortfolio,
 }
+
+export {
+  PORTFOLIO_CACHE_TTL_MS,
+  canonicalGoogleSheetsUrl,
+  portfolioCacheIsFresh,
+  syncInvestmentPortfolio,
+  syncWorkspaceInvestmentPortfolios,
+  updateInvestmentPortfolio,
+}
+export default investmentPortfoliosService

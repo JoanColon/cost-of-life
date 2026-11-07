@@ -1,15 +1,31 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('firebase/functions', () => ({ httpsCallable: vi.fn(() => vi.fn()) }))
+const { callables, httpsCallable } = vi.hoisted(() => {
+  const callables = {}
+  return {
+    callables,
+    httpsCallable: vi.fn((_functions, name) => {
+      callables[name] = vi.fn()
+      return callables[name]
+    }),
+  }
+})
+
+vi.mock('firebase/functions', () => ({ httpsCallable }))
 vi.mock('@/firebase/firebase', () => ({ functions: {} }))
 
 import {
   investmentPortfolioCache,
   investmentPortfolioCacheIsFresh,
   isGoogleSheetsUrl,
+  syncWorkspaceInvestmentPortfolios,
 } from '../../src/services/firebase/investment-portfolios.service.js'
 
 describe('investment portfolio client validation', () => {
+  beforeEach(() => {
+    callables.syncWorkspaceInvestmentPortfolios.mockReset().mockResolvedValue({ data: {} })
+  })
+
   it('recognizes supported Google Sheets links', () => {
     expect(
       isGoogleSheetsUrl('https://docs.google.com/spreadsheets/d/sheet_123/edit?usp=sharing'),
@@ -53,5 +69,19 @@ describe('investment portfolio client validation', () => {
       sync: { financialProjectionDirty: true },
     }
     expect(investmentPortfolioCacheIsFresh(dirty, 100)).toBe(false)
+  })
+
+  it('uses cached workspace portfolios automatically and forces only explicit refreshes', async () => {
+    await syncWorkspaceInvestmentPortfolios('workspace-a')
+    await syncWorkspaceInvestmentPortfolios('workspace-a', true)
+
+    expect(callables.syncWorkspaceInvestmentPortfolios).toHaveBeenNthCalledWith(1, {
+      workspaceId: 'workspace-a',
+      force: false,
+    })
+    expect(callables.syncWorkspaceInvestmentPortfolios).toHaveBeenNthCalledWith(2, {
+      workspaceId: 'workspace-a',
+      force: true,
+    })
   })
 })

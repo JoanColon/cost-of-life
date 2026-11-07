@@ -138,6 +138,8 @@ describe('strategy simulation', () => {
       cashTarget: 14_627.93,
       realCash: 9_844.18,
     })
+    expect(result.monthlyPoints).toHaveLength(121)
+    expect(result.monthlyPoints[1].month).toBe(1)
   })
 
   it('compounds the configured cash return on the balance and new contributions', () => {
@@ -150,13 +152,13 @@ describe('strategy simulation', () => {
       monthlyCost: 0,
     })
 
-    expect(result.cash).toBe(2_395.08)
+    expect(result.cash).toBe(2_384.65)
     expect(result.cashContributions).toBe(1_200)
-    expect(result.cashGrowth).toBe(195.08)
-    expect(result.points.at(-1).cash).toBe(2_395.08)
+    expect(result.cashGrowth).toBe(184.65)
+    expect(result.points.at(-1).cash).toBe(2_384.65)
   })
 
-  it('projects net worth from asset growth and capped debt reduction', () => {
+  it('keeps unmodeled debt frozen in net worth projections', () => {
     const points = strategyNetWorthPoints({
       currentNetWorth: 5_000,
       strategy: {
@@ -173,8 +175,8 @@ describe('strategy simulation', () => {
 
     expect(points).toEqual([
       { month: 0, value: 5_000 },
-      { month: 12, value: 24_000 },
-      { month: 24, value: 41_000 },
+      { month: 12, value: 18_000 },
+      { month: 24, value: 33_000 },
     ])
   })
 

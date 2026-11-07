@@ -5,6 +5,7 @@ import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {
   activateMilestoneTracking as activateMilestoneTrackingDocuments,
   getAchievements,
+  milestoneConfirmationDueAt,
   syncMilestoneAchievements,
 } from '@/services/firebase/achievements.service'
 import { getFinancialHistory } from '@/services/firebase/history.service'
@@ -31,6 +32,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
   const activationLoading = ref(false)
   let requestId = 0
   let achievementSyncPending = false
+  let confirmationTimer = null
 
   const financialYear = computed(() =>
     workspaceId.value ? financialYearsStore.get(workspaceId.value, currentYear.value) : null,
@@ -96,27 +98,32 @@ export const useMilestonesStore = defineStore('milestones', () => {
     historyLoading.value = true
     achievementsLoading.value = true
 
-    await Promise.all([
-      financialYearsStore.load(id, year, force),
-      liabilitiesStore.loadCategory(id, 'mortgage', force),
-    ])
-    const [historyResult, achievementsResult] = await Promise.allSettled([
-      getFinancialHistory(id),
-      getAchievements(id),
-    ])
-    if (currentRequest !== requestId) return
+    try {
+      await Promise.all([
+        financialYearsStore.load(id, year, force),
+        liabilitiesStore.loadCategory(id, 'mortgage', force),
+      ])
+      const [historyResult, achievementsResult] = await Promise.allSettled([
+        getFinancialHistory(id),
+        getAchievements(id),
+      ])
+      if (currentRequest !== requestId) return
 
-    if (historyResult.status === 'fulfilled') historyDocuments.value = historyResult.value
-    else historyError.value = historyResult.reason
-    if (achievementsResult.status === 'fulfilled') {
-      achievements.value = achievementsResult.value
-      achievementsReady.value = true
-    } else achievementsError.value = achievementsResult.reason
+      if (historyResult.status === 'fulfilled') historyDocuments.value = historyResult.value
+      else historyError.value = historyResult.reason
+      if (achievementsResult.status === 'fulfilled') {
+        achievements.value = achievementsResult.value
+        achievementsReady.value = true
+      } else achievementsError.value = achievementsResult.reason
 
-    loadedKey.value = key
-    historyLoading.value = false
-    achievementsLoading.value = false
-    await syncAchievements(progress.value)
+      loadedKey.value = key
+      await syncAchievements(progress.value)
+    } finally {
+      if (currentRequest === requestId) {
+        historyLoading.value = false
+        achievementsLoading.value = false
+      }
+    }
   }
 
   async function syncAchievements(currentProgress) {
@@ -140,11 +147,38 @@ export const useMilestonesStore = defineStore('milestones', () => {
       achievementsError.value = syncError
     } finally {
       achievementSyncing.value = false
+      schedulePendingConfirmation()
       if (achievementSyncPending) {
         achievementSyncPending = false
         syncAchievements(progress.value)
       }
     }
+  }
+
+  function revalidateAchievements() {
+    if (!workspaceId.value || !achievementsReady.value) return Promise.resolve()
+    return syncAchievements(progress.value)
+  }
+
+  function schedulePendingConfirmation() {
+    clearTimeout(confirmationTimer)
+    confirmationTimer = null
+    if (!trackingActive.value) return
+
+    const nextDueAt = achievements.value
+      .filter(({ status }) => status === 'pending')
+      .map(({ qualifiedAt }) => milestoneConfirmationDueAt(qualifiedAt))
+      .filter((dueAt) => dueAt !== null)
+      .sort((left, right) => left - right)[0]
+    if (nextDueAt == null) return
+
+    confirmationTimer = setTimeout(
+      () => {
+        confirmationTimer = null
+        revalidateAchievements()
+      },
+      Math.max(0, nextDueAt - Date.now()),
+    )
   }
 
   async function activateTracking() {
@@ -173,6 +207,8 @@ export const useMilestonesStore = defineStore('milestones', () => {
   function reset() {
     requestId += 1
     achievementSyncPending = false
+    clearTimeout(confirmationTimer)
+    confirmationTimer = null
     workspaceId.value = null
     loadedKey.value = null
     currentYear.value = currentFinancialYear()
@@ -190,6 +226,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
 
   return {
     achievements,
+    achievementsLoading,
     activateTracking,
     activationLoading,
     currentMonth,
@@ -203,6 +240,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
     load,
     loading,
     progress,
+    revalidateAchievements,
     reset,
     trackingActive,
   }

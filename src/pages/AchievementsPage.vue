@@ -1,29 +1,19 @@
 <template>
   <q-page class="achievements-page">
     <main class="achievements-shell">
-      <header class="page-header">
-        <div>
-          <q-btn
-            flat
-            dense
-            no-caps
-            color="grey-7"
-            icon="arrow_back"
-            :label="t('navigation.progress')"
-            :to="{ name: 'progress', params: { workspaceId } }"
-            class="back-button"
-          />
-          <h1>{{ t('achievements.title') }}</h1>
-          <p v-if="visibleMilestones.length">
-            {{
-              t(trackingActive ? 'milestones.reachedSummary' : 'milestones.setup.previewSummary', {
+      <AppPageHeader
+        :title="t('achievements.title')"
+        :subtitle="
+          visibleMilestones.length
+            ? t(trackingActive ? 'milestones.reachedSummary' : 'milestones.setup.previewSummary', {
                 achieved: achievedCount,
                 total: visibleMilestones.length,
               })
-            }}
-          </p>
-        </div>
-      </header>
+            : ''
+        "
+        :back-label="t('navigation.progress')"
+        :back-to="{ name: 'progress', params: { workspaceId } }"
+      />
 
       <q-banner v-if="!trackingActive && !loading" rounded class="setup-banner">
         <template #avatar>
@@ -228,6 +218,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { milestoneFamilies } from '@/config/milestone-families'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import { authUser } from '@/services/auth'

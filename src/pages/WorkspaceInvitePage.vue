@@ -30,7 +30,7 @@
                 unelevated
                 no-caps
                 color="primary"
-                class="full-width join-button"
+                class="full-width app-btn--large"
                 :label="joinLabel"
                 :loading="joining"
                 @click="continueInvite"
@@ -199,12 +199,6 @@ h1 {
   margin: 1rem 0 0;
   color: var(--color-copy);
   line-height: 1.6;
-}
-
-.join-button {
-  min-height: 3.1rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
 }
 
 .error-banner {

@@ -1,7 +1,8 @@
-const { FieldPath, FieldValue } = require('firebase-admin/firestore')
-const { updateFinancialYearProjection } = require('../domain/financial-year')
-const { annualRealEstateValue } = require('../domain/real-estate')
-const { currentMonth, currentYear, positionStartMonth } = require('./financial-years')
+import { FieldPath, FieldValue } from 'firebase-admin/firestore'
+import { updateFinancialYearProjection } from '../domain/financial-year.js'
+import { calculatePositionsAt } from '../domain/positions.js'
+import { annualRealEstateValue } from '../domain/real-estate.js'
+import { currentMonth, currentYear, positionStartMonth } from './financial-years.js'
 
 const MONTHS = [
   'january',
@@ -126,7 +127,8 @@ async function mutateFinancialModel(
       expensesConfigSnapshot,
     ] = await Promise.all([
       transaction.get(itemsReference),
-      section === 'expenses' || (section === 'liabilities' && operation === 'update') ?
+      section === 'expenses' ||
+      (section === 'liabilities' && ['update', 'delete', 'deleteCategory'].includes(operation)) ?
         transaction.get(
             workspaceReference
               .collection('expenseTracking')
@@ -139,7 +141,7 @@ async function mutateFinancialModel(
         section === 'assets' && operation === 'deleteCategory' ?
           transaction.get(linkedIncomeReference) :
           null,
-      requestedMortgageId ?
+      section === 'expenses' || requestedMortgageId ?
         transaction.get(linkedLiabilitiesReference) :
         null,
       section === 'liabilities' && ['update', 'delete', 'deleteCategory'].includes(operation) ?
@@ -156,7 +158,7 @@ async function mutateFinancialModel(
               linkedExpensesReference,
           ) :
         null,
-      section === 'liabilities' && operation === 'update' ?
+      section === 'liabilities' && ['update', 'delete', 'deleteCategory'].includes(operation) ?
         transaction.get(expensesConfigReference) :
         null,
     ])
@@ -165,6 +167,7 @@ async function mutateFinancialModel(
     const existingItem = itemId ? existingItems.find(({ id }) => id === itemId) : null
     let nextItems = existingItems
     let syncedExpenses = null
+    let pendingItemData = null
     let response
 
     if (operation === 'create') {
@@ -176,7 +179,7 @@ async function mutateFinancialModel(
       synchronizeExpenseCandidate(section, requestedItem, relatedLiabilities)
       const itemData = withAuditFields(requestedItem, userId, true)
       nextItems = [...existingItems, { id: itemReference.id, ...itemData }]
-      transaction.set(itemReference, itemData)
+      pendingItemData = itemData
       response = { [definition.result]: clientItem(itemReference.id, itemData) }
     }
 
@@ -216,7 +219,7 @@ async function mutateFinancialModel(
       nextItems = existingItems.map((candidate) =>
         candidate.id === itemReference.id ? { id: itemReference.id, ...itemData } : candidate,
       )
-      transaction.set(itemReference, itemData)
+      pendingItemData = itemData
       if (section === 'liabilities' && updated.categoryId === 'mortgage') {
         syncMortgageAssetRelation(
           transaction,
@@ -245,13 +248,14 @@ async function mutateFinancialModel(
       nextItems = existingItems.filter((candidate) => candidate.id !== itemReference.id)
       transaction.delete(itemReference)
       unlinkPortfolioIncome(transaction, linkedIncomeSnapshot, new Set([itemReference.id]), userId)
-      unlinkMortgageRelations(
+      const unlinkedExpenses = unlinkMortgageRelations(
         transaction,
         linkedAssetsSnapshot,
         linkedExpensesSnapshot,
         new Set([itemReference.id]),
         userId,
       )
+      if (section === 'liabilities' && unlinkedExpenses) syncedExpenses = unlinkedExpenses
       response = { categoryId: deletedItem.categoryId }
     }
 
@@ -279,13 +283,14 @@ async function mutateFinancialModel(
         categoryItemIds,
         userId,
       )
-      unlinkMortgageRelations(
+      const unlinkedExpenses = unlinkMortgageRelations(
         transaction,
         linkedAssetsSnapshot,
         linkedExpensesSnapshot,
         categoryItemIds,
         userId,
       )
+      if (section === 'liabilities' && unlinkedExpenses) syncedExpenses = unlinkedExpenses
       if (section === 'expenses') {
         removeTrackingPreferences(
           transaction,
@@ -309,6 +314,26 @@ async function mutateFinancialModel(
       response = { categoryId }
     }
 
+    if (section === 'assets' || section === 'liabilities') {
+      const positions = calculatePositionsAt({
+        [section]: nextItems,
+        asOfDate: madridToday(),
+      })
+      nextItems = positions[section]
+      if (pendingItemData) {
+        const effectiveItem = nextItems.find(({ id }) => id === itemReference.id)
+        if (effectiveItem) {
+          const effectiveItemData = { ...effectiveItem }
+          delete effectiveItemData.id
+          pendingItemData = effectiveItemData
+          response = {
+            [definition.result]: clientItem(itemReference.id, effectiveItemData),
+          }
+        }
+      }
+    }
+    if (pendingItemData) transaction.set(itemReference, pendingItemData)
+
     const latest = financialYearSnapshot.data()
     const projectionInput = {
       year,
@@ -318,6 +343,9 @@ async function mutateFinancialModel(
       },
       [section]: nextItems,
       ...(syncedExpenses ? { expenses: syncedExpenses } : {}),
+      ...(section === 'expenses' && relatedLiabilities.length ?
+        { liabilities: relatedLiabilities } :
+        {}),
       sections: syncedExpenses ? [section, 'expenses'] : [section],
       positionObservedMonth: month,
     }
@@ -682,7 +710,7 @@ function synchronizeExpenseCandidate(section, candidate, liabilities) {
   const mortgage = liabilities.find(({ id }) => id === candidate.liabilityId)
   const payment = mortgage?.detail?.mortgage?.monthlyPayment
   if (!Number.isFinite(payment)) return
-  const amount = mortgage.balance === 0 ? 0 : payment
+  const amount = payment
   candidate.estimate = { amount, frequency: 'monthly' }
   candidate.monthlyAmounts = Object.fromEntries(MONTHS.map((month) => [month, amount]))
   candidate.variability = 'fixed'
@@ -736,7 +764,7 @@ function syncMortgageExpenseRelation(
 
   if (!selected) return nextExpenses
 
-  const amount = mortgage.balance === 0 ? 0 : mortgage.detail.mortgage.monthlyPayment
+  const amount = mortgage.detail.mortgage.monthlyPayment
   const monthlyAmounts = Object.fromEntries(MONTHS.map((month) => [month, amount]))
   const updated = {
     ...selected.data(),
@@ -810,14 +838,21 @@ function unlinkMortgageRelations(transaction, assetsSnapshot, expensesSnapshot, 
       updatedBy: userId,
     })
   }
+  const nextExpenses = documents(expensesSnapshot)
+  let expensesChanged = false
   for (const document of expensesSnapshot?.docs || []) {
     if (!mortgageIds.has(document.data()?.liabilityId)) continue
-    transaction.update(document.ref, {
+    const updated = {
+      ...document.data(),
       liabilityId: null,
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: userId,
-    })
+    }
+    transaction.set(document.ref, updated)
+    replaceDocument(nextExpenses, document.id, updated)
+    expensesChanged = true
   }
+  return expensesChanged ? nextExpenses : null
 }
 
 function assertDeleteCategoryWriteLimit(
@@ -970,4 +1005,5 @@ function assertText(value, message) {
   if (!String(value || '').trim()) throw new Error(message)
 }
 
-module.exports = { financialModelMutationInput, mutateFinancialModel }
+export { financialModelMutationInput, mutateFinancialModel }
+export default { financialModelMutationInput, mutateFinancialModel }

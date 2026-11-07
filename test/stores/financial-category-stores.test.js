@@ -121,5 +121,31 @@ describe.each(storeCases)(
       ])
       expect(store.categoryLoading).toBe(false)
     })
+
+    it('retries the same workspace after a config load fails', async () => {
+      getConfig.mockRejectedValueOnce(new Error('Temporary Firestore error'))
+      const store = useStore()
+
+      await store.loadConfig('workspace-a')
+      expect(store.error).toEqual(expect.objectContaining({ message: 'Temporary Firestore error' }))
+
+      await store.loadConfig('workspace-a')
+
+      expect(getConfig).toHaveBeenCalledTimes(2)
+      expect(store.error).toBeNull()
+      expect(store.config).toEqual(expect.objectContaining({ setupCompleted: true }))
+    })
+
+    it('invalidates a previous successful load when a forced reload fails', async () => {
+      const store = useStore()
+      await store.loadConfig('workspace-a')
+      getConfig.mockRejectedValueOnce(new Error('Temporary Firestore error'))
+
+      await store.loadConfig('workspace-a', true)
+      await store.loadConfig('workspace-a')
+
+      expect(getConfig).toHaveBeenCalledTimes(3)
+      expect(store.error).toBeNull()
+    })
   },
 )

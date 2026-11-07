@@ -1,11 +1,11 @@
-const { getFirestore } = require('firebase-admin/firestore')
-const { HttpsError, onCall } = require('firebase-functions/https')
-const logger = require('firebase-functions/logger')
-const {
-  syncInvestmentPortfolio: syncInvestmentPortfolioData,
-  syncWorkspaceInvestmentPortfolios: syncWorkspaceInvestmentPortfoliosData,
-  updateInvestmentPortfolio: updateInvestmentPortfolioData,
-} = require('./services/investment-portfolios')
+import { getFirestore } from 'firebase-admin/firestore'
+import { HttpsError, onCall } from 'firebase-functions/https'
+import * as logger from 'firebase-functions/logger'
+import {
+  syncInvestmentPortfolio as syncInvestmentPortfolioData,
+  syncWorkspaceInvestmentPortfolios as syncWorkspaceInvestmentPortfoliosData,
+  updateInvestmentPortfolio as updateInvestmentPortfolioData,
+} from './services/investment-portfolios.js'
 
 const updateInvestmentPortfolio = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
@@ -56,7 +56,7 @@ const syncWorkspaceInvestmentPortfolios = onCall(
       return await syncWorkspaceInvestmentPortfoliosData(getFirestore(), {
         workspaceId,
         userId: request.auth.uid,
-        force: true,
+        force: Boolean(request.data?.force),
       })
     } catch (error) {
       if (error instanceof HttpsError) throw error
@@ -69,7 +69,7 @@ const syncWorkspaceInvestmentPortfolios = onCall(
   },
 )
 
-module.exports = {
+export {
   readInvestmentPortfolioSheet,
   syncWorkspaceInvestmentPortfolios,
   updateInvestmentPortfolio,

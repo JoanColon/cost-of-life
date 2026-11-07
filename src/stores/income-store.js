@@ -37,6 +37,7 @@ export const useIncomeStore = defineStore('income', () => {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
     loading.value = true
     error.value = null
+    loadedWorkspaceId.value = null
     config.value = null
     incomeByCategory.value = {}
     loadedCategoryIds.value = new Set()
@@ -53,7 +54,6 @@ export const useIncomeStore = defineStore('income', () => {
     } catch (loadError) {
       if (requestId !== configRequestId) return
       error.value = loadError
-      loadedWorkspaceId.value = workspaceId
     } finally {
       if (requestId === configRequestId) loading.value = false
     }

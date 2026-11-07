@@ -1,9 +1,9 @@
-const { getFirestore } = require('firebase-admin/firestore')
-const { HttpsError, onCall } = require('firebase-functions/https')
-const {
+import { getFirestore } from 'firebase-admin/firestore'
+import { HttpsError, onCall } from 'firebase-functions/https'
+import {
   financialModelMutationInput,
-  mutateFinancialModel: mutateFinancialModelData,
-} = require('./services/financial-model')
+  mutateFinancialModel as mutateFinancialModelData,
+} from './services/financial-model.js'
 
 const mutateFinancialModel = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
@@ -19,4 +19,4 @@ const mutateFinancialModel = onCall({ region: 'europe-west1' }, async (request) 
   }
 })
 
-module.exports = { mutateFinancialModel }
+export { mutateFinancialModel }

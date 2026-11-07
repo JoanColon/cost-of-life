@@ -15,6 +15,7 @@ import {
 } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { calendarYearTickIndices } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([
@@ -105,6 +106,7 @@ function renderChart() {
     ...props.acceleratedSchedule.map(({ remainingBalance }) => remainingBalance),
   ]
   while (acceleratedValues.length < periods.length) acceleratedValues.push(null)
+  const yearLabels = calendarYearTickIndices(periods)
 
   const normalSeries = payoffSeries(props.normalLabel, normalValues, '#0870d8')
   if (props.currentDate) {
@@ -146,9 +148,11 @@ function renderChart() {
         axisLabel: {
           color: '#64748b',
           fontSize: 11,
+          interval: (index) => yearLabels.has(index),
           hideOverlap: true,
           margin: 12,
-          formatter: (value, index) => yearLabel(value, index, periods.length),
+          showMaxLabel: true,
+          formatter: (_value, index) => yearLabels.get(index) || '',
         },
       },
       yAxis: {
@@ -193,12 +197,6 @@ function formatTooltip(points) {
         `${marker}<span style="display:inline-block;min-width:9rem">${seriesName}</span> <strong>${formatCurrency(data)}</strong>`,
     )
     .join('<br/>')}`
-}
-
-function yearLabel(value, index, length) {
-  const year = String(value || '').slice(0, 4)
-  const month = String(value || '').slice(5, 7)
-  return index === 0 || index === length - 1 || month === '01' ? year : ''
 }
 
 function formatMonthYear(value) {

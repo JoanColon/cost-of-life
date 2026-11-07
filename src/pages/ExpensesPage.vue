@@ -27,21 +27,11 @@
       />
 
       <template v-else>
-        <header class="expenses-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('navigation.backToWorkspaceHome')"
-              :to="workspaceHomeRoute"
-              class="back-button"
-            />
-            <h1>{{ t('expenses.title') }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t('expenses.title')"
+          :back-label="t('navigation.backToWorkspaceHome')"
+          :back-to="workspaceHomeRoute"
+        />
 
         <ExpensesSectionNav :workspace-id="workspaceId" active="plan" :context="planContext" />
 
@@ -232,11 +222,12 @@ import { useRoute, useRouter } from 'vue-router'
 import ExpenseCategorySetup from '@/components/expenses/ExpenseCategorySetup.vue'
 import ExpensesSectionNav from '@/components/expenses/ExpensesSectionNav.vue'
 import SimpleValueEditor from '@/components/financial/SimpleValueEditor.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { expenseCategories } from '@/config/expense-categories'
 import {
   currentFinancialYear,
-  financialYearCategoryValue,
-  financialYearValue,
+  financialYearFlowCategoryValue,
+  financialYearFlowValue,
 } from '@/domain/financial/financial-year'
 import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
 import { authUser } from '@/services/auth'
@@ -293,9 +284,9 @@ const financialYearError = computed(() =>
   financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
 const totals = computed(() => ({
-  annualCostOfLife: financialYearValue(financialYear.value, 'expenses', selectedMemberId.value),
+  annualCostOfLife: financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value),
   monthlyCostOfLife:
-    financialYearValue(financialYear.value, 'expenses', selectedMemberId.value) / 12,
+    financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value) / 12,
 }))
 const pageLoading = computed(
   () =>
@@ -345,7 +336,7 @@ function categoryDisplayValue(categoryId) {
 }
 
 function categoryAnnualValue(categoryId) {
-  return financialYearCategoryValue(
+  return financialYearFlowCategoryValue(
     financialYear.value,
     'expenses',
     categoryId,
@@ -505,7 +496,7 @@ async function runSaving(operation) {
 }
 
 .expenses-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 
 .state {

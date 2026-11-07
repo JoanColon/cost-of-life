@@ -25,21 +25,11 @@
       </section>
 
       <template v-else-if="category && categoryConfig?.enabled">
-        <header class="category-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('expenses.backToExpenses')"
-              :to="expensesRoute"
-              class="back-button"
-            />
-            <h1>{{ t(category.nameKey) }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t(category.nameKey)"
+          :back-label="t('expenses.backToExpenses')"
+          :back-to="expensesRoute"
+        />
 
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
@@ -180,11 +170,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ExpenseForm from '@/components/expenses/ExpenseForm.vue'
 import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { getExpenseCategory } from '@/config/expense-categories'
 import { expenseTrackingCategories } from '@/config/expense-tracking-categories'
 import {
   currentFinancialYear,
-  financialYearCategoryValue,
+  financialYearFlowCategoryValue,
   financialYearExpenseModelItemValue,
 } from '@/domain/financial/financial-year'
 import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
@@ -262,7 +253,7 @@ const pageLoading = computed(
     liabilitiesStore.categoryLoading,
 )
 const categoryTotal = computed(() =>
-  financialYearCategoryValue(
+  financialYearFlowCategoryValue(
     financialYear.value,
     'expenses',
     categoryId.value,

@@ -1,4 +1,5 @@
 import { normalizeDisposablePercentage } from './income-calculations'
+import { effectiveGrowthFactor, effectiveMonthlyRate, normalizeAnnualPercent } from './rates'
 export const investmentHorizons = Object.freeze([10, 20, 30])
 
 export const investmentTypeDefinitions = Object.freeze([
@@ -17,7 +18,7 @@ export const defaultStrategyScenario = Object.freeze({
   investmentMix: Object.freeze({
     stockMarket: Object.freeze({ allocation: 100, annualReturnPercent: 7 }),
   }),
-  cashAnnualReturnPercent: 0,
+  cashAnnualReturnPercent: 1,
   inflationAnnualPercent: 2,
   horizonYears: 20,
   cashTargetMonths: 12,
@@ -42,7 +43,7 @@ export function normalizeWhatIfConfig(config = {}) {
         annualReturnPercent: normalizeReturn(config.expectedAnnualReturnPercent) ?? 7,
       },
     },
-    cashAnnualReturnPercent: normalizeReturn(config.cashAnnualReturnPercent) ?? 0,
+    cashAnnualReturnPercent: normalizeReturn(config.cashAnnualReturnPercent) ?? 1,
     inflationAnnualPercent: normalizeReturn(config.inflationAnnualPercent) ?? 2,
     selectedLiabilityId:
       typeof config.selectedLiabilityId === 'string' ? config.selectedLiabilityId : null,
@@ -79,7 +80,7 @@ export function normalizeStrategyScenario(scenario = {}) {
         .slice(0, 80) || 'Strategy',
     allocation: allocation || { ...defaultStrategyScenario.allocation },
     investmentMix,
-    cashAnnualReturnPercent: normalizeReturn(scenario.cashAnnualReturnPercent) ?? 0,
+    cashAnnualReturnPercent: normalizeReturn(scenario.cashAnnualReturnPercent) ?? 1,
     inflationAnnualPercent: normalizeReturn(scenario.inflationAnnualPercent) ?? 2,
     horizonYears: Number.isFinite(horizon) ? Math.min(50, Math.max(1, Math.round(horizon))) : 20,
     cashTargetMonths: [3, 6, 12].includes(cashTarget) ? cashTarget : 12,
@@ -203,20 +204,29 @@ export function calculateSafetyImpact({
   simulatedMonthlySavings = 0,
   horizonMonths = 12,
   targetMonths = 12,
+  cashAnnualReturnPercent = 1,
+  inflationAnnualPercent = 2,
 } = {}) {
   const baselineCost = Math.max(0, Number(currentMonthlyCost) || 0)
   const scenarioCost = Math.max(0, Number(simulatedMonthlyCost) || 0)
   if (!(baselineCost > 0) || !(scenarioCost > 0)) return null
   const months = Math.max(0, Math.round(Number(horizonMonths) || 0))
   const startingCash = Math.max(0, Number(cash) || 0)
-  const baselineCash = money(
-    startingCash + Math.max(0, Number(currentMonthlySavings) || 0) * months,
+  const baselineCash = projectedCashBalance(
+    startingCash,
+    currentMonthlySavings,
+    cashAnnualReturnPercent,
+    months,
   )
-  const scenarioCash = money(
-    startingCash + Math.max(0, Number(simulatedMonthlySavings) || 0) * months,
+  const scenarioCash = projectedCashBalance(
+    startingCash,
+    simulatedMonthlySavings,
+    cashAnnualReturnPercent,
+    months,
   )
-  const baselineSafetyMonths = money(baselineCash / baselineCost)
-  const scenarioSafetyMonths = money(scenarioCash / scenarioCost)
+  const inflationFactor = effectiveGrowthFactor(inflationAnnualPercent, months)
+  const baselineSafetyMonths = money(baselineCash / (baselineCost * inflationFactor))
+  const scenarioSafetyMonths = money(scenarioCash / (scenarioCost * inflationFactor))
   return {
     horizonMonths: months,
     baselineSafetyMonths,
@@ -229,6 +239,16 @@ export function calculateSafetyImpact({
   }
 }
 
+function projectedCashBalance(startingCash, monthlyContribution, annualReturnPercent, months) {
+  const contribution = Math.max(0, Number(monthlyContribution) || 0)
+  const monthlyRate = effectiveMonthlyRate(annualReturnPercent)
+  let balance = Math.max(0, Number(startingCash) || 0)
+  for (let month = 0; month < months; month += 1) {
+    balance = balance * (1 + monthlyRate) + contribution
+  }
+  return money(balance)
+}
+
 export function calculateProjectionDelta(scenarioResult = 0, baselineResult = 0) {
   return money((Number(scenarioResult) || 0) - (Number(baselineResult) || 0))
 }
@@ -236,7 +256,7 @@ export function calculateProjectionDelta(scenarioResult = 0, baselineResult = 0)
 export function futureValueOfMonthlyContributions(monthlyContribution, annualReturnPercent, years) {
   const contribution = Math.max(0, Number(monthlyContribution) || 0)
   const months = Math.max(0, Math.round(Number(years) * 12))
-  const monthlyRate = (Number(annualReturnPercent) || 0) / 100 / 12
+  const monthlyRate = effectiveMonthlyRate(annualReturnPercent)
   if (!months || !contribution) return 0
   if (!monthlyRate) return money(contribution * months)
   return money(contribution * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate))
@@ -244,9 +264,8 @@ export function futureValueOfMonthlyContributions(monthlyContribution, annualRet
 
 export function futureValueOfPrincipal(principal, annualReturnPercent, years) {
   const value = Math.max(0, Number(principal) || 0)
-  const duration = Math.max(0, Number(years) || 0)
-  const annualRate = (Number(annualReturnPercent) || 0) / 100
-  return money(value * Math.pow(1 + annualRate, duration))
+  const months = Math.max(0, Number(years) || 0) * 12
+  return money(value * effectiveGrowthFactor(annualReturnPercent, months))
 }
 
 export function calculateDebtScenario(monthlyAmount = 0) {
@@ -287,8 +306,7 @@ function monthsToTarget(current, target, monthlyContribution) {
 }
 
 function normalizeReturn(value) {
-  const number = Number(value)
-  return Number.isFinite(number) && number >= 0 && number <= 100 ? number : null
+  return normalizeAnnualPercent(value)
 }
 
 function normalizeMoneyInput(value) {

@@ -18,7 +18,7 @@ La aplicación permite:
 - calcular y guardar hitos de seguridad, patrimonio, deuda y libertad financiera.
 - simular recortes de gasto discrecional y comparar su uso en efectivo, inversión o deuda.
 
-La implementación actual es una SPA en JavaScript. Aunque la visión de producto menciona TypeScript, Capacitor y funcionalidades futuras, no se debe asumir que estén implementados.
+La implementación actual es una SPA en JavaScript y tanto la aplicación como Functions usan ES Modules. Aunque la visión de producto menciona TypeScript, Capacitor y funcionalidades futuras, no se debe asumir que estén implementados.
 
 ## Modelo mental del producto
 
@@ -126,6 +126,7 @@ cost-of-life/
 │   └── utils/                   Formato y utilidades de miembros
 ├── functions/
 │   ├── domain/                  Proyección financiera pura del backend
+│   ├── shared/                  Fórmulas puras compartidas con el frontend
 │   ├── services/                Transacciones y lógica de aplicación
 │   ├── financial-model.js       Callable de mutación del modelo
 │   ├── financial-years.js       Callable y triggers de proyección anual
@@ -150,6 +151,7 @@ cost-of-life/
 - **Domain** contiene cálculos deterministas y validaciones sin Vue ni acceso remoto. Es la primera opción para lógica financiera nueva y debe cubrirse con tests.
 - **Config** define IDs estables de categorías, subtipos, valores sugeridos y familias de hitos. Esos IDs forman parte del contrato persistido.
 - **Functions** concentra las operaciones que requieren privilegios, borrado recursivo o atomicidad entre el modelo y su proyección.
+- **Functions/shared** contiene únicamente fórmulas deterministas que deben producir exactamente el mismo resultado en navegador y servidor. No puede depender de Firebase, Vue ni estado remoto.
 
 Se usa el alias `@` para `src`. Mantén la dirección de dependencias `page/component → store → service → Firebase` y extrae la lógica pura a `domain`.
 

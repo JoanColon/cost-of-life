@@ -1,9 +1,9 @@
 import {
   currentFinancialMonth,
+  financialYearFlowValue,
   financialYearMonthCategoryValue,
   financialYearMonthSubcategoryValue,
   financialYearMonthValue,
-  financialYearValue,
 } from '@/domain/financial/financial-year'
 import { positionHistoryDocuments } from '@/domain/financial/history'
 import { applyOwnership } from '@/domain/financial/ownership'
@@ -38,7 +38,7 @@ export function calculateMilestoneProgress({
       throughPeriod: Number.isInteger(currentYear) ? `${currentYear}-${month}` : null,
     },
   )
-  const annualCostOfLife = financialYearValue(financialYear, 'expenses', memberId)
+  const annualCostOfLife = financialYearFlowValue(financialYear, 'expenses', memberId)
   const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash', memberId)
   const freedomAssets =
     categoryTotal(financialYear, month, 'assets', INVESTABLE_ASSET_CATEGORY_IDS, memberId) +

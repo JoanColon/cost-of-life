@@ -1,13 +1,13 @@
-const { getFirestore } = require('firebase-admin/firestore')
-const { HttpsError, onCall } = require('firebase-functions/https')
-const {
-  acceptWorkspaceInvite: acceptWorkspaceInviteData,
-  createWorkspaceInvite: createWorkspaceInviteData,
+import { getFirestore } from 'firebase-admin/firestore'
+import { HttpsError, onCall } from 'firebase-functions/https'
+import {
+  acceptWorkspaceInvite as acceptWorkspaceInviteData,
+  createWorkspaceInvite as createWorkspaceInviteData,
   deleteWorkspaceData,
-  getWorkspaceInvite: getWorkspaceInviteData,
+  getWorkspaceInvite as getWorkspaceInviteData,
   isWorkspaceOwner,
-  updateWorkspaceSettings: updateWorkspaceSettingsData,
-} = require('./services/workspaces')
+  updateWorkspaceSettings as updateWorkspaceSettingsData,
+} from './services/workspaces.js'
 
 function callableError(error) {
   if (error instanceof HttpsError) return error
@@ -101,7 +101,7 @@ const updateWorkspaceSettings = onCall({ region: 'europe-west1' }, async (reques
   }
 })
 
-module.exports = {
+export {
   acceptWorkspaceInvite,
   createWorkspaceInvite,
   deleteWorkspace,

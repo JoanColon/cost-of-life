@@ -1,6 +1,7 @@
 import { currentFinancialMonth, financialYearMonthCategoryValue } from './financial-year'
 import { buildFrenchAmortizationSchedule } from './mortgage-amortization'
 import { annualRealEstateValue } from './real-estate-valuation'
+import { effectiveGrowthFactor, effectiveMonthlyRate } from './rates'
 import { investmentTypeDefinitions, normalizeStrategyForOptions } from './what-if'
 
 const INVESTMENT_ASSET_TYPES = Object.freeze({
@@ -125,7 +126,6 @@ export function strategyNetWorthPoints({
   currentRealEstate = 0,
   strategy,
   monthlyDebtContribution = 0,
-  debtBalance = 0,
   selectedDebtId = null,
   realEstateAssets = [],
   mortgages = [],
@@ -133,15 +133,12 @@ export function strategyNetWorthPoints({
 } = {}) {
   const startingValue = Number(strategy?.startingValue) || 0
   const monthlyDebt = Math.max(0, Number(monthlyDebtContribution) || 0)
-  const maximumDebtReduction = Math.max(0, Number(debtBalance) || 0)
-
   if (currentAssets == null) {
     return (strategy?.points || []).map((point) => {
       const assetChange = (Number(point.value) || 0) - startingValue
-      const debtReduction = Math.min(maximumDebtReduction, monthlyDebt * Number(point.month || 0))
       return {
         month: Number(point.month || 0),
-        value: money(Number(currentNetWorth || 0) + assetChange + debtReduction),
+        value: money(Number(currentNetWorth || 0) + assetChange),
       }
     })
   }
@@ -162,8 +159,6 @@ export function strategyNetWorthPoints({
       asOfDate,
     ),
   }))
-  const selectedDebtIsModeled = mortgageSchedules.some(({ id }) => id === selectedDebtId)
-
   return points.map((point) => {
     const month = Number(point.month || 0)
     const cash = Number(point.cash) || 0
@@ -181,13 +176,7 @@ export function strategyNetWorthPoints({
       (sum, mortgage) => sum + mortgageReductionAtMonth(mortgage, month),
       0,
     )
-    const fallbackDebtReduction = selectedDebtIsModeled
-      ? 0
-      : Math.min(maximumDebtReduction, monthlyDebt * month)
-    const liabilities = Math.max(
-      0,
-      Number(currentLiabilities || 0) - modeledDebtReduction - fallbackDebtReduction,
-    )
+    const liabilities = Math.max(0, Number(currentLiabilities || 0) - modeledDebtReduction)
     const otherAssets = frozenOtherAssets
     const value = cash + investments + realEstate + otherAssets - liabilities
     return {
@@ -217,7 +206,7 @@ export function projectPath({
 } = {}) {
   const months = Math.max(1, Math.round(Number(horizonYears) * 12))
   const savings = Math.max(0, Number(monthlySavings) || 0)
-  const monthlyCashReturn = Math.max(0, Number(cashAnnualReturnPercent) || 0) / 100 / 12
+  const monthlyCashReturn = effectiveMonthlyRate(cashAnnualReturnPercent)
   const nominalMonthlyCost = Math.max(0, Number(monthlyCost) || 0)
   const initialCashTarget = money(nominalMonthlyCost * cashTargetMonths)
   let cash = Math.max(0, Number(startingPosition.cash) || 0)
@@ -236,6 +225,7 @@ export function projectPath({
       cashTarget: initialCashTarget,
     }),
   ]
+  const monthlyPoints = [...points]
 
   for (let month = 1; month <= months; month += 1) {
     const cashBeforeGrowth = cash
@@ -246,8 +236,9 @@ export function projectPath({
       const defaultReturn =
         investmentTypeDefinitions.find((definition) => definition.id === type)?.returnPercent || 0
       const annualReturn = Number(investmentMix[type]?.annualReturnPercent ?? defaultReturn)
-      balances[type] = balance * (1 + annualReturn / 100 / 12)
-      investmentContributionBalances[type] *= 1 + annualReturn / 100 / 12
+      const monthlyReturn = effectiveMonthlyRate(annualReturn)
+      balances[type] = balance * (1 + monthlyReturn)
+      investmentContributionBalances[type] *= 1 + monthlyReturn
     }
 
     const cashContribution = (savings * allocation.cash) / 100
@@ -267,15 +258,13 @@ export function projectPath({
     debtContributions += debtContribution
 
     if (cashTargetMonth == null && cashTarget > 0 && cash >= cashTarget) cashTargetMonth = month
-    if (month % 12 === 0 || month === months) {
-      points.push(
-        projectionPoint(month, cash, balances, investmentContributionBalances, {
-          inflationFactor,
-          monthlyCost: nominalMonthlyCost,
-          cashTarget,
-        }),
-      )
-    }
+    const point = projectionPoint(month, cash, balances, investmentContributionBalances, {
+      inflationFactor,
+      monthlyCost: nominalMonthlyCost,
+      cashTarget,
+    })
+    monthlyPoints.push(point)
+    if (month % 12 === 0 || month === months) points.push(point)
   }
 
   const investmentValue = money(Object.values(balances).reduce((sum, value) => sum + value, 0))
@@ -301,6 +290,7 @@ export function projectPath({
     ),
     cashTargetMonth,
     points,
+    monthlyPoints,
     investmentBalances: Object.fromEntries(
       Object.entries(balances).map(([type, value]) => [type, money(value)]),
     ),
@@ -369,6 +359,7 @@ function mortgageSchedule(mortgage, extraMonthlyPayment, asOfDate) {
       monthlyPayment: mortgage.monthlyPayment,
       extraMonthlyPayment,
       asOfDate,
+      startDate: mortgage.startDate,
     })
   } catch {
     return []
@@ -396,7 +387,7 @@ function addMonths(value, months) {
 }
 
 export function inflationFactorAtMonth(annualPercent = 0, month = 0) {
-  return Math.pow(1 + monthlyRateFromAnnualPercent(annualPercent), Math.max(0, Number(month) || 0))
+  return effectiveGrowthFactor(annualPercent, month)
 }
 
 export function presentValue(value, inflationFactor = 1) {
@@ -417,11 +408,6 @@ export function inflationAdjustedCoverage({
     inflationFactorAtMonth(annualInflationPercent, month),
   )
   return money(realValue / cost)
-}
-
-function monthlyRateFromAnnualPercent(annualPercent = 0) {
-  const annualRate = Math.max(0, Number(annualPercent) || 0) / 100
-  return Math.pow(1 + annualRate, 1 / 12) - 1
 }
 
 function addMappedCategory(financialYear, month, categoryId, mapping, target, memberId) {

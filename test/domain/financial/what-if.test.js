@@ -118,9 +118,9 @@ describe('What If calculations', () => {
         simulatedMonthlySavings: 600,
       }),
     ).toMatchObject({
-      baselineSafetyMonths: 8,
-      scenarioSafetyMonths: 8.6,
-      additionalSafetyMonths: 0.6,
+      baselineSafetyMonths: 7.91,
+      scenarioSafetyMonths: 8.5,
+      additionalSafetyMonths: 0.59,
       alreadyFunded: false,
     })
   })
@@ -153,7 +153,7 @@ describe('What If calculations', () => {
     })
   })
 
-  it('keeps cash return settings while defaulting older scenarios to zero', () => {
+  it('keeps cash return settings while defaulting older scenarios to one percent', () => {
     const configured = normalizeWhatIfConfig({
       activeScenarioId: 'cash-return',
       scenarios: [
@@ -171,6 +171,6 @@ describe('What If calculations', () => {
     })
 
     expect(configured.scenarios[0].cashAnnualReturnPercent).toBe(2.5)
-    expect(legacy.scenarios[0].cashAnnualReturnPercent).toBe(0)
+    expect(legacy.scenarios[0].cashAnnualReturnPercent).toBe(1)
   })
 })

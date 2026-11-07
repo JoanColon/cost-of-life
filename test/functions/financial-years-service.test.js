@@ -397,7 +397,7 @@ describe('financial year persistence', () => {
     expect(updates[0].data.balance).toBeUndefined()
   })
 
-  it('stops a linked mortgage expense when the modeled balance reaches zero', async () => {
+  it('keeps the contractual mortgage expense when the modeled balance reaches zero', async () => {
     const { firestore, updates } = createPositionRefreshFirestore({
       mortgages: [
         {
@@ -425,9 +425,10 @@ describe('financial year persistence', () => {
       '2026-02-01',
     )
 
-    expect(result).toMatchObject({ liabilitiesUpdated: 1, expensesUpdated: 1 })
-    expect(updates.find(({ reference }) => reference.path === 'modelExpenses/expense-a').data)
-      .toMatchObject({ estimate: { amount: 0, frequency: 'monthly' } })
+    expect(result).toMatchObject({ liabilitiesUpdated: 1, expensesUpdated: 0 })
+    expect(updates.some(({ reference }) => reference.path === 'modelExpenses/expense-a')).toBe(
+      false,
+    )
   })
 
   it('does not rebuild data for a workspace being deleted', async () => {

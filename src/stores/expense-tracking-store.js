@@ -126,9 +126,9 @@ export const useExpenseTrackingStore = defineStore('expense-tracking', () => {
     )
   }
 
-  async function saveReconciliations(workspaceId, period, subcategoryIds, decision) {
+  async function saveReconciliations(workspaceId, period, subcategoryIdsOrDecisions, decision) {
     await mutate(workspaceId, period, () =>
-      saveTrackingReconciliations(workspaceId, period, subcategoryIds, decision),
+      saveTrackingReconciliations(workspaceId, period, subcategoryIdsOrDecisions, decision),
     )
   }
 

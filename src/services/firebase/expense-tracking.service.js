@@ -15,7 +15,6 @@ import {
   emptyExpenseTrackingMonth,
   normalizeTrackingMonth,
   setTrackingDecision,
-  setTrackingDecisions,
   updateTrackedItem,
 } from '@/domain/financial/expense-tracking'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
@@ -120,11 +119,26 @@ export async function saveTrackingReconciliation(workspaceId, period, subcategor
   )
 }
 
-export async function saveTrackingReconciliations(workspaceId, period, subcategoryIds, decision) {
+export async function saveTrackingReconciliations(
+  workspaceId,
+  period,
+  subcategoryIdsOrDecisions,
+  decision,
+) {
   const userId = currentUserId()
-  subcategoryIds.forEach(assertSubcategory)
+  const decisions = Array.isArray(subcategoryIdsOrDecisions)
+    ? Object.fromEntries(
+        subcategoryIdsOrDecisions.map((subcategoryId) => [subcategoryId, decision]),
+      )
+    : subcategoryIdsOrDecisions
+  const entries = Object.entries(decisions || {})
+  entries.forEach(([subcategoryId]) => assertSubcategory(subcategoryId))
   return mutateMonth(workspaceId, period, userId, (month) =>
-    setTrackingDecisions(month, subcategoryIds, decision),
+    entries.reduce(
+      (next, [subcategoryId, selectedDecision]) =>
+        setTrackingDecision(next, subcategoryId, selectedDecision),
+      month,
+    ),
   )
 }
 

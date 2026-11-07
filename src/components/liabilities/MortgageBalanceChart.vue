@@ -14,6 +14,7 @@ import {
 } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { calendarYearTickIndices } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([
@@ -83,6 +84,7 @@ function renderChart() {
   ]
   const paymentNumber = currentPaymentNumber()
   const markerPeriod = periods[paymentNumber] || periods.at(-1)
+  const yearLabels = calendarYearTickIndices(periods)
 
   chart.setOption(
     {
@@ -106,9 +108,11 @@ function renderChart() {
         axisLabel: {
           color: '#64748b',
           fontSize: 11,
+          interval: (index) => yearLabels.has(index),
           hideOverlap: true,
           margin: 12,
-          formatter: (value, index) => yearLabel(value, index, periods.length),
+          showMaxLabel: true,
+          formatter: (_value, index) => yearLabels.get(index) || '',
         },
       },
       yAxis: {
@@ -177,12 +181,6 @@ function formatTooltip(points) {
       return `${marker}${seriesName}: <strong>${formatCurrency(value)}</strong>`
     })
     .join('<br/>')}`
-}
-
-function yearLabel(value, index, length) {
-  const year = String(value || '').slice(0, 4)
-  const month = String(value || '').slice(5, 7)
-  return index === 0 || index === length - 1 || month === '01' ? year : ''
 }
 
 function formatMonthYear(value) {

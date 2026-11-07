@@ -18,21 +18,11 @@
         />
       </section>
       <template v-else-if="category && categoryConfig?.enabled">
-        <header class="category-header">
-          <div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('income.backToIncome')"
-              :to="incomeRoute"
-              class="back-button"
-            />
-            <h1>{{ t(category.nameKey) }}</h1>
-          </div>
-        </header>
+        <AppPageHeader
+          :title="t(category.nameKey)"
+          :back-label="t('income.backToIncome')"
+          :back-to="incomeRoute"
+        />
         <section class="summary-card">
           <span class="summary-icon"><q-icon :name="category.icon" /></span>
           <div class="summary-copy">
@@ -169,10 +159,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IncomeForm from '@/components/income/IncomeForm.vue'
 import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { getIncomeCategory } from '@/config/income-categories'
 import {
   currentFinancialYear,
-  financialYearCategoryValue,
+  financialYearFlowCategoryValue,
   financialYearIncomeModelItemValue,
 } from '@/domain/financial/financial-year'
 import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
@@ -267,7 +258,7 @@ const scopedIncome = computed(() =>
     .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
 )
 const categoryTotal = computed(() =>
-  financialYearCategoryValue(
+  financialYearFlowCategoryValue(
     financialYear.value,
     'income',
     categoryId.value,

@@ -1,12 +1,7 @@
 <template>
   <q-page class="workspace-dashboard-page">
     <main class="dashboard-shell">
-      <header class="dashboard-header">
-        <div class="dashboard-heading">
-          <h1>{{ greeting }}</h1>
-          <p>{{ t('dashboard.snapshotSubtitle') }}</p>
-        </div>
-      </header>
+      <AppPageHeader :title="greeting" :subtitle="t('dashboard.snapshotSubtitle')" size="hero" />
 
       <FinancialSetupCard v-if="showSetup" :items="setupItems" class="setup-guide" />
 
@@ -48,18 +43,23 @@ import FinancialSetupCard from '@/components/dashboard/FinancialSetupCard.vue'
 import FinancialPositionCard from '@/components/dashboard/FinancialPositionCard.vue'
 import PlanSummaryCard from '@/components/dashboard/PlanSummaryCard.vue'
 import QuickLinksSection from '@/components/dashboard/QuickLinksSection.vue'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { assetCategories } from '@/config/asset-categories'
 import { expenseCategories } from '@/config/expense-categories'
 import { incomeCategories } from '@/config/income-categories'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import { liabilityCategories } from '@/config/liability-categories'
+import {
+  extractPositionLiabilities,
+  modeledLiabilitiesForPositions,
+} from '@/domain/financial/calculation-context'
 import { calculateDebtPayoffImpact } from '@/domain/financial/debt-payoff'
 import { buildNetWorthSeries, withCurrentPosition } from '@/domain/financial/history'
 import {
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
+  financialYearFlowValue,
   financialYearMonthValue,
-  financialYearValue,
 } from '@/domain/financial/financial-year'
 import {
   latestPositionMonth,
@@ -134,7 +134,7 @@ const dashboardData = computed(() => {
     ? financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value)
     : 0
   const annualCostOfLife = financialYear.value
-    ? financialYearValue(financialYear.value, 'expenses', selectedMemberId.value)
+    ? financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value)
     : 0
   const savingsCapacity = Math.round((income - annualCostOfLife + Number.EPSILON) * 100) / 100
 
@@ -194,15 +194,23 @@ const planData = computed(() => {
   }
 
   const positionMonth = latestPositionMonth(financialYear.value, currentMonth.value)
-  const liabilities = extractLiabilities(financialYear.value, positionMonth, selectedMemberId.value)
+  const liabilities = extractPositionLiabilities(
+    financialYear.value,
+    positionMonth,
+    selectedMemberId.value,
+    liabilityCategoryName,
+  )
   const selectedDebt =
     liabilities.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
     liabilities.find(({ categoryId }) => categoryId === 'mortgage') ||
     liabilities[0] ||
     null
   const selectedDebtModel = selectedDebt
-    ? liabilitiesStore.itemsForCategory('mortgage').find(({ id }) => id === selectedDebt.id) ||
-      selectedDebt
+    ? modeledLiabilitiesForPositions(
+        [selectedDebt],
+        liabilitiesStore.itemsForCategory('mortgage'),
+        selectedMemberId.value,
+      )[0] || selectedDebt
     : null
   const debtAvailable = Boolean(selectedDebt)
   const allocation = normalizeStrategyForOptions(activeScenario.value.allocation, {
@@ -234,7 +242,7 @@ const planData = computed(() => {
       {
         id: 'cash',
         label: t('whatIf.cash.title'),
-        result: strategyCashOutcome(projection.strategy, allocation.cash),
+        result: strategyCashOutcome(projection.strategy, activeScenario.value.horizonYears),
       },
       {
         id: 'invest',
@@ -500,16 +508,11 @@ async function loadDashboard(id) {
   if (id === workspaceId.value) setupLoading.value = false
 }
 
-function strategyCashOutcome(strategy, cashAllocation) {
-  if (cashAllocation <= 0) return t('plan.outcomes.notIncluded')
-  if (strategy.cashTargetMonth === 0)
-    return t('plan.outcomes.fundReady', { amount: formatCurrency(strategy.cashTarget) })
-  if (strategy.cashTargetMonth != null)
-    return t('plan.outcomes.fundInMonths', {
-      amount: formatCurrency(strategy.cashTarget),
-      months: strategy.cashTargetMonth,
-    })
-  return t('plan.outcomes.fundTarget', { amount: formatCurrency(strategy.cashTarget) })
+function strategyCashOutcome(strategy, horizonYears) {
+  return t('plan.outcomes.inYears', {
+    amount: formatCurrency(strategy.cash),
+    years: horizonYears,
+  })
 }
 
 function debtOutcome(payoff, hasDebt, debtName) {
@@ -537,36 +540,8 @@ function formatMonthYear(value) {
   }).format(new Date(`${value}T00:00:00Z`))
 }
 
-function extractLiabilities(document, month, memberId) {
-  const categories = document?.months?.[month]?.liabilities?.categories || {}
-  return Object.entries(categories)
-    .flatMap(([categoryId, category]) =>
-      Object.entries(category.subcategories || {}).flatMap(([subcategoryId, subcategory]) => {
-        const items = Object.entries(subcategory.items || {})
-        if (!items.length)
-          return [
-            {
-              id: subcategoryId,
-              categoryId,
-              name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-              balance: scopedValue(subcategory, memberId),
-            },
-          ]
-        return items.map(([id, item]) => ({
-          id,
-          categoryId,
-          name: t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title'),
-          balance: scopedValue(item, memberId),
-        }))
-      }),
-    )
-    .filter(({ balance }) => balance > 0)
-    .sort((left, right) => right.balance - left.balance)
-}
-
-function scopedValue(item, memberId) {
-  if (memberId !== 'all') return Number(item?.memberValues?.[memberId] || 0)
-  return Number(item?.total || 0)
+function liabilityCategoryName(categoryId) {
+  return t(getLiabilityCategory(categoryId)?.nameKey || 'whatIf.debt.title')
 }
 </script>
 

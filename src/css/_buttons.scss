@@ -1,0 +1,53 @@
+// Shared button system. Quasar props define semantics; this layer keeps every
+// action visually consistent without component-specific height/radius rules.
+.q-btn {
+  font-weight: var(--button-font-weight);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.q-btn:not(.q-btn--round) {
+  min-height: var(--button-height-md);
+  padding-inline: var(--button-padding-inline);
+  border-radius: var(--radius-button) !important;
+}
+
+.q-btn.q-btn--dense:not(.q-btn--round) {
+  min-height: var(--button-height-sm);
+  padding-inline: 0.75rem;
+}
+
+.q-btn.q-btn--round {
+  min-width: var(--button-height-md);
+  min-height: var(--button-height-md);
+}
+
+.q-btn.q-btn--round.q-btn--dense {
+  min-width: var(--button-height-sm);
+  min-height: var(--button-height-sm);
+}
+
+.q-btn.q-btn--outline {
+  background: var(--color-surface);
+}
+
+.q-btn:focus-visible {
+  outline: 3px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+// Sizing utilities are intentionally semantic and reusable. Components own
+// placement; the button system owns the control itself.
+.app-btn--wide {
+  min-width: 10rem;
+}
+
+.app-btn--large {
+  min-height: var(--button-height-lg) !important;
+}
+
+@media (max-width: 599px) {
+  .app-btn--mobile-block {
+    width: 100%;
+  }
+}

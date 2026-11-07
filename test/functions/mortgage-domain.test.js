@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import mortgageDomain from '../../functions/domain/mortgage.js'
 
-const { effectiveMortgageBalance } = mortgageDomain
+const { effectiveMortgageBalance, isMortgagePaymentDueInMonth } = mortgageDomain
 
 const mortgage = {
   schemaVersion: 2,
@@ -40,5 +40,19 @@ describe('modeled mortgage balance', () => {
         '2026-03-15',
       ),
     ).toBe(0)
+  })
+
+  it('identifies contractual payment months before and after payoff', () => {
+    const shortMortgage = {
+      ...mortgage,
+      annualInterestRate: 0,
+      monthlyPayment: 10_000,
+      startDate: '2026-01-01',
+      balanceAnchor: { amount: 10_000, date: '2026-01-01' },
+    }
+
+    expect(isMortgagePaymentDueInMonth(shortMortgage, 2026, 0)).toBe(false)
+    expect(isMortgagePaymentDueInMonth(shortMortgage, 2026, 1)).toBe(true)
+    expect(isMortgagePaymentDueInMonth(shortMortgage, 2026, 2)).toBe(false)
   })
 })

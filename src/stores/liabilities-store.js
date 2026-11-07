@@ -39,6 +39,7 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
     loading.value = true
     error.value = null
+    loadedWorkspaceId.value = null
     config.value = null
     liabilitiesByCategory.value = {}
     loadedCategoryIds.value = new Set()
@@ -55,7 +56,6 @@ export const useLiabilitiesStore = defineStore('liabilities', () => {
     } catch (loadError) {
       if (requestId !== configRequestId) return
       error.value = loadError
-      loadedWorkspaceId.value = workspaceId
     } finally {
       if (requestId === configRequestId) loading.value = false
     }

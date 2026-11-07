@@ -37,6 +37,7 @@ export const useExpensesStore = defineStore('expenses', () => {
     if (!workspaceId || (!force && loadedWorkspaceId.value === workspaceId)) return
     loading.value = true
     error.value = null
+    loadedWorkspaceId.value = null
     config.value = null
     expensesByCategory.value = {}
     loadedCategoryIds.value = new Set()
@@ -53,7 +54,6 @@ export const useExpensesStore = defineStore('expenses', () => {
     } catch (loadError) {
       if (requestId !== configRequestId) return
       error.value = loadError
-      loadedWorkspaceId.value = workspaceId
     } finally {
       if (requestId === configRequestId) loading.value = false
     }

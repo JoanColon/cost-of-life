@@ -7,20 +7,22 @@
     />
 
     <main v-else class="workspace-hub">
-      <header class="hub-header">
-        <div>
-          <h1>{{ t('home.workspacesTitle') }}</h1>
-          <p>{{ t('home.workspacesDescription') }}</p>
-        </div>
-        <q-btn
-          unelevated
-          no-caps
-          color="primary"
-          icon="add"
-          :label="t('navigation.createWorkspace')"
-          :to="{ name: 'create-workspace' }"
-        />
-      </header>
+      <AppPageHeader
+        :title="t('home.workspacesTitle')"
+        :subtitle="t('home.workspacesDescription')"
+        size="hero"
+      >
+        <template #actions>
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            icon="add"
+            :label="t('navigation.createWorkspace')"
+            :to="{ name: 'create-workspace' }"
+          />
+        </template>
+      </AppPageHeader>
 
       <section class="workspace-grid" :aria-label="t('navigation.workspaces')">
         <article
@@ -175,6 +177,7 @@ import { computed, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import WorkspaceForm from '@/components/workspace/WorkspaceForm.vue'
 import { authUser } from '@/services/auth'
 import { createWorkspaceInvite } from '@/services/firebase/workspace.service'

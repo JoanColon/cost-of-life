@@ -141,8 +141,13 @@ export async function syncMilestoneAchievements(
 }
 
 export function confirmationIsDue(qualifiedAt, now = Date.now()) {
+  const dueAt = milestoneConfirmationDueAt(qualifiedAt)
+  return dueAt !== null && now >= dueAt
+}
+
+export function milestoneConfirmationDueAt(qualifiedAt) {
   const qualifiedAtMs = timestampMilliseconds(qualifiedAt)
-  return qualifiedAtMs !== null && now - qualifiedAtMs >= MILESTONE_CONFIRMATION_DELAY_MS
+  return qualifiedAtMs === null ? null : qualifiedAtMs + MILESTONE_CONFIRMATION_DELAY_MS
 }
 
 function timestampMilliseconds(value) {
