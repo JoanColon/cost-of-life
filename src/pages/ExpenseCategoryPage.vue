@@ -424,7 +424,7 @@ async function persist(operation) {
 }
 
 .category-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 
 .state {

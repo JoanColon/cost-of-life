@@ -1,24 +1,5 @@
 <template>
   <section class="review-panel">
-    <div class="review-toolbar">
-      <q-input
-        v-model="period"
-        outlined
-        dense
-        type="month"
-        :label="t('expenseTracker.review.month')"
-        class="month-input"
-      />
-      <div class="month-total">
-        <span>{{ t('expenseTracker.review.trackedTotal') }}</span>
-        <strong>{{ formatCurrency(trackedTotal) }}</strong>
-      </div>
-      <div class="month-total">
-        <span>{{ t('expenseTracker.review.modelTotal') }}</span>
-        <strong>{{ formatCurrency(modelTotal) }}</strong>
-      </div>
-    </div>
-
     <div class="review-groups">
       <section
         v-for="group in groups"
@@ -69,11 +50,8 @@
 import { useI18n } from 'vue-i18n'
 import { formatCurrency } from '@/utils/formatters'
 
-const period = defineModel({ type: String, required: true })
 defineProps({
   groups: { type: Array, required: true },
-  trackedTotal: { type: Number, default: 0 },
-  modelTotal: { type: Number, default: 0 },
   canUseAllTracked: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
 })
@@ -102,43 +80,7 @@ function groupModelTotal(group) {
 @include tracking.category-colors;
 
 .review-panel {
-  margin-top: 2rem;
-}
-
-.review-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 5.8rem;
-  margin-bottom: 1.35rem;
-  padding: 1rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px rgb(34 55 78 / 4%);
-}
-
-.month-input {
-  width: 15rem;
-  margin-right: auto;
-}
-
-.month-total {
-  display: grid;
-  min-width: 8.5rem;
-  gap: 0.15rem;
-}
-
-.month-total span {
-  color: var(--color-copy);
-  font-size: 0.75rem;
-}
-
-.month-total strong {
-  color: var(--color-ink);
-  font-size: 1.65rem;
-  line-height: 1;
+  margin-top: 1rem;
 }
 
 .review-groups {
@@ -257,29 +199,6 @@ function groupModelTotal(group) {
 @media (max-width: 599px) {
   .review-panel {
     margin-top: 0.85rem;
-  }
-
-  .review-toolbar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.65rem;
-    min-height: 0;
-    margin-bottom: 0.75rem;
-    padding: 0.7rem;
-  }
-
-  .month-input {
-    width: auto;
-    margin-right: 0;
-    grid-column: 1 / -1;
-  }
-
-  .month-total {
-    min-width: 0;
-  }
-
-  .month-total strong {
-    font-size: 1.3rem;
   }
 
   .review-actions {

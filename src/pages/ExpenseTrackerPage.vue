@@ -43,24 +43,66 @@
           :context="trackerContext"
         />
 
-        <ExpenseTrackingPanel
-          v-if="tab === 'track'"
-          :categories="enabledCategories"
-          @add="openAdd"
-          @manage="manageDialog = true"
-        />
+        <template v-if="tab === 'track'">
+          <section class="monthly-overview">
+            <nav class="track-mode-nav" :aria-label="t('expenseTracker.modes.label')">
+              <button
+                type="button"
+                :class="{ active: trackMode === 'record' }"
+                :aria-pressed="trackMode === 'record'"
+                @click="setTrackMode('record')"
+              >
+                <q-icon name="edit" />
+                {{ t('expenseTracker.modes.record') }}
+              </button>
+              <button
+                type="button"
+                :class="{ active: trackMode === 'reconcile' }"
+                :aria-pressed="trackMode === 'reconcile'"
+                @click="setTrackMode('reconcile')"
+              >
+                <q-icon name="bar_chart" />
+                {{ t('expenseTracker.modes.reconcile') }}
+              </button>
+            </nav>
+            <span class="monthly-spacer" aria-hidden="true" />
+            <ExpenseMonthMetric
+              v-model="period"
+              class="month-metric"
+              :label="t('expenseTracker.review.month')"
+            />
+            <div class="monthly-metric">
+              <span>{{ t('expenseTracker.summary.spent') }}</span>
+              <strong>{{ formatCurrency(monthlySpent) }}</strong>
+            </div>
+            <div class="monthly-metric">
+              <span>{{ t('expenseTracker.summary.planned') }}</span>
+              <strong>{{ formatCurrency(reviewModelTotal) }}</strong>
+            </div>
+            <div class="monthly-metric" :class="{ over: monthlyRemaining < 0 }">
+              <span>{{ t('expenseTracker.summary.remaining') }}</span>
+              <strong>{{ formatCurrency(monthlyRemaining) }}</strong>
+            </div>
+          </section>
 
-        <ExpenseReviewPanel
-          v-else
-          v-model="period"
-          :groups="reviewGroups"
-          :tracked-total="trackingStore.month?.total || 0"
-          :model-total="reviewModelTotal"
-          :can-use-all-tracked="Boolean(categoriesWithTrackedItems.length)"
-          :saving="decisionSaving"
-          @view-group="openReviewGroup"
-          @use-all-tracked="requestApplyAllTracked"
-        />
+          <ExpenseTrackingPanel
+            v-if="trackMode === 'record'"
+            :categories="enabledCategories"
+            @add="openAdd"
+            @manage="manageDialog = true"
+          />
+
+          <ExpenseReviewPanel
+            v-else
+            :groups="reviewGroups"
+            :can-use-all-tracked="Boolean(categoriesWithTrackedItems.length)"
+            :saving="decisionSaving"
+            @view-group="openReviewGroup"
+            @use-all-tracked="requestApplyAllTracked"
+          />
+        </template>
+
+        <ExpenseAnalyticsPanel v-else v-model="period" :categories="analyticsCategories" />
       </template>
     </main>
 
@@ -382,20 +424,27 @@
 import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import ExpenseAnalyticsPanel from '@/components/expenses/ExpenseAnalyticsPanel.vue'
+import ExpenseMonthMetric from '@/components/expenses/ExpenseMonthMetric.vue'
 import ExpenseTrackingCategorySetup from '@/components/expenses/ExpenseTrackingCategorySetup.vue'
 import ExpenseTrackingEntryDialog from '@/components/expenses/ExpenseTrackingEntryDialog.vue'
 import ExpenseTrackingPanel from '@/components/expenses/ExpenseTrackingPanel.vue'
 import ExpenseReviewPanel from '@/components/expenses/ExpenseReviewPanel.vue'
 import ExpensesSectionNav from '@/components/expenses/ExpensesSectionNav.vue'
 import OwnershipAvatar from '@/components/financial/OwnershipAvatar.vue'
+import { expenseCategories } from '@/config/expense-categories'
 import {
   expenseTrackingCategories,
   groupedExpenseTrackingCategories,
   reviewExpenseTrackingCategories,
 } from '@/config/expense-tracking-categories'
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
-import { FINANCIAL_YEAR_TIME_ZONE } from '@/domain/financial/financial-year'
+import {
+  FINANCIAL_YEAR_TIME_ZONE,
+  financialYearMonthCategoryValue,
+  financialYearMonthSubcategoryValue,
+} from '@/domain/financial/financial-year'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
@@ -408,11 +457,13 @@ import { getWorkspaceMembers } from '@/utils/workspace-members'
 const $q = useQuasar()
 const { t, locale } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const trackingStore = useExpenseTrackingStore()
 const expensesStore = useExpensesStore()
 const financialYearsStore = useFinancialYearsStore()
 const workspaceStore = useWorkspaceStore()
 const tab = computed(() => (route.query.view === 'review' ? 'review' : 'track'))
+const trackMode = computed(() => (route.query.mode === 'reconcile' ? 'reconcile' : 'record'))
 const period = ref(currentPeriod())
 const pageError = ref(null)
 const preparing = ref(false)
@@ -436,11 +487,7 @@ const workspace = computed(
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map(({ id }) => id))
 const trackerWorkspaceName = computed(() => workspace.value?.name || t('navigation.workspaces'))
-const trackerContext = computed(() =>
-  periodLabel.value
-    ? `${periodLabel.value} · ${trackerWorkspaceName.value}`
-    : trackerWorkspaceName.value,
-)
+const trackerContext = computed(() => trackerWorkspaceName.value)
 const allExpenseItems = computed(() =>
   expensesStore.enabledCategories
     .flatMap((categoryId) => expensesStore.itemsForCategory(categoryId))
@@ -518,6 +565,51 @@ const reviewModelTotal = computed(() =>
     0,
   ),
 )
+const monthlySpent = computed(() => Number(trackingStore.month?.total || 0))
+const monthlyRemaining = computed(() => reviewModelTotal.value - monthlySpent.value)
+const analyticsCategories = computed(() => {
+  const month = period.value.slice(5, 7)
+  const categories = expenseCategories
+    .map((category) => {
+      const storedSubcategories =
+        financialYear.value?.months?.[month]?.expenses?.categories?.[category.id]?.subcategories ||
+        {}
+      const subcategoryIds = new Set([
+        ...category.suggestions.map(({ id }) => id),
+        ...Object.keys(storedSubcategories),
+      ])
+      const subcategories = [...subcategoryIds]
+        .map((subcategoryId) => {
+          const definition = category.suggestions.find(({ id }) => id === subcategoryId)
+          return {
+            id: subcategoryId,
+            name: definition ? t(definition.nameKey) : subcategoryId.replaceAll('_', ' '),
+            value: financialYearMonthSubcategoryValue(
+              financialYear.value,
+              month,
+              'expenses',
+              category.id,
+              subcategoryId,
+            ),
+          }
+        })
+        .filter(({ value }) => value > 0)
+        .sort((a, b) => b.value - a.value)
+      return {
+        id: category.id,
+        name: t(category.nameKey),
+        value: financialYearMonthCategoryValue(financialYear.value, month, 'expenses', category.id),
+        subcategories,
+      }
+    })
+    .filter(({ value }) => value > 0)
+    .sort((a, b) => b.value - a.value)
+  const total = categories.reduce((sum, category) => sum + category.value, 0)
+  return categories.map((category) => ({
+    ...category,
+    percentage: total > 0 ? (category.value / total) * 100 : 0,
+  }))
+})
 const canMutateActiveSubcategory = computed(() => isTrackingEnabled(activeSubcategory.value?.id))
 const categoriesWithTrackedItems = computed(() =>
   enabledCategories.value.filter(({ id }) => trackingStore.itemsFor(id).length),
@@ -553,9 +645,15 @@ watch(
 watch(activeWorkspaceId, () => {
   period.value = currentPeriod()
 })
-watch(tab, (value) => {
-  if (value === 'track' && period.value !== currentPeriod()) period.value = currentPeriod()
-})
+
+function setTrackMode(mode) {
+  if (mode === trackMode.value) return
+  router.replace({
+    name: 'expense-tracker',
+    params: { workspaceId: activeWorkspaceId.value },
+    query: { view: 'track', mode },
+  })
+}
 
 async function loadPage(force = false) {
   const requestId = ++loadRequestId
@@ -833,7 +931,7 @@ function currentPeriod() {
 }
 
 .tracker-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 
 .tracker-header,
@@ -868,6 +966,85 @@ h1 {
 
 .state p {
   color: var(--color-copy);
+}
+
+.track-mode-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  width: 17.4rem;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgb(34 55 78 / 4%);
+}
+
+.track-mode-nav button {
+  @include segmented-button;
+  gap: 0.45rem;
+  min-height: 2rem;
+  color: var(--color-copy);
+  font-size: 0.82rem;
+}
+
+.track-mode-nav button.active {
+  background: var(--color-ink);
+  color: var(--color-inverse);
+  box-shadow: var(--shadow-control);
+}
+
+.track-mode-nav button:focus-visible {
+  @include focus-ring;
+}
+
+.monthly-overview {
+  display: grid;
+  grid-template-columns: 17.4rem minmax(1rem, 1fr) minmax(13rem, auto) repeat(
+      3,
+      minmax(7rem, auto)
+    );
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(34 55 78 / 4%);
+}
+
+.monthly-spacer {
+  min-width: 0;
+}
+
+.monthly-metric {
+  display: grid;
+  min-width: 7.5rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--color-line);
+}
+
+.monthly-metric span {
+  color: var(--color-copy);
+  font-size: 0.72rem;
+}
+
+.monthly-metric strong {
+  margin-top: 0.1rem;
+  color: var(--color-ink);
+  font-size: 1.25rem;
+  line-height: 1.1;
+}
+
+.monthly-metric:last-child strong {
+  color: var(--color-success);
+}
+
+.monthly-metric.over strong {
+  color: var(--color-danger);
 }
 
 .review-dialog-card {
@@ -1365,6 +1542,25 @@ h1 {
 }
 
 @media (max-width: 899px) {
+  .monthly-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .track-mode-nav {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .monthly-spacer {
+    display: none;
+  }
+
+  .monthly-metric {
+    grid-column: auto;
+    min-width: 0;
+  }
+
   .review-category-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.65rem 1rem;
@@ -1396,6 +1592,43 @@ h1 {
     padding-right: max(0.75rem, env(safe-area-inset-right));
     padding-bottom: calc(var(--mobile-nav-height) + 1.5rem);
     padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .track-mode-nav {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    margin: 0 0 0.7rem;
+  }
+
+  .monthly-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 0;
+    margin-top: 0.75rem;
+    padding: 0.65rem;
+  }
+
+  .monthly-metric {
+    grid-column: auto;
+    min-width: 0;
+    padding: 0 0.45rem;
+    text-align: center;
+  }
+
+  .month-metric,
+  .monthly-metric:nth-last-child(2) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .monthly-metric strong {
+    overflow: hidden;
+    font-size: 1rem;
+    text-overflow: ellipsis;
+  }
+
+  .monthly-metric span {
+    font-size: 0.65rem;
   }
 
   .tracker-header {

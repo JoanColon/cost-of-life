@@ -587,7 +587,7 @@ h1 {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  grid-template-columns: minmax(0, 1.75fr) minmax(20rem, 1fr);
   gap: 1.15rem;
 }
 

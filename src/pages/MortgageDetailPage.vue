@@ -828,8 +828,7 @@ function roundMoney(value) {
 }
 
 .mortgage-shell {
-  @include financial-shell;
-  max-width: 70rem;
+  @include financial-shell(wide);
 }
 
 .page-state {

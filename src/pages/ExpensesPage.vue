@@ -37,7 +37,7 @@
 
         <section class="total-card">
           <div class="total-copy">
-            <span>{{ t('expenses.totalCostOfLife') }}</span>
+            <span>{{ totalLabel }}</span>
             <strong>{{ formatCurrency(displayedTotal) }}</strong>
             <small>{{ displayedPeriodLabel }} · {{ scopeLabel }}</small>
           </div>
@@ -297,6 +297,9 @@ const pageLoading = computed(
 )
 const displayedTotal = computed(() =>
   period.value === 'annual' ? totals.value.annualCostOfLife : totals.value.monthlyCostOfLife,
+)
+const totalLabel = computed(() =>
+  period.value === 'annual' ? t('expenses.annualExpenses') : t('expenses.averageMonthlyExpenses'),
 )
 const displayedPeriodLabel = computed(() =>
   period.value === 'annual'

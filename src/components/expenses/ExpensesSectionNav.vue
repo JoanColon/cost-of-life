@@ -73,7 +73,7 @@ const items = computed(() => [
     to: {
       name: 'expense-tracker',
       params: { workspaceId: props.workspaceId },
-      query: { view: 'track' },
+      query: { view: 'track', mode: 'record' },
     },
   },
   {

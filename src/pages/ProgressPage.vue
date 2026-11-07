@@ -279,7 +279,7 @@ function signedPercentage(value) {
 }
 
 .progress-shell {
-  @include financial-shell(analytical);
+  @include financial-shell(wide);
 }
 
 .page-header {

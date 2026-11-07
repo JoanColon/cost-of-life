@@ -810,8 +810,7 @@ function tableColumn(name, label, align, width, sortField = null) {
   @include financial-page;
 }
 .portfolio-shell {
-  @include financial-shell;
-  max-width: 76rem;
+  @include financial-shell(wide);
 }
 .page-state {
   display: grid;

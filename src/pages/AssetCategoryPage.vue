@@ -420,7 +420,7 @@ async function persist(action) {
   @include financial-page;
 }
 .category-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 .loading-state,
 .error-state {

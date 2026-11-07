@@ -475,7 +475,7 @@ function localToday() {
   @include financial-page;
 }
 .model-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
   display: grid;
   gap: 1.2rem;
 }

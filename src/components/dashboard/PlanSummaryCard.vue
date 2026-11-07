@@ -195,6 +195,7 @@ const { t } = useI18n()
 
   .strategy-outcomes li > span {
     gap: 0.38rem;
+    min-width: 0;
   }
 
   .strategy-outcomes i {
@@ -214,6 +215,7 @@ const { t } = useI18n()
   }
 
   .strategy-outcomes strong {
+    min-width: 0;
     color: var(--color-ink);
     font-size: 0.74rem;
     font-weight: 750;

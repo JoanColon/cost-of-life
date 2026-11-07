@@ -514,7 +514,7 @@ function liabilityCategoryName(categoryId) {
   @include financial-page;
 }
 .plan-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 .page-header {
   @include financial-header;

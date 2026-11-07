@@ -1489,6 +1489,8 @@ export default {
   expenses: {
     title: 'Expenses',
     totalCostOfLife: 'Your Cost of Life',
+    annualExpenses: 'Annual expenses',
+    averageMonthlyExpenses: 'Average monthly expenses',
     annualCategoryCost: 'Annual category cost',
     monthlyCategoryCost: 'Monthly category cost',
     enabledCategories: 'Enabled expense categories',
@@ -1506,9 +1508,8 @@ export default {
         title: 'How Expenses works',
         plan: 'Build your normal cost of life. Add your fixed, periodic and variable expenses.',
         track:
-          "Choose which discretionary expenses you want to track more closely. Record your actual spending for those selected expenses throughout the month. You don't need to track everything — only what is useful to you.",
-        review:
-          'Compare what you actually spent with what you planned. At the end of the month, use your actual spending to update planned expenses when it better reflects your real cost of life.',
+          'Record actual spending throughout the month, then reconcile it with your plan when you are ready.',
+        review: 'See how your actual spending is distributed across categories for any month.',
       },
     },
     itemCount: '{count} items',
@@ -1696,6 +1697,32 @@ export default {
     tabs: {
       track: 'Track',
       review: 'Review',
+    },
+    modes: {
+      label: 'Tracking view',
+      record: 'Record',
+      reconcile: 'Reconcile',
+    },
+    summary: {
+      spent: 'Spent',
+      planned: 'Planned',
+      remaining: 'Remaining',
+    },
+    analytics: {
+      title: 'Spending by category',
+      infoAction: 'About the monthly spending data',
+      infoTitle: 'How monthly spending is calculated',
+      infoDescription:
+        'This view includes all monthly expenses defined in Plan. It uses reconciled Track amounts when available; otherwise, it shows the planned amounts.',
+      spent: 'Expenses',
+      totalSpent: 'Total spent',
+      showMoreCategories: 'Show {count} more categories',
+      showFewerCategories: 'Show fewer categories',
+      ariaLabel: 'Donut chart showing monthly expenses by category',
+      emptyTitle: 'No expenses this month',
+      emptyDescription: 'There are no planned or reconciled expenses for this month.',
+      breakdownTitle: '{category} by subcategory',
+      breakdownDescription: 'Select another category above to change this breakdown.',
     },
     manage: {
       action: 'Manage categories',

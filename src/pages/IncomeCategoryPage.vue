@@ -401,7 +401,7 @@ async function persist(action) {
   @include financial-page;
 }
 .category-shell {
-  @include financial-shell;
+  @include financial-shell(wide);
 }
 .state {
   display: grid;
