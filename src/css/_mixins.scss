@@ -19,7 +19,7 @@
 @mixin interactive-button-surface($radius: var(--radius-button)) {
   @include button-reset;
   border: 1px solid var(--color-line);
-  border-radius: $radius !important;
+  border-radius: $radius;
   background: var(--color-surface);
   transition:
     border-color 150ms ease,
@@ -39,7 +39,7 @@
   align-items: center;
   justify-content: center;
   min-height: var(--button-height-sm);
-  border-radius: 999px !important;
+  border-radius: 999px;
   font-weight: var(--button-font-weight);
   text-align: center;
 }
@@ -167,7 +167,7 @@
     min-width: 5.4rem;
     padding: 0.45rem 0.8rem;
     border: 0;
-    border-radius: 999px !important;
+    border-radius: 999px;
     background: transparent;
     color: var(--color-inverse-muted);
     font-size: 0.8rem;
@@ -515,4 +515,499 @@
 @mixin focus-ring {
   outline: 3px solid var(--color-primary-focus);
   outline-offset: 3px;
+}
+
+@mixin category-setup(
+  $choice-min-height: 5.5rem,
+  $choice-padding: 0.9rem 1rem,
+  $dialog: false,
+  $mobile-choice-min-height: null
+) {
+  .setup-panel {
+    width: 100%;
+    max-width: 64rem;
+    margin: 0 auto;
+  }
+
+  @if $dialog {
+    .setup-panel--dialog {
+      display: flex;
+      flex-direction: column;
+      max-width: none;
+      max-height: calc(100dvh - 2rem);
+    }
+
+    .setup-panel--dialog .setup-copy {
+      flex: 0 0 auto;
+      max-width: none;
+      padding: 1.5rem 1.75rem 0.85rem;
+    }
+
+    .setup-panel--dialog .setup-copy h1 {
+      padding-right: 2.75rem;
+      font-size: 2rem;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+    }
+
+    .setup-panel--dialog .setup-copy p {
+      margin-top: 0.5rem;
+    }
+
+    .setup-panel--dialog .category-grid {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-top: 0;
+      padding: 0.75rem 1.75rem 1.5rem;
+      overflow-y: auto;
+    }
+
+    .setup-panel--dialog .setup-actions {
+      flex: 0 0 auto;
+      min-height: 4.75rem;
+      margin-top: 0;
+      padding: 0.85rem 1.75rem;
+      border-top: 1px solid var(--color-line);
+      background: var(--color-surface);
+    }
+  }
+
+  .setup-copy {
+    max-width: 40rem;
+  }
+
+  h1 {
+    margin: 0;
+    color: var(--color-ink);
+    font-size: clamp(2.25rem, 5vw, 4rem);
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+
+  p {
+    margin: 0.8rem 0 0;
+    color: var(--color-copy);
+  }
+
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .category-choice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    min-height: $choice-min-height;
+    padding: $choice-padding;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    text-align: left;
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+  }
+
+  .category-choice.selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 38px var(--color-primary-glow);
+  }
+
+  .category-choice:focus-visible {
+    @include focus-ring;
+  }
+
+  .category-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    font-size: 1.4rem;
+  }
+
+  .category-choice strong,
+  .category-choice small {
+    display: block;
+  }
+
+  .category-choice small {
+    margin-top: 0.25rem;
+    color: var(--color-copy);
+    font-size: 0.8rem;
+    line-height: 1.35;
+  }
+
+  .selection-mark {
+    color: var(--color-primary);
+    font-size: 1.4rem;
+  }
+
+  .setup-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  @media (max-width: 699px) {
+    .category-grid {
+      grid-template-columns: 1fr;
+    }
+
+    @if $mobile-choice-min-height != null {
+      .category-choice {
+        min-height: $mobile-choice-min-height;
+      }
+    }
+
+    .setup-actions,
+    .setup-actions .q-btn {
+      width: 100%;
+    }
+
+    @if $dialog {
+      .setup-panel--dialog {
+        max-height: 100dvh;
+      }
+
+      .setup-panel--dialog .setup-copy {
+        padding: 1.15rem 1rem 0.65rem;
+      }
+
+      .setup-panel--dialog .setup-copy h1 {
+        font-size: 1.55rem;
+      }
+
+      .setup-panel--dialog .category-grid {
+        padding: 0.6rem 1rem 1rem;
+      }
+
+      .setup-panel--dialog .setup-actions {
+        padding: 0.65rem 1rem;
+      }
+    }
+  }
+}
+
+@mixin position-overview-list {
+  .loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--color-copy);
+  }
+
+  .error-state {
+    display: grid;
+    justify-items: center;
+    place-content: center;
+    text-align: center;
+  }
+
+  .error-state > .q-icon {
+    color: var(--color-copy);
+    font-size: 3rem;
+  }
+
+  .total-card {
+    @include financial-total-card;
+  }
+
+  .total-card span,
+  .total-card small {
+    @include financial-total-secondary;
+  }
+
+  .total-card strong {
+    @include financial-total-value;
+  }
+
+  .total-card small {
+    @include financial-total-meta;
+  }
+
+  .category-list {
+    @include dashboard-card;
+    margin-top: 1.25rem;
+    overflow: hidden;
+  }
+
+  .category-row {
+    display: grid;
+    grid-template-columns: minmax(14rem, 1fr) auto auto auto;
+    align-items: center;
+    gap: 1rem;
+    min-height: 5.6rem;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+
+  .category-row:last-child {
+    border-bottom: 0;
+  }
+
+  .category-main {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+    min-height: 5.6rem;
+    padding: 1rem 0 1rem 1.25rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .category-main:focus-visible,
+  .category-link:focus-visible {
+    @include focus-ring;
+  }
+
+  .category-icon {
+    display: grid;
+    place-items: center;
+    width: 2.9rem;
+    height: 2.9rem;
+    border-radius: 50%;
+    font-size: 1.3rem;
+  }
+
+  .category-copy strong,
+  .category-copy small {
+    display: block;
+  }
+
+  .category-copy small {
+    margin-top: 0.25rem;
+    color: var(--color-copy);
+  }
+
+  .category-link {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    min-height: 5.6rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .chevron {
+    color: var(--color-copy);
+    font-size: 1.25rem;
+  }
+
+  .edit-categories {
+    margin-top: 1rem;
+  }
+
+  .category-dialog {
+    @include financial-dialog-card(68rem);
+    max-width: none;
+  }
+
+  .confirm-card {
+    @include financial-simple-dialog(28rem);
+  }
+
+  .ownership-dialog-card {
+    @include financial-simple-dialog(34rem);
+  }
+
+  @media (max-width: 699px) {
+    .category-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      @include mobile-financial-row;
+    }
+
+    .category-main {
+      grid-column: 1;
+      min-height: 2.75rem;
+      padding: 0;
+      gap: 0.6rem;
+    }
+
+    .category-row :deep(.simple-value) {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .category-link {
+      display: none;
+    }
+
+    .category-row > .q-btn {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .category-icon {
+      width: 2.35rem;
+      height: 2.35rem;
+      font-size: 1.05rem;
+    }
+  }
+}
+
+@mixin position-category-detail {
+  .loading-state,
+  .error-state {
+    min-height: 20rem;
+  }
+
+  .loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--color-copy);
+  }
+
+  .error-state {
+    display: grid;
+    justify-items: center;
+    place-content: center;
+    text-align: center;
+  }
+
+  .error-state > .q-icon {
+    color: var(--color-copy);
+    font-size: 3rem;
+  }
+
+  .error-state h1 {
+    margin: 1rem 0 0;
+  }
+
+  .error-state p {
+    color: var(--color-copy);
+  }
+
+  .summary-card,
+  .position-list,
+  .empty-card {
+    @include dashboard-card;
+    margin-top: 1.25rem;
+  }
+
+  .summary-card {
+    @include financial-category-summary;
+  }
+
+  .summary-icon,
+  .position-icon,
+  .empty-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+  }
+
+  .summary-icon {
+    @include financial-summary-icon;
+  }
+
+  .position-list {
+    overflow: hidden;
+  }
+
+  .position-row {
+    display: grid;
+    grid-template-columns: minmax(14rem, 1fr) auto auto auto;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 5.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: background-color 160ms ease;
+  }
+
+  .position-row:hover {
+    background: var(--color-surface-soft);
+  }
+
+  .position-row:focus-visible {
+    position: relative;
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+  }
+
+  .position-main {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+  }
+
+  .position-icon {
+    @include financial-item-icon;
+  }
+
+  .position-copy {
+    min-width: 0;
+  }
+
+  .position-copy strong,
+  .position-copy small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .position-copy small {
+    margin-top: 0.2rem;
+    color: var(--color-copy);
+  }
+
+  .add-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    border: 0;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .add-row .q-icon {
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: var(--color-inverse);
+  }
+
+  .empty-card {
+    display: grid;
+    justify-items: center;
+    padding: 3rem 1.5rem;
+    text-align: center;
+  }
+
+  .empty-icon {
+    width: 4rem;
+    height: 4rem;
+    font-size: 1.8rem;
+  }
+
+  .empty-card p {
+    color: var(--color-copy);
+  }
+
+  .confirm-card {
+    @include financial-simple-dialog(28rem);
+  }
 }

@@ -76,90 +76,11 @@ function toggle(categoryId) {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
-.setup-panel {
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
-}
-.setup-copy {
-  max-width: 40rem;
-}
-h1 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: clamp(2.25rem, 5vw, 4rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
-}
-p {
-  margin: 0.8rem 0 0;
-  color: var(--color-copy);
-}
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 2rem;
-}
-.category-choice {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  min-height: 5.5rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  text-align: left;
-  box-shadow: var(--shadow-card);
-  cursor: pointer;
-}
-.category-choice.selected {
-  border-color: var(--color-primary);
-  box-shadow: 0 12px 38px var(--color-primary-glow);
-}
-.category-choice:focus-visible {
-  @include focus-ring;
-}
+
+@include category-setup;
+
 .category-icon {
-  display: grid;
-  place-items: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
   background: var(--color-green-soft);
   color: var(--color-success-dark);
-  font-size: 1.4rem;
-}
-.category-choice strong,
-.category-choice small {
-  display: block;
-}
-.category-choice small {
-  margin-top: 0.25rem;
-  color: var(--color-copy);
-  font-size: 0.8rem;
-  line-height: 1.35;
-}
-.selection-mark {
-  color: var(--color-primary);
-  font-size: 1.4rem;
-}
-.setup-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-@media (max-width: 699px) {
-  .category-grid {
-    grid-template-columns: 1fr;
-  }
-  .setup-actions,
-  .setup-actions .q-btn {
-    width: 100%;
-  }
 }
 </style>

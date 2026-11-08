@@ -138,7 +138,7 @@ const periodLabel = computed(() =>
     padding: 0.22rem;
     overflow: hidden;
     border: 1px solid var(--color-ink);
-    border-radius: 999px !important;
+    border-radius: 999px;
     background: var(--color-ink);
   }
 
@@ -146,7 +146,7 @@ const periodLabel = computed(() =>
     flex: 1;
     padding: 0.45rem 0.8rem;
     border: 0;
-    border-radius: 999px !important;
+    border-radius: 999px;
     background: transparent;
     color: var(--color-inverse-muted);
     font-size: 0.8rem;

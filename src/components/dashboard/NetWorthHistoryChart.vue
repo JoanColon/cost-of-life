@@ -26,6 +26,7 @@ import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { assetCategories } from '@/config/asset-categories'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { liabilityCategories } from '@/config/liability-categories'
 import { formatCurrency } from '@/utils/formatters'
 
@@ -49,8 +50,22 @@ const categorySeries = computed(() => [
 let chart = null
 let resizeObserver = null
 
-const ASSET_COLORS = ['#0c6b4d', '#0870d8', '#39a8a3', '#8754ed', '#4f7cac', '#73bfb8']
-const LIABILITY_COLORS = ['#c44750', '#e58b43', '#d95568', '#b66d57', '#a85567', '#ef6c57']
+const ASSET_COLORS = [
+  CHART_COLORS.successDark,
+  CHART_COLORS.primary,
+  '#39a8a3',
+  CHART_COLORS.purple,
+  '#4f7cac',
+  '#73bfb8',
+]
+const LIABILITY_COLORS = [
+  '#c44750',
+  CHART_COLORS.warning,
+  '#d95568',
+  '#b66d57',
+  '#a85567',
+  '#ef6c57',
+]
 
 onMounted(() => {
   chart = init(chartElement.value)
@@ -103,26 +118,26 @@ function renderChart() {
               right: 8,
               itemWidth: 18,
               itemHeight: 8,
-              textStyle: { color: '#526987', fontSize: 11 },
-              pageTextStyle: { color: '#526987' },
+              textStyle: { color: CHART_COLORS.copy, fontSize: 11 },
+              pageTextStyle: { color: CHART_COLORS.copy },
             }
           : { show: false },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
         padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 12 },
+        textStyle: { color: CHART_COLORS.inverse, fontSize: 12 },
         formatter: formatTooltip,
       },
       xAxis: {
         type: 'category',
         boundaryGap: false,
         data: periods.value,
-        axisLine: { lineStyle: { color: '#dbe4eb' } },
+        axisLine: { lineStyle: { color: CHART_COLORS.axisSoft } },
         axisTick: { show: false },
         axisLabel: {
-          color: '#64748b',
+          color: CHART_COLORS.muted,
           fontSize: 11,
           hideOverlap: true,
           margin: 12,
@@ -132,8 +147,8 @@ function renderChart() {
       yAxis: {
         type: 'value',
         splitNumber: 4,
-        axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
-        splitLine: { lineStyle: { color: '#edf2f5' } },
+        axisLabel: { color: CHART_COLORS.muted, fontSize: 11, formatter: compactCurrency },
+        splitLine: { lineStyle: { color: CHART_COLORS.grid } },
       },
       series: props.mode === 'breakdown' ? breakdownChartSeries() : netWorthChartSeries(),
     },
@@ -151,8 +166,8 @@ function netWorthChartSeries() {
       symbol: 'circle',
       symbolSize: props.points.length === 1 ? 9 : 6,
       showSymbol: props.points.length < 18,
-      lineStyle: { width: 3, color: '#16815f' },
-      itemStyle: { color: '#16815f', borderColor: '#fff', borderWidth: 2 },
+      lineStyle: { width: 3, color: CHART_COLORS.success },
+      itemStyle: { color: CHART_COLORS.success, borderColor: CHART_COLORS.inverse, borderWidth: 2 },
       areaStyle: {
         color: {
           type: 'linear',
@@ -181,7 +196,7 @@ function breakdownChartSeries() {
     symbolSize: 5,
     showSymbol: props.breakdownPoints.length < 18,
     lineStyle: { width: 2, color },
-    itemStyle: { color, borderColor: '#fff', borderWidth: 1 },
+    itemStyle: { color, borderColor: CHART_COLORS.inverse, borderWidth: 1 },
     emphasis: { focus: 'series', lineStyle: { width: 3 } },
   }))
 }

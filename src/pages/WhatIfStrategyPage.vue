@@ -513,440 +513,6 @@
             </aside>
           </section>
         </div>
-
-        <div class="strategy-layout legacy-strategy-layout">
-          <div class="configuration-column">
-            <section class="panel available-panel">
-              <div>
-                <span>{{ t('whatIf.strategy.available') }}</span>
-                <strong
-                  >{{ formatCurrency(monthlySavings)
-                  }}<small>{{ t('whatIf.perMonth') }}</small></strong
-                >
-                <small>{{ t('whatIf.strategy.fromWhatIf') }}</small>
-              </div>
-              <q-icon name="signal_cellular_alt" />
-            </section>
-
-            <section class="panel allocation-panel">
-              <div class="panel-heading">
-                <h2>{{ t('whatIf.strategy.allocation') }}</h2>
-                <p>
-                  {{
-                    t('whatIf.strategy.allocationDescription', {
-                      amount: formatCurrency(monthlySavings),
-                    })
-                  }}
-                </p>
-              </div>
-              <div class="allocation-list">
-                <StrategyAllocationRow
-                  icon="paid"
-                  tone="cash"
-                  :title="t('whatIf.cash.title')"
-                  :description="t('whatIf.strategy.cashDescription')"
-                  :percent="allocation.cash"
-                  :amount="monthlyFor(allocation.cash)"
-                  @change="setAllocation('cash', $event)"
-                />
-                <StrategyAllocationRow
-                  icon="trending_up"
-                  tone="invest"
-                  :title="t('whatIf.strategy.investments')"
-                  :description="t('whatIf.strategy.investDescription')"
-                  :percent="allocation.invest"
-                  :amount="monthlyFor(allocation.invest)"
-                  @change="setAllocation('invest', $event)"
-                />
-                <StrategyAllocationRow
-                  v-if="selectedDebt"
-                  icon="home"
-                  tone="debt"
-                  :title="t('whatIf.debt.title')"
-                  :description="t('whatIf.strategy.debtDescription')"
-                  :percent="allocation.debt"
-                  :amount="monthlyFor(allocation.debt)"
-                  @change="setAllocation('debt', $event)"
-                />
-              </div>
-              <div class="allocation-total">
-                <span>{{ t('whatIf.strategy.total') }}</span>
-                <strong>100%</strong>
-                <strong>{{ formatCurrency(monthlySavings) }}{{ t('whatIf.perMonth') }}</strong>
-              </div>
-            </section>
-
-            <section class="panel mix-panel">
-              <div class="panel-heading">
-                <h2>{{ t('whatIf.strategy.investmentMix') }}</h2>
-                <p>{{ t('whatIf.strategy.investmentMixDescription') }}</p>
-              </div>
-              <div class="mix-list">
-                <article v-for="entry in activeMix" :key="entry.id" class="investment-mix-card">
-                  <span :class="['mix-card-icon', entry.tone]">
-                    <q-icon :name="entry.icon" />
-                  </span>
-                  <div class="mix-card-identity">
-                    <strong>{{ entry.label }}</strong>
-                    <small>{{ entry.description }}</small>
-                  </div>
-                  <button
-                    type="button"
-                    class="mix-card-metric editable-metric allocation-metric"
-                    :aria-label="`Edit ${entry.label} allocation`"
-                  >
-                    <strong>{{ entry.allocation }}%</strong>
-                    <small>{{ t('whatIf.strategy.ofInvestments') }}</small>
-                    <q-popup-edit
-                      :model-value="entry.allocation"
-                      buttons
-                      :title="t('whatIf.strategy.investmentAllocation')"
-                      :label-set="t('common.save')"
-                      :label-cancel="t('common.cancel')"
-                      @save="setMixAllocation(entry.id, $event)"
-                    >
-                      <template #default="scope">
-                        <q-input
-                          v-model.number="scope.value"
-                          autofocus
-                          dense
-                          outlined
-                          type="number"
-                          inputmode="numeric"
-                          min="0"
-                          max="100"
-                          step="5"
-                          suffix="%"
-                          @keyup.enter="scope.set"
-                        />
-                      </template>
-                    </q-popup-edit>
-                  </button>
-                  <button
-                    type="button"
-                    class="mix-card-metric editable-metric return-metric"
-                    :aria-label="`Edit ${entry.label} expected return`"
-                  >
-                    <strong>{{ Number(entry.annualReturnPercent).toFixed(1) }}%</strong>
-                    <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
-                    <q-popup-edit
-                      :model-value="entry.annualReturnPercent"
-                      buttons
-                      :title="t('whatIf.strategy.expectedAnnualReturn')"
-                      :label-set="t('common.save')"
-                      :label-cancel="t('common.cancel')"
-                      @save="setReturn(entry.id, $event)"
-                    >
-                      <template #default="scope">
-                        <q-input
-                          v-model.number="scope.value"
-                          autofocus
-                          dense
-                          outlined
-                          type="number"
-                          inputmode="decimal"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          suffix="%"
-                          @keyup.enter="scope.set"
-                        />
-                      </template>
-                    </q-popup-edit>
-                  </button>
-                  <span class="mix-card-amount">
-                    <strong>
-                      {{ formatCurrency((monthlyFor(allocation.invest) * entry.allocation) / 100) }}
-                    </strong>
-                    <small>{{ t('whatIf.perMonth').trim() }}</small>
-                  </span>
-                  <q-btn
-                    v-if="activeMix.length > 1"
-                    flat
-                    round
-                    dense
-                    icon="delete_outline"
-                    color="negative"
-                    size="sm"
-                    :aria-label="`${t('whatIf.strategy.removeInvestmentType')}: ${entry.label}`"
-                    class="mix-card-remove"
-                    @click="removeMix(entry.id)"
-                  />
-                </article>
-              </div>
-              <button
-                v-if="availableMixOptions.length"
-                type="button"
-                class="add-investment-card"
-                @click="openInvestmentTypeDialog"
-              >
-                <q-icon name="add" />
-                {{ t('whatIf.strategy.addInvestmentType') }}
-              </button>
-            </section>
-
-            <div v-if="allocation.cash > 0" class="small-panels single-detail">
-              <section class="panel strategy-detail">
-                <div class="detail-title">
-                  <span class="mini-icon cash"><q-icon name="paid" /></span>
-                  <div>
-                    <h2>{{ t('whatIf.strategy.cashStrategy') }}</h2>
-                    <p>{{ t('whatIf.strategy.cashTarget') }}</p>
-                  </div>
-                </div>
-                <div class="detail-values">
-                  <span
-                    ><small>{{ t('whatIf.strategy.current') }}</small
-                    ><strong>{{ formatCurrency(startingPosition.cash) }}</strong></span
-                  >
-                  <span
-                    ><small>{{ t('whatIf.strategy.target') }}</small
-                    ><strong>{{ formatCurrency(projection.strategy.cashTarget) }}</strong></span
-                  >
-                  <span
-                    ><small>{{ t('whatIf.strategy.allocatedMonthly') }}</small
-                    ><strong>{{ formatCurrency(monthlyFor(allocation.cash)) }}</strong></span
-                  >
-                </div>
-                <q-select
-                  :model-value="activeScenario.cashTargetMonths"
-                  :options="cashTargetOptions"
-                  emit-value
-                  map-options
-                  dense
-                  outlined
-                  :label="t('whatIf.strategy.emergencyFundTarget')"
-                  @update:model-value="updateScenario({ cashTargetMonths: $event })"
-                />
-              </section>
-            </div>
-          </div>
-
-          <div class="results-column">
-            <div class="strategy-section-heading results-heading">
-              <h2>{{ t('whatIf.strategy.resultsTitle') }}</h2>
-            </div>
-
-            <section v-if="allocation.invest > 0" class="panel projection-panel">
-              <div class="projection-heading">
-                <div>
-                  <h2>{{ t('whatIf.strategy.investmentStrategy') }}</h2>
-                </div>
-                <div class="projection-controls">
-                  <div class="horizon-options desktop-horizon-options">
-                    <button
-                      v-for="years in [10, 20, 30]"
-                      :key="years"
-                      type="button"
-                      :class="{ selected: activeScenario.horizonYears === years }"
-                      :aria-label="`${years} ${t('whatIf.years')}`"
-                      @click="updateScenario({ horizonYears: years })"
-                    >
-                      {{ years }}<span class="horizon-unit"> years</span>
-                    </button>
-                    <button
-                      type="button"
-                      :class="{ selected: ![10, 20, 30].includes(activeScenario.horizonYears) }"
-                      :aria-label="t('whatIf.reduction.custom')"
-                      @click="setCustomHorizon"
-                    >
-                      {{ t('whatIf.reduction.custom') }}
-                    </button>
-                  </div>
-                  <div
-                    class="projection-view-switch desktop-view-switch"
-                    role="group"
-                    :aria-label="t('whatIf.strategy.chartView.label')"
-                  >
-                    <button
-                      type="button"
-                      :class="{ selected: projectionChartMode === 'total' }"
-                      :aria-pressed="projectionChartMode === 'total'"
-                      @click="projectionChartMode = 'total'"
-                    >
-                      {{ t('whatIf.strategy.chartView.total') }}
-                    </button>
-                    <button
-                      type="button"
-                      :class="{ selected: projectionChartMode === 'breakdown' }"
-                      :aria-pressed="projectionChartMode === 'breakdown'"
-                      @click="projectionChartMode = 'breakdown'"
-                    >
-                      {{ t('whatIf.strategy.chartView.breakdown') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="projection-result-row">
-                <div class="projected-total">
-                  <strong>{{ formatCurrency(projection.strategy.investmentValue) }}</strong>
-                  <span>{{
-                    t('whatIf.strategy.inYears', { years: activeScenario.horizonYears })
-                  }}</span>
-                  <span>{{
-                    t('whatIf.strategy.inTodaysMoney', {
-                      value: formatCurrency(finalProjectionPoint.realInvestmentValue),
-                    })
-                  }}</span>
-                </div>
-                <div
-                  class="projection-view-switch mobile-view-switch"
-                  role="group"
-                  :aria-label="t('whatIf.strategy.chartView.label')"
-                >
-                  <button
-                    type="button"
-                    :class="{ selected: projectionChartMode === 'total' }"
-                    :aria-pressed="projectionChartMode === 'total'"
-                    @click="projectionChartMode = 'total'"
-                  >
-                    {{ t('whatIf.strategy.chartView.total') }}
-                  </button>
-                  <button
-                    type="button"
-                    :class="{ selected: projectionChartMode === 'breakdown' }"
-                    :aria-pressed="projectionChartMode === 'breakdown'"
-                    @click="projectionChartMode = 'breakdown'"
-                  >
-                    {{ t('whatIf.strategy.chartView.breakdown') }}
-                  </button>
-                </div>
-              </div>
-              <StrategyProjectionChart
-                :strategy-points="investmentProjectionPoints"
-                :baseline-points="baselineInvestmentProjectionPoints"
-                :mode="projectionChartMode"
-              />
-              <div class="result-breakdown">
-                <span
-                  ><small>{{ t('whatIf.strategy.startingValue') }}</small
-                  ><strong>{{ formatCurrency(startingPosition.investmentTotal) }}</strong></span
-                >
-                <span
-                  ><small>{{ t('whatIf.strategy.contributions') }}</small
-                  ><strong>{{
-                    formatCurrency(projection.strategy.investmentContributions)
-                  }}</strong></span
-                >
-                <span
-                  ><small>{{ t('whatIf.strategy.growth') }}</small
-                  ><strong>{{ formatCurrency(projection.strategy.growth) }}</strong></span
-                >
-              </div>
-            </section>
-
-            <section v-if="selectedDebt && allocation.debt > 0" class="panel debt-projection-panel">
-              <div class="projection-heading">
-                <div>
-                  <h2>{{ t('whatIf.strategy.debtProjection.title') }}</h2>
-                  <p>{{ debtInfoText }}</p>
-                </div>
-                <div class="debt-projection-controls">
-                  <q-select
-                    :model-value="selectedDebt.id"
-                    :options="liabilityOptions"
-                    emit-value
-                    map-options
-                    dense
-                    outlined
-                    options-dense
-                    @update:model-value="updateScenario({ selectedLiabilityId: $event })"
-                  />
-                  <q-btn
-                    flat
-                    round
-                    dense
-                    size="sm"
-                    icon="info_outline"
-                    :aria-label="t('whatIf.strategy.debtInfoAction')"
-                    @click="debtInfoDialogOpen = true"
-                  />
-                </div>
-              </div>
-
-              <template v-if="debtPayoff">
-                <MortgageComparisonChart
-                  :normal-schedule="debtPayoff.schedule"
-                  :accelerated-schedule="debtPayoff.accelerated.schedule"
-                  :history-schedule="debtPayoff.historySchedule"
-                  :original-balance="debtPayoff.originalPrincipal"
-                  :starting-balance="selectedDebtModel.balance"
-                  :start-date="debtPayoff.startDate"
-                  :current-date="debtPayoff.currentDate"
-                  :normal-label="t('whatIf.strategy.debtProjection.normalPayment')"
-                  :accelerated-label="t('whatIf.strategy.debtProjection.withExtraPayment')"
-                  :aria-label="t('whatIf.strategy.debtProjection.chartAria')"
-                  class="embedded-debt-chart"
-                />
-                <div class="result-breakdown debt-result-breakdown">
-                  <span class="projected-value-kpi">
-                    <small>{{ t('whatIf.strategy.finishEarlier') }}</small>
-                    <strong>{{ formatDuration(debtPayoff.accelerated.monthsEarlier) }}</strong>
-                  </span>
-                  <span>
-                    <small>{{ t('whatIf.strategy.debtProjection.normalPayoff') }}</small>
-                    <strong>{{ formatMonthYear(debtPayoff.payoffDate) }}</strong>
-                  </span>
-                  <span>
-                    <small>{{ t('whatIf.strategy.debtProjection.strategyPayoff') }}</small>
-                    <strong>{{ formatMonthYear(debtPayoff.accelerated.payoffDate) }}</strong>
-                  </span>
-                  <span>
-                    <small>{{ t('whatIf.strategy.interestSaved') }}</small>
-                    <strong>{{ formatCurrency(debtPayoff.accelerated.interestSaved) }}</strong>
-                  </span>
-                </div>
-              </template>
-              <div v-else class="debt-projection-fallback">
-                <q-icon name="info_outline" />
-                <div>
-                  <strong>
-                    {{
-                      t('whatIf.debt.perYear', {
-                        amount: formatCurrency(projection.strategy.annualDebtContribution),
-                      })
-                    }}
-                  </strong>
-                  <p>{{ t('whatIf.strategy.debtDisclaimer') }}</p>
-                </div>
-              </div>
-            </section>
-
-            <div class="strategy-section-heading impact-heading">
-              <h2>{{ t('whatIf.strategy.impactTitle') }}</h2>
-            </div>
-
-            <section class="panel milestones-panel">
-              <div class="panel-heading">
-                <h2>{{ t('whatIf.strategy.milestonesImpacted') }}</h2>
-                <p>{{ t('whatIf.strategy.milestonesDescription') }}</p>
-              </div>
-              <div v-for="outcome in strategyOutcomes" :key="outcome.id" class="milestone-card">
-                <span :class="['mini-icon', outcome.tone]">
-                  <q-icon :name="outcome.icon" />
-                </span>
-                <div class="outcome-copy">
-                  <span class="outcome-title">
-                    <strong>{{ outcome.title }}</strong>
-                    <q-btn
-                      v-if="outcome.showInfo"
-                      flat
-                      round
-                      dense
-                      size="sm"
-                      icon="info_outline"
-                      class="outcome-info-button"
-                      :aria-label="t('whatIf.strategy.freedomInfoAction')"
-                      @click="freedomInfoDialogOpen = true"
-                    />
-                  </span>
-                  <small>{{ outcome.description }}</small>
-                </div>
-                <b :class="outcome.status">{{ outcome.result }}</b>
-              </div>
-            </section>
-          </div>
-        </div>
       </template>
     </main>
 
@@ -1708,6 +1274,7 @@ import {
   financialYearExpenseNecessityValue,
   financialYearFlowValue,
 } from '@/domain/financial/financial-year'
+import { primaryHomeMortgageLiabilityIds } from '@/domain/financial/investable-wealth'
 import {
   inflationAdjustedCoverage,
   inflationFactorAtMonth,
@@ -1932,6 +1499,9 @@ const currentMilestones = computed(() =>
   calculateMilestoneProgress({
     financialYear: financialYear.value,
     liabilities: liabilitiesStore.itemsForCategory('mortgage'),
+    excludedLiabilityIds: primaryHomeMortgageLiabilityIds(
+      assetsStore.itemsForCategory('real_estate'),
+    ),
     month: positionMonth.value,
     memberId: selectedMemberId.value,
   }),
@@ -2589,9 +2159,7 @@ h1 {
   @include financial-title;
 }
 .strategy-header p,
-.panel-heading p,
-.projection-heading p,
-.detail-title p {
+.projection-heading p {
   margin: 0.35rem 0 0;
   color: var(--color-copy);
 }
@@ -2757,18 +2325,15 @@ h1 {
 .overview-outcome:last-child {
   border-bottom: 0;
 }
-.overview-outcome .outcome-copy,
-.sheet-outcome-card .outcome-copy {
+.overview-outcome .outcome-copy {
   display: grid;
   min-width: 0;
   gap: 0.15rem;
 }
-.overview-outcome .outcome-copy strong,
-.sheet-outcome-card .outcome-copy strong {
+.overview-outcome .outcome-copy strong {
   font-size: 0.83rem;
 }
-.overview-outcome .outcome-copy small,
-.sheet-outcome-card .outcome-copy small {
+.overview-outcome .outcome-copy small {
   color: var(--color-copy);
   font-size: 0.68rem;
   line-height: 1.35;
@@ -2780,9 +2345,6 @@ h1 {
 }
 .outcome-arrow {
   color: var(--color-copy);
-}
-.legacy-strategy-layout {
-  display: none !important;
 }
 .desktop-projections {
   display: grid;
@@ -3094,25 +2656,6 @@ h1 {
 .desktop-debt-select {
   width: min(17rem, 32vw);
 }
-.desktop-mortgage-panel {
-  margin-bottom: 1rem;
-}
-.strategy-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas:
-    'available available'
-    'allocation mix'
-    'results-title results-title'
-    'projection projection'
-    'debt-projection debt-projection'
-    'details details'
-    'impact-title impact-title'
-    'milestones milestones';
-  column-gap: 1rem;
-  row-gap: 0.85rem;
-  margin-top: 0.75rem;
-}
 .strategy-sheet {
   display: flex;
   flex-direction: column;
@@ -3237,33 +2780,6 @@ h1 {
   padding: 0.9rem 1.35rem 1.25rem;
   border-top: 1px solid var(--color-line);
 }
-.strategy-sheet-actions.single-action {
-  grid-template-columns: 1fr;
-}
-.outcome-sheet-list {
-  display: grid;
-  gap: 0.7rem;
-}
-.sheet-outcome-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(8rem, auto) auto;
-  align-items: center;
-  gap: 0.8rem;
-  width: 100%;
-  padding: 0.85rem;
-  border: 1px solid var(--color-line);
-  border-radius: 0.85rem;
-  background: white;
-  color: var(--color-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.sheet-outcome-card b {
-  max-width: 15rem;
-  text-align: right;
-  font-size: 0.76rem;
-}
 .detail-sheet-content {
   display: grid;
   gap: 1rem;
@@ -3306,50 +2822,8 @@ h1 {
 .detail-horizon-options button {
   flex: 1;
 }
-.detail-projected-total {
-  margin-top: 0;
-}
 .large-detail-values strong {
   font-size: 1.05rem;
-}
-.large-detail-values.two-values {
-  grid-template-columns: repeat(2, 1fr);
-}
-.net-worth-detail-hero {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-  padding: 1.5rem;
-  border-radius: 0.85rem;
-  background: var(--color-blue-soft);
-  text-align: center;
-}
-.net-worth-detail-hero span,
-.net-worth-detail-hero small {
-  color: var(--color-copy);
-}
-.net-worth-detail-hero strong {
-  color: var(--color-primary);
-  font-size: 2rem;
-}
-.configuration-column,
-.results-column {
-  display: contents;
-}
-.strategy-section-heading {
-  margin: 0.25rem 0 -0.55rem;
-}
-.strategy-section-heading h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 1.35rem;
-  letter-spacing: -0.025em;
-}
-.results-heading {
-  grid-area: results-title;
-}
-.impact-heading {
-  grid-area: impact-title;
 }
 .panel {
   @include dashboard-card;
@@ -3363,18 +2837,6 @@ h1 {
   justify-content: space-between;
   min-height: 6rem;
   background: linear-gradient(110deg, #fff, #f0fbf7);
-}
-.allocation-panel {
-  grid-area: allocation;
-}
-.mix-panel {
-  grid-area: mix;
-}
-.allocation-panel,
-.mix-panel {
-  min-width: 0;
-  padding: 1rem;
-  border-radius: var(--radius-lg);
 }
 .available-panel > div {
   display: grid;
@@ -3398,16 +2860,12 @@ h1 {
   color: var(--color-success-dark);
   font-size: 2rem;
 }
-.panel-heading h2,
-.projection-heading h2,
-.detail-title h2 {
+.projection-heading h2 {
   margin: 0;
   font-size: 1.05rem;
   line-height: 1.25;
 }
-.panel-heading p,
-.projection-heading p,
-.detail-title p {
+.projection-heading p {
   margin-top: 0.25rem;
   font-size: 0.72rem;
   line-height: 1.35;
@@ -3655,25 +3113,6 @@ h1 {
   padding: 0.85rem 1.35rem 1.2rem;
   border-top: 1px solid var(--color-line);
 }
-.small-panels {
-  grid-area: details;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-.small-panels.single-detail {
-  grid-template-columns: 1fr;
-}
-.strategy-detail {
-  display: grid;
-  align-content: start;
-  gap: 0.75rem;
-}
-.detail-title {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
 .detail-values {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -3682,8 +3121,7 @@ h1 {
 .detail-values span {
   display: grid;
 }
-.detail-values small,
-.strategy-detail > small {
+.detail-values small {
   color: var(--color-copy);
   font-size: 0.65rem;
 }
@@ -3700,28 +3138,9 @@ h1 {
 .progress {
   color: var(--color-primary);
 }
-.redirect-note {
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--color-line);
-}
 .projection-panel {
   grid-area: projection;
   position: relative;
-}
-.debt-projection-panel {
-  grid-area: debt-projection;
-}
-.debt-projection-controls {
-  display: grid;
-  grid-template-columns: minmax(10rem, 15rem) auto;
-  align-items: center;
-  gap: 0.5rem;
-}
-.debt-projection-controls .q-btn {
-  color: var(--color-copy);
-}
-.embedded-debt-chart {
-  margin-top: 1rem;
 }
 .debt-projection-fallback {
   display: flex;
@@ -3797,7 +3216,7 @@ h1 {
 .projection-view-switch button {
   min-width: 5.5rem;
   padding: 0.42rem 0.72rem;
-  border-radius: 999px !important;
+  border-radius: 999px;
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -3806,35 +3225,9 @@ h1 {
   color: white;
   box-shadow: 0 2px 8px rgb(24 43 68 / 12%);
 }
-.mobile-view-switch {
-  display: none;
-}
-.projection-result-row {
-  display: contents;
-}
 .horizon-options button:focus-visible,
 .projection-view-switch button:focus-visible {
   @include focus-ring;
-}
-.projected-total {
-  display: grid;
-  grid-template-rows: auto auto;
-  justify-content: start;
-  gap: 0 1.25rem;
-  margin: 0.65rem 0 0.1rem;
-  text-align: left;
-}
-.projected-total strong {
-  grid-column: 1;
-  grid-row: 1;
-  color: var(--color-primary);
-  font-size: 1.15rem;
-}
-.projected-total span {
-  grid-column: 1;
-  grid-row: 2;
-  color: var(--color-copy);
-  font-size: 0.64rem;
 }
 .result-breakdown {
   display: grid;
@@ -3893,46 +3286,6 @@ h1 {
   margin: 0.4rem 0 1.25rem;
   color: var(--color-copy);
 }
-.milestones-panel {
-  grid-area: milestones;
-  display: grid;
-}
-.milestone-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--color-line);
-}
-.milestone-card div {
-  display: grid;
-}
-.outcome-title {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-.outcome-info-button {
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-  color: var(--color-copy);
-}
-.milestone-card small {
-  color: var(--color-copy);
-  font-size: 0.68rem;
-}
-.milestone-card b {
-  text-align: right;
-  font-size: 0.78rem;
-  max-width: 15rem;
-}
-.milestone-card {
-  margin-top: 0.7rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-line);
-  border-radius: 0.75rem;
-}
 .freedom-info-dialog {
   width: min(31rem, calc(100vw - 2rem));
   border-radius: var(--radius-card);
@@ -3977,19 +3330,6 @@ h1 {
   .milestone-highlight-value > strong {
     font-size: 2rem;
   }
-  .strategy-layout {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'available'
-      'allocation'
-      'mix'
-      'results-title'
-      'projection'
-      'debt-projection'
-      'details'
-      'impact-title'
-      'milestones';
-  }
 }
 
 @media (max-width: 1023px) {
@@ -4005,8 +3345,7 @@ h1 {
     display: block;
   }
   .projection-detail-sheet .result-breakdown,
-  .projection-detail-sheet .detail-values,
-  .projection-detail-sheet .large-detail-values.two-values {
+  .projection-detail-sheet .detail-values {
     grid-template-columns: 1fr;
   }
   .projection-detail-sheet .result-breakdown {
@@ -4132,27 +3471,6 @@ h1 {
   .strategy-sheet-actions {
     padding: 0.8rem 1rem max(1rem, env(safe-area-inset-bottom));
   }
-  .sheet-outcome-card {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'icon copy arrow'
-      'icon status arrow';
-    gap: 0.25rem 0.65rem;
-  }
-  .sheet-outcome-card > .mini-icon {
-    grid-area: icon;
-  }
-  .sheet-outcome-card .outcome-copy {
-    grid-area: copy;
-  }
-  .sheet-outcome-card b {
-    grid-area: status;
-    max-width: none;
-    text-align: left;
-  }
-  .sheet-outcome-card > .q-icon:last-child {
-    grid-area: arrow;
-  }
   .detail-sheet-section {
     padding: 0.75rem;
   }
@@ -4178,12 +3496,6 @@ h1 {
     flex: 1;
   }
   .large-detail-values {
-    grid-template-columns: 1fr;
-  }
-  .strategy-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .small-panels {
     grid-template-columns: 1fr;
   }
   .investment-mix-card {
@@ -4243,56 +3555,8 @@ h1 {
   .projection-heading > div:first-child {
     grid-area: copy;
   }
-  .debt-projection-panel .projection-heading {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'copy'
-      'debt-controls';
-    align-items: stretch;
-  }
-  .debt-projection-controls {
-    grid-area: debt-controls;
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
   .projection-controls {
     display: contents;
-  }
-  .desktop-view-switch {
-    display: none;
-  }
-  .desktop-horizon-options {
-    display: flex;
-    grid-area: horizon;
-    justify-self: end;
-    padding: 0.15rem;
-  }
-  .desktop-horizon-options button {
-    min-width: 0;
-    height: 1.6rem;
-    padding: 0.15rem 0.3rem;
-  }
-  .horizon-unit {
-    display: none;
-  }
-  .projection-result-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-  }
-  .mobile-view-switch {
-    display: flex;
-    flex-shrink: 0;
-  }
-  .mobile-view-switch button {
-    min-width: 0;
-    padding: 0.38rem 0.45rem;
-  }
-  .projected-total {
-    justify-content: start;
-    margin: 0;
-    text-align: left;
   }
   .result-breakdown {
     gap: 0;
@@ -4309,51 +3573,6 @@ h1 {
   }
   .result-breakdown strong {
     font-size: clamp(0.88rem, 3.5vw, 1rem);
-  }
-  .milestones-panel {
-    gap: 0.6rem;
-  }
-  .milestone-card {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'icon copy'
-      'status status';
-    align-items: start;
-    gap: 0.55rem 0.7rem;
-    margin-top: 0;
-    padding: 0.8rem;
-    border: 0;
-    background: var(--color-surface-soft);
-  }
-  .milestone-card > .mini-icon {
-    grid-area: icon;
-  }
-  .milestone-card > .outcome-copy {
-    grid-area: copy;
-    gap: 0.15rem;
-    min-width: 0;
-  }
-  .milestone-card small {
-    font-size: 0.67rem;
-    line-height: 1.4;
-  }
-  .milestone-card > b {
-    grid-area: status;
-    max-width: none;
-    padding: 0.5rem 0.6rem;
-    border-radius: 0.55rem;
-    text-align: left;
-    font-size: 0.7rem;
-    line-height: 1.35;
-  }
-  .milestone-card > b.positive {
-    background: var(--color-green-soft);
-  }
-  .milestone-card > b.progress {
-    background: var(--color-blue-soft);
-  }
-  .milestone-card > b.negative {
-    background: var(--color-red-soft);
   }
 }
 </style>

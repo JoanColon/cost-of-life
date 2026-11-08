@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { currentFinancialMonth, currentFinancialYear } from '@/domain/financial/financial-year'
+import { primaryHomeMortgageLiabilityIds } from '@/domain/financial/investable-wealth'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {
   activateMilestoneTracking as activateMilestoneTrackingDocuments,
@@ -9,11 +10,13 @@ import {
   syncMilestoneAchievements,
 } from '@/services/firebase/achievements.service'
 import { getFinancialHistory } from '@/services/firebase/history.service'
+import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 export const useMilestonesStore = defineStore('milestones', () => {
+  const assetsStore = useAssetsStore()
   const financialYearsStore = useFinancialYearsStore()
   const liabilitiesStore = useLiabilitiesStore()
   const workspaceStore = useWorkspaceStore()
@@ -42,12 +45,17 @@ export const useMilestonesStore = defineStore('milestones', () => {
   )
   const trackingActive = computed(() => workspace.value?.milestoneTracking?.status === 'active')
   const liabilities = computed(() => liabilitiesStore.itemsForCategory('mortgage'))
+  const realEstateAssets = computed(() => assetsStore.itemsForCategory('real_estate'))
+  const excludedLiabilityIds = computed(() =>
+    primaryHomeMortgageLiabilityIds(realEstateAssets.value),
+  )
   const progress = computed(() => {
     if (!financialYear.value || !achievementsReady.value) return []
     return calculateMilestoneProgress({
       financialYear: financialYear.value,
       financialHistory: historyDocuments.value,
       liabilities: liabilities.value,
+      excludedLiabilityIds: excludedLiabilityIds.value,
       achievements: trackingActive.value ? achievements.value : [],
       month: currentMonth.value,
     })
@@ -55,6 +63,8 @@ export const useMilestonesStore = defineStore('milestones', () => {
   const loading = computed(
     () =>
       financialYearsStore.loading ||
+      assetsStore.loading ||
+      assetsStore.categoryLoading ||
       liabilitiesStore.loading ||
       liabilitiesStore.categoryLoading ||
       historyLoading.value ||
@@ -63,12 +73,15 @@ export const useMilestonesStore = defineStore('milestones', () => {
   const error = computed(
     () =>
       (workspaceId.value && financialYearsStore.errorFor(workspaceId.value, currentYear.value)) ||
+      assetsStore.error ||
       liabilitiesStore.error ||
       historyError.value ||
       achievementsError.value,
   )
 
-  watch([financialYear, liabilities, trackingActive], () => syncAchievements(progress.value))
+  watch([financialYear, liabilities, excludedLiabilityIds, trackingActive], () =>
+    syncAchievements(progress.value),
+  )
 
   async function load(id, force = false) {
     if (!id) return
@@ -83,6 +96,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
     if (!force && loadedKey.value === key) {
       await Promise.all([
         financialYearsStore.load(id, year),
+        assetsStore.loadCategory(id, 'real_estate'),
         liabilitiesStore.loadCategory(id, 'mortgage'),
       ])
       await syncAchievements(progress.value)
@@ -101,6 +115,7 @@ export const useMilestonesStore = defineStore('milestones', () => {
     try {
       await Promise.all([
         financialYearsStore.load(id, year, force),
+        assetsStore.loadCategory(id, 'real_estate', force),
         liabilitiesStore.loadCategory(id, 'mortgage', force),
       ])
       const [historyResult, achievementsResult] = await Promise.allSettled([
@@ -237,6 +252,8 @@ export const useMilestonesStore = defineStore('milestones', () => {
     historyError,
     historyLoading,
     liabilities,
+    realEstateAssets,
+    excludedLiabilityIds,
     load,
     loading,
     progress,

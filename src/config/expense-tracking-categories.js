@@ -44,7 +44,7 @@ export function reviewExpenseTrackingCategories(currentSubcategoryIds = [], trac
   for (const [subcategoryId, reconciliation] of Object.entries(
     trackingMonth?.reconciliation || {},
   )) {
-    if (reconciliation?.decision === 'tracked') visible.add(subcategoryId)
+    if (['tracked', 'combined'].includes(reconciliation?.decision)) visible.add(subcategoryId)
   }
   return expenseTrackingCategories.filter(({ id }) => visible.has(id))
 }

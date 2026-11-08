@@ -434,18 +434,6 @@ async function persist(operation) {
   text-align: center;
 }
 
-.category-header {
-  @include financial-header;
-}
-
-.category-header h1 {
-  @include financial-title;
-}
-
-.back-button {
-  @include financial-back-button;
-}
-
 .summary-card {
   @include financial-category-summary;
 }

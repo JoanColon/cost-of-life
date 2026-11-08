@@ -463,13 +463,13 @@ const portfolioSummary = ref(null)
 const sheetError = ref(false)
 const tablePagination = ref({ sortBy: 'ticker', descending: false, page: 1, rowsPerPage: 25 })
 const portfolioView = ref('holdings')
-const allocationDimension = ref('ticker')
+const allocationDimension = ref('country')
 const selectedAllocation = ref(null)
 const selectedAllocationMetric = ref('marketValueBase')
 let preparationId = 0
 let sheetReadId = 0
 
-const allocationDimensions = ['ticker', 'country', 'currency', 'sector', 'industry']
+const allocationDimensions = ['country', 'currency', 'sector', 'industry']
 
 const workspaceId = computed(() => String(route.params.workspaceId))
 const assetId = computed(() => String(route.params.assetId))
@@ -1219,7 +1219,7 @@ h1 {
     font-size: 0.62rem;
   }
   .portfolio-kpis {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-top: 1rem;
   }
   .portfolio-allocation-view {
@@ -1230,31 +1230,40 @@ h1 {
   }
   .portfolio-kpi {
     min-height: 8rem;
-    padding: 0.9rem;
+    padding: 0.75rem 0.45rem;
   }
   .portfolio-kpi + .portfolio-kpi {
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
+    border-left: 1px solid var(--color-line);
   }
   .portfolio-kpi-heading {
-    gap: 0.45rem;
-    font-size: 0.7rem;
+    min-height: 3.25rem;
+    gap: 0.3rem;
+    font-size: 0.78rem;
     line-height: 1.2;
   }
   .portfolio-kpi-label b {
-    font-size: 0.7rem;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    white-space: normal;
   }
   .portfolio-kpi-icon {
-    width: 2rem;
-    height: 2rem;
-    font-size: 0.9rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.72rem;
   }
   .portfolio-kpi strong {
-    margin-top: 0.75rem;
-    font-size: clamp(1.35rem, 6vw, 2rem);
+    display: flex;
+    width: 100%;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+    padding-top: 0;
+    font-size: clamp(1.15rem, 5vw, 1.5rem);
+    text-align: center;
   }
   .portfolio-kpi-label small {
-    font-size: 0.64rem;
+    display: none;
   }
   .portfolio-actions {
     display: grid;

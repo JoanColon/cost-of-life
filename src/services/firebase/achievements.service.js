@@ -89,6 +89,12 @@ export async function syncMilestoneAchievements(
   const newCandidateIds = milestoneProgress
     .filter(({ id, reached }) => definitionsById.has(id) && reached && !existingById.has(id))
     .map(({ id }) => id)
+  const staleAchievementIds = existingAchievements
+    .filter(({ milestoneId }) => {
+      if (!definitionsById.has(milestoneId)) return false
+      return !progressById.get(milestoneId)?.reached
+    })
+    .map(({ milestoneId }) => milestoneId)
   const pendingActionIds = existingAchievements
     .filter(({ milestoneId, status, qualifiedAt }) => {
       if (status !== 'pending' || !definitionsById.has(milestoneId)) return false
@@ -96,7 +102,7 @@ export async function syncMilestoneAchievements(
       return !progress?.reached || confirmationIsDue(qualifiedAt, now)
     })
     .map(({ milestoneId }) => milestoneId)
-  const actionIds = [...new Set([...newCandidateIds, ...pendingActionIds])]
+  const actionIds = [...new Set([...newCandidateIds, ...staleAchievementIds, ...pendingActionIds])]
   if (!actionIds.length) return existingAchievements
 
   const references = actionIds.map((id) => doc(db, 'workspaces', workspaceId, 'achievements', id))
@@ -122,11 +128,11 @@ export async function syncMilestoneAchievements(
       }
 
       const achievement = snapshot.data()
-      if (achievement.status !== 'pending') return
       if (!progress?.reached) {
         transaction.delete(snapshot.ref)
         return
       }
+      if (achievement.status !== 'pending') return
       if (!confirmationIsDue(achievement.qualifiedAt, now)) return
 
       transaction.update(snapshot.ref, {

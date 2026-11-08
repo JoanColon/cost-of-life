@@ -41,27 +41,27 @@
           </div>
         </section>
 
-        <section v-if="allCategoryAssets.length" class="asset-list">
+        <section v-if="allCategoryAssets.length" class="position-list">
           <article
             v-for="asset in scopedAssets"
             :key="asset.id"
-            class="asset-row"
+            class="position-row"
             role="button"
             tabindex="0"
             @click="edit(asset)"
             @keydown.enter.self="edit(asset)"
             @keydown.space.self.prevent="edit(asset)"
           >
-            <div class="asset-main">
-              <span class="asset-icon"><q-icon :name="category.icon" /></span>
-              <span class="asset-copy">
+            <div class="position-main">
+              <span class="position-icon"><q-icon :name="category.icon" /></span>
+              <span class="position-copy">
                 <strong>{{ assetSubcategoryLabel(asset) }}</strong>
                 <small>{{ asset.itemName }}</small>
               </span>
             </div>
 
             <OwnershipAvatar :ownership="asset.ownership" :members="members" />
-            <strong class="asset-value">{{ formatCurrency(asset.scopedValue) }}</strong>
+            <strong class="position-value">{{ formatCurrency(asset.scopedValue) }}</strong>
 
             <q-btn
               flat
@@ -73,7 +73,7 @@
               @click.stop
             >
               <q-menu anchor="bottom right" self="top right">
-                <q-list dense class="asset-menu">
+                <q-list dense class="position-menu">
                   <q-item clickable v-close-popup @click="edit(asset)">
                     <q-item-section avatar><q-icon name="edit" /></q-item-section>
                     <q-item-section>{{ t('assets.editDetails') }}</q-item-section>
@@ -419,197 +419,91 @@ async function persist(action) {
 .category-page {
   @include financial-page;
 }
+
 .category-shell {
   @include financial-shell(wide);
 }
-.loading-state,
-.error-state {
-  min-height: 20rem;
-}
-.loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: var(--color-copy);
-}
-.error-state {
-  display: grid;
-  justify-items: center;
-  place-content: center;
-  text-align: center;
-}
-.error-state > .q-icon {
-  color: var(--color-copy);
-  font-size: 3rem;
-}
+
+@include position-category-detail;
+
 .error-state h1 {
-  margin: 1rem 0 0;
   font-size: 2rem;
 }
+
 .error-state p {
   max-width: 32rem;
   margin: 0.75rem 0 1.25rem;
-  color: var(--color-copy);
 }
-.category-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-h1 {
-  @include financial-title;
-}
-.summary-card,
-.asset-list,
-.empty-card {
-  @include dashboard-card;
-  margin-top: 1.25rem;
-}
-.summary-card {
-  @include financial-category-summary;
-}
+
 .summary-icon,
-.asset-icon,
+.position-icon,
 .empty-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 50%;
   background: var(--color-green-soft);
   color: var(--color-success-dark);
 }
-.summary-icon {
-  @include financial-summary-icon;
-}
-.asset-list {
-  overflow: hidden;
-}
-.asset-row {
-  display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto auto auto;
-  align-items: center;
-  gap: 0.65rem;
-  min-height: 5.5rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: background-color 160ms ease;
-}
-.asset-row:hover {
-  background: var(--color-surface-soft);
-}
-.asset-row:focus-visible {
-  position: relative;
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-.asset-main {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink);
-  text-align: left;
-}
-.asset-icon {
-  @include financial-item-icon;
-}
-.asset-copy {
-  min-width: 0;
-}
-.asset-copy strong,
-.asset-copy small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.asset-copy small {
-  margin-top: 0.2rem;
-  color: var(--color-copy);
-}
-.asset-value {
+
+.position-value {
   color: var(--color-ink);
   font-size: 1.15rem;
   font-weight: 700;
   white-space: nowrap;
 }
-.asset-menu {
+
+.position-menu {
   min-width: 12rem;
 }
+
 .add-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
   min-height: 4.4rem;
   padding: 0.8rem 1.25rem;
-  border: 0;
-  background: var(--color-surface);
-  color: var(--color-primary);
   font-weight: 700;
-  cursor: pointer;
 }
+
 .add-row:hover {
   background: var(--color-blue-soft);
 }
+
 .add-row .q-icon {
   padding: 0.4rem;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: white;
   font-size: 1.1rem;
 }
-.empty-card {
-  display: grid;
-  justify-items: center;
-  padding: 3rem 1.5rem;
-  text-align: center;
-}
+
 .empty-icon {
-  width: 4rem;
-  height: 4rem;
   margin-bottom: 0.75rem;
-  font-size: 1.8rem;
 }
+
 .empty-card h2 {
   margin: 0;
   color: var(--color-ink);
 }
+
 .empty-card p {
   margin: 0.45rem 0 1.25rem;
-  color: var(--color-copy);
-}
-.confirm-card {
-  @include financial-simple-dialog(28rem);
 }
 
 @media (max-width: 760px) {
-  .asset-row {
+  .position-row {
     grid-template-columns: minmax(0, 1fr) auto auto auto;
     @include mobile-financial-row;
   }
-  .asset-main {
+
+  .position-main {
     grid-column: 1;
     gap: 0.6rem;
   }
-  .asset-value {
+
+  .position-value {
     grid-column: 3;
     font-size: 0.95rem;
   }
-  .asset-row > .q-btn {
+
+  .position-row > .q-btn {
     grid-column: 4;
     grid-row: 1;
   }
+
   .add-row {
-    min-height: 3.5rem;
-    padding: 0.6rem 0.75rem;
+    justify-content: center;
   }
 }
 </style>

@@ -27,11 +27,11 @@ select {
 }
 
 button {
-  text-transform: none !important;
+  text-transform: none;
 }
 
-button:not(.q-btn) {
-  border-radius: var(--radius-button) !important;
+:where(button:not(.q-btn)) {
+  border-radius: var(--radius-button);
 }
 
 .q-card {

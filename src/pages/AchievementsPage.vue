@@ -3,17 +3,36 @@
     <main class="achievements-shell">
       <AppPageHeader
         :title="t('achievements.title')"
-        :subtitle="
-          visibleMilestones.length
-            ? t(trackingActive ? 'milestones.reachedSummary' : 'milestones.setup.previewSummary', {
-                achieved: achievedCount,
-                total: visibleMilestones.length,
-              })
-            : ''
-        "
+        :subtitle="t('achievements.subtitle')"
         :back-label="t('navigation.progress')"
         :back-to="{ name: 'progress', params: { workspaceId } }"
-      />
+      >
+        <template #actions>
+          <section class="milestone-summary" :aria-label="t('achievements.summaryLabel')">
+            <div class="summary-item summary-item--total">
+              <q-icon name="emoji_events" />
+              <span>
+                <strong>{{ achievedCount }} / {{ visibleMilestones.length }}</strong>
+                <small>{{ t('achievements.milestonesAchieved') }}</small>
+              </span>
+            </div>
+            <div class="summary-item summary-item--achieved">
+              <q-icon name="check" />
+              <span>
+                <strong>{{ achievedCount }}</strong>
+                <small>{{ t('achievements.achieved') }}</small>
+              </span>
+            </div>
+            <div class="summary-item summary-item--progress">
+              <span class="summary-progress-ring" />
+              <span>
+                <strong>{{ inProgressCount }}</strong>
+                <small>{{ t('achievements.inProgress') }}</small>
+              </span>
+            </div>
+          </section>
+        </template>
+      </AppPageHeader>
 
       <q-banner v-if="!trackingActive && !loading" rounded class="setup-banner">
         <template #avatar>
@@ -52,28 +71,27 @@
         />
       </section>
       <template v-else>
-        <MilestoneSummaryCard
-          class="milestone-summary"
-          :milestones="progress"
-          :tracking-active="trackingActive"
-          :loading="loading"
-          :error="Boolean(error)"
-          :show-action="false"
-          :show-tracking-setup="false"
-        />
+        <nav class="milestone-filters" :aria-label="t('achievements.filterLabel')">
+          <button
+            v-for="filter in filters"
+            :key="filter.id"
+            type="button"
+            :class="{ active: activeFilter === filter.id }"
+            :aria-pressed="activeFilter === filter.id"
+            @click="activeFilter = filter.id"
+          >
+            {{ filter.label }} ({{ filter.count }})
+          </button>
+        </nav>
 
         <div class="family-grid">
           <section
-            v-for="family in families"
+            v-for="family in filteredFamilies"
             :key="family.id"
             class="family-card"
             :class="`family--${family.id}`"
           >
-            <div
-              class="family-header"
-              :class="{ expanded: isExpanded(family.id) }"
-              @click="toggleFamily(family.id)"
-            >
+            <header class="family-header">
               <span class="family-icon"><q-icon :name="family.icon" /></span>
               <div class="family-copy">
                 <div class="family-title">
@@ -92,75 +110,74 @@
                     "
                     @click.stop="showFamilyInfo(family.id)"
                     @keydown.stop
-                  />
+                  >
+                    <q-tooltip v-if="$q.screen.gt.xs" max-width="24rem">
+                      {{ t(`milestones.families.${family.id}.info`) }}
+                    </q-tooltip>
+                  </q-btn>
                 </div>
-                <p>{{ t(`milestones.families.${family.id}.description`) }}</p>
+                <p>{{ t(`milestones.families.${family.id}.shortDescription`) }}</p>
+                <strong class="family-count">
+                  {{
+                    t('achievements.familyCount', {
+                      achieved: family.achieved,
+                      total: family.total,
+                    })
+                  }}
+                  {{ t('achievements.achieved').toLowerCase() }}
+                </strong>
+                <span class="family-progress-track">
+                  <span :style="{ width: `${family.percentage}%` }" />
+                </span>
               </div>
-              <button
-                type="button"
-                class="family-meta"
-                :aria-expanded="isExpanded(family.id)"
-                :aria-controls="`achievements-${family.id}`"
-                :aria-label="
-                  t('achievements.toggleFamily', {
-                    family: t(`milestones.families.${family.id}.title`),
-                  })
-                "
-                @click.stop="toggleFamily(family.id)"
-              >
-                <strong>{{
-                  t('achievements.familyCount', {
-                    achieved: family.achieved,
-                    total: family.milestones.length,
-                  })
-                }}</strong>
-                <q-icon name="expand_more" class="expand-icon" />
-              </button>
-            </div>
+            </header>
 
-            <q-slide-transition>
-              <div
-                v-show="isExpanded(family.id)"
-                :id="`achievements-${family.id}`"
-                class="achievement-list"
+            <div class="achievement-list">
+              <article
+                v-for="milestone in family.filteredMilestones"
+                :key="milestone.id"
+                :class="{
+                  unlocked: milestoneIsUnlocked(milestone),
+                  pending: milestone.pending,
+                  current: family.currentIds.has(milestone.id),
+                  locked: !milestoneIsUnlocked(milestone) && !family.currentIds.has(milestone.id),
+                }"
               >
-                <article
-                  v-for="milestone in family.milestones"
-                  :key="milestone.id"
-                  :class="{
-                    unlocked: milestoneIsUnlocked(milestone),
-                    pending: milestone.pending,
-                    preview: !trackingActive && milestone.reached,
-                  }"
-                >
-                  <span class="status-icon">
-                    <q-icon :name="milestoneStatusIcon(milestone)" />
-                  </span>
-                  <div>
-                    <strong>{{ milestoneTitle(milestone) }}</strong>
-                    <p>{{ descriptionFor(milestone) }}</p>
-                    <small v-if="milestone.pending">{{
-                      t('milestones.status.pendingConfirmation')
-                    }}</small>
-                    <small v-else-if="trackingActive && milestone.previouslyAchieved">{{
-                      achievedDateLabel(milestone.id)
-                    }}</small>
-                    <small v-else-if="!trackingActive && milestone.reached">{{
-                      t('milestones.setup.previewReached')
-                    }}</small>
+                <MilestoneBadge
+                  :family="milestone.family"
+                  :milestone-id="milestone.id"
+                  :level="milestoneLevel(family, milestone)"
+                  :final="family.milestones.at(-1)?.id === milestone.id"
+                  :locked="!milestoneIsUnlocked(milestone) && !family.currentIds.has(milestone.id)"
+                />
+                <strong>{{ milestoneTitle(milestone) }}</strong>
+                <div v-if="milestoneIsUnlocked(milestone)" class="milestone-state achieved">
+                  <q-icon name="check_circle" />
+                  <span>{{ achievedDateLabel(milestone.id) }}</span>
+                </div>
+                <template v-else-if="family.currentIds.has(milestone.id)">
+                  <div class="milestone-current-row">
+                    <q-linear-progress
+                      rounded
+                      size="0.42rem"
+                      :value="milestone.progress"
+                      :color="family.color"
+                      track-color="grey-3"
+                    />
+                    <b>{{ Math.round(milestone.progress * 100) }}%</b>
                   </div>
-                  <q-icon
-                    v-if="milestoneIsUnlocked(milestone) && !milestone.pending"
-                    class="check-icon"
-                    name="check_circle"
-                  />
-                </article>
-                <p v-if="!family.milestones.length" class="empty-family">
-                  {{ t('achievements.noRelevantDebt') }}
-                </p>
-              </div>
-            </q-slide-transition>
+                  <small>{{ currentTargetLabel(milestone) }}</small>
+                </template>
+                <div v-else class="milestone-state locked-label">
+                  <q-icon name="lock_outline" />
+                  <span>{{ t('achievements.locked') }}</span>
+                </div>
+              </article>
+            </div>
           </section>
+          <p v-if="!filteredFamilies.length" class="filter-empty">
+            {{ t('achievements.filterEmpty') }}
+          </p>
         </div>
       </template>
 
@@ -217,8 +234,8 @@ import { storeToRefs } from 'pinia'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import MilestoneSummaryCard from '@/components/dashboard/MilestoneSummaryCard.vue'
 import AppPageHeader from '@/components/layout/AppPageHeader.vue'
+import MilestoneBadge from '@/components/milestones/MilestoneBadge.vue'
 import { milestoneFamilies } from '@/config/milestone-families'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import { authUser } from '@/services/auth'
@@ -240,6 +257,7 @@ const {
   activationLoading,
   currentMonth,
   error,
+  excludedLiabilityIds,
   financialYear,
   historyDocuments,
   liabilities,
@@ -259,12 +277,13 @@ const progress = computed(() =>
     financialYear: financialYear.value,
     financialHistory: historyDocuments.value,
     liabilities: liabilities.value,
+    excludedLiabilityIds: excludedLiabilityIds.value,
     achievements: trackingActive.value ? achievements.value : [],
     month: currentMonth.value,
     memberId: selectedMemberId.value,
   }),
 )
-const expandedFamilies = ref(new Set())
+const activeFilter = ref('all')
 const infoDialogOpen = ref(false)
 const activationDialogOpen = ref(false)
 const selectedInfoFamilyId = ref(null)
@@ -272,7 +291,7 @@ const selectedInfoFamilyId = ref(null)
 watch(
   workspaceId,
   (id) => {
-    expandedFamilies.value = new Set()
+    activeFilter.value = 'all'
     milestonesStore.load(id)
   },
   { immediate: true },
@@ -280,24 +299,56 @@ watch(
 
 const visibleMilestones = computed(() =>
   progress.value.filter(
-    (milestone) =>
-      milestone.family !== 'debt' || milestone.relevant || milestone.previouslyAchieved,
+    (milestone) => milestone.family !== 'debt' || milestone.relevant || milestone.achieved,
   ),
 )
 const achievedCount = computed(
   () => visibleMilestones.value.filter((milestone) => milestoneIsUnlocked(milestone)).length,
 )
+const inProgressCount = computed(() => visibleMilestones.value.length - achievedCount.value)
+const filters = computed(() => [
+  { id: 'all', label: t('achievements.filters.all'), count: visibleMilestones.value.length },
+  { id: 'achieved', label: t('achievements.filters.achieved'), count: achievedCount.value },
+  {
+    id: 'inProgress',
+    label: t('achievements.filters.inProgress'),
+    count: inProgressCount.value,
+  },
+])
 const families = computed(() =>
   milestoneFamilies.map((family) => {
     const milestones = visibleMilestones.value.filter(
       ({ family: familyId }) => familyId === family.id,
     )
+    const achieved = milestones.filter((milestone) => milestoneIsUnlocked(milestone)).length
+    const remaining = milestones.filter((milestone) => !milestoneIsUnlocked(milestone))
+    const currentIds = new Set(
+      (family.id === 'debt'
+        ? remaining.filter(({ relevant }) => relevant)
+        : remaining.slice(0, 1)
+      ).map(({ id }) => id),
+    )
     return {
       ...family,
       milestones,
-      achieved: milestones.filter((milestone) => milestoneIsUnlocked(milestone)).length,
+      achieved,
+      total: milestones.length,
+      percentage: milestones.length ? (achieved / milestones.length) * 100 : 0,
+      currentIds,
     }
   }),
+)
+const filteredFamilies = computed(() =>
+  families.value
+    .map((family) => ({
+      ...family,
+      filteredMilestones: family.milestones.filter((milestone) => {
+        if (activeFilter.value === 'achieved') return milestoneIsUnlocked(milestone)
+        if (activeFilter.value === 'inProgress') return !milestoneIsUnlocked(milestone)
+        return true
+      }),
+    }))
+    .filter(({ filteredMilestones }) => filteredMilestones.length),
 )
 const achievementById = computed(
   () => new Map(achievements.value.map((achievement) => [achievement.milestoneId, achievement])),
@@ -310,30 +361,14 @@ function retry() {
   milestonesStore.load(workspaceId.value, true)
 }
 
-function isExpanded(familyId) {
-  return expandedFamilies.value.has(familyId)
-}
-
-function toggleFamily(familyId) {
-  const next = new Set(expandedFamilies.value)
-  if (next.has(familyId)) next.delete(familyId)
-  else next.add(familyId)
-  expandedFamilies.value = next
-}
-
 function showFamilyInfo(familyId) {
+  if (!$q.screen.lt.sm) return
   selectedInfoFamilyId.value = familyId
   infoDialogOpen.value = true
 }
 
 function milestoneIsUnlocked(milestone) {
-  return trackingActive.value ? milestone.previouslyAchieved : milestone.reached
-}
-
-function milestoneStatusIcon(milestone) {
-  if (milestone.pending) return 'schedule'
-  if (milestoneIsUnlocked(milestone)) return trackingActive.value ? 'emoji_events' : 'visibility'
-  return 'lock_outline'
+  return trackingActive.value ? milestone.achieved : milestone.reached
 }
 
 async function activateTracking() {
@@ -346,23 +381,40 @@ async function activateTracking() {
   }
 }
 
-function descriptionFor(milestone) {
-  if (milestone.family === 'safety')
-    return t('milestones.descriptions.safety', { target: milestone.target })
-  if (milestone.family === 'freedom')
-    return t('milestones.descriptions.freedom', { target: milestone.target })
-  if (milestone.family === 'netWorth') {
-    return milestone.id === 'net_worth_positive'
-      ? t('milestones.descriptions.netWorthPositive')
-      : t('milestones.descriptions.netWorth', { target: formatCurrency(milestone.target) })
-  }
-  return t(`milestones.descriptions.${milestone.id}`)
-}
-
 function milestoneTitle(milestone) {
   return t(`milestones.items.${milestone.id}`, {
     amount: formatCurrency(milestone.target),
   })
+}
+
+function milestoneLevel(family, milestone) {
+  const index = family.milestones.findIndex(({ id }) => id === milestone.id)
+  if (index < 0 || family.milestones.length < 2) return 0
+  return Math.round((index / (family.milestones.length - 1)) * 3)
+}
+
+function currentTargetLabel(milestone) {
+  const current = milestone.currentValue
+  if (milestone.family === 'safety') {
+    return t('milestones.values.monthsCurrentTarget', {
+      current: formatDecimal(current),
+      target: milestone.target,
+    })
+  }
+  if (milestone.family === 'freedom') {
+    return t('milestones.values.yearsCurrentTarget', {
+      current: formatDecimal(current),
+      target: milestone.target,
+    })
+  }
+  if (milestone.family === 'debt') {
+    return t('milestones.values.remaining', { value: formatCurrency(current) })
+  }
+  return `${formatCurrency(current)} / ${formatCurrency(milestone.target)}`
+}
+
+function formatDecimal(value) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(Number(value || 0))
 }
 
 function achievedDateLabel(milestoneId) {
@@ -384,24 +436,11 @@ function achievedDateLabel(milestoneId) {
 .achievements-shell {
   @include financial-shell;
 }
-.page-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-h1 {
-  @include financial-title;
-}
-.page-header p,
 .family-header p,
 .achievement-list p,
 .achievement-list small,
 .state {
   color: var(--color-copy);
-}
-.page-header p {
-  margin: 0.5rem 0 0;
 }
 
 .setup-banner {
@@ -462,7 +501,7 @@ h1 {
   border-bottom: 1px solid var(--color-line);
 }
 .family-header:hover {
-  background: var(--color-surface-soft);
+  background: var(--color-surface);
 }
 .family-copy {
   flex: 1;
@@ -663,8 +702,8 @@ h1 {
   background: var(--color-green-soft);
   color: var(--color-success-dark);
 }
-.pending {
-  opacity: 1 !important;
+.achievement-list article.pending {
+  opacity: 1;
 }
 .pending .status-icon {
   background: var(--color-blue-soft);
@@ -699,9 +738,6 @@ h1 {
 }
 
 @media (max-width: 760px) {
-  .page-header p {
-    font-size: 0.82rem;
-  }
   .family-grid {
     margin-top: 1.25rem;
   }
@@ -717,6 +753,413 @@ h1 {
   }
   .achievement-list article {
     margin: 0 0.9rem;
+  }
+}
+
+/* Narrative milestone board */
+.achievements-shell {
+  @include financial-shell(analytical);
+}
+
+.milestone-summary {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  min-width: min(32rem, 46vw);
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: rgb(255 255 255 / 90%);
+  box-shadow: var(--shadow-card);
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0 1rem;
+  border-left: 1px solid var(--color-line);
+}
+
+.summary-item:first-child {
+  padding-left: 0.2rem;
+  border-left: 0;
+}
+
+.summary-item:last-child {
+  padding-right: 0.2rem;
+}
+
+.summary-item > .q-icon {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+.summary-item--total > .q-icon {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
+}
+
+.summary-item--achieved > .q-icon {
+  background: var(--color-green-soft);
+  color: var(--color-success);
+}
+
+.summary-item > span:not(.summary-progress-ring) {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.summary-item strong {
+  color: var(--color-ink);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.summary-item small {
+  color: var(--color-copy);
+  font-size: 0.67rem;
+  white-space: nowrap;
+}
+
+.summary-progress-ring {
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  border: 0.36rem solid var(--color-blue-soft);
+  border-top-color: var(--color-primary);
+  border-right-color: var(--color-primary);
+  border-radius: 50%;
+  transform: rotate(25deg);
+}
+
+.milestone-filters {
+  display: flex;
+  gap: 0.55rem;
+  margin-top: 1.4rem;
+}
+
+.milestone-filters button {
+  @include button-reset;
+  min-width: 6.6rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-control);
+  color: var(--color-copy);
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+.milestone-filters button.active {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-inverse);
+}
+
+.milestone-filters button:focus-visible {
+  @include focus-ring;
+}
+
+.family-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.family-card {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.25fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.family-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  width: auto;
+  min-height: 10.5rem;
+  padding: 1.1rem 1rem;
+  border-right: 1px solid var(--color-line);
+  cursor: default;
+}
+
+.family-header:hover {
+  background: transparent;
+}
+
+.family-icon {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 0.8rem;
+  font-size: 1.35rem;
+}
+
+.family-copy {
+  display: grid;
+  align-content: start;
+  gap: 0.15rem;
+}
+
+.family-title {
+  gap: 0.15rem;
+}
+
+.family-header h2 {
+  font-size: 1.12rem;
+  letter-spacing: -0.025em;
+}
+
+.family-header p {
+  margin-top: 0;
+  font-size: 0.72rem;
+}
+
+.family-info-button {
+  min-width: 1.8rem;
+  min-height: 1.8rem;
+  color: var(--color-muted);
+}
+
+.family-count {
+  margin-top: 0.9rem;
+  color: var(--color-ink);
+  font-size: 0.72rem;
+}
+
+.family-progress-track {
+  display: block;
+  width: 100%;
+  height: 0.42rem;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+}
+
+.family-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+}
+
+.family--safety .family-progress-track > span {
+  background: var(--color-success);
+}
+
+.family--freedom .family-progress-track > span {
+  background: var(--color-purple);
+}
+
+.family--debt .family-progress-track > span {
+  background: var(--color-danger);
+}
+
+.achievement-list {
+  display: grid;
+  grid-auto-columns: minmax(9rem, 1fr);
+  grid-auto-flow: column;
+  gap: 0.55rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0.75rem;
+  scrollbar-width: thin;
+}
+
+.achievement-list article {
+  display: grid;
+  grid-template-rows: 5rem minmax(2.8rem, auto) 1.9rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.25rem;
+  min-width: 9rem;
+  min-height: 10.2rem;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.9rem;
+  background: var(--color-surface);
+  opacity: 1;
+  text-align: center;
+}
+
+.family--safety .achievement-list article.unlocked {
+  background: var(--color-surface);
+}
+
+.family--freedom .achievement-list article.unlocked {
+  background: var(--color-surface);
+}
+
+.family--debt .achievement-list article.unlocked {
+  background: var(--color-surface);
+}
+
+.family--netWorth .achievement-list article.unlocked {
+  background: var(--color-surface);
+}
+
+.achievement-list article.current {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface);
+  box-shadow: 0 0.35rem 1rem rgb(23 74 135 / 9%);
+}
+
+.family--freedom .achievement-list article.current {
+  border-color: var(--color-line-strong);
+}
+
+.family--debt .achievement-list article.current {
+  border-color: var(--color-line-strong);
+}
+
+.achievement-list article.locked {
+  background: var(--color-surface);
+}
+
+.achievement-list article > strong {
+  display: block;
+  max-width: 8.4rem;
+  color: var(--color-ink);
+  font-size: 1rem;
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+}
+
+.milestone-state {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  gap: 0.25rem;
+  color: var(--color-copy);
+  font-size: 0.82rem;
+}
+
+.milestone-state.achieved {
+  color: var(--color-success-dark);
+}
+
+.milestone-state .q-icon {
+  font-size: 1rem;
+}
+
+.locked-label {
+  color: var(--color-muted);
+}
+
+.milestone-current-row {
+  display: grid;
+  grid-template-columns: minmax(4.2rem, 1fr) auto;
+  align-self: end;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  color: var(--color-ink);
+  font-size: 0.74rem;
+}
+
+.achievement-list article > small {
+  overflow: hidden;
+  max-width: 8.4rem;
+  color: var(--color-copy);
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-empty {
+  margin: 0;
+  padding: 2.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-copy);
+  text-align: center;
+}
+
+@media (max-width: 1050px) {
+  .milestone-summary {
+    min-width: 0;
+  }
+
+  .summary-item {
+    padding: 0 0.65rem;
+  }
+
+  .summary-item--total small {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 760px) {
+  .milestone-summary {
+    grid-template-columns: 1fr;
+    width: 100%;
+    padding: 0.55rem 0.8rem;
+  }
+
+  .summary-item,
+  .summary-item:first-child,
+  .summary-item:last-child {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--color-line);
+    border-left: 0;
+  }
+
+  .summary-item:first-child {
+    border-top: 0;
+  }
+
+  .milestone-filters {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .milestone-filters button {
+    min-width: max-content;
+  }
+
+  .family-card {
+    grid-template-columns: 1fr;
+  }
+
+  .family-header {
+    min-height: 0;
+    padding: 0.9rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .family-header p {
+    display: block;
+  }
+
+  .family-count {
+    margin-top: 0.45rem;
+  }
+
+  .achievement-list {
+    grid-auto-columns: minmax(8.5rem, 42vw);
+  }
+
+  .achievement-list article {
+    min-width: 8.5rem;
+    margin: 0;
   }
 }
 </style>

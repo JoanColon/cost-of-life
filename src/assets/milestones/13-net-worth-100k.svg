@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="€100,000 net worth">
+<title>€100,000 net worth</title>
+<defs>
+ <linearGradient id="face" x1=".05" y1="0" x2=".95" y2="1"><stop stop-color="#FFFFFF"/><stop offset=".55" stop-color="#B8D8FF" stop-opacity=".67"/><stop offset="1" stop-color="#B8D8FF" stop-opacity=".92"/></linearGradient>
+ <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#B8D8FF"/><stop offset=".5" stop-color="#1177E7"/><stop offset="1" stop-color="#B8D8FF"/></linearGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#1177E7" flood-opacity=".16"/></filter>
+</defs>
+
+<circle cx="64" cy="64" r="43" fill="url(#face)" stroke="url(#metal)" stroke-width="1.9" filter="url(#shadow)"/>
+<circle cx="64" cy="64" r="37" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.4"/>
+
+<g fill="none" stroke="#1177E7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="64" cy="63" r="30"/><path d="M47 78 V66"/><path d="M56 78 V59"/><path d="M65 78 V52"/></g>
+</svg>

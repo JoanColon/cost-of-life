@@ -15,6 +15,7 @@ import {
 } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
 use([
@@ -68,23 +69,28 @@ function renderChart() {
   if (!chart || !props.projection.length) return chart?.clear()
   const periods = props.projection.map(({ date }) => date)
   const currentPoint = props.projection.find(({ isCurrent }) => isCurrent)
-  const series = [line(t('assets.realEstate.propertyValue'), 'propertyValue', '#0870d8')]
+  const series = [line(t('assets.realEstate.propertyValue'), 'propertyValue', CHART_COLORS.primary)]
   if (props.showMortgage) {
     series.push(line(t('assets.realEstate.mortgageBalance'), 'mortgageBalance', '#dc4c64'))
   }
   if (props.showEquity) {
-    series.push(line(t('assets.realEstate.homeEquity'), 'homeEquity', '#0c6b4d'))
+    series.push(line(t('assets.realEstate.homeEquity'), 'homeEquity', CHART_COLORS.successDark))
   }
   if (currentPoint) {
     series[0].markLine = {
       silent: true,
       symbol: 'none',
       label: { show: false },
-      lineStyle: { color: '#0870d8', type: 'dashed', width: 1.5, opacity: 0.55 },
+      lineStyle: { color: CHART_COLORS.primary, type: 'dashed', width: 1.5, opacity: 0.55 },
       data: [{ xAxis: currentPoint.date }],
     }
     series.push(
-      currentMarker(currentPoint, 'propertyValue', '#0870d8', t('assets.realEstate.propertyValue')),
+      currentMarker(
+        currentPoint,
+        'propertyValue',
+        CHART_COLORS.primary,
+        t('assets.realEstate.propertyValue'),
+      ),
     )
     if (props.showMortgage) {
       series.push(
@@ -98,7 +104,12 @@ function renderChart() {
     }
     if (props.showEquity) {
       series.push(
-        currentMarker(currentPoint, 'homeEquity', '#0c6b4d', t('assets.realEstate.homeEquity')),
+        currentMarker(
+          currentPoint,
+          'homeEquity',
+          CHART_COLORS.successDark,
+          t('assets.realEstate.homeEquity'),
+        ),
       )
     }
   }
@@ -108,13 +119,13 @@ function renderChart() {
       animationDuration: 400,
       aria: { enabled: true, label: { description: props.ariaLabel } },
       grid: { top: 50, right: 18, bottom: 42, left: 72 },
-      legend: { top: 4, left: 4, textStyle: { color: '#526987', fontSize: 11 } },
+      legend: { top: 4, left: 4, textStyle: { color: CHART_COLORS.copy, fontSize: 11 } },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
         padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 12 },
+        textStyle: { color: CHART_COLORS.inverse, fontSize: 12 },
         formatter: (points) => formatTooltip(points, periods),
       },
       xAxis: {
@@ -122,9 +133,9 @@ function renderChart() {
         boundaryGap: false,
         data: periods,
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#dce5ed' } },
+        axisLine: { lineStyle: { color: CHART_COLORS.axis } },
         axisLabel: {
-          color: '#64748b',
+          color: CHART_COLORS.muted,
           fontSize: 11,
           interval: (index, value) =>
             shouldShowPeriodLabel(value, index, periods, currentPoint?.date),
@@ -137,8 +148,8 @@ function renderChart() {
       yAxis: {
         type: 'value',
         splitNumber: 4,
-        axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
-        splitLine: { lineStyle: { color: '#edf2f5' } },
+        axisLabel: { color: CHART_COLORS.muted, fontSize: 11, formatter: compactCurrency },
+        splitLine: { lineStyle: { color: CHART_COLORS.grid } },
       },
       series,
     },
@@ -165,7 +176,7 @@ function currentMarker(point, field, color, name) {
     data: [[point.date, point[field]]],
     symbol: 'diamond',
     symbolSize: 13,
-    itemStyle: { color, borderColor: '#fff', borderWidth: 2 },
+    itemStyle: { color, borderColor: CHART_COLORS.inverse, borderWidth: 2 },
     tooltip: { show: false },
     silent: true,
     z: 5,

@@ -120,7 +120,8 @@
               icon="tune"
               color="primary"
               :label="t('expenses.editCategories')"
-              @click="editingCategories = true"
+              :loading="loadingCategoryEditor"
+              @click="openCategoryEditor"
             />
           </div>
         </section>
@@ -141,6 +142,7 @@
         <ExpenseCategorySetup
           edit-mode
           :initial-selected="expensesStore.enabledCategories"
+          :initial-selected-subcategories="selectedSubcategoryIds"
           :saving="saving"
           @save="requestCategorySave"
           @cancel="editingCategories = false"
@@ -248,6 +250,7 @@ const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
 const loadingItems = ref(false)
+const loadingCategoryEditor = ref(false)
 const savingCategoryIds = ref(new Set())
 const editingCategories = ref(false)
 const confirmDisable = ref(false)
@@ -280,6 +283,13 @@ const enabledCategories = computed(() =>
     .filter((category) => expensesStore.config?.categories?.[category.id]?.enabled)
     .sort((left, right) => categoryAnnualValue(right.id) - categoryAnnualValue(left.id)),
 )
+const selectedSubcategoryIds = computed(() => [
+  ...new Set(
+    expenseCategories.flatMap((category) =>
+      expensesStore.itemsForCategory(category.id).map(({ subcategoryId }) => subcategoryId),
+    ),
+  ),
+])
 const financialYearError = computed(() =>
   financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
@@ -426,20 +436,36 @@ function openCategory(categoryId) {
   })
 }
 
+async function openCategoryEditor() {
+  if (loadingCategoryEditor.value) return
+  loadingCategoryEditor.value = true
+  try {
+    await Promise.allSettled(
+      Object.keys(expensesStore.config?.categories || {}).map((categoryId) =>
+        expensesStore.loadCategory(workspaceId.value, categoryId),
+      ),
+    )
+    editingCategories.value = true
+  } finally {
+    loadingCategoryEditor.value = false
+  }
+}
+
 async function completeSetup(selected) {
   await runSaving(() => expensesStore.completeSetup(workspaceId.value, selected, memberIds.value))
 }
 
-function requestCategorySave(selected) {
+function requestCategorySave(selection) {
+  const selected = selection.categoryIds
   const removedWithData = expensesStore.enabledCategories.some(
     (categoryId) => !selected.includes(categoryId) && categoryHasData(categoryId),
   )
   if (removedWithData) {
-    pendingSelection.value = selected
+    pendingSelection.value = selection
     confirmDisable.value = true
     return
   }
-  saveCategorySelection(selected)
+  saveCategorySelection(selection)
 }
 
 async function savePendingCategories() {
@@ -448,11 +474,52 @@ async function savePendingCategories() {
   pendingSelection.value = null
 }
 
-async function saveCategorySelection(selected) {
-  const saved = await runSaving(() =>
-    expensesStore.saveCategorySelection(workspaceId.value, selected, memberIds.value),
-  )
+async function saveCategorySelection(selection) {
+  const saved = await runSaving(async () => {
+    await expensesStore.saveCategorySelection(
+      workspaceId.value,
+      selection.categoryIds,
+      memberIds.value,
+    )
+    await createSelectedSubcategoryExpenses(selection.subcategoryIds)
+  })
   if (saved) editingCategories.value = false
+}
+
+async function createSelectedSubcategoryExpenses(subcategoryIds) {
+  const ownership =
+    memberIds.value.length === 1
+      ? createSingleOwnership(memberIds.value[0])
+      : createEqualOwnership(memberIds.value)
+
+  for (const category of expenseCategories) {
+    const existingSubcategoryIds = new Set(
+      expensesStore.itemsForCategory(category.id).map(({ subcategoryId }) => subcategoryId),
+    )
+    for (const suggestion of category.suggestions) {
+      if (!subcategoryIds.includes(suggestion.id) || existingSubcategoryIds.has(suggestion.id)) {
+        continue
+      }
+      await expensesStore.addExpense(
+        workspaceId.value,
+        {
+          categoryId: category.id,
+          subcategoryId: suggestion.id,
+          itemName: 'general',
+          notes: '',
+          estimate: { amount: 0, frequency: suggestion.defaults.frequency },
+          monthlyAmounts: null,
+          variability: suggestion.defaults.variability,
+          recurrence: suggestion.defaults.recurrence,
+          necessity: suggestion.defaults.necessity,
+          ownership,
+          entryMode: 'detailed',
+        },
+        memberIds.value,
+      )
+      existingSubcategoryIds.add(suggestion.id)
+    }
+  }
 }
 
 function categoryHasData(categoryId) {
@@ -512,18 +579,6 @@ async function runSaving(operation) {
 .state h1,
 .state p {
   margin: 0.35rem;
-}
-
-.expenses-header {
-  @include financial-header;
-}
-
-.back-button {
-  @include financial-back-button;
-}
-
-.expenses-header h1 {
-  @include financial-title;
 }
 
 .total-card {

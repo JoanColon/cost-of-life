@@ -3,6 +3,7 @@ import {
   buildAssetAnnualSeries,
   buildNetWorthBreakdownSeries,
   buildNetWorthSeries,
+  buildProgressSeries,
   positionHistoryDocuments,
   withCurrentPosition,
 } from '../../../src/domain/financial/history'
@@ -222,6 +223,88 @@ describe('financial history series', () => {
         assets: { cash: 400 },
         liabilities: { mortgage: -100 },
       },
+    ])
+  })
+
+  it('builds progress snapshots from the same financial year model', () => {
+    const month = {
+      positionStatus: 'current',
+      assets: {
+        categories: {
+          cash: { subcategories: { cash: { total: 5_000 } } },
+          investment: { subcategories: { stocks: { total: 40_000 } } },
+          real_estate: {
+            subcategories: {
+              rental_property: { total: 20_000 },
+              main_home: { total: 100_000 },
+            },
+          },
+        },
+      },
+      liabilities: {
+        categories: { mortgage: { subcategories: { home: { total: 60_000 } } } },
+      },
+      income: {
+        categories: {
+          salary: {
+            subcategories: { salary: { items: { salary: { total: 30_000 } } } },
+          },
+        },
+      },
+      expenses: {
+        categories: {
+          housing: { subcategories: { housing: { effective: 12_000 } } },
+        },
+      },
+    }
+
+    expect(buildProgressSeries([{ year: 2026, months: { 11: month } }])).toEqual([
+      {
+        period: '2026-11',
+        netWorth: 105_000,
+        assets: 165_000,
+        liabilities: 60_000,
+        investmentAssets: 40_000,
+        mortgageBalance: 60_000,
+        costOfLife: 12_000,
+        income: 30_000,
+        savingsCapacity: 18_000,
+        investableWealth: 5_000,
+        yearsFunded: 5 / 12,
+      },
+    ])
+  })
+
+  it('uses the full financial year for annual flows when only one position month is observed', () => {
+    const flowMonth = (positionStatus = 'projected') => ({
+      positionStatus,
+      assets: { categories: { investment: { subcategories: { stocks: { total: 24_000 } } } } },
+      liabilities: { categories: {} },
+      income: {
+        categories: {
+          salary: { subcategories: { salary: { items: { salary: { total: 3_000 } } } } },
+        },
+      },
+      expenses: {
+        categories: { living: { subcategories: { living: { effective: 1_000 } } } },
+      },
+    })
+    const months = Object.fromEntries(
+      Array.from({ length: 12 }, (_, index) => {
+        const month = String(index + 1).padStart(2, '0')
+        return [month, flowMonth(month === '11' ? 'current' : 'projected')]
+      }),
+    )
+
+    expect(buildProgressSeries([{ year: 2026, months }], { throughPeriod: '2026-11' })).toEqual([
+      expect.objectContaining({
+        period: '2026-11',
+        costOfLife: 12_000,
+        income: 36_000,
+        savingsCapacity: 24_000,
+        investableWealth: 24_000,
+        yearsFunded: 2,
+      }),
     ])
   })
 })

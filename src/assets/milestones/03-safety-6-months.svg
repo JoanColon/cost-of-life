@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="6 months of safety">
+<title>6 months of safety</title>
+<defs>
+ <linearGradient id="face" x1=".05" y1="0" x2=".95" y2="1"><stop stop-color="#FFFFFF"/><stop offset=".55" stop-color="#B8E6D1" stop-opacity=".67"/><stop offset="1" stop-color="#B8E6D1" stop-opacity=".92"/></linearGradient>
+ <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#B8E6D1"/><stop offset=".5" stop-color="#087F5B"/><stop offset="1" stop-color="#B8E6D1"/></linearGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#087F5B" flood-opacity=".16"/></filter>
+</defs>
+
+<circle cx="64" cy="64" r="43" fill="url(#face)" stroke="url(#metal)" stroke-width="1.9" filter="url(#shadow)"/>
+<circle cx="64" cy="64" r="37" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.4"/>
+
+<g fill="none" stroke="#087F5B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M64 29 Q76 37 88 38 V58 Q88 77 64 91 Q40 77 40 58 V38 Q52 37 64 29Z"/><ellipse cx="64" cy="74" rx="12" ry="4"/><path d="M52 74v5c0 5 24 5 24 0v-5"/><ellipse cx="64" cy="65" rx="12" ry="4"/><path d="M52 65v5c0 5 24 5 24 0v-5"/><ellipse cx="64" cy="56" rx="12" ry="4"/><path d="M52 56v5c0 5 24 5 24 0v-5"/></g>
+</svg>

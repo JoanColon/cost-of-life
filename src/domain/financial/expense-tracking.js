@@ -58,6 +58,8 @@ export function setTrackingDecision(month, subcategoryId, decision) {
   const reconciliation = { ...(month?.reconciliation || {}) }
   if (decision === 'tracked') {
     reconciliation[subcategoryId] = { decision: 'tracked' }
+  } else if (decision === 'combined') {
+    reconciliation[subcategoryId] = { decision: 'combined' }
   } else if (decision === 'model') {
     delete reconciliation[subcategoryId]
   } else {
@@ -77,11 +79,13 @@ export function resolveExpenseTrackingValue(modelValue, actualValue, decision) {
   const model = normalizeNonNegativeMoney(modelValue) || 0
   const actual = actualValue == null ? null : normalizeNonNegativeMoney(actualValue)
   const usesTracked = decision === 'tracked' && actual !== null
-  const source = usesTracked ? 'tracked' : 'model'
+  const usesCombined = decision === 'combined' && actual !== null
+  const source = usesTracked ? 'tracked' : usesCombined ? 'combined' : 'model'
+  const effective = usesCombined ? model + actual : actual
   return {
     model,
     actual,
-    effective: financialYearExpenseItemValue({ source, effective: actual }, model),
+    effective: financialYearExpenseItemValue({ source, effective }, model),
     source,
   }
 }
@@ -116,7 +120,9 @@ function buildCategory(items) {
 function normalizeReconciliation(value) {
   return Object.fromEntries(
     Object.entries(value || {}).flatMap(([subcategoryId, state]) => {
-      return state?.decision === 'tracked' ? [[subcategoryId, { decision: 'tracked' }]] : []
+      return ['tracked', 'combined'].includes(state?.decision)
+        ? [[subcategoryId, { decision: state.decision }]]
+        : []
     }),
   )
 }

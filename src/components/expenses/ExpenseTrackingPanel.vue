@@ -167,7 +167,7 @@ const { t } = useI18n()
   .tracking-button {
     border: 0;
     border-bottom: 1px solid var(--color-line);
-    border-radius: 0 !important;
+    border-radius: 0;
   }
 
   .tracking-button:last-child {

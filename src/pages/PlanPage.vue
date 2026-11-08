@@ -516,27 +516,8 @@ function liabilityCategoryName(categoryId) {
 .plan-shell {
   @include financial-shell(wide);
 }
-.page-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-h1 {
-  @include financial-title;
-}
-.page-header p,
 .state {
   color: var(--color-copy);
-}
-.page-header p {
-  margin: 0.45rem 0 0;
-  font-size: 1rem;
 }
 .capacity-card {
   position: relative;
@@ -841,20 +822,6 @@ h1 {
     height: 100%;
   }
 
-  .back-button {
-    min-height: 1.5rem;
-    margin-bottom: 0.1rem;
-  }
-
-  h1 {
-    font-size: clamp(2rem, 3.5vh, 2.7rem);
-  }
-
-  .page-header p {
-    margin-top: 0.2rem;
-    font-size: 0.9rem;
-  }
-
   .capacity-card {
     grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.85fr);
     gap: clamp(1.25rem, 3vw, 2rem);
@@ -965,11 +932,6 @@ h1 {
 }
 
 @media (max-width: 850px) {
-  .page-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1rem;
-  }
   .capacity-card {
     grid-template-columns: 1fr;
     gap: 1.5rem;
@@ -984,7 +946,7 @@ h1 {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 599px) {
   .capacity-card {
     gap: 1rem;
     margin-top: 0.85rem;

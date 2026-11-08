@@ -137,6 +137,7 @@ describe('expense tracking month', () => {
         categories: { groceries: { items: [item('a', 450)] } },
         reconciliation: {
           groceries: { decision: 'tracked', modelTotal: 500 },
+          electricity: { decision: 'combined' },
           invalid: { decision: 'model', modelTotal: 20 },
         },
       },
@@ -145,6 +146,7 @@ describe('expense tracking month', () => {
 
     expect(month.reconciliation).toEqual({
       groceries: { decision: 'tracked' },
+      electricity: { decision: 'combined' },
     })
   })
 
@@ -173,6 +175,19 @@ describe('expense tracking month', () => {
     expect(tracked.reconciliation.groceries).toEqual({ decision: 'tracked' })
     expect(normalizeTrackingMonth(tracked, '2026-10').reconciliation.groceries).toEqual({
       decision: 'tracked',
+    })
+  })
+
+  it('stores a combined decision', () => {
+    const combined = setTrackingDecision(
+      emptyExpenseTrackingMonth('2026-10'),
+      'groceries',
+      'combined',
+    )
+
+    expect(combined.reconciliation.groceries).toEqual({ decision: 'combined' })
+    expect(normalizeTrackingMonth(combined, '2026-10').reconciliation.groceries).toEqual({
+      decision: 'combined',
     })
   })
 
@@ -215,6 +230,12 @@ describe('expense tracking month', () => {
       actual: 472,
       effective: 600,
       source: 'model',
+    })
+    expect(resolveExpenseTrackingValue(600, 472, 'combined')).toEqual({
+      model: 600,
+      actual: 472,
+      effective: 1072,
+      source: 'combined',
     })
     expect(resolveExpenseTrackingValue(600, null, 'tracked')).toEqual({
       model: 600,

@@ -14,6 +14,7 @@ import {
 } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { calendarYearTickIndices } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
@@ -93,10 +94,10 @@ function renderChart() {
       grid: { top: 18, right: 18, bottom: 42, left: 72 },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
         padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 12 },
+        textStyle: { color: CHART_COLORS.inverse, fontSize: 12 },
         formatter: formatTooltip,
       },
       xAxis: {
@@ -104,9 +105,9 @@ function renderChart() {
         boundaryGap: false,
         data: periods,
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#dce5ed' } },
+        axisLine: { lineStyle: { color: CHART_COLORS.axis } },
         axisLabel: {
-          color: '#64748b',
+          color: CHART_COLORS.muted,
           fontSize: 11,
           interval: (index) => yearLabels.has(index),
           hideOverlap: true,
@@ -119,8 +120,8 @@ function renderChart() {
         type: 'value',
         min: 0,
         splitNumber: 4,
-        axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
-        splitLine: { lineStyle: { color: '#edf2f5' } },
+        axisLabel: { color: CHART_COLORS.muted, fontSize: 11, formatter: compactCurrency },
+        splitLine: { lineStyle: { color: CHART_COLORS.grid } },
       },
       series: [
         {
@@ -128,8 +129,8 @@ function renderChart() {
           type: 'line',
           data: balances,
           showSymbol: false,
-          lineStyle: { width: 3, color: '#0870d8' },
-          itemStyle: { color: '#0870d8' },
+          lineStyle: { width: 3, color: CHART_COLORS.primary },
+          itemStyle: { color: CHART_COLORS.primary },
           areaStyle: {
             color: {
               type: 'linear',
@@ -150,13 +151,17 @@ function renderChart() {
           data: [[markerPeriod, props.currentBalance]],
           symbol: 'diamond',
           symbolSize: 13,
-          itemStyle: { color: '#0870d8', borderColor: '#fff', borderWidth: 2 },
+          itemStyle: {
+            color: CHART_COLORS.primary,
+            borderColor: CHART_COLORS.inverse,
+            borderWidth: 2,
+          },
           z: 5,
           markLine: {
             silent: true,
             symbol: 'none',
             label: { show: false },
-            lineStyle: { color: '#0870d8', type: 'dashed', width: 1.5, opacity: 0.55 },
+            lineStyle: { color: CHART_COLORS.primary, type: 'dashed', width: 1.5, opacity: 0.55 },
             data: [{ xAxis: markerPeriod }],
           },
         },

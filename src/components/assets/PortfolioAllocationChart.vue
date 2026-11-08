@@ -36,6 +36,7 @@ import { PieChart } from 'echarts/charts'
 import { AriaComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { formatCurrencyValue } from '@/domain/financial/investment-portfolio'
 
 use([PieChart, TooltipComponent, AriaComponent, CanvasRenderer])
@@ -108,10 +109,10 @@ function renderChart() {
       aria: { enabled: true, label: { description: props.ariaLabel } },
       tooltip: {
         trigger: 'item',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
         padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 12 },
+        textStyle: { color: CHART_COLORS.inverse, fontSize: 12 },
         formatter: ({ name, value, percent, marker }) =>
           `${marker}<strong>${escapeHtml(name)}</strong><br/>${formatCurrencyValue(value, props.baseCurrency, 0)} · ${formatPercentage(percent)}`,
       },
@@ -124,7 +125,7 @@ function renderChart() {
           label: { show: false },
           labelLine: { show: false },
           emphasis: { scaleSize: 6, label: { show: false } },
-          itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 3 },
+          itemStyle: { borderColor: CHART_COLORS.inverse, borderWidth: 2, borderRadius: 3 },
           data: props.groups.map((group) => ({
             name: group.name,
             value: group.value,

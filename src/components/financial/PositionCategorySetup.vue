@@ -93,96 +93,16 @@ function toggle(categoryId) {
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
 
-.setup-panel {
-  width: 100%;
-  max-width: 64rem;
-  margin: 0 auto;
-}
-
-.setup-panel--dialog {
-  display: flex;
-  flex-direction: column;
-  max-width: none;
-  max-height: calc(100dvh - 2rem);
-}
-
-.setup-panel--dialog .setup-copy {
-  flex: 0 0 auto;
-  max-width: none;
-  padding: 1.5rem 1.75rem 0.85rem;
-}
-
-.setup-panel--dialog .setup-copy h1 {
-  padding-right: 2.75rem;
-  font-size: 2rem;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-}
-
-.setup-panel--dialog .setup-copy p {
-  margin-top: 0.5rem;
-}
-
-.setup-panel--dialog .category-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  margin-top: 0;
-  padding: 0.75rem 1.75rem 1.5rem;
-  overflow-y: auto;
-}
-
-.setup-panel--dialog .setup-actions {
-  flex: 0 0 auto;
-  min-height: 4.75rem;
-  margin-top: 0;
-  padding: 0.85rem 1.75rem;
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface);
-}
-
-.setup-copy {
-  max-width: 40rem;
-}
-
-h1 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: clamp(2.25rem, 5vw, 4rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
-}
-
-p {
-  margin: 0.8rem 0 0;
-  color: var(--color-copy);
-}
+@include category-setup(
+  $choice-min-height: 7rem,
+  $choice-padding: 1.25rem,
+  $dialog: true,
+  $mobile-choice-min-height: 6.25rem
+);
 
 .setup-panel--assets p,
 .setup-panel--assets .category-choice strong {
   font-size: 1rem;
-}
-
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.category-choice {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  min-height: 7rem;
-  padding: 1.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  text-align: left;
-  box-shadow: var(--shadow-card);
-  cursor: pointer;
 }
 
 .setup-panel--assets .category-choice {
@@ -196,87 +116,13 @@ p {
   transform: translateY(-2px);
 }
 
-.category-choice.selected {
-  border-color: var(--color-primary);
-  box-shadow: 0 12px 38px var(--color-primary-glow);
-}
-
-.category-choice:focus-visible {
-  @include focus-ring;
-}
-
 .category-icon {
-  display: grid;
-  place-items: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
   background: var(--color-blue-soft);
   color: var(--color-primary);
-  font-size: 1.4rem;
 }
 
 .setup-panel--liabilities .category-icon {
   background: var(--color-red-soft);
   color: var(--color-danger);
-}
-
-.category-choice strong,
-.category-choice small {
-  display: block;
-}
-
-.category-choice small {
-  margin-top: 0.25rem;
-  color: var(--color-copy);
-  font-size: 0.8rem;
-  line-height: 1.35;
-}
-
-.selection-mark {
-  color: var(--color-primary);
-  font-size: 1.4rem;
-}
-
-.setup-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-
-@media (max-width: 699px) {
-  .category-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .category-choice {
-    min-height: 6.25rem;
-  }
-
-  .setup-actions,
-  .setup-actions .q-btn {
-    width: 100%;
-  }
-
-  .setup-panel--dialog {
-    max-height: 100dvh;
-  }
-
-  .setup-panel--dialog .setup-copy {
-    padding: 1.15rem 1rem 0.65rem;
-  }
-
-  .setup-panel--dialog .setup-copy h1 {
-    font-size: 1.55rem;
-  }
-
-  .setup-panel--dialog .category-grid {
-    padding: 0.6rem 1rem 1rem;
-  }
-
-  .setup-panel--dialog .setup-actions {
-    padding: 0.65rem 1rem;
-  }
 }
 </style>

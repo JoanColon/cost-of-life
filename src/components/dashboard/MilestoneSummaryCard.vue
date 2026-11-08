@@ -90,8 +90,7 @@ const activeFamily = ref(milestoneFamilies[0]?.id)
 
 const visibleMilestones = computed(() =>
   props.milestones.filter(
-    (milestone) =>
-      milestone.family !== 'debt' || milestone.relevant || milestone.previouslyAchieved,
+    (milestone) => milestone.family !== 'debt' || milestone.relevant || milestone.achieved,
   ),
 )
 const familySummaries = computed(() =>
@@ -100,7 +99,7 @@ const familySummaries = computed(() =>
       ({ family: familyId }) => familyId === family.id,
     )
     const nextMilestone = milestones.find((milestone) =>
-      props.trackingActive ? !milestone.previouslyAchieved : !milestone.reached,
+      props.trackingActive ? !milestone.achieved : !milestone.reached,
     )
     const completed = milestones.length > 0 && !nextMilestone
     return {

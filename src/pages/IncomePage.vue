@@ -474,15 +474,6 @@ async function persist(action) {
 .state p {
   margin: 0;
 }
-.income-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-h1 {
-  @include financial-title;
-}
 .total-card {
   @include financial-total-card;
   min-height: 0;

@@ -2,22 +2,19 @@ import {
   currentFinancialMonth,
   financialYearFlowValue,
   financialYearMonthCategoryValue,
-  financialYearMonthSubcategoryValue,
   financialYearMonthValue,
 } from '@/domain/financial/financial-year'
 import { positionHistoryDocuments } from '@/domain/financial/history'
+import { investableWealthAt } from '@/domain/financial/investable-wealth'
 import { applyOwnership } from '@/domain/financial/ownership'
-import {
-  FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS,
-  INVESTABLE_ASSET_CATEGORY_IDS,
-  milestoneDefinitions,
-} from './definitions'
+import { milestoneDefinitions } from './definitions'
 
 export function calculateMilestoneProgress({
   financialYear,
   financialHistory = [],
   achievements = [],
   liabilities = [],
+  excludedLiabilityIds = new Set(),
   month = currentFinancialMonth(),
   memberId = 'all',
 } = {}) {
@@ -40,24 +37,13 @@ export function calculateMilestoneProgress({
   )
   const annualCostOfLife = financialYearFlowValue(financialYear, 'expenses', memberId)
   const cash = financialYearMonthCategoryValue(financialYear, month, 'assets', 'cash', memberId)
-  const freedomAssets =
-    categoryTotal(financialYear, month, 'assets', INVESTABLE_ASSET_CATEGORY_IDS, memberId) +
-    FREEDOM_REAL_ESTATE_SUBCATEGORY_IDS.reduce(
-      (total, subcategoryId) =>
-        total +
-        financialYearMonthSubcategoryValue(
-          financialYear,
-          month,
-          'assets',
-          'real_estate',
-          subcategoryId,
-          memberId,
-        ),
-      0,
-    )
+  const freedomAssets = investableWealthAt(financialYear, month, {
+    memberId,
+    excludedLiabilityIds,
+  })
   const netWorth = financialYearMonthValue(financialYear, month, 'netWorth', memberId)
   const safetyMonths = annualCostOfLife > 0 ? cash / (annualCostOfLife / 12) : 0
-  const fundedYears = annualCostOfLife > 0 ? freedomAssets / annualCostOfLife : 0
+  const fundedYears = annualCostOfLife > 0 ? Math.max(0, freedomAssets / annualCostOfLife) : 0
 
   return milestoneDefinitions.map((definition) => {
     const result = calculateDefinition(definition, {
@@ -78,7 +64,7 @@ export function calculateMilestoneProgress({
       currentValue: result.currentValue,
       progress: result.progress,
       reached: result.reached,
-      previouslyAchieved: achievedIds.has(definition.id),
+      achieved: result.reached && achievedIds.has(definition.id),
       pending: pendingById.has(definition.id),
       qualifiedAt: pendingById.get(definition.id)?.qualifiedAt || null,
       relevant: result.relevant,
@@ -163,14 +149,6 @@ function targetProgress(currentValue, target, relevant) {
     reached,
     relevant,
   }
-}
-
-function categoryTotal(financialYear, month, section, categoryIds, memberId = 'all') {
-  return categoryIds.reduce(
-    (total, categoryId) =>
-      total + financialYearMonthCategoryValue(financialYear, month, section, categoryId, memberId),
-    0,
-  )
 }
 
 function historicalLiabilityMaximums(financialHistory, categoryIds, memberId) {

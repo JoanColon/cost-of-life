@@ -9,6 +9,7 @@ import { LineChart } from 'echarts/charts'
 import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { currentFinancialYear } from '@/domain/financial/financial-year'
 import { calendarYearAtMonth } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
@@ -41,12 +42,12 @@ let chart = null
 let resizeObserver = null
 
 const INVESTMENT_TYPES = [
-  { id: 'stockMarket', color: '#0870d8' },
-  { id: 'realEstate', color: '#0c6b4d' },
-  { id: 'fixedIncome', color: '#8754ed' },
-  { id: 'crypto', color: '#e58b43' },
+  { id: 'stockMarket', color: CHART_COLORS.primary },
+  { id: 'realEstate', color: CHART_COLORS.successDark },
+  { id: 'fixedIncome', color: CHART_COLORS.purple },
+  { id: 'crypto', color: CHART_COLORS.warning },
   { id: 'businessEquity', color: '#39a8a3' },
-  { id: 'other', color: '#7f90a5' },
+  { id: 'other', color: CHART_COLORS.mutedLight },
 ]
 
 onMounted(() => {
@@ -104,13 +105,13 @@ function renderChart() {
         right: 8,
         itemWidth: 18,
         itemHeight: 8,
-        textStyle: { color: '#526987', fontSize: 11 },
+        textStyle: { color: CHART_COLORS.copy, fontSize: 11 },
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
-        textStyle: { color: '#fff' },
+        textStyle: { color: CHART_COLORS.inverse },
         formatter: (points) =>
           `<strong>${points[0]?.axisValue || startYear}</strong><br/>${points
             .map(
@@ -123,9 +124,9 @@ function renderChart() {
         boundaryGap: false,
         data: years,
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#dce5ed' } },
+        axisLine: { lineStyle: { color: CHART_COLORS.axis } },
         axisLabel: {
-          color: '#7f90a5',
+          color: CHART_COLORS.mutedLight,
           formatter: (value, index) =>
             years.length <= 12 ||
             index === 0 ||
@@ -138,8 +139,8 @@ function renderChart() {
       yAxis: {
         type: 'value',
         splitNumber: 4,
-        axisLabel: { color: '#7f90a5', formatter: compactValue },
-        splitLine: { lineStyle: { color: '#edf2f5' } },
+        axisLabel: { color: CHART_COLORS.mutedLight, formatter: compactValue },
+        splitLine: { lineStyle: { color: CHART_COLORS.grid } },
       },
       series: props.mode === 'breakdown' ? breakdownChartSeries() : totalChartSeries(),
     },
@@ -155,8 +156,8 @@ function totalChartSeries() {
       data: props.baselinePoints.map(({ value }) => value),
       smooth: 0.25,
       showSymbol: false,
-      lineStyle: { width: 3, color: '#0870d8' },
-      itemStyle: { color: '#0870d8' },
+      lineStyle: { width: 3, color: CHART_COLORS.primary },
+      itemStyle: { color: CHART_COLORS.primary },
       emphasis: { focus: 'series', lineStyle: { width: 4 } },
     },
     {
@@ -165,8 +166,8 @@ function totalChartSeries() {
       data: props.strategyPoints.map(({ value }) => value),
       smooth: 0.25,
       showSymbol: false,
-      lineStyle: { width: 3, color: '#0c6b4d' },
-      itemStyle: { color: '#0c6b4d' },
+      lineStyle: { width: 3, color: CHART_COLORS.successDark },
+      itemStyle: { color: CHART_COLORS.successDark },
       emphasis: { focus: 'series', lineStyle: { width: 4 } },
     },
   ]
@@ -182,7 +183,7 @@ function breakdownChartSeries() {
     symbol: 'circle',
     symbolSize: 5,
     lineStyle: { width: 2, color },
-    itemStyle: { color, borderColor: '#fff', borderWidth: 1 },
+    itemStyle: { color, borderColor: CHART_COLORS.inverse, borderWidth: 1 },
     emphasis: { focus: 'series', lineStyle: { width: 3 } },
   }))
 }

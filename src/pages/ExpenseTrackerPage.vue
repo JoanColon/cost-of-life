@@ -146,7 +146,11 @@
             :aria-label="t('expenseTracker.review.backToGroup')"
             @click="activeSubcategory = null"
           />
-          <span v-else class="items-category-icon">
+          <span
+            v-else
+            class="items-category-icon"
+            :class="`tracking-category--${activeReviewGroup?.id || ''}`"
+          >
             <q-icon :name="activeReviewGroup?.icon" />
           </span>
           <div class="items-title">
@@ -204,7 +208,12 @@
               class="review-category-identity"
               @click="openSubcategory(subcategory)"
             >
-              <span class="review-category-icon"><q-icon :name="subcategory.icon" /></span>
+              <span
+                class="review-category-icon"
+                :class="`tracking-category--${subcategory.categoryId}`"
+              >
+                <q-icon :name="subcategory.icon" />
+              </span>
               <span class="review-category-copy">
                 <strong>{{ t(subcategory.nameKey) }}</strong>
                 <small>{{
@@ -220,6 +229,12 @@
               <span>
                 <small>{{ t('expenseTracker.review.planned') }}</small>
                 <strong>{{ formatCurrency(subcategory.modelValue) }}</strong>
+              </span>
+              <span>
+                <small>{{ t('expenseTracker.review.addBoth') }}</small>
+                <strong>{{
+                  formatCurrency(subcategory.modelValue + subcategory.trackedTotal)
+                }}</strong>
               </span>
             </div>
             <div
@@ -626,6 +641,7 @@ const financialYear = computed(() =>
 const decisionOptions = computed(() => [
   { label: t('expenseTracker.review.useTracked'), value: 'tracked' },
   { label: t('expenseTracker.review.keepModel'), value: 'model' },
+  { label: t('expenseTracker.review.addBoth'), value: 'combined' },
 ])
 const periodLabel = computed(() => {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period.value)) return ''
@@ -835,7 +851,10 @@ function reconciliationFor(subcategoryId) {
 
 function resolvedValue(subcategory) {
   const decision = reconciliationFor(subcategory.id)?.decision
-  const hasActual = trackingStore.itemsFor(subcategory.id).length > 0 || decision === 'tracked'
+  const hasActual =
+    trackingStore.itemsFor(subcategory.id).length > 0 ||
+    decision === 'tracked' ||
+    decision === 'combined'
   return resolveExpenseTrackingValue(
     currentModelValue(subcategory),
     hasActual ? trackingStore.totalFor(subcategory.id) : null,
@@ -1195,7 +1214,7 @@ h1 {
 
 .review-category-row {
   display: grid;
-  grid-template-columns: minmax(12rem, 1.3fr) minmax(9rem, 0.65fr) minmax(15rem, 1fr) auto;
+  grid-template-columns: minmax(12rem, 1.3fr) minmax(14rem, 0.8fr) minmax(15rem, 1fr) auto;
   align-items: center;
   gap: 1rem;
   min-height: 5.4rem;
@@ -1247,7 +1266,7 @@ h1 {
 
 .review-category-values {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
 }
 
@@ -1296,7 +1315,7 @@ h1 {
 
 .review-category-decision {
   @include segmented-button;
-  flex: 1 1 50%;
+  flex: 1 1 33.333%;
   gap: 0.3rem;
   min-height: 2.45rem;
   padding: 0.35rem 0.8rem;
@@ -1602,7 +1621,7 @@ h1 {
   }
 
   .monthly-overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem 0;
     margin-top: 0.75rem;
     padding: 0.65rem;
@@ -1731,7 +1750,7 @@ h1 {
   .review-category-values {
     grid-column: 1 / -1;
     grid-row: 2;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow: hidden;
     padding: 0;
     border-radius: 0.75rem;
@@ -1739,8 +1758,20 @@ h1 {
   }
 
   .review-category-values > span {
-    gap: 0.2rem;
-    padding: 0.6rem 0.75rem;
+    gap: 0.15rem;
+    padding: 0.5rem 0.4rem;
+  }
+
+  .review-category-values small {
+    overflow: hidden;
+    font-size: 0.65rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .review-category-values strong {
+    font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .review-category-decisions {

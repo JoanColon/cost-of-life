@@ -43,7 +43,7 @@ async function workspaceCreated({ workspace }) {
     var(--color-page);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 699px) {
   .new-workspace-page {
     min-height: calc(100dvh - 56px - env(safe-area-inset-top));
   }

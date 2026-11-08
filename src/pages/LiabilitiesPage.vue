@@ -481,175 +481,36 @@ async function persist(action) {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
+
 .liabilities-page {
   @include financial-page;
 }
+
 .liabilities-shell {
   @include financial-shell(wide);
 }
+
+@include position-overview-list;
+
 .loading-state,
 .error-state {
   min-height: 24rem;
 }
-.loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: var(--color-copy);
-}
-.error-state {
-  display: grid;
-  justify-items: center;
-  place-content: center;
-  text-align: center;
-}
-.error-state > .q-icon {
-  color: var(--color-copy);
-  font-size: 3rem;
-}
+
 .error-state h1 {
   margin: 1rem 0 0;
 }
+
 .error-state p {
   color: var(--color-copy);
 }
-.liabilities-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-h1 {
-  @include financial-title;
-}
-.total-card,
-.category-list {
-  @include dashboard-card;
-  margin-top: 1.25rem;
-}
-.total-card {
-  @include financial-total-card;
-}
-.total-card span,
-.total-card small {
-  @include financial-total-secondary;
-}
-.total-card strong {
-  @include financial-total-value;
-}
-.total-card small {
-  @include financial-total-meta;
-}
-.category-list {
-  overflow: hidden;
-}
-.category-row {
-  display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto auto auto;
-  align-items: center;
-  gap: 1rem;
-  min-height: 5.6rem;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-surface);
-}
-.category-row:last-child {
-  border-bottom: 0;
-}
-.category-main {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 1rem;
-  min-width: 0;
-  min-height: 5.6rem;
-  padding: 1rem 0 1rem 1.25rem;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
+
 .category-icon {
-  display: grid;
-  place-items: center;
-  width: 2.9rem;
-  height: 2.9rem;
-  border-radius: 50%;
   background: var(--color-red-soft);
   color: var(--color-danger);
-  font-size: 1.3rem;
 }
-.category-copy strong,
-.category-copy small {
-  display: block;
-}
-.category-copy small {
-  margin-top: 0.25rem;
-  color: var(--color-copy);
-}
-.category-link {
-  display: grid;
-  place-items: center;
-  width: 3rem;
-  min-height: 5.6rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-.category-main:focus-visible,
-.category-link:focus-visible {
-  @include focus-ring;
-}
-.chevron {
-  color: var(--color-copy);
-  font-size: 1.25rem;
-}
-.edit-categories {
-  margin-top: 1rem;
-}
-.category-dialog {
-  @include financial-dialog-card(68rem);
-  max-width: none;
-}
-.confirm-card {
-  @include financial-simple-dialog(28rem);
-}
-.ownership-dialog-card {
-  @include financial-simple-dialog(34rem);
 
-  h2 {
-    margin-bottom: 1rem;
-  }
-}
-@media (max-width: 699px) {
-  .category-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    @include mobile-financial-row;
-  }
-  .category-main {
-    grid-column: 1;
-    min-height: 2.75rem;
-    padding: 0;
-    gap: 0.6rem;
-  }
-  .category-row :deep(.simple-value) {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .category-link {
-    display: none;
-  }
-  .category-row > .q-btn {
-    grid-column: 3;
-    grid-row: 1;
-  }
-  .category-icon {
-    width: 2.35rem;
-    height: 2.35rem;
-    font-size: 1.1rem;
-  }
+.ownership-dialog-card h2 {
+  margin-bottom: 1rem;
 }
 </style>

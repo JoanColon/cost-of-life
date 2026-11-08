@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="€1,000,000 net worth">
+<title>€1,000,000 net worth</title>
+<defs>
+ <linearGradient id="face" x1=".05" y1="0" x2=".95" y2="1"><stop stop-color="#FFFFFF"/><stop offset=".55" stop-color="#B8D8FF" stop-opacity=".67"/><stop offset="1" stop-color="#B8D8FF" stop-opacity=".92"/></linearGradient>
+ <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#B8D8FF"/><stop offset=".5" stop-color="#1177E7"/><stop offset="1" stop-color="#B8D8FF"/></linearGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#1177E7" flood-opacity=".16"/></filter>
+</defs>
+<circle cx="64" cy="64" r="48" fill="none" stroke="url(#metal)" stroke-width="2" stroke-dasharray="2 5" opacity=".75"/>
+<circle cx="64" cy="64" r="43" fill="url(#face)" stroke="url(#metal)" stroke-width="1.9" filter="url(#shadow)"/>
+<circle cx="64" cy="64" r="37" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.4"/>
+<path d="M26 95 Q 8 64 27 34" stroke="#1177E7" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="29" cy="42" rx="3" ry="7" transform="rotate(35 29 42)" fill="#1177E7" opacity=".88"/><ellipse cx="22" cy="53" rx="3" ry="7" transform="rotate(35 22 53)" fill="#1177E7" opacity=".88"/><ellipse cx="20" cy="65" rx="3" ry="7" transform="rotate(35 20 65)" fill="#1177E7" opacity=".88"/><ellipse cx="22" cy="77" rx="3" ry="7" transform="rotate(35 22 77)" fill="#1177E7" opacity=".88"/><ellipse cx="29" cy="88" rx="3" ry="7" transform="rotate(35 29 88)" fill="#1177E7" opacity=".88"/><path d="M102 95 Q 120 64 101 34" stroke="#1177E7" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="99" cy="42" rx="3" ry="7" transform="rotate(-35 99 42)" fill="#1177E7" opacity=".88"/><ellipse cx="106" cy="53" rx="3" ry="7" transform="rotate(-35 106 53)" fill="#1177E7" opacity=".88"/><ellipse cx="108" cy="65" rx="3" ry="7" transform="rotate(-35 108 65)" fill="#1177E7" opacity=".88"/><ellipse cx="106" cy="77" rx="3" ry="7" transform="rotate(-35 106 77)" fill="#1177E7" opacity=".88"/><ellipse cx="99" cy="88" rx="3" ry="7" transform="rotate(-35 99 88)" fill="#1177E7" opacity=".88"/>
+<g fill="none" stroke="#1177E7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="64" cy="63" r="30"/><path d="M47 78 V66"/><path d="M56 78 V59"/><path d="M65 78 V52"/><path d="M74 78 V45"/><path d="M83 78 V38"/><path d="M92 78 V31"/><path d="m72 42 12-10m-8 0h8v8"/><path d="M50 38 Q64 27 78 38"/></g>
+</svg>

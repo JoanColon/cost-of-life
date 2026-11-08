@@ -497,26 +497,14 @@ async function persist(action) {
   @include financial-shell(wide);
 }
 
+@include position-overview-list;
+
 .loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
   min-height: 20rem;
-  color: var(--color-copy);
 }
 
 .error-state {
-  display: grid;
-  justify-items: center;
   min-height: 24rem;
-  place-content: center;
-  text-align: center;
-}
-
-.error-state > .q-icon {
-  color: var(--color-copy);
-  font-size: 3rem;
 }
 
 .error-state h1 {
@@ -530,179 +518,31 @@ async function persist(action) {
   color: var(--color-copy);
 }
 
-.assets-header {
-  @include financial-header;
-}
-
-.back-button {
-  @include financial-back-button;
-}
-
-h1 {
-  @include financial-title;
-}
-
-.total-card {
-  @include financial-total-card;
-}
-
-.total-card span,
-.total-card small {
-  @include financial-total-secondary;
-}
-
-.total-card strong {
-  @include financial-total-value;
-}
-
-.total-card small {
-  @include financial-total-meta;
-}
-
-.category-list {
-  @include dashboard-card;
-  overflow: hidden;
-  margin-top: 1.25rem;
-}
-
 .category-row {
-  display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto auto auto;
-  align-items: center;
-  gap: 1rem;
   width: 100%;
-  min-height: 5.6rem;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-surface);
   color: var(--color-ink);
-}
-
-.category-menu {
-  min-width: 10rem;
-}
-
-.category-row:last-child {
-  border-bottom: 0;
 }
 
 .category-row:hover {
   background: var(--color-surface-soft);
 }
 
-.category-main {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 1rem;
-  min-width: 0;
-  min-height: 5.6rem;
-  padding: 1rem 0 1rem 1.25rem;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.category-main:focus-visible,
-.category-link:focus-visible {
-  @include focus-ring;
+.category-menu {
+  min-width: 10rem;
 }
 
 .category-icon {
-  display: grid;
-  place-items: center;
-  width: 2.9rem;
-  height: 2.9rem;
-  border-radius: 50%;
   background: var(--color-green-soft);
   color: var(--color-success-dark);
-  font-size: 1.3rem;
 }
 
-.category-copy strong,
-.category-copy small {
-  display: block;
-}
-
-.category-copy small {
-  margin-top: 0.25rem;
-  color: var(--color-copy);
-}
-
-.category-link {
-  display: grid;
-  place-items: center;
-  width: 3rem;
-  min-height: 5.6rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.chevron {
-  color: var(--color-copy);
-  font-size: 1.25rem;
-}
-
-.edit-categories {
-  margin-top: 1rem;
-}
-
-.category-dialog {
-  @include financial-dialog-card(68rem);
-  max-width: none;
-}
-
-.confirm-card {
-  @include financial-simple-dialog(28rem);
-}
-
-.ownership-dialog-card {
-  @include financial-simple-dialog(34rem);
-
-  h2 {
-    margin-bottom: 1.25rem;
-  }
+.ownership-dialog-card h2 {
+  margin-bottom: 1.25rem;
 }
 
 @media (max-width: 699px) {
-  .category-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    @include mobile-financial-row;
-  }
-
-  .category-main {
-    grid-column: 1;
-    min-height: 2.75rem;
-    padding: 0;
-  }
-
   .category-row :deep(.simple-value) {
-    grid-column: 2;
-    grid-row: 1;
     justify-self: end;
-  }
-
-  .category-link {
-    display: none;
-  }
-
-  .category-row > .q-btn {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .category-main {
-    gap: 0.6rem;
-  }
-
-  .category-icon {
-    width: 2.35rem;
-    height: 2.35rem;
-    font-size: 1.1rem;
   }
 }
 </style>

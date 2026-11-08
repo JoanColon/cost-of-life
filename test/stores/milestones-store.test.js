@@ -50,7 +50,7 @@ describe('milestones store', () => {
         family: 'safety',
         progress: 0.5,
         reached: false,
-        previouslyAchieved: false,
+        achieved: false,
       },
     ])
   })
@@ -100,7 +100,7 @@ describe('milestones store', () => {
         family: 'safety',
         reached: true,
         currentValue: 2,
-        previouslyAchieved: false,
+        achieved: false,
       },
     ])
     const store = useMilestonesStore()

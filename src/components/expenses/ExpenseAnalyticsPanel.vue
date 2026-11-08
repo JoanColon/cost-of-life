@@ -141,6 +141,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import ExpenseMonthMetric from '@/components/expenses/ExpenseMonthMetric.vue'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { formatCurrency } from '@/utils/formatters'
 
 use([PieChart, TooltipComponent, AriaComponent, CanvasRenderer])
@@ -222,10 +223,10 @@ function renderChart() {
       aria: { enabled: true, label: { description: t('expenseTracker.analytics.ariaLabel') } },
       tooltip: {
         trigger: 'item',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
         padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 12 },
+        textStyle: { color: CHART_COLORS.inverse, fontSize: 12 },
         formatter: ({ name, value, percent, marker }) =>
           `${marker}<strong>${escapeHtml(name)}</strong><br/>${formatCurrency(value)} · ${formatPercentage(percent)}`,
       },
@@ -237,7 +238,7 @@ function renderChart() {
           label: { show: false },
           labelLine: { show: false },
           emphasis: { scaleSize: 5 },
-          itemStyle: { borderColor: '#fff', borderWidth: 3, borderRadius: 4 },
+          itemStyle: { borderColor: CHART_COLORS.inverse, borderWidth: 3, borderRadius: 4 },
           data: props.categories.map((category, index) => ({
             name: category.name,
             value: category.value,
@@ -622,18 +623,46 @@ function escapeHtml(value) {
   }
 
   .analytics-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .analytics-total {
-    padding-left: 0.75rem;
+    box-sizing: border-box;
+    min-width: 0;
+    justify-items: end;
+    padding-left: 1rem;
+    text-align: right;
   }
 
   .analytics-month,
   .analytics-total {
-    flex: 1 1 50%;
     min-width: 0;
+  }
+
+  .analytics-summary :deep(.expense-month-metric) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .analytics-summary :deep(.metric-value) {
+    min-width: 0;
+    gap: 0.25rem;
+  }
+
+  .analytics-summary :deep(.metric-value strong) {
+    min-width: 0;
+    font-size: 0.95rem;
+  }
+
+  .analytics-total strong {
+    font-size: 1.05rem;
+    white-space: nowrap;
   }
 
   .expense-donut {

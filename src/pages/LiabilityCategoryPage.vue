@@ -34,26 +34,26 @@
           </div>
         </section>
 
-        <section v-if="allCategoryLiabilities.length" class="liability-list">
+        <section v-if="allCategoryLiabilities.length" class="position-list">
           <article
             v-for="liability in scopedLiabilities"
             :key="liability.id"
-            class="liability-row"
+            class="position-row"
             role="button"
             tabindex="0"
             @click="edit(liability)"
             @keydown.enter.self="edit(liability)"
             @keydown.space.self.prevent="edit(liability)"
           >
-            <div class="liability-main">
-              <span class="liability-icon"><q-icon :name="category.icon" /></span>
-              <span class="liability-copy"
+            <div class="position-main">
+              <span class="position-icon"><q-icon :name="category.icon" /></span>
+              <span class="position-copy"
                 ><strong>{{ liabilitySubcategoryLabel(liability) }}</strong
                 ><small>{{ liability.itemName }}</small></span
               >
             </div>
             <OwnershipAvatar :ownership="liability.ownership" :members="members" />
-            <strong class="liability-value">{{ formatCurrency(liability.scopedValue) }}</strong>
+            <strong class="position-value">{{ formatCurrency(liability.scopedValue) }}</strong>
             <q-btn
               flat
               round
@@ -64,7 +64,7 @@
               @click.stop
             >
               <q-menu anchor="bottom right" self="top right">
-                <q-list dense class="liability-menu">
+                <q-list dense class="position-menu">
                   <q-item clickable v-close-popup @click="edit(liability)"
                     ><q-item-section avatar><q-icon name="edit" /></q-item-section
                     ><q-item-section>{{ t('liabilities.editDetails') }}</q-item-section></q-item
@@ -363,188 +363,75 @@ async function persist(action) {
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
+
 .category-page {
   @include financial-page;
 }
+
 .category-shell {
   @include financial-shell(wide);
 }
-.loading-state,
-.error-state {
-  min-height: 20rem;
-}
-.loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: var(--color-copy);
-}
-.error-state {
-  display: grid;
-  justify-items: center;
-  place-content: center;
-  text-align: center;
-}
-.error-state > .q-icon {
-  color: var(--color-copy);
-  font-size: 3rem;
-}
-.error-state h1 {
-  margin: 1rem 0 0;
-}
-.error-state p {
-  color: var(--color-copy);
-}
-.category-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-h1 {
-  @include financial-title;
-}
-.summary-card,
-.liability-list,
-.empty-card {
-  @include dashboard-card;
-  margin-top: 1.25rem;
-}
-.summary-card {
-  @include financial-category-summary;
-}
+
+@include position-category-detail;
+
 .summary-icon,
-.liability-icon,
+.position-icon,
 .empty-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 50%;
   background: var(--color-red-soft);
   color: var(--color-danger);
 }
-.summary-icon {
-  @include financial-summary-icon;
-}
-.liability-list {
-  overflow: hidden;
-}
-.liability-row {
-  display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto auto auto;
-  align-items: center;
-  gap: 0.65rem;
-  min-height: 5.5rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: background-color 160ms ease;
-}
-.liability-row:hover {
-  background: var(--color-surface-soft);
-}
-.liability-row:focus-visible {
-  position: relative;
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-.liability-main {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  min-width: 0;
-}
-.liability-icon {
-  @include financial-item-icon;
-}
-.liability-copy {
-  min-width: 0;
-}
-.liability-copy strong,
-.liability-copy small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.liability-copy small {
-  margin-top: 0.2rem;
-  color: var(--color-copy);
-}
-.liability-value {
+
+.position-value {
   min-width: 7rem;
   text-align: right;
 }
-.liability-menu {
+
+.position-menu {
   min-width: 11rem;
 }
+
 .add-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
   min-height: 4.6rem;
   padding: 0.9rem 1.4rem;
-  border: 0;
-  background: var(--color-surface);
-  color: var(--color-primary);
   font-weight: 750;
-  cursor: pointer;
 }
+
 .add-row .q-icon {
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: white;
 }
-.empty-card {
-  display: grid;
-  justify-items: center;
-  padding: 3rem 1.5rem;
-  text-align: center;
-}
-.empty-icon {
-  width: 4rem;
-  height: 4rem;
-  font-size: 1.8rem;
-}
+
 .empty-card h2 {
   margin: 1rem 0 0;
 }
+
 .empty-card p {
   margin: 0.55rem 0 1.25rem;
-  color: var(--color-copy);
 }
-.confirm-card {
-  @include financial-simple-dialog(28rem);
-}
+
 @media (max-width: 699px) {
-  .liability-row {
+  .position-row {
     grid-template-columns: minmax(0, 1fr) auto auto auto;
     @include mobile-financial-row;
   }
-  .liability-main {
+
+  .position-main {
     grid-column: 1;
     gap: 0.6rem;
   }
-  .liability-value {
+
+  .position-value {
     grid-column: 3;
     grid-row: 1;
     min-width: 0;
     font-size: 0.95rem;
   }
-  .liability-row > .q-btn {
+
+  .position-row > .q-btn {
     grid-column: 4;
     grid-row: 1;
-  }
-  .add-row {
-    min-height: 3.5rem;
-    padding: 0.6rem 0.75rem;
   }
 }
 </style>

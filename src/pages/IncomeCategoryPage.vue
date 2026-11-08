@@ -415,15 +415,6 @@ async function persist(action) {
 .state p {
   margin: 0;
 }
-.category-header {
-  @include financial-header;
-}
-.back-button {
-  @include financial-back-button;
-}
-h1 {
-  @include financial-title;
-}
 .summary-card {
   @include financial-category-summary;
 }

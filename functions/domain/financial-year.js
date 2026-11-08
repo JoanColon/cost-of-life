@@ -204,7 +204,7 @@ function buildExpenseMonth(
     for (const subcategoryId of subcategoryIds) {
       const modelItems = categoryItems.filter((item) => item.subcategoryId === subcategoryId)
       const tracked = trackedValue(trackingMonth, subcategoryId)
-      const applied = tracked.applied === true
+      const source = tracked.source
       const items = Object.fromEntries(
         modelItems.map((expense) => {
           const estimated = effectiveExpenseMonth(
@@ -223,10 +223,14 @@ function buildExpenseMonth(
               notes: expense.notes || '',
               estimated,
               actual: actual?.total ?? null,
-              effective: applied ? actual?.total || 0 : estimated,
-              source: applied ? 'tracked' : 'model',
+              effective: reconciledExpenseValue(estimated, actual?.total || 0, source),
+              source,
               necessity: expense.necessity ?? null,
-              memberValues: applied ? actual?.memberValues || {} : estimatedMemberValues,
+              memberValues: reconciledMemberValues(
+                estimatedMemberValues,
+                actual?.memberValues || {},
+                source,
+              ),
               estimatedMemberValues,
               actualMemberValues: actual?.memberValues || {},
             },
@@ -243,10 +247,10 @@ function buildExpenseMonth(
       subcategories[subcategoryId] = {
         estimated,
         actual: tracked.actual,
-        effective: applied ? tracked.total : estimated,
-        source: applied ? 'tracked' : 'model',
+        effective: reconciledExpenseValue(estimated, tracked.total, source),
+        source,
         necessity: null,
-        memberValues: applied ? tracked.memberValues : estimatedMemberValues,
+        memberValues: reconciledMemberValues(estimatedMemberValues, tracked.memberValues, source),
         estimatedMemberValues,
         actualMemberValues: tracked.actualMemberValues,
         items,
@@ -365,7 +369,9 @@ function distributeAnnual(value, monthIndex) {
 
 function trackedValue(month, id) {
   const category = month?.categories?.[id]
-  const applied = month?.reconciliation?.[id]?.decision === 'tracked'
+  const decision = month?.reconciliation?.[id]?.decision
+  const source = ['tracked', 'combined'].includes(decision) ? decision : 'model'
+  const applied = source !== 'model'
   const hasActual = Boolean(category) || applied
   const items = category?.items || []
   const total = moneyOrZero(items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))
@@ -382,12 +388,25 @@ function trackedValue(month, id) {
   }
   return {
     applied,
+    source,
     actual: hasActual ? total : null,
     total,
     memberValues,
     actualMemberValues: hasActual ? memberValues : {},
     items: itemValues,
   }
+}
+
+function reconciledExpenseValue(estimated, actual, source) {
+  if (source === 'tracked') return moneyOrZero(actual)
+  if (source === 'combined') return moneyOrZero(estimated + actual)
+  return moneyOrZero(estimated)
+}
+
+function reconciledMemberValues(estimated, actual, source) {
+  if (source === 'tracked') return actual
+  if (source === 'combined') return addMaps(estimated, actual)
+  return estimated
 }
 
 function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
@@ -398,7 +417,7 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
     const subcategories = {}
     for (const [id, item] of Object.entries(category.subcategories || {})) {
       const tracked = trackedValue(trackingMonth, id)
-      const applied = tracked.applied === true
+      const source = tracked.source
       const items = Object.fromEntries(
         Object.entries(item.items || {}).map(([itemId, modelItem]) => {
           const actual = tracked.items[itemId]
@@ -407,11 +426,17 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
             {
               ...modelItem,
               actual: actual?.total ?? null,
-              effective: applied ? actual?.total || 0 : modelItem.estimated,
-              source: applied ? 'tracked' : 'model',
-              memberValues: applied ?
-                actual?.memberValues || {} :
+              effective: reconciledExpenseValue(
+                modelItem.estimated,
+                actual?.total || 0,
+                source,
+              ),
+              source,
+              memberValues: reconciledMemberValues(
                 modelItem.estimatedMemberValues || modelItem.memberValues,
+                actual?.memberValues || {},
+                source,
+              ),
               actualMemberValues: actual?.memberValues || {},
             },
           ]
@@ -420,11 +445,13 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
       subcategories[id] = {
         ...item,
         actual: tracked.actual,
-        effective: applied ? tracked.total : item.estimated,
-        source: applied ? 'tracked' : 'model',
-        memberValues: applied ?
-          tracked.memberValues :
+        effective: reconciledExpenseValue(item.estimated, tracked.total, source),
+        source,
+        memberValues: reconciledMemberValues(
           item.estimatedMemberValues || item.memberValues,
+          tracked.memberValues,
+          source,
+        ),
         actualMemberValues: tracked.actualMemberValues,
         items,
       }

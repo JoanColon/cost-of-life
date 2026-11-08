@@ -134,7 +134,6 @@ const { t } = useI18n()
     text-transform: uppercase;
   }
 
-  .strategy-name,
   .result-value {
     margin-top: 0.45rem;
     font-size: clamp(1.7rem, 3vw, 2.5rem);
@@ -325,14 +324,9 @@ const { t } = useI18n()
       font-size: 0.9rem;
     }
 
-    .strategy-name,
     .result-value {
       margin-top: 0.2rem;
       font-size: clamp(1.45rem, 2.6vw, 2.1rem);
-    }
-
-    .strategy-name {
-      font-size: clamp(1.35rem, 2.1vw, 1.75rem);
     }
 
     .primary-result {

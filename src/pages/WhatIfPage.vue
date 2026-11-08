@@ -630,34 +630,9 @@ async function saveCustomScenario(value) {
   @include financial-shell;
 }
 
-.page-header {
-  @include financial-header;
-}
-
-.page-heading {
-  width: 100%;
-}
-
-.page-nav {
-  display: flex;
-  align-items: center;
-}
-
-.back-button {
-  @include financial-back-button;
-}
-
-.mobile-section-title,
 .mobile-label {
   display: none;
 }
-
-h1 {
-  @include financial-title;
-  max-width: 44rem;
-}
-
-.page-header p,
 .comparison-heading p {
   margin: 0.45rem 0 0;
   color: var(--color-copy);
@@ -955,8 +930,7 @@ h1 {
   padding-top: 0.75rem;
 }
 
-.cash-outcome > strong,
-.positive-comparison {
+.cash-outcome > strong {
   color: var(--color-success-dark);
 }
 
@@ -1119,41 +1093,8 @@ h1 {
     max-width: 32rem;
   }
 
-  .page-nav {
-    position: relative;
-    justify-content: center;
-    min-height: 2.25rem;
-    margin-bottom: 0.8rem;
-  }
-
-  .back-button {
-    position: absolute;
-    left: -0.5rem;
-    margin: 0;
-  }
-
-  .back-button :deep(.block) {
-    display: none;
-  }
-
-  .mobile-section-title {
-    display: block;
-    font-size: 1rem;
-  }
-
-  h1 {
-    max-width: 22rem;
-    font-size: 2rem;
-    line-height: 1.05;
-  }
-
-  .page-header p,
   .comparison-heading p {
     font-size: 0.82rem;
-  }
-
-  .page-header p {
-    max-width: 24rem;
   }
 
   .simulator-card,

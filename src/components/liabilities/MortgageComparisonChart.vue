@@ -15,6 +15,7 @@ import {
 } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
+import { CHART_COLORS } from '@/config/chart-theme'
 import { calendarYearTickIndices } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 
@@ -108,13 +109,13 @@ function renderChart() {
   while (acceleratedValues.length < periods.length) acceleratedValues.push(null)
   const yearLabels = calendarYearTickIndices(periods)
 
-  const normalSeries = payoffSeries(props.normalLabel, normalValues, '#0870d8')
+  const normalSeries = payoffSeries(props.normalLabel, normalValues, CHART_COLORS.primary)
   if (props.currentDate) {
     normalSeries.markLine = {
       silent: true,
       symbol: 'none',
       label: { show: false },
-      lineStyle: { color: '#7f90a5', type: 'dashed', width: 1.5 },
+      lineStyle: { color: CHART_COLORS.mutedLight, type: 'dashed', width: 1.5 },
       data: [{ xAxis: props.currentDate }],
     }
   }
@@ -129,14 +130,14 @@ function renderChart() {
         left: 4,
         itemWidth: 22,
         itemHeight: 8,
-        textStyle: { color: '#526987', fontSize: 11 },
+        textStyle: { color: CHART_COLORS.copy, fontSize: 11 },
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: '#0b1633',
+        backgroundColor: CHART_COLORS.ink,
         borderWidth: 0,
         padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 12 },
+        textStyle: { color: CHART_COLORS.inverse, fontSize: 12 },
         formatter: formatTooltip,
       },
       xAxis: {
@@ -144,9 +145,9 @@ function renderChart() {
         boundaryGap: false,
         data: periods,
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#dce5ed' } },
+        axisLine: { lineStyle: { color: CHART_COLORS.axis } },
         axisLabel: {
-          color: '#64748b',
+          color: CHART_COLORS.muted,
           fontSize: 11,
           interval: (index) => yearLabels.has(index),
           hideOverlap: true,
@@ -159,10 +160,13 @@ function renderChart() {
         type: 'value',
         min: 0,
         splitNumber: 4,
-        axisLabel: { color: '#64748b', fontSize: 11, formatter: compactCurrency },
-        splitLine: { lineStyle: { color: '#edf2f5' } },
+        axisLabel: { color: CHART_COLORS.muted, fontSize: 11, formatter: compactCurrency },
+        splitLine: { lineStyle: { color: CHART_COLORS.grid } },
       },
-      series: [normalSeries, payoffSeries(props.acceleratedLabel, acceleratedValues, '#0c6b4d')],
+      series: [
+        normalSeries,
+        payoffSeries(props.acceleratedLabel, acceleratedValues, CHART_COLORS.successDark),
+      ],
     },
     true,
   )
@@ -184,7 +188,7 @@ function payoffSeries(name, data, color) {
     showSymbol: false,
     symbol: 'circle',
     lineStyle: { width: 3, color },
-    itemStyle: { color, borderColor: '#fff', borderWidth: 2 },
+    itemStyle: { color, borderColor: CHART_COLORS.inverse, borderWidth: 2 },
     emphasis: { focus: 'series', lineStyle: { width: 4 } },
   }
 }

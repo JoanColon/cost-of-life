@@ -573,7 +573,7 @@ function currentPeriodKey() {
   color: var(--color-copy);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 699px) {
   .app-toolbar {
     min-height: calc(56px + env(safe-area-inset-top));
     padding-top: env(safe-area-inset-top);

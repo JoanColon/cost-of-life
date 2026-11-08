@@ -297,44 +297,6 @@
               :aria-label="t('liabilities.mortgage.balanceChartAria')"
             />
           </section>
-
-          <section class="faster-card">
-            <div class="section-heading">
-              <span class="section-icon section-icon--faster"><q-icon name="speed" /></span>
-              <div>
-                <h2>{{ t('liabilities.mortgage.payOffFaster') }}</h2>
-                <small>{{ t('liabilities.mortgage.payOffDescription') }}</small>
-              </div>
-            </div>
-
-            <div class="extra-payment-field form-field">
-              <label>{{ t('liabilities.mortgage.extraMonthlyPayment') }}</label>
-              <q-input
-                v-model="extraMonthlyPayment"
-                outlined
-                type="number"
-                min="0"
-                step="10"
-                :prefix="currencySymbol"
-                :suffix="t('liabilities.mortgage.perMonth')"
-              />
-            </div>
-
-            <div class="faster-results">
-              <article>
-                <span>{{ t('liabilities.mortgage.newPayoffDate') }}</span>
-                <strong>{{ formatMonthYear(projection.accelerated.payoffDate) }}</strong>
-              </article>
-              <article>
-                <span>{{ t('liabilities.mortgage.finishEarlier') }}</span>
-                <strong>{{ formatDuration(projection.accelerated.monthsEarlier) }}</strong>
-              </article>
-              <article>
-                <span>{{ t('liabilities.mortgage.interestSaved') }}</span>
-                <strong>{{ formatCurrency(projection.accelerated.interestSaved) }}</strong>
-              </article>
-            </div>
-          </section>
         </template>
       </template>
     </main>
@@ -420,7 +382,6 @@ const pageError = ref(null)
 const saving = ref(false)
 const editing = ref(false)
 const modelForm = ref(null)
-const extraMonthlyPayment = ref(0)
 const amortizationDialog = ref(false)
 const amortizationPagination = ref({ page: 1, rowsPerPage: 12 })
 const form = reactive(emptyForm())
@@ -483,7 +444,6 @@ const projection = computed(() => {
   try {
     return calculateMortgageProjection({
       ...mortgageModel.value,
-      extraMonthlyPayment: normalizeNonNegativeMoney(extraMonthlyPayment.value) ?? 0,
       asOfDate: localToday(),
     })
   } catch {
@@ -869,8 +829,7 @@ h1 {
 .setup-card,
 .mortgage-summary,
 .next-payment-card,
-.chart-card,
-.faster-card {
+.chart-card {
   @include dashboard-card;
   margin-top: 1.25rem;
 }
@@ -996,8 +955,7 @@ h1 {
 }
 
 .next-payment-card,
-.chart-card,
-.faster-card {
+.chart-card {
   padding: clamp(1.1rem, 3vw, 1.75rem);
 }
 
@@ -1022,11 +980,6 @@ h1 {
   font-size: 1.2rem;
 }
 
-.section-icon--faster {
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
-}
-
 .section-heading h2,
 .section-heading small {
   margin: 0;
@@ -1041,8 +994,7 @@ h1 {
   color: var(--color-copy);
 }
 
-.payment-values,
-.faster-results {
+.payment-values {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
@@ -1053,23 +1005,20 @@ h1 {
   background: var(--color-line);
 }
 
-.payment-values > div,
-.faster-results article {
+.payment-values > div {
   display: grid;
   gap: 0.35rem;
   padding: 1rem;
   background: var(--color-surface);
 }
 
-.payment-values span,
-.faster-results span {
+.payment-values span {
   color: var(--color-copy);
   font-size: 0.78rem;
   font-weight: 650;
 }
 
-.payment-values strong,
-.faster-results strong {
+.payment-values strong {
   color: var(--color-ink);
   font-size: clamp(1.15rem, 3vw, 1.55rem);
 }
@@ -1082,11 +1031,6 @@ h1 {
 
 .chart-card :deep(.mortgage-balance-chart) {
   margin-top: 1.25rem;
-}
-
-.extra-payment-field {
-  max-width: 22rem;
-  margin-top: 1.5rem;
 }
 
 .amortization-dialog {
@@ -1198,9 +1142,20 @@ h1 {
     font-size: 1.35rem;
   }
 
-  .payment-values,
-  .faster-results {
-    grid-template-columns: 1fr;
+  .payment-values {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .payment-values > div {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .payment-values span {
+    font-size: 0.65rem;
+  }
+
+  .payment-values strong {
+    font-size: 1.05rem;
   }
 
   .chart-heading {

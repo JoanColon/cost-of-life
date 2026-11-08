@@ -40,11 +40,35 @@ describe('milestones', () => {
       progress: 0.7,
       reached: false,
     })
-    expect(milestone(progress, 'freedom_5_years')).toMatchObject({
-      currentValue: 5,
-      progress: 1,
-      reached: true,
+    const freedom = milestone(progress, 'freedom_5_years')
+    expect(freedom.currentValue).toBeCloseTo(70_000 / 12_000)
+    expect(freedom).toMatchObject({ progress: 1, reached: true })
+  })
+
+  it('excludes a linked primary-home mortgage from investable wealth', () => {
+    const current = financialYear({
+      cash: 30_000,
+      investments: 60_000,
+      primaryHome: 500_000,
+      annualCost: 12_000,
     })
+    for (const month of Object.values(current.months)) {
+      month.liabilities.categories.mortgage = {
+        subcategories: {
+          mortgage: {
+            total: 20_000,
+            items: { 'primary-mortgage': { total: 20_000 } },
+          },
+        },
+      }
+    }
+    const progress = calculateMilestoneProgress({
+      financialYear: current,
+      excludedLiabilityIds: new Set(['primary-mortgage']),
+      month: '10',
+    })
+
+    expect(milestone(progress, 'freedom_5_years').currentValue).toBe(7.5)
   })
 
   it('does not award coverage milestones when Cost of Life is zero', () => {
@@ -86,7 +110,7 @@ describe('milestones', () => {
     })
   })
 
-  it('keeps an achievement while reporting lower current progress', () => {
+  it('revokes an achievement when the current data no longer reaches it', () => {
     const progress = calculateMilestoneProgress({
       financialYear: financialYear({ cash: 1_000, annualCost: 12_000 }),
       achievements: [{ milestoneId: 'safety_6_months' }],
@@ -97,7 +121,7 @@ describe('milestones', () => {
     expect(safety.currentValue).toBe(1)
     expect(safety.progress).toBeCloseTo(1 / 6)
     expect(safety.reached).toBe(false)
-    expect(safety.previouslyAchieved).toBe(true)
+    expect(safety.achieved).toBe(false)
   })
 
   it('distinguishes pending milestones from permanent achievements', () => {
@@ -113,12 +137,12 @@ describe('milestones', () => {
 
     expect(milestone(progress, 'safety_6_months')).toMatchObject({
       pending: true,
-      previouslyAchieved: false,
+      achieved: false,
       qualifiedAt,
     })
     expect(milestone(progress, 'safety_3_months')).toMatchObject({
       pending: false,
-      previouslyAchieved: true,
+      achieved: true,
     })
   })
 
@@ -187,6 +211,12 @@ describe('milestones', () => {
     })
 
     expect(milestone(progress, 'debt_mortgage_free')).toMatchObject({
+      currentValue: 40_000,
+      progress: 0.6,
+      reached: false,
+      relevant: true,
+    })
+    expect(milestone(progress, 'debt_free')).toMatchObject({
       currentValue: 40_000,
       progress: 0.6,
       reached: false,

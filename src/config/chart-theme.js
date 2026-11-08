@@ -1,0 +1,15 @@
+export const CHART_COLORS = Object.freeze({
+  ink: '#0b1633',
+  copy: '#526987',
+  muted: '#64748b',
+  mutedLight: '#7f90a5',
+  axis: '#dce5ed',
+  axisSoft: '#dbe4eb',
+  grid: '#edf2f5',
+  inverse: '#fff',
+  primary: '#0870d8',
+  success: '#16815f',
+  successDark: '#0c6b4d',
+  purple: '#8754ed',
+  warning: '#e58b43',
+})

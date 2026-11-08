@@ -347,26 +347,6 @@ async function workspaceCreated({ workspace }) {
   margin: 0 auto;
 }
 
-.hub-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
-}
-
-h1 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: clamp(2.25rem, 5vw, 4rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
-}
-
-.hub-header p {
-  margin: 0.75rem 0 0;
-  color: var(--color-copy);
-}
-
 .workspace-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
@@ -471,10 +451,5 @@ h1 {
 }
 
 @media (max-width: 699px) {
-  .hub-header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
 }
 </style>

@@ -105,6 +105,24 @@ describe('achievements service', () => {
     expect(transaction.update).not.toHaveBeenCalled()
   })
 
+  it('revokes a confirmed achievement when the milestone is no longer reached', async () => {
+    const reference = { id: 'freedom_25_years' }
+    transaction.get.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ status: 'achieved' }),
+      ref: reference,
+    })
+
+    await syncMilestoneAchievements(
+      'workspace-a',
+      [{ id: 'freedom_25_years', reached: false, currentValue: 23.4 }],
+      [{ milestoneId: 'freedom_25_years', status: 'achieved' }],
+    )
+
+    expect(transaction.delete).toHaveBeenCalledWith(reference)
+    expect(transaction.update).not.toHaveBeenCalled()
+  })
+
   it('promotes a candidate that remains reached for 24 hours', async () => {
     const now = Date.UTC(2026, 9, 19, 10)
     const qualifiedAt = now - MILESTONE_CONFIRMATION_DELAY_MS

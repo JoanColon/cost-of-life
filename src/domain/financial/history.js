@@ -1,4 +1,10 @@
-import { financialYearMonthCategoryValue, financialYearMonthValue } from './financial-year'
+import {
+  financialYearAvailableIncomeValue,
+  financialYearFlowValue,
+  financialYearMonthCategoryValue,
+  financialYearMonthValue,
+} from './financial-year'
+import { investableWealthAt } from './investable-wealth'
 
 export function withCurrentPosition(historyDocuments, financialYear, month) {
   if (!financialYear || !/^\d{2}$/.test(String(month || '')))
@@ -65,6 +71,50 @@ export function buildNetWorthBreakdownSeries(
       liabilities: categoryValues(history, month, projection, 'liabilities', memberId, -1),
     }),
   )
+}
+
+export function buildProgressSeries(
+  historyDocuments = [],
+  { throughPeriod = null, memberId = 'all', excludedLiabilityIds = new Set() } = {},
+) {
+  return positionPeriods(historyDocuments, throughPeriod).map(({ history, month, period }) => {
+    const year = Number(history.year || history.id)
+    const annualFinancialYear =
+      historyDocuments.find((document) => Number(document?.year || document?.id) === year) ||
+      history
+    const costOfLife = financialYearFlowValue(annualFinancialYear, 'expenses', memberId)
+    const income = financialYearAvailableIncomeValue(annualFinancialYear, memberId)
+    const investableWealth = investableWealthAt(history, month, {
+      memberId,
+      excludedLiabilityIds,
+    })
+
+    return {
+      period,
+      netWorth: financialYearMonthValue(history, month, 'netWorth', memberId),
+      assets: financialYearMonthValue(history, month, 'assets', memberId),
+      liabilities: financialYearMonthValue(history, month, 'liabilities', memberId),
+      investmentAssets: financialYearMonthCategoryValue(
+        history,
+        month,
+        'assets',
+        'investment',
+        memberId,
+      ),
+      mortgageBalance: financialYearMonthCategoryValue(
+        history,
+        month,
+        'liabilities',
+        'mortgage',
+        memberId,
+      ),
+      costOfLife,
+      income,
+      savingsCapacity: income - costOfLife,
+      investableWealth,
+      yearsFunded: costOfLife > 0 ? Math.max(0, investableWealth / costOfLife) : 0,
+    }
+  })
 }
 
 export function buildAssetAnnualSeries(

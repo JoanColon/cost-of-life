@@ -216,6 +216,27 @@ export function financialYearMonthSubcategoryValue(
   return itemValue(item, section, memberId)
 }
 
+export function financialYearMonthItemValue(
+  financialYear,
+  month,
+  section,
+  itemId,
+  memberId = 'all',
+) {
+  return moneyOrZero(
+    Object.values(financialYear?.months?.[month]?.[section]?.categories || {}).reduce(
+      (categoryTotal, category) =>
+        categoryTotal +
+        Object.values(category?.subcategories || {}).reduce(
+          (subcategoryTotal, subcategory) =>
+            subcategoryTotal + itemValue(subcategory?.items?.[itemId], section, memberId),
+          0,
+        ),
+      0,
+    ),
+  )
+}
+
 export function financialYearCategoryItemCount(financialYear, section, categoryId, month = null) {
   const category = month
     ? financialYear?.months?.[month]?.[section]?.categories?.[categoryId]
@@ -265,7 +286,9 @@ export function financialYearSubcategoryValue(
 }
 
 export function financialYearExpenseItemValue(item, modelValue) {
-  if (item?.source === 'tracked') return moneyOrZero(item.effective)
+  if (item?.source === 'tracked' || item?.source === 'combined') {
+    return moneyOrZero(item.effective)
+  }
   return modelValue === undefined ? moneyOrZero(item?.effective) : moneyOrZero(modelValue)
 }
 

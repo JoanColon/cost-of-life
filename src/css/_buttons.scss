@@ -9,7 +9,6 @@
 .q-btn:not(.q-btn--round) {
   min-height: var(--button-height-md);
   padding-inline: var(--button-padding-inline);
-  border-radius: var(--radius-button) !important;
 }
 
 .q-btn.q-btn--dense:not(.q-btn--round) {
@@ -42,8 +41,8 @@
   min-width: 10rem;
 }
 
-.app-btn--large {
-  min-height: var(--button-height-lg) !important;
+.q-btn.app-btn--large {
+  min-height: var(--button-height-lg);
 }
 
 @media (max-width: 599px) {

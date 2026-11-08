@@ -317,6 +317,33 @@ describe('server financial year projection', () => {
     expect(updated.schemaVersion).toBe(1)
   })
 
+  it('adds tracked actuals to the planned amount for a combined month', () => {
+    const updated = applyTrackingMonth(projection(), '10', {
+      categories: {
+        groceries: { items: [{ itemId: 'groceries', amount: 437, ownership }] },
+      },
+      reconciliation: { groceries: { decision: 'combined' } },
+    })
+
+    expect(updated.months['10'].expenses.categories.food.subcategories.groceries).toMatchObject({
+      estimated: 500,
+      actual: 437,
+      effective: 937,
+      source: 'combined',
+      memberValues: { 'member-a': 937 },
+    })
+    expect(
+      updated.months['10'].expenses.categories.food.subcategories.groceries.items.groceries,
+    ).toMatchObject({
+      estimated: 500,
+      actual: 437,
+      effective: 937,
+      source: 'combined',
+      memberValues: { 'member-a': 937 },
+    })
+    expect(financialYearValue(updated, 'expenses')).toBe(6437)
+  })
+
   it('keeps the tracked actual when a historical month uses the model', () => {
     const updated = applyTrackingMonth(projection(), '10', {
       categories: {

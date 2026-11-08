@@ -559,32 +559,6 @@ function liabilityCategoryName(categoryId) {
   margin: 0 auto;
 }
 
-.dashboard-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 1.5rem;
-}
-
-.dashboard-heading {
-  min-width: 0;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(2rem, 3.5vw, 3.1rem);
-  font-weight: 780;
-  line-height: 1;
-  letter-spacing: -0.055em;
-}
-
-.dashboard-heading p {
-  margin: 0.45rem 0 0;
-  color: var(--color-copy);
-  font-size: 1.05rem;
-}
-
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.75fr) minmax(20rem, 1fr);
@@ -612,20 +586,6 @@ h1 {
     display: flex;
     flex-direction: column;
     height: 100%;
-  }
-
-  .dashboard-header {
-    flex: 0 0 auto;
-    margin-bottom: clamp(0.55rem, 1.3vh, 0.85rem);
-  }
-
-  h1 {
-    font-size: clamp(2rem, 3.4vh, 2.65rem);
-  }
-
-  .dashboard-heading p {
-    margin-top: 0.25rem;
-    font-size: 0.9rem;
   }
 
   .dashboard-grid {
@@ -665,10 +625,6 @@ h1 {
     padding-left: max(1rem, env(safe-area-inset-left));
   }
 
-  .dashboard-header {
-    align-items: center;
-  }
-
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -683,27 +639,8 @@ h1 {
 }
 
 @media (max-width: 699px) {
-  .dashboard-header {
-    align-items: flex-end;
-    gap: 1rem;
-  }
-
-  h1 {
-    font-size: clamp(1.9rem, 8vw, 2.65rem);
-  }
-
-  .dashboard-heading p {
-    display: none;
-  }
-
   .dashboard-grid {
     gap: 1rem;
-  }
-}
-
-@media (max-width: 599px) {
-  .dashboard-header {
-    display: none;
   }
 }
 
@@ -711,10 +648,6 @@ h1 {
   .workspace-dashboard-page {
     padding-right: max(0.75rem, env(safe-area-inset-right));
     padding-left: max(0.75rem, env(safe-area-inset-left));
-  }
-
-  .dashboard-header {
-    margin-bottom: 1.1rem;
   }
 }
 </style>
