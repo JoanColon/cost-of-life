@@ -52,14 +52,17 @@ const PORTFOLIO_SCHEMA = {
 }
 
 function normalizeInvestmentPortfolio(portfolioRows, summaryRows) {
+  const normalizedSummary = normalizeSummary(summaryRows, { allowPartial: true })
+  const normalizedHoldings = normalizeHoldings(portfolioRows, { collectWarnings: true })
   return {
     schemaVersion: PORTFOLIO_SCHEMA.version,
-    summary: normalizeSummary(summaryRows),
-    holdings: normalizeHoldings(portfolioRows),
+    summary: normalizedSummary.summary,
+    holdings: normalizedHoldings.holdings,
+    warnings: [...normalizedSummary.warnings, ...normalizedHoldings.warnings],
   }
 }
 
-function normalizeSummary(rows) {
+function normalizeSummary(rows, { allowPartial = false } = {}) {
   const values = {}
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!Array.isArray(row)) continue
@@ -86,19 +89,28 @@ function normalizeSummary(rows) {
     invalidFields.push('dividends received')
   }
   if (!isNonNegativeNumber(summary.annualDividendIncome)) invalidFields.push('annual dividends')
-  if (invalidFields.length) {
+  if (invalidFields.length && !allowPartial) {
     throw new Error(`The Google Sheet returned an invalid Summary: ${invalidFields.join(', ')}`)
   }
 
-  return {
+  const normalized = {
     ...summary,
-    totalPortfolioValue: roundMoney(summary.totalPortfolioValue),
-    totalDividendsReceived: roundMoney(summary.totalDividendsReceived),
-    annualDividendIncome: roundMoney(summary.annualDividendIncome),
+    totalPortfolioValue: nullableMoney(summary.totalPortfolioValue),
+    totalDividendsReceived: nullableMoney(summary.totalDividendsReceived),
+    annualDividendIncome: nullableMoney(summary.annualDividendIncome),
+  }
+  if (!allowPartial) return normalized
+  return {
+    summary: normalized,
+    warnings: invalidFields.map((field) => ({
+      scope: 'summary',
+      field: summaryFieldName(field),
+      code: spreadsheetError(values[summaryFieldName(field)]) ? 'formula_error' : 'invalid_value',
+    })),
   }
 }
 
-function normalizeHoldings(rows) {
+function normalizeHoldings(rows, { collectWarnings = false } = {}) {
   if (!Array.isArray(rows) || !rows.length) {
     throw new Error('The Google Sheet returned an empty Portfolio')
   }
@@ -118,24 +130,47 @@ function normalizeHoldings(rows) {
     )
   }
 
-  return rows.slice(1).reduce((holdings, row, rowIndex) => {
-    if (!Array.isArray(row) || row.every((value) => !String(value ?? '').trim())) return holdings
+  const warnings = []
+  const holdings = rows.slice(1).reduce((result, row, rowIndex) => {
+    if (!Array.isArray(row) || row.every((value) => !String(value ?? '').trim())) return result
     const ticker = String(row[indexes.ticker] ?? '').trim()
-    if (!ticker) return holdings
+    if (!ticker || spreadsheetError(ticker)) {
+      if (String(row[indexes.ticker] ?? '').trim()) {
+        warnings.push({ scope: 'holding', row: rowIndex + 2, field: 'ticker', code: 'formula_error' })
+      }
+      return result
+    }
 
     const holding = { id: `portfolio-${rowIndex}`, ticker }
     for (const field of PORTFOLIO_SCHEMA.holdings) {
       if (field.name === 'ticker') continue
       const value = indexes[field.name] < 0 ? null : row[indexes[field.name]]
-      holding[field.name] =
-        field.type === 'number' ? parseLocalizedNumber(value) : String(value ?? '').trim()
+      const sourceError = spreadsheetError(value)
+      holding[field.name] = field.type === 'number' ? parseLocalizedNumber(value) : sourceError ? '' : String(value ?? '').trim()
+      const missingRequired =
+        field.required !== false && (holding[field.name] == null || holding[field.name] === '')
+      if (
+        sourceError ||
+        missingRequired ||
+        (field.type === 'number' && holding[field.name] === null && String(value ?? '').trim())
+      ) {
+        warnings.push({
+          scope: 'holding',
+          row: rowIndex + 2,
+          ticker,
+          field: field.name,
+          code: sourceError ? 'formula_error' : missingRequired ? 'missing_value' : 'invalid_value',
+        })
+      }
     }
-    holdings.push(holding)
-    return holdings
+    result.push(holding)
+    return result
   }, [])
+  return collectWarnings ? { holdings, warnings } : holdings
 }
 
 function parseLocalizedNumber(value) {
+  if (spreadsheetError(value)) return null
   const input = String(value ?? '')
     .trim()
     .replace(/[^0-9,.-]/g, '')
@@ -163,6 +198,25 @@ function parseLocalizedNumber(value) {
 
   const number = Number(normalized)
   return Number.isFinite(number) ? number : null
+}
+
+function spreadsheetError(value) {
+  return /^#(?:N\/A|ERROR!?|REF!?|DIV\/0!?|VALUE!?|NAME\??|NUM!?|NULL!?|SPILL!?|CALC!?|LOADING)(?:\b|$)/i.test(
+    String(value ?? '').trim(),
+  )
+}
+
+function nullableMoney(value) {
+  return isNonNegativeNumber(value) ? roundMoney(value) : null
+}
+
+function summaryFieldName(label) {
+  return {
+    'base currency': 'baseCurrency',
+    'portfolio value': 'totalPortfolioValue',
+    'dividends received': 'totalDividendsReceived',
+    'annual dividends': 'annualDividendIncome',
+  }[label]
 }
 
 function parseCsv(value) {
@@ -247,6 +301,7 @@ const investmentPortfolioSchema = {
   normalizeHoldings,
   parseCsv,
   parseLocalizedNumber,
+  spreadsheetError,
 }
 
 export {
@@ -256,5 +311,6 @@ export {
   normalizeHoldings,
   parseCsv,
   parseLocalizedNumber,
+  spreadsheetError,
 }
 export default investmentPortfolioSchema

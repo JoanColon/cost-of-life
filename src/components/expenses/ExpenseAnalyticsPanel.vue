@@ -10,24 +10,13 @@
             dense
             icon="info_outline"
             class="analytics-info"
-            :aria-label="t('expenseTracker.analytics.infoAction')"
+            :aria-label="infoAction"
             @click="openInfo"
           >
             <q-tooltip v-if="$q.screen.gt.xs" max-width="22rem">
-              {{ t('expenseTracker.analytics.infoDescription') }}
+              {{ infoDescription }}
             </q-tooltip>
           </q-btn>
-        </div>
-      </div>
-      <div class="analytics-summary">
-        <ExpenseMonthMetric
-          v-model="period"
-          class="analytics-month"
-          :label="t('expenseTracker.review.month')"
-        />
-        <div class="analytics-total">
-          <span>{{ t('expenseTracker.analytics.totalSpent') }}</span>
-          <strong>{{ formatCurrency(total) }}</strong>
         </div>
       </div>
     </header>
@@ -113,19 +102,19 @@
 
     <div v-if="!categories.length" class="analytics-empty">
       <span><q-icon name="donut_large" /></span>
-      <h2>{{ t('expenseTracker.analytics.emptyTitle') }}</h2>
-      <p>{{ t('expenseTracker.analytics.emptyDescription') }}</p>
+      <h2>{{ emptyTitle }}</h2>
+      <p>{{ emptyDescription }}</p>
     </div>
 
     <q-dialog v-model="infoOpen" position="bottom">
       <q-card class="app-info-dialog responsive-info-card">
         <span class="info-sheet-handle" aria-hidden="true" />
         <q-card-section class="app-info-heading">
-          <h2>{{ t('expenseTracker.analytics.infoTitle') }}</h2>
+          <h2>{{ infoTitle }}</h2>
           <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
         </q-card-section>
         <q-card-section class="app-info-copy">
-          <p>{{ t('expenseTracker.analytics.infoDescription') }}</p>
+          <p>{{ infoDescription }}</p>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -140,20 +129,61 @@ import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
-import ExpenseMonthMetric from '@/components/expenses/ExpenseMonthMetric.vue'
 import { CHART_COLORS } from '@/config/chart-theme'
 import { formatCurrency } from '@/utils/formatters'
 
 use([PieChart, TooltipComponent, AriaComponent, CanvasRenderer])
 
-const props = defineProps({ categories: { type: Array, default: () => [] } })
-const period = defineModel({ type: String, required: true })
+const props = defineProps({
+  categories: { type: Array, default: () => [] },
+  granularity: {
+    type: String,
+    default: 'monthly',
+    validator: (value) => ['monthly', 'annual'].includes(value),
+  },
+})
+const granularity = computed(() => props.granularity)
 const $q = useQuasar()
 const { t, locale } = useI18n()
 const chartElement = ref(null)
 const selectedCategoryId = ref(null)
 const legendExpanded = ref(false)
 const infoOpen = ref(false)
+const infoDescription = computed(() =>
+  t(
+    granularity.value === 'annual'
+      ? 'expenseTracker.analytics.annualInfoDescription'
+      : 'expenseTracker.analytics.infoDescription',
+  ),
+)
+const infoAction = computed(() =>
+  t(
+    granularity.value === 'annual'
+      ? 'expenseTracker.analytics.annualInfoAction'
+      : 'expenseTracker.analytics.infoAction',
+  ),
+)
+const infoTitle = computed(() =>
+  t(
+    granularity.value === 'annual'
+      ? 'expenseTracker.analytics.annualInfoTitle'
+      : 'expenseTracker.analytics.infoTitle',
+  ),
+)
+const emptyTitle = computed(() =>
+  t(
+    granularity.value === 'annual'
+      ? 'expenseTracker.analytics.annualEmptyTitle'
+      : 'expenseTracker.analytics.emptyTitle',
+  ),
+)
+const emptyDescription = computed(() =>
+  t(
+    granularity.value === 'annual'
+      ? 'expenseTracker.analytics.annualEmptyDescription'
+      : 'expenseTracker.analytics.emptyDescription',
+  ),
+)
 const total = computed(() => props.categories.reduce((sum, category) => sum + category.value, 0))
 const visibleCategories = computed(() =>
   legendExpanded.value ? props.categories : props.categories.slice(0, 5),
@@ -220,7 +250,16 @@ function renderChart() {
   chart.setOption(
     {
       animationDuration: 350,
-      aria: { enabled: true, label: { description: t('expenseTracker.analytics.ariaLabel') } },
+      aria: {
+        enabled: true,
+        label: {
+          description: t(
+            granularity.value === 'annual'
+              ? 'expenseTracker.analytics.annualAriaLabel'
+              : 'expenseTracker.analytics.ariaLabel',
+          ),
+        },
+      },
       tooltip: {
         trigger: 'item',
         backgroundColor: CHART_COLORS.ink,
@@ -326,35 +365,6 @@ function escapeHtml(value) {
 
 .analytics-heading-copy {
   align-self: center;
-}
-
-.analytics-summary {
-  display: flex;
-  align-items: stretch;
-  gap: 1.35rem;
-}
-
-.analytics-month {
-  min-width: 13rem;
-}
-
-.analytics-total {
-  display: grid;
-  min-width: 8.5rem;
-  padding-left: 1.35rem;
-  border-left: 1px solid var(--color-line);
-}
-
-.analytics-total span {
-  color: var(--color-copy);
-  font-size: 0.72rem;
-}
-
-.analytics-total strong {
-  margin-top: 0.1rem;
-  color: var(--color-ink);
-  font-size: 1.25rem;
-  line-height: 1.1;
 }
 
 .subcategory-analysis header > strong {
@@ -620,49 +630,6 @@ function escapeHtml(value) {
 
   .analytics-heading {
     display: grid;
-  }
-
-  .analytics-summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-    gap: 1rem;
-  }
-
-  .analytics-total {
-    box-sizing: border-box;
-    min-width: 0;
-    justify-items: end;
-    padding-left: 1rem;
-    text-align: right;
-  }
-
-  .analytics-month,
-  .analytics-total {
-    min-width: 0;
-  }
-
-  .analytics-summary :deep(.expense-month-metric) {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .analytics-summary :deep(.metric-value) {
-    min-width: 0;
-    gap: 0.25rem;
-  }
-
-  .analytics-summary :deep(.metric-value strong) {
-    min-width: 0;
-    font-size: 0.95rem;
-  }
-
-  .analytics-total strong {
-    font-size: 1.05rem;
-    white-space: nowrap;
   }
 
   .expense-donut {

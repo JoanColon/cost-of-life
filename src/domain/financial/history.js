@@ -1,6 +1,7 @@
 import {
   financialYearAvailableIncomeValue,
   financialYearFlowValue,
+  financialYearMonthAvailableIncomeValue,
   financialYearMonthCategoryValue,
   financialYearMonthValue,
 } from './financial-year'
@@ -117,6 +118,33 @@ export function buildProgressSeries(
   })
 }
 
+export function buildMonthlyFlowSeries(
+  historyDocuments = [],
+  { throughPeriod = null, memberId = 'all' } = {},
+) {
+  return positionPeriods(historyDocuments, throughPeriod).map(({ history, month, period }) => {
+    const income = financialYearMonthAvailableIncomeValue(history, month, memberId)
+    const costOfLife = financialYearMonthValue(history, month, 'expenses', memberId)
+    return {
+      period,
+      income,
+      costOfLife,
+      savingsCapacity: income - costOfLife,
+      coverage: expenseCoverage(history?.months?.[month]?.expenses),
+    }
+  })
+}
+
+export function buildNetWorthBridge(startPoint, endPoint) {
+  if (!startPoint || !endPoint) return []
+  return [
+    ...sectionBridge(startPoint.assets, endPoint.assets, 'assets'),
+    ...sectionBridge(startPoint.liabilities, endPoint.liabilities, 'liabilities'),
+  ]
+    .filter(({ value }) => Math.abs(value) >= 0.01)
+    .sort((first, second) => Math.abs(second.value) - Math.abs(first.value))
+}
+
 export function buildAssetAnnualSeries(
   historyDocuments = [],
   { assetId, categoryId = 'investment' } = {},
@@ -185,4 +213,25 @@ function categoryValues(history, month, projection, section, memberId, multiplie
       financialYearMonthCategoryValue(history, month, section, categoryId, memberId) * multiplier,
     ]),
   )
+}
+
+function expenseCoverage(expenses) {
+  const sources = new Set(
+    Object.values(expenses?.categories || {}).flatMap((category) =>
+      Object.values(category?.subcategories || {}).map(({ source }) => source || 'model'),
+    ),
+  )
+  if (!sources.size || (sources.size === 1 && sources.has('model'))) return 'model'
+  if (sources.size === 1 && sources.has('tracked')) return 'tracked'
+  return 'mixed'
+}
+
+function sectionBridge(start = {}, end = {}, section) {
+  const categoryIds = new Set([...Object.keys(start || {}), ...Object.keys(end || {})])
+  return [...categoryIds].map((categoryId) => ({
+    key: `${section}:${categoryId}`,
+    section,
+    categoryId,
+    value: Number(end?.[categoryId] || 0) - Number(start?.[categoryId] || 0),
+  }))
 }

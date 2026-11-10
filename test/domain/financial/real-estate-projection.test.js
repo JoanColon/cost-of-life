@@ -70,4 +70,10 @@ describe('real estate projection', () => {
     const projection = projectRealEstate({ ...baseModel, horizonMonths: 1 })
     expect(projection.at(-1).homeEquity).toBe(projection.at(-1).propertyValue)
   })
+
+  it('uses the persisted model appreciation bounds', () => {
+    expect(() => projectRealEstate({ ...baseModel, annualAppreciationRate: 100.01 })).toThrow(
+      'between -100% and 100%',
+    )
+  })
 })

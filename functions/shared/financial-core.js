@@ -83,14 +83,16 @@ export function annualRealEstateValue(model, asOfDate) {
   return roundMoney(purchasePrice * Math.pow(1 + annualAppreciationRate / 100, years))
 }
 
-function completedYears(startDate, endDate) {
-  const [startYear, startMonth, startDay] = startDate.split('-').map(Number)
-  const [endYear, endMonth, endDay] = endDate.split('-').map(Number)
+export function completedYears(startDate, endDate) {
+  const canonicalStart = canonicalDate(startDate, 'start date')
+  const canonicalEnd = canonicalDate(endDate, 'end date')
+  const [startYear, startMonth, startDay] = canonicalStart.split('-').map(Number)
+  const [endYear, endMonth, endDay] = canonicalEnd.split('-').map(Number)
   const beforeAnniversary = endMonth < startMonth || (endMonth === startMonth && endDay < startDay)
   return endYear - startYear - Number(beforeAnniversary)
 }
 
-function canonicalDate(value, label) {
+export function canonicalDate(value, label = 'date') {
   const date = String(value || '')
   const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!match) throw new RangeError(`A valid ${label} is required`)
@@ -103,6 +105,32 @@ function canonicalDate(value, label) {
     throw new RangeError(`A valid ${label} is required`)
   }
   return date
+}
+
+export function addCalendarMonths(value, months) {
+  const date = canonicalDate(value)
+  const offset = Number(months)
+  if (!Number.isInteger(offset)) throw new RangeError('A valid month offset is required')
+  const [year, month, day] = date.split('-').map(Number)
+  const targetMonth = month - 1 + offset
+  const lastDay = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year, targetMonth, Math.min(day, lastDay))).toISOString().slice(0, 10)
+}
+
+export function financialDate(value = new Date(), timeZone = 'Europe/Madrid') {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) throw new RangeError('A valid date is required')
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone,
+    })
+      .formatToParts(date)
+      .map(({ type, value: part }) => [type, part]),
+  )
+  return `${parts.year}-${parts.month}-${parts.day}`
 }
 
 function finiteNumber(value, label) {

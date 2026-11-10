@@ -1,4 +1,7 @@
 import {
+  addCalendarMonths,
+  canonicalDate,
+  financialDate,
   frenchMortgagePaymentStep,
   nominalMonthlyRate,
   roundMoney,
@@ -34,8 +37,8 @@ export function buildFrenchAmortizationSchedule({
   const extraPayment = roundMoney(
     finiteNonNegativeNumber(extraMonthlyPayment, 'extra monthly payment'),
   )
-  const projectionDate = canonicalDate(asOfDate)
-  const contractualStartDate = startDate ? canonicalDate(startDate) : null
+  const projectionDate = dateString(asOfDate)
+  const contractualStartDate = startDate ? canonicalDate(startDate, 'mortgage start date') : null
   const firstContractualPayment = contractualStartDate
     ? firstPaymentAfter(contractualStartDate, projectionDate)
     : null
@@ -55,8 +58,8 @@ export function buildFrenchAmortizationSchedule({
     schedule.push({
       paymentNumber,
       date: contractualStartDate
-        ? addUtcMonths(contractualStartDate, firstContractualPayment + paymentNumber - 1)
-        : addUtcMonths(projectionDate, paymentNumber),
+        ? addCalendarMonths(contractualStartDate, firstContractualPayment + paymentNumber - 1)
+        : addCalendarMonths(projectionDate, paymentNumber),
       payment: step.payment,
       interest: step.interest,
       principal: step.principal,
@@ -70,9 +73,8 @@ export function buildFrenchAmortizationSchedule({
 }
 
 function firstPaymentAfter(startDate, asOfDate) {
-  const asOf = asOfDate.toISOString().slice(0, 10)
   for (let paymentNumber = 1; paymentNumber <= MAX_SCHEDULE_MONTHS; paymentNumber += 1) {
-    if (addUtcMonths(startDate, paymentNumber) > asOf) return paymentNumber
+    if (addCalendarMonths(startDate, paymentNumber) > asOfDate) return paymentNumber
   }
   throw new RangeError('The projection date exceeds the supported mortgage schedule')
 }
@@ -138,29 +140,6 @@ function positiveInteger(value, label) {
   return number
 }
 
-function canonicalDate(value) {
-  if (value instanceof Date && Number.isFinite(value.getTime())) {
-    return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()))
-  }
-
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!match) throw new RangeError('A valid projection date is required')
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
-  if (
-    date.getUTCFullYear() !== Number(match[1]) ||
-    date.getUTCMonth() !== Number(match[2]) - 1 ||
-    date.getUTCDate() !== Number(match[3])
-  ) {
-    throw new RangeError('A valid projection date is required')
-  }
-  return date
-}
-
-function addUtcMonths(date, months) {
-  const year = date.getUTCFullYear()
-  const month = date.getUTCMonth() + months
-  const day = date.getUTCDate()
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-  const result = new Date(Date.UTC(year, month, Math.min(day, lastDay)))
-  return result.toISOString().slice(0, 10)
+function dateString(value) {
+  return value instanceof Date ? financialDate(value) : canonicalDate(value, 'projection date')
 }

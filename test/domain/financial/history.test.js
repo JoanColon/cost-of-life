@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAssetAnnualSeries,
+  buildMonthlyFlowSeries,
   buildNetWorthBreakdownSeries,
+  buildNetWorthBridge,
   buildNetWorthSeries,
   buildProgressSeries,
   positionHistoryDocuments,
@@ -272,6 +274,52 @@ describe('financial history series', () => {
         investableWealth: 5_000,
         yearsFunded: 5 / 12,
       },
+    ])
+  })
+
+  it('builds monthly flow points and reports the expense data coverage', () => {
+    const month = {
+      positionStatus: 'current',
+      assets: { categories: {} },
+      liabilities: { categories: {} },
+      income: {
+        categories: {
+          salary: { subcategories: { salary: { items: { job: { total: 3_000 } } } } },
+        },
+      },
+      expenses: {
+        categories: {
+          living: {
+            subcategories: {
+              housing: { effective: 1_000, source: 'tracked' },
+              food: { effective: 500, source: 'model' },
+            },
+          },
+        },
+      },
+    }
+
+    expect(buildMonthlyFlowSeries([{ year: 2026, months: { 11: month } }])).toEqual([
+      {
+        period: '2026-11',
+        income: 3_000,
+        costOfLife: 1_500,
+        savingsCapacity: 1_500,
+        coverage: 'mixed',
+      },
+    ])
+  })
+
+  it('builds a net worth bridge from asset and liability category changes', () => {
+    expect(
+      buildNetWorthBridge(
+        { assets: { cash: 10_000 }, liabilities: { mortgage: -8_000 } },
+        { assets: { cash: 12_500, investment: 2_000 }, liabilities: { mortgage: -6_000 } },
+      ),
+    ).toEqual([
+      { key: 'assets:cash', section: 'assets', categoryId: 'cash', value: 2_500 },
+      { key: 'assets:investment', section: 'assets', categoryId: 'investment', value: 2_000 },
+      { key: 'liabilities:mortgage', section: 'liabilities', categoryId: 'mortgage', value: 2_000 },
     ])
   })
 

@@ -13,6 +13,7 @@ const SHEET_RETRY_DELAY_MS = 200
 const GOOGLE_SHEET_TIMEOUT_MS = 25_000
 const PORTFOLIO_CACHE_TTL_MS = 15 * 60 * 1000
 const MAXIMUM_CACHE_BYTES = 700_000
+const MAXIMUM_STORED_WARNINGS = 100
 
 async function updateInvestmentPortfolio(
   firestore,
@@ -127,8 +128,14 @@ async function synchronizeInvestmentPortfolio(
 
     const spreadsheetUrl = spreadsheetUrlOverride || existingPortfolio?.spreadsheetUrl
     const spreadsheetId = spreadsheetIdFromUrl(spreadsheetUrl)
-    const normalized = await fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl)
-    const cacheBytes = Buffer.byteLength(JSON.stringify(normalized.holdings), 'utf8')
+    const imported = await fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl)
+    const normalized = mergeInvestmentPortfolio(imported, existingPortfolio)
+    if (!Number.isFinite(normalized.summary.totalPortfolioValue)) {
+      throw new Error('The Google Sheet did not provide a valid portfolio value')
+    }
+    const warnings = normalized.warnings.slice(0, MAXIMUM_STORED_WARNINGS)
+    const warningCount = normalized.warnings.length
+    const cacheBytes = Buffer.byteLength(JSON.stringify({ holdings: normalized.holdings, warnings }), 'utf8')
     if (cacheBytes > MAXIMUM_CACHE_BYTES) {
       throw new Error('The Google Sheet is too large to cache safely')
     }
@@ -141,11 +148,15 @@ async function synchronizeInvestmentPortfolio(
       const income = document.data()
       return income?.categoryId === 'investments' && income?.subcategoryId === 'dividends'
     })
-    const incomeDocumentsToUpdate = linkedIncomeDocuments.filter(
-      (document) => !incomeMatchesAnnualDividends(document.data(), normalized.summary),
-    )
+    const incomeDocumentsToUpdate = Number.isFinite(imported.summary.annualDividendIncome) ?
+      linkedIncomeDocuments.filter(
+          (document) => !incomeMatchesAnnualDividends(document.data(), normalized.summary),
+        ) :
+      []
 
+    const importedPortfolioValueIsValid = Number.isFinite(imported.summary.totalPortfolioValue)
     const assetValueChanged =
+      importedPortfolioValueIsValid &&
       roundMoney(context.asset.currentValue) !== normalized.summary.totalPortfolioValue
     const summaryChanged = !sameValue(existingPortfolio?.summary, normalized.summary)
     const holdingsChanged = !sameValue(existingPortfolio?.cache?.holdings, normalized.holdings)
@@ -169,6 +180,8 @@ async function synchronizeInvestmentPortfolio(
       cache: {
         schemaVersion: PORTFOLIO_SCHEMA.version,
         holdings: normalized.holdings,
+        warnings,
+        warningCount,
         lastCheckedAt: now,
         dataUpdatedAt: contentChanged ? now : existingPortfolio?.cache?.dataUpdatedAt || now,
         refreshAfter: now + PORTFOLIO_CACHE_TTL_MS,
@@ -217,10 +230,17 @@ async function synchronizeInvestmentPortfolio(
       })
     }
 
-    return portfolioResult(nextPortfolio, normalized.summary.totalPortfolioValue, 'refreshed', {
-      contentChanged,
-      financialSections: sections,
-    })
+    return portfolioResult(
+      nextPortfolio,
+      importedPortfolioValueIsValid ?
+        normalized.summary.totalPortfolioValue :
+        context.asset.currentValue,
+      'refreshed',
+      {
+        contentChanged,
+        financialSections: sections,
+      },
+    )
   } catch (error) {
     if (existingPortfolio?.spreadsheetUrl) {
       try {
@@ -301,17 +321,73 @@ async function fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl) {
   let lastError
   for (let attempt = 0; attempt < SHEET_READ_ATTEMPTS; attempt += 1) {
     try {
-      const [portfolioBody, summaryBody] = await Promise.all([
+      const [portfolioResult, summaryResult] = await Promise.allSettled([
         fetchGoogleSheet(portfolioUrl, fetchImpl, 1_000_000, 'Portfolio'),
         fetchGoogleSheet(summaryUrl, fetchImpl, 100_000, 'Summary'),
       ])
-      return normalizeInvestmentPortfolio(parseCsv(portfolioBody), parseCsv(summaryBody))
+      if (portfolioResult.status === 'rejected') throw portfolioResult.reason
+      const normalized = normalizeInvestmentPortfolio(
+        parseCsv(portfolioResult.value),
+        summaryResult.status === 'fulfilled' ? parseCsv(summaryResult.value) : [],
+      )
+      if (summaryResult.status === 'rejected') {
+        normalized.warnings.unshift({
+          scope: 'summary',
+          field: 'summary',
+          code: 'source_unavailable',
+          message: summaryResult.reason?.message || 'The Summary tab could not be read',
+        })
+      }
+      return normalized
     } catch (error) {
       lastError = error
       if (attempt + 1 < SHEET_READ_ATTEMPTS) await delay(SHEET_RETRY_DELAY_MS)
     }
   }
   throw lastError
+}
+
+function mergeInvestmentPortfolio(imported, existingPortfolio) {
+  const previousSummary = existingPortfolio?.summary || {}
+  const summary = Object.fromEntries(
+    ['baseCurrency', 'totalPortfolioValue', 'totalDividendsReceived', 'annualDividendIncome'].map(
+      (field) => [field, validImportedValue(imported.summary?.[field]) ? imported.summary[field] : previousSummary[field] ?? null],
+    ),
+  )
+  const previousHoldings = existingPortfolio?.cache?.holdings || []
+  const previousByKey = uniqueHoldingsByKey(previousHoldings)
+  const holdings = imported.holdings.map((holding) => {
+    const previous = previousByKey.get(holdingKey(holding))
+    if (!previous) return holding
+    return Object.fromEntries(
+      Object.entries(holding).map(([field, value]) => [
+        field,
+        value == null || value === '' ? previous[field] ?? value : value,
+      ]),
+    )
+  })
+  return { ...imported, summary, holdings }
+}
+
+function validImportedValue(value) {
+  return typeof value === 'string' ? Boolean(value) : Number.isFinite(value)
+}
+
+function uniqueHoldingsByKey(holdings) {
+  const counts = new Map()
+  for (const holding of holdings) {
+    const key = holdingKey(holding)
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+  return new Map(
+    holdings
+      .filter((holding) => counts.get(holdingKey(holding)) === 1)
+      .map((holding) => [holdingKey(holding), holding]),
+  )
+}
+
+function holdingKey(holding) {
+  return String(holding?.ticker || '').trim().toUpperCase()
 }
 
 async function fetchGoogleSheet(
@@ -347,12 +423,17 @@ function portfolioCacheIsFresh(portfolio, now = Date.now()) {
 }
 
 function portfolioResult(portfolio, currentValue, cacheStatus, extra = {}) {
+  const warnings = Array.isArray(portfolio?.cache?.warnings) ? portfolio.cache.warnings : []
+  const warningCount = Number(portfolio?.cache?.warningCount) || warnings.length
   return {
     portfolio,
     currentValue: roundMoney(currentValue),
     summary: portfolio.summary,
     holdings: portfolio.cache.holdings,
     cacheStatus,
+    status: warningCount ? 'partial' : 'success',
+    warnings,
+    warningCount,
     ...extra,
   }
 }

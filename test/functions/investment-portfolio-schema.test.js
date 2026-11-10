@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import schema from '../../functions/services/investment-portfolio-schema.js'
 
-const { normalizeHoldings, normalizeSummary, parseCsv, parseLocalizedNumber } = schema
+const {
+  normalizeHoldings,
+  normalizeInvestmentPortfolio,
+  normalizeSummary,
+  parseCsv,
+  parseLocalizedNumber,
+} = schema
 
 describe('Google Sheets investment portfolio schema', () => {
   it('parses CSV quotes, commas, line breaks and empty cells', () => {
@@ -32,6 +38,59 @@ describe('Google Sheets investment portfolio schema', () => {
     expect(parseLocalizedNumber('27,693.16 USD')).toBe(27693.16)
     expect(parseLocalizedNumber('1.000')).toBe(1000)
     expect(parseLocalizedNumber('-0,74%')).toBe(-0.74)
+    expect(parseLocalizedNumber('#DIV/0!')).toBeNull()
+    expect(parseLocalizedNumber('#N/A')).toBeNull()
+    expect(parseLocalizedNumber('0')).toBe(0)
+  })
+
+  it('keeps valid portfolio data when optional dividend formulas fail', () => {
+    const result = normalizeInvestmentPortfolio(
+      [
+        portfolioHeaders(),
+        [
+          'IBE.MC',
+          'ES',
+          'Utilities',
+          'Diversified Utilities',
+          'EUR',
+          '1000',
+          '21,9',
+          '#N/A',
+          '#DIV/0!',
+          '21900',
+          '100',
+          '#REF!',
+          '#ERROR!',
+        ],
+      ],
+      [
+        ['Base currency', 'EUR'],
+        ['Total Portofolio Value', '21.900'],
+        ['Total dividends received', '#N/A'],
+        ['Net dividends received', '#DIV/0!'],
+      ],
+    )
+
+    expect(result.summary).toEqual({
+      baseCurrency: 'EUR',
+      totalPortfolioValue: 21900,
+      totalDividendsReceived: null,
+      annualDividendIncome: null,
+    })
+    expect(result.holdings[0]).toMatchObject({
+      ticker: 'IBE.MC',
+      priceLocal: 21.9,
+      marketValueBase: 21900,
+      dayChangePercent: null,
+      dividendYieldPercent: null,
+      annualDividendBase: null,
+    })
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ scope: 'summary', field: 'annualDividendIncome' }),
+        expect.objectContaining({ scope: 'holding', field: 'dividendYieldPercent' }),
+      ]),
+    )
   })
 
   it('maps Portfolio columns into typed canonical holdings', () => {

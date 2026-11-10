@@ -79,6 +79,11 @@
           </div>
         </header>
 
+        <q-banner v-if="projectionWarnings.length" rounded class="projection-warning">
+          <template #avatar><q-icon name="warning_amber" /></template>
+          {{ t('whatIf.strategy.projectionIncomplete') }}
+        </q-banner>
+
         <div class="strategy-overview">
           <section class="panel overview-available-panel">
             <div>
@@ -1281,7 +1286,7 @@ import {
   latestPositionMonth,
   presentValue,
   simulateStrategy,
-  strategyNetWorthPoints,
+  strategyNetWorthProjection,
 } from '@/domain/financial/strategy-simulation'
 import {
   calculateWhatIf,
@@ -1387,23 +1392,20 @@ const liabilities = computed(() =>
     name: liability.name || liabilityCategoryName(liability.categoryId),
   })),
 )
+const modeledDebts = computed(() =>
+  modeledLiabilitiesForPositions(
+    liabilities.value,
+    liabilitiesStore.itemsForCategory('mortgage'),
+    selectedMemberId.value,
+  ),
+)
 const selectedDebt = computed(
   () =>
-    liabilities.value.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
-    liabilities.value.find(({ categoryId }) => categoryId === 'mortgage') ||
-    liabilities.value[0] ||
+    modeledDebts.value.find(({ id }) => id === activeScenario.value.selectedLiabilityId) ||
+    modeledDebts.value[0] ||
     null,
 )
-const selectedDebtModel = computed(() => {
-  if (!selectedDebt.value) return null
-  return (
-    modeledLiabilitiesForPositions(
-      [selectedDebt.value],
-      liabilitiesStore.itemsForCategory('mortgage'),
-      selectedMemberId.value,
-    )[0] || selectedDebt.value
-  )
-})
+const selectedDebtModel = computed(() => selectedDebt.value)
 const allocation = computed(() =>
   normalizeStrategyForOptions(activeScenario.value.allocation, {
     cash: true,
@@ -1464,7 +1466,7 @@ const scenarioOptions = computed(() =>
   config.value.scenarios.map(({ id, name }) => ({ value: id, label: name })),
 )
 const liabilityOptions = computed(() =>
-  liabilities.value.map(({ id, name }) => ({ value: id, label: name })),
+  modeledDebts.value.map(({ id, name }) => ({ value: id, label: name })),
 )
 const cashTargetOptions = computed(() =>
   [3, 6, 12].map((months) => ({ value: months, label: `${months} months` })),
@@ -1512,8 +1514,8 @@ const currentRealEstate = computed(() => calculationContext.value.currentRealEst
 const modeledRealEstateAssets = computed(() => calculationContext.value.modeledRealEstateAssets)
 const modeledMortgages = computed(() => calculationContext.value.modeledMortgages)
 const currentNetWorth = computed(() => calculationContext.value.currentNetWorth)
-const netWorthPoints = computed(() =>
-  strategyNetWorthPoints({
+const netWorthProjection = computed(() =>
+  strategyNetWorthProjection({
     currentNetWorth: currentNetWorth.value,
     currentAssets: currentAssets.value,
     currentLiabilities: currentLiabilities.value,
@@ -1527,8 +1529,9 @@ const netWorthPoints = computed(() =>
     asOfDate: localToday(),
   }),
 )
-const baselineNetWorthPoints = computed(() =>
-  strategyNetWorthPoints({
+const netWorthPoints = computed(() => netWorthProjection.value.points)
+const baselineNetWorthProjection = computed(() =>
+  strategyNetWorthProjection({
     currentNetWorth: currentNetWorth.value,
     currentAssets: currentAssets.value,
     currentLiabilities: currentLiabilities.value,
@@ -1542,8 +1545,9 @@ const baselineNetWorthPoints = computed(() =>
     asOfDate: localToday(),
   }),
 )
-const monthlyNetWorthPoints = computed(() =>
-  strategyNetWorthPoints({
+const baselineNetWorthPoints = computed(() => baselineNetWorthProjection.value.points)
+const monthlyNetWorthProjection = computed(() =>
+  strategyNetWorthProjection({
     currentNetWorth: currentNetWorth.value,
     currentAssets: currentAssets.value,
     currentLiabilities: currentLiabilities.value,
@@ -1559,6 +1563,12 @@ const monthlyNetWorthPoints = computed(() =>
     asOfDate: localToday(),
   }),
 )
+const monthlyNetWorthPoints = computed(() => monthlyNetWorthProjection.value.points)
+const projectionWarnings = computed(() => [
+  ...netWorthProjection.value.warnings,
+  ...baselineNetWorthProjection.value.warnings,
+  ...monthlyNetWorthProjection.value.warnings,
+])
 const netWorthBreakdownTypes = computed(() => [
   { id: 'cash', label: t('whatIf.strategy.netWorthBreakdown.cash'), color: '#0870d8' },
   {
@@ -2162,6 +2172,10 @@ h1 {
 .projection-heading p {
   margin: 0.35rem 0 0;
   color: var(--color-copy);
+}
+.projection-warning {
+  color: #7a4b00;
+  background: #fff4d6;
 }
 .scenario-actions {
   display: flex;

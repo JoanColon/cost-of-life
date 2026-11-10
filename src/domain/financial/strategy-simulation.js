@@ -3,6 +3,7 @@ import { buildFrenchAmortizationSchedule } from './mortgage-amortization'
 import { annualRealEstateValue } from './real-estate-valuation'
 import { effectiveGrowthFactor, effectiveMonthlyRate } from './rates'
 import { investmentTypeDefinitions, normalizeStrategyForOptions } from './what-if'
+import { addCalendarMonths, financialDate } from '../../../functions/shared/financial-core.js'
 
 const INVESTMENT_ASSET_TYPES = Object.freeze({
   brokerage: 'stockMarket',
@@ -119,7 +120,11 @@ export function simulateStrategy({
   }
 }
 
-export function strategyNetWorthPoints({
+export function strategyNetWorthPoints(options = {}) {
+  return strategyNetWorthProjection(options).points
+}
+
+export function strategyNetWorthProjection({
   currentNetWorth = 0,
   currentAssets = null,
   currentLiabilities = 0,
@@ -131,16 +136,20 @@ export function strategyNetWorthPoints({
   mortgages = [],
   asOfDate = new Date(),
 } = {}) {
+  const warnings = []
   const startingValue = Number(strategy?.startingValue) || 0
   const monthlyDebt = Math.max(0, Number(monthlyDebtContribution) || 0)
   if (currentAssets == null) {
-    return (strategy?.points || []).map((point) => {
-      const assetChange = (Number(point.value) || 0) - startingValue
-      return {
-        month: Number(point.month || 0),
-        value: money(Number(currentNetWorth || 0) + assetChange),
-      }
-    })
+    return {
+      warnings,
+      points: (strategy?.points || []).map((point) => {
+        const assetChange = (Number(point.value) || 0) - startingValue
+        return {
+          month: Number(point.month || 0),
+          value: money(Number(currentNetWorth || 0) + assetChange),
+        }
+      }),
+    }
   }
 
   const points = strategy?.points || []
@@ -151,27 +160,30 @@ export function strategyNetWorthPoints({
   const startingInvestments = initialInvestmentValue - initialStrategyRealEstate
   const frozenOtherAssets =
     Number(currentAssets || 0) - initialCash - startingInvestments - Number(currentRealEstate || 0)
-  const mortgageSchedules = mortgages.map((mortgage) => ({
-    ...mortgage,
-    schedule: mortgageSchedule(
+  const mortgageSchedules = mortgages.map((mortgage) => {
+    const result = mortgageSchedule(
       mortgage,
       mortgage.id === selectedDebtId ? monthlyDebt : 0,
       asOfDate,
-    ),
-  }))
-  return points.map((point) => {
+    )
+    if (result.warning) warnings.push(result.warning)
+    return { ...mortgage, schedule: result.schedule }
+  })
+  const projectionPoints = points.map((point) => {
     const month = Number(point.month || 0)
     const cash = Number(point.cash) || 0
     const strategyRealEstate = Number(point.investmentBalances?.realEstate) || 0
     const contributedRealEstate = Number(point.investmentContributionBalances?.realEstate) || 0
     const investments =
       (Number(point.investmentValue) || 0) - strategyRealEstate + contributedRealEstate
-    const realEstate =
-      Number(currentRealEstate || 0) +
-      realEstateAssets.reduce(
-        (sum, asset) => sum + projectedRealEstateChange(asset, month, asOfDate),
-        0,
-      )
+    const realEstateChange = realEstateAssets.reduce((sum, asset) => {
+      const result = projectedRealEstateChange(asset, month, asOfDate)
+      if (result.warning && !warnings.some(({ key }) => key === result.warning.key)) {
+        warnings.push(result.warning)
+      }
+      return sum + result.value
+    }, 0)
+    const realEstate = Number(currentRealEstate || 0) + realEstateChange
     const modeledDebtReduction = mortgageSchedules.reduce(
       (sum, mortgage) => sum + mortgageReductionAtMonth(mortgage, month),
       0,
@@ -191,6 +203,7 @@ export function strategyNetWorthPoints({
       },
     }
   })
+  return { points: projectionPoints, warnings }
 }
 
 export function projectPath({
@@ -337,32 +350,51 @@ function projectionPoint(
 function projectedRealEstateChange(asset, month, asOfDate) {
   const currentValue = Math.max(0, Number(asset?.currentValue) || 0)
   const model = asset?.model || {}
-  if (!month) return 0
+  if (!month) return { value: 0, warning: null }
   try {
     const projectedValue =
       model.schemaVersion === 2
-        ? annualRealEstateValue(model, addMonths(asOfDate, month))
+        ? annualRealEstateValue(model, addCalendarMonths(dateString(asOfDate), month))
         : currentValue * Math.pow(1 + (Number(model.annualAppreciationRate) || 0) / 100, month / 12)
     const modeledCurrentValue =
-      model.schemaVersion === 2 ? annualRealEstateValue(model, asOfDate) : currentValue
-    return projectedValue - modeledCurrentValue
-  } catch {
-    return 0
+      model.schemaVersion === 2 ? annualRealEstateValue(model, dateString(asOfDate)) : currentValue
+    return { value: projectedValue - modeledCurrentValue, warning: null }
+  } catch (error) {
+    return {
+      value: 0,
+      warning: projectionWarning(
+        `real-estate:${asset?.id || asset?.itemName || 'unknown'}`,
+        'real_estate',
+        asset?.id || null,
+        error,
+      ),
+    }
   }
 }
 
 function mortgageSchedule(mortgage, extraMonthlyPayment, asOfDate) {
   try {
-    return buildFrenchAmortizationSchedule({
-      currentBalance: mortgage.currentBalance,
-      annualInterestRate: mortgage.annualInterestRate,
-      monthlyPayment: mortgage.monthlyPayment,
-      extraMonthlyPayment,
-      asOfDate,
-      startDate: mortgage.startDate,
-    })
-  } catch {
-    return []
+    return {
+      schedule: buildFrenchAmortizationSchedule({
+        currentBalance: mortgage.currentBalance,
+        annualInterestRate: mortgage.annualInterestRate,
+        monthlyPayment: mortgage.monthlyPayment,
+        extraMonthlyPayment,
+        asOfDate,
+        startDate: mortgage.startDate,
+      }),
+      warning: null,
+    }
+  } catch (error) {
+    return {
+      schedule: [],
+      warning: projectionWarning(
+        `mortgage:${mortgage?.id || 'unknown'}`,
+        'mortgage',
+        mortgage?.id || null,
+        error,
+      ),
+    }
   }
 }
 
@@ -374,16 +406,17 @@ function mortgageReductionAtMonth(mortgage, month) {
   return Math.max(0, currentBalance - remainingBalance)
 }
 
-function addMonths(value, months) {
-  const date = value instanceof Date ? new Date(value) : new Date(`${value}T00:00:00`)
-  const day = date.getDate()
-  date.setDate(1)
-  date.setMonth(date.getMonth() + months)
-  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-  date.setDate(Math.min(day, lastDay))
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate(),
-  ).padStart(2, '0')}`
+function dateString(value) {
+  return value instanceof Date ? financialDate(value) : String(value || '').slice(0, 10)
+}
+
+function projectionWarning(key, type, id, error) {
+  return {
+    key,
+    type,
+    id,
+    message: error?.message || 'The projection could not be calculated',
+  }
 }
 
 export function inflationFactorAtMonth(annualPercent = 0, month = 0) {

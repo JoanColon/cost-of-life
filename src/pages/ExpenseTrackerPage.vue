@@ -102,7 +102,60 @@
           />
         </template>
 
-        <ExpenseAnalyticsPanel v-else v-model="period" :categories="analyticsCategories" />
+        <template v-else>
+          <section class="monthly-overview review-overview">
+            <nav class="track-mode-nav" :aria-label="t('expenseTracker.analytics.period')">
+              <button
+                type="button"
+                :class="{ active: analyticsGranularity === 'annual' }"
+                :aria-pressed="analyticsGranularity === 'annual'"
+                @click="analyticsGranularity = 'annual'"
+              >
+                <q-icon name="calendar_view_month" />
+                {{ t('expenseTracker.analytics.annual') }}
+              </button>
+              <button
+                type="button"
+                :class="{ active: analyticsGranularity === 'monthly' }"
+                :aria-pressed="analyticsGranularity === 'monthly'"
+                @click="analyticsGranularity = 'monthly'"
+              >
+                <q-icon name="calendar_today" />
+                {{ t('expenseTracker.analytics.monthly') }}
+              </button>
+            </nav>
+            <span class="monthly-spacer" aria-hidden="true" />
+            <ExpenseMonthMetric
+              v-if="analyticsGranularity === 'monthly'"
+              v-model="period"
+              class="month-metric"
+              :label="t('expenseTracker.review.month')"
+            />
+            <label v-else class="review-year-metric">
+              <span>{{ t('expenseTracker.analytics.year') }}</span>
+              <span class="review-year-value">
+                <input
+                  :value="selectedYear"
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  :aria-label="t('expenseTracker.analytics.year')"
+                  @change="selectAnalyticsYear"
+                />
+                <q-icon name="calendar_month" />
+              </span>
+            </label>
+            <div class="monthly-metric review-total">
+              <span>{{ t('expenseTracker.analytics.totalSpent') }}</span>
+              <strong>{{ formatCurrency(analyticsTotal) }}</strong>
+            </div>
+          </section>
+
+          <ExpenseAnalyticsPanel
+            :granularity="analyticsGranularity"
+            :categories="analyticsCategories"
+          />
+        </template>
       </template>
     </main>
 
@@ -457,8 +510,10 @@ import {
 import { resolveExpenseTrackingValue } from '@/domain/financial/expense-tracking'
 import {
   FINANCIAL_YEAR_TIME_ZONE,
+  financialYearFlowCategoryValue,
   financialYearMonthCategoryValue,
   financialYearMonthSubcategoryValue,
+  financialYearSubcategoryValue,
 } from '@/domain/financial/financial-year'
 import { normalizeNonNegativeMoney } from '@/domain/financial/money'
 import { authUser } from '@/services/auth'
@@ -480,6 +535,7 @@ const workspaceStore = useWorkspaceStore()
 const tab = computed(() => (route.query.view === 'review' ? 'review' : 'track'))
 const trackMode = computed(() => (route.query.mode === 'reconcile' ? 'reconcile' : 'record'))
 const period = ref(currentPeriod())
+const analyticsGranularity = ref('monthly')
 const pageError = ref(null)
 const preparing = ref(false)
 const manageDialog = ref(false)
@@ -586,12 +642,18 @@ const analyticsCategories = computed(() => {
   const month = period.value.slice(5, 7)
   const categories = expenseCategories
     .map((category) => {
-      const storedSubcategories =
-        financialYear.value?.months?.[month]?.expenses?.categories?.[category.id]?.subcategories ||
-        {}
+      const storedSubcategoryIds =
+        analyticsGranularity.value === 'annual'
+          ? Object.values(financialYear.value?.months || {}).flatMap((financialMonth) =>
+              Object.keys(financialMonth?.expenses?.categories?.[category.id]?.subcategories || {}),
+            )
+          : Object.keys(
+              financialYear.value?.months?.[month]?.expenses?.categories?.[category.id]
+                ?.subcategories || {},
+            )
       const subcategoryIds = new Set([
         ...category.suggestions.map(({ id }) => id),
-        ...Object.keys(storedSubcategories),
+        ...storedSubcategoryIds,
       ])
       const subcategories = [...subcategoryIds]
         .map((subcategoryId) => {
@@ -599,13 +661,21 @@ const analyticsCategories = computed(() => {
           return {
             id: subcategoryId,
             name: definition ? t(definition.nameKey) : subcategoryId.replaceAll('_', ' '),
-            value: financialYearMonthSubcategoryValue(
-              financialYear.value,
-              month,
-              'expenses',
-              category.id,
-              subcategoryId,
-            ),
+            value:
+              analyticsGranularity.value === 'annual'
+                ? financialYearSubcategoryValue(
+                    financialYear.value,
+                    'expenses',
+                    category.id,
+                    subcategoryId,
+                  )
+                : financialYearMonthSubcategoryValue(
+                    financialYear.value,
+                    month,
+                    'expenses',
+                    category.id,
+                    subcategoryId,
+                  ),
           }
         })
         .filter(({ value }) => value > 0)
@@ -613,7 +683,10 @@ const analyticsCategories = computed(() => {
       return {
         id: category.id,
         name: t(category.nameKey),
-        value: financialYearMonthCategoryValue(financialYear.value, month, 'expenses', category.id),
+        value:
+          analyticsGranularity.value === 'annual'
+            ? financialYearFlowCategoryValue(financialYear.value, 'expenses', category.id)
+            : financialYearMonthCategoryValue(financialYear.value, month, 'expenses', category.id),
         subcategories,
       }
     })
@@ -625,6 +698,9 @@ const analyticsCategories = computed(() => {
     percentage: total > 0 ? (category.value / total) * 100 : 0,
   }))
 })
+const analyticsTotal = computed(() =>
+  analyticsCategories.value.reduce((total, category) => total + category.value, 0),
+)
 const canMutateActiveSubcategory = computed(() => isTrackingEnabled(activeSubcategory.value?.id))
 const categoriesWithTrackedItems = computed(() =>
   enabledCategories.value.filter(({ id }) => trackingStore.itemsFor(id).length),
@@ -669,6 +745,15 @@ function setTrackMode(mode) {
     params: { workspaceId: activeWorkspaceId.value },
     query: { view: 'track', mode },
   })
+}
+
+function selectAnalyticsYear(event) {
+  const year = Number(event.target.value)
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    event.target.value = selectedYear.value
+    return
+  }
+  period.value = `${year}-${period.value.slice(5, 7)}`
 }
 
 async function loadPage(force = false) {
@@ -1056,6 +1141,45 @@ h1 {
   color: var(--color-ink);
   font-size: 1.25rem;
   line-height: 1.1;
+}
+
+.review-year-metric {
+  display: grid;
+  min-width: 9rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--color-line);
+  color: var(--color-copy);
+  font-size: 0.72rem;
+}
+
+.review-year-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 0.1rem;
+}
+
+.review-year-metric input {
+  width: 5rem;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.review-year-metric:has(input:focus-visible) {
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 3px var(--color-primary-focus);
+}
+
+.review-overview {
+  grid-template-columns: 17.4rem minmax(1rem, 1fr) minmax(9rem, auto) minmax(8.5rem, auto);
 }
 
 .monthly-metric:last-child strong {
@@ -1580,6 +1704,16 @@ h1 {
     min-width: 0;
   }
 
+  .review-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review-year-metric {
+    min-width: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+
   .review-category-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.65rem 1rem;
@@ -1627,6 +1761,10 @@ h1 {
     padding: 0.65rem;
   }
 
+  .review-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .monthly-metric {
     grid-column: auto;
     min-width: 0;
@@ -1635,9 +1773,19 @@ h1 {
   }
 
   .month-metric,
+  .review-year-metric,
   .monthly-metric:nth-last-child(2) {
     padding-left: 0;
     border-left: 0;
+  }
+
+  .review-year-metric {
+    padding: 0 0.45rem;
+    text-align: left;
+  }
+
+  .review-year-metric input {
+    font-size: 1rem;
   }
 
   .monthly-metric strong {

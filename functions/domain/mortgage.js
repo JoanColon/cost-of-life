@@ -1,4 +1,6 @@
 import {
+  addCalendarMonths,
+  canonicalDate,
   frenchMortgagePaymentStep,
   roundMoney,
 } from '../shared/financial-core.js'
@@ -20,7 +22,7 @@ function effectiveMortgageBalance(mortgage, asOfDate) {
 
   let balance = roundMoney(anchorAmount)
   for (let paymentNumber = 1; paymentNumber <= MAX_SCHEDULE_MONTHS; paymentNumber += 1) {
-    const paymentDate = addMonths(startDate, paymentNumber)
+    const paymentDate = addCalendarMonths(startDate, paymentNumber)
     if (paymentDate <= anchorDate) continue
     if (paymentDate > valuationDate || balance === 0) return balance
     balance = frenchMortgagePaymentStep({
@@ -34,7 +36,7 @@ function effectiveMortgageBalance(mortgage, asOfDate) {
 
 function isMortgagePaymentDueInMonth(mortgage, year, monthIndex) {
   const startDate = canonicalDate(mortgage?.startDate, 'start date')
-  const firstPaymentDate = addMonths(startDate, 1)
+  const firstPaymentDate = addCalendarMonths(startDate, 1)
   const monthEnd = new Date(Date.UTC(Number(year), Number(monthIndex) + 1, 0))
     .toISOString()
     .slice(0, 10)
@@ -44,29 +46,6 @@ function isMortgagePaymentDueInMonth(mortgage, year, monthIndex) {
     .toISOString()
     .slice(0, 10)
   return effectiveMortgageBalance(mortgage, beforeMonth) > 0
-}
-
-function addMonths(value, months) {
-  const [year, month, day] = value.split('-').map(Number)
-  const targetMonth = month - 1 + months
-  const lastDay = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate()
-  return new Date(Date.UTC(year, targetMonth, Math.min(day, lastDay)))
-    .toISOString()
-    .slice(0, 10)
-}
-
-function canonicalDate(value, label) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!match) throw new Error(`A valid ${label} is required`)
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
-  if (
-    date.getUTCFullYear() !== Number(match[1]) ||
-    date.getUTCMonth() !== Number(match[2]) - 1 ||
-    date.getUTCDate() !== Number(match[3])
-  ) {
-    throw new Error(`A valid ${label} is required`)
-  }
-  return date.toISOString().slice(0, 10)
 }
 
 function nonNegativeMoney(value, label) {

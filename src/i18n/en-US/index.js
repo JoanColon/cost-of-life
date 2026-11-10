@@ -374,9 +374,72 @@ export default {
   },
   progress: {
     title: 'Progress',
-    subtitle: 'Your financial journey, in perspective.',
+    subtitle: 'Understand how your finances are changing.',
     loading: 'Loading your progress…',
     error: 'We could not load your progress.',
+    tabs: {
+      label: 'Progress section',
+      evolution: 'Evolution',
+      achievements: 'Achievements',
+    },
+    evolution: {
+      navigationLabel: 'Financial evolution perspectives',
+      otherChanges: 'Other changes',
+      wealthCreation: {
+        label: 'Wealth creation',
+        question: 'How did your net worth change?',
+        title: 'How did your net worth change?',
+        description:
+          'See which recorded asset and liability balances contributed to the change in your net worth.',
+        note: 'These are changes in recorded balances. Investment changes may include contributions, withdrawals, and valuation changes.',
+        chartAria: 'Bridge from starting to ending net worth by balance category.',
+      },
+      costOfLife: {
+        label: 'Cost of Life & savings',
+        question: 'Is your life becoming more affordable?',
+        title: 'How is your monthly capacity changing?',
+        description:
+          'Compare available income, effective expenses, and the capacity left for saving each month.',
+        note: 'Savings capacity is available income minus effective expenses; it is not a measured change in your cash accounts.',
+        chartAria: 'Monthly available income, effective expenses, and savings capacity.',
+      },
+      freedom: {
+        label: 'Financial freedom',
+        question: 'How much freedom have you gained?',
+        title: 'How much of your life is already funded?',
+        description:
+          'Track how many years of your current Cost of Life could be covered by investable wealth.',
+        note: 'This historical measure uses the annual Cost of Life model for each year and assumes no future returns.',
+        chartAria: 'History of years funded by investable wealth.',
+      },
+      composition: {
+        label: 'Wealth composition',
+        question: 'How has your wealth changed shape?',
+        title: 'How has your wealth changed shape?',
+        description:
+          'Explore how the balance between asset categories and liabilities has evolved over time.',
+        note: 'Liabilities appear below zero so their effect on your net position remains visible.',
+        chartAria: 'Assets and liabilities over time, grouped by category.',
+      },
+      metrics: {
+        netWorthChange: 'Change in net worth',
+        monthlySavingsCapacity: 'Monthly savings capacity',
+        yearsFunded: 'Current years funded',
+        netPosition: 'Current net position',
+        noPercentage: 'No comparable percentage',
+      },
+      breakdown: {
+        wealth: 'Changes by balance category',
+        flows: 'Latest monthly values',
+        freedom: 'Current calculation',
+        composition: 'Current composition',
+      },
+      coverage: {
+        model: 'Expenses in this month use the financial model.',
+        tracked: 'Expenses in this month come from reconciled tracking data.',
+        mixed: 'This month combines modelled and reconciled expenses.',
+      },
+    },
     keyMetrics: 'Key progress metrics',
     netWorth: 'Net worth',
     netWorthDescription: 'What you own minus what you owe today.',
@@ -607,6 +670,8 @@ export default {
       combinedResults: 'Combined results',
       loading: 'Building your strategy…',
       pageDescription: 'Plan your {amount}/month for the future.',
+      projectionIncomplete:
+        'Part of this projection could not be calculated. Review the linked mortgage or property model before relying on the result.',
       scenario: 'Saved scenario',
       newScenario: 'New scenario',
       scenarioName: 'Scenario name',
@@ -992,6 +1057,8 @@ export default {
       lastChecked: 'Last checked {value}',
       dataUpdated: 'Data last changed {value}',
       lastSyncFailed: 'The latest synchronization failed. Cached values are being shown.',
+      partialImport:
+        '{count} values could not be refreshed. Valid data was imported and the last valid values were preserved where possible.',
       loadingPositions: 'Loading current positions…',
       emptyPortfolio: 'No positions in the Portfolio tab.',
       kpis: {
@@ -1811,17 +1878,28 @@ export default {
     },
     analytics: {
       title: 'Spending by category',
+      period: 'Review period',
+      monthly: 'Monthly',
+      annual: 'Annual',
+      year: 'Year',
       infoAction: 'About the monthly spending data',
       infoTitle: 'How monthly spending is calculated',
       infoDescription:
         'This view includes all monthly expenses defined in Plan. It uses reconciled Track amounts when available; otherwise, it shows the planned amounts.',
+      annualInfoAction: 'About the annual spending data',
+      annualInfoTitle: 'How annual spending is calculated',
+      annualInfoDescription:
+        'This view includes all expenses for the selected year defined in Plan. Each month uses reconciled Track amounts when available; otherwise, it shows the planned amounts.',
       spent: 'Expenses',
       totalSpent: 'Total spent',
       showMoreCategories: 'Show {count} more categories',
       showFewerCategories: 'Show fewer categories',
       ariaLabel: 'Donut chart showing monthly expenses by category',
+      annualAriaLabel: 'Donut chart showing annual expenses by category',
       emptyTitle: 'No expenses this month',
       emptyDescription: 'There are no planned or reconciled expenses for this month.',
+      annualEmptyTitle: 'No expenses this year',
+      annualEmptyDescription: 'There are no planned or reconciled expenses for this year.',
       breakdownTitle: '{category} by subcategory',
       breakdownDescription: 'Select another category above to change this breakdown.',
     },

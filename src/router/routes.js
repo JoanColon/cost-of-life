@@ -77,7 +77,11 @@ const routes = [
       {
         path: 'workspaces/:workspaceId/achievements',
         name: 'achievements',
-        component: () => import('@/pages/AchievementsPage.vue'),
+        redirect: (to) => ({
+          name: 'progress',
+          params: { workspaceId: to.params.workspaceId },
+          query: { ...to.query, tab: 'achievements' },
+        }),
       },
       {
         path: 'workspaces/:workspaceId/plan',

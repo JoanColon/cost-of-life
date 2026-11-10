@@ -2,6 +2,7 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { onDocumentWritten } from 'firebase-functions/firestore'
 import { HttpsError, onCall } from 'firebase-functions/https'
 import { onSchedule } from 'firebase-functions/scheduler'
+import * as logger from 'firebase-functions/logger'
 import { syncWorkspaceInvestmentPortfolios } from './services/investment-portfolios.js'
 import {
   closePreviousFinancialPositionMonth,
@@ -16,7 +17,27 @@ import {
 const options = { region: 'europe-west1', retry: true }
 
 const ensureFinancialYear = onCall({ region: 'europe-west1' }, async (request) => {
-  return handleFinancialYearRequest(request)
+  const startedAt = Date.now()
+  try {
+    const result = await handleFinancialYearRequest(request)
+    logger.info('Financial year ensured', {
+      workspaceId: request.data?.workspaceId || null,
+      year: request.data?.year || null,
+      durationMs: Date.now() - startedAt,
+      status: result.status,
+      modeledPositions: result.modeledPositions,
+      financialPosition: result.financialPosition,
+    })
+    return result
+  } catch (error) {
+    logger.error('Financial year ensure failed', {
+      workspaceId: request.data?.workspaceId || null,
+      year: request.data?.year || null,
+      durationMs: Date.now() - startedAt,
+      error: error?.message || String(error),
+    })
+    throw error
+  }
 })
 
 async function handleFinancialYearRequest(request) {
@@ -85,6 +106,7 @@ const closeMonthlyFinancialPositions = onSchedule(
     const failures = []
     for (const workspace of workspaces.docs || []) {
       if (workspace.data()?.deletionPendingAt) continue
+      const startedAt = Date.now()
       try {
         await syncWorkspaceInvestmentPortfolios(firestore, {
           workspaceId: workspace.id,
@@ -92,8 +114,17 @@ const closeMonthlyFinancialPositions = onSchedule(
           throwOnError: true,
         })
         await closePreviousFinancialPositionMonth(firestore, workspace.id, madridToday())
+        logger.info('Monthly financial position closed', {
+          workspaceId: workspace.id,
+          durationMs: Date.now() - startedAt,
+        })
       } catch (error) {
         failures.push({ workspaceId: workspace.id, error })
+        logger.error('Monthly financial position close failed', {
+          workspaceId: workspace.id,
+          durationMs: Date.now() - startedAt,
+          error: error?.message || String(error),
+        })
       }
     }
     if (failures.length) {

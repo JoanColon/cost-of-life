@@ -8,399 +8,229 @@
         :back-to="homeRoute"
       >
         <template #actions>
-          <div class="progress-filters">
-            <div class="period-switch" role="group" :aria-label="t('progress.filters.period')">
-              <button
-                v-for="option in periodOptions"
-                :key="option.value"
-                type="button"
-                :class="{ selected: selectedPeriod === option.value }"
-                :aria-pressed="selectedPeriod === option.value"
-                @click="selectPeriod(option.value)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-
-            <q-btn
-              outline
-              no-caps
-              icon="calendar_month"
-              class="date-filter"
-              :label="rangeLabel"
-              :aria-label="t('progress.filters.date')"
+          <div class="progress-tabs" role="tablist" :aria-label="t('progress.tabs.label')">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === tab.id"
+              :class="{ active: activeTab === tab.id }"
+              @click="selectTab(tab.id)"
             >
-              <q-icon name="expand_more" class="date-filter__chevron" />
-              <q-menu anchor="bottom right" self="top right" class="snapshot-menu">
-                <div class="snapshot-menu__heading">{{ t('progress.filters.chooseSnapshot') }}</div>
-                <q-list dense>
-                  <q-item
-                    v-for="point in availableStartPoints"
-                    :key="point.period"
-                    clickable
-                    v-close-popup
-                    :active="startPoint?.period === point.period"
-                    active-class="snapshot-menu__active"
-                    @click="selectStartPeriod(point.period)"
-                  >
-                    <q-item-section>{{ formatPeriod(point.period) }}</q-item-section>
-                    <q-item-section side><q-icon name="chevron_right" /></q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-btn>
+              {{ tab.label }}
+            </button>
           </div>
         </template>
       </AppPageHeader>
 
-      <div v-if="loading && !financialYear" class="state">
-        <q-spinner color="primary" size="2rem" />
-        <span>{{ t('progress.loading') }}</span>
-      </div>
-      <section v-else-if="error && !financialYear" class="state">
-        <q-icon name="cloud_off" size="2rem" />
-        <p>{{ t('progress.error') }}</p>
-        <q-btn
-          unelevated
-          no-caps
-          color="primary"
-          icon="refresh"
-          :label="t('common.retry')"
-          @click="load(true)"
-        />
-      </section>
+      <AchievementsPage v-if="activeTab === 'achievements'" embedded class="achievements-view" />
 
-      <section v-else-if="!hasComparison" class="empty-story">
-        <span class="story-number">1</span>
-        <div>
-          <h2>{{ t('progress.empty.title') }}</h2>
-          <p>{{ t('progress.empty.description') }}</p>
-        </div>
-      </section>
-
-      <div v-else class="story-stack">
-        <article class="story-card transformation-card">
-          <div class="story-intro">
-            <span class="story-number story-number--green">1</span>
-            <div>
-              <h2>{{ t('progress.transformation.title') }}</h2>
-              <p>{{ t('progress.transformation.description') }}</p>
-            </div>
+      <template v-else>
+        <div class="evolution-toolbar">
+          <div class="period-switch" role="group" :aria-label="t('progress.filters.period')">
+            <button
+              v-for="option in periodOptions"
+              :key="option.value"
+              type="button"
+              :class="{ selected: selectedPeriod === option.value }"
+              :aria-pressed="selectedPeriod === option.value"
+              @click="selectPeriod(option.value)"
+            >
+              {{ option.label }}
+            </button>
           </div>
 
-          <div class="transformation-content">
-            <div class="comparison-grid">
-              <div
-                v-for="row in transformationRows"
-                :key="row.key"
-                class="comparison-card"
-                :class="[
-                  `comparison-card--${row.tone}`,
-                  { 'comparison-card--open': activeDetail === row.key },
-                ]"
-                role="button"
-                tabindex="0"
-                :aria-expanded="activeDetail === row.key"
-                @click="toggleDetail(row.key)"
-                @keydown.enter.prevent="toggleDetail(row.key)"
-                @keydown.space.prevent="toggleDetail(row.key)"
-              >
-                <span class="comparison-card__heading">
-                  <span class="metric-name">
-                    <span class="metric-icon" :class="`metric-icon--${row.tone}`">
-                      <q-icon :name="row.icon" />
-                    </span>
-                    <strong>{{ row.label }}</strong>
-                    <q-btn
-                      v-if="row.key === 'yearsFunded'"
-                      flat
-                      round
-                      dense
-                      size="sm"
-                      icon="info_outline"
-                      class="years-funded-info"
-                      :aria-label="t('progress.freedom.infoAction')"
-                      @click.stop="openYearsFundedInfo"
-                      @keydown.stop
-                    >
-                      <q-tooltip v-if="$q.screen.gt.xs" max-width="24rem">
-                        <div class="years-funded-tooltip">
-                          <strong>{{ t('progress.freedom.infoTitle') }}</strong>
-                          <span>{{ t('progress.freedom.infoSummary') }}</span>
-                          <span>{{ t('progress.freedom.infoIncluded') }}</span>
-                          <span>{{ t('progress.freedom.infoExcluded') }}</span>
-                          <b>{{ t('progress.freedom.infoFormula') }}</b>
-                          <span>{{ t('progress.freedom.infoRule') }}</span>
-                        </div>
-                      </q-tooltip>
-                    </q-btn>
-                  </span>
-                  <q-icon
-                    name="chevron_right"
-                    class="row-chevron"
-                    :class="{ 'row-chevron--open': activeDetail === row.key }"
-                  />
-                </span>
-                <span class="comparison-card__values">
-                  <span class="comparison-value comparison-value--past">{{ row.start }}</span>
-                  <q-icon name="arrow_forward" class="comparison-arrow" />
-                  <span class="comparison-value comparison-value--today">{{ row.current }}</span>
-                  <span
-                    class="delta-pill"
-                    :class="row.beneficial ? 'delta-pill--good' : 'delta-pill--bad'"
-                  >
-                    {{ row.delta }}
-                  </span>
-                </span>
+          <q-btn
+            outline
+            no-caps
+            icon="calendar_month"
+            class="date-filter"
+            :label="rangeLabel"
+            :aria-label="t('progress.filters.date')"
+          >
+            <q-icon name="expand_more" class="date-filter__chevron" />
+            <q-menu anchor="bottom right" self="top right" class="snapshot-menu">
+              <div class="snapshot-menu__heading">{{ t('progress.filters.chooseSnapshot') }}</div>
+              <q-list dense>
+                <q-item
+                  v-for="point in availableStartPoints"
+                  :key="point.period"
+                  clickable
+                  v-close-popup
+                  :active="startPoint?.period === point.period"
+                  active-class="snapshot-menu__active"
+                  @click="selectStartPeriod(point.period)"
+                >
+                  <q-item-section>{{ formatPeriod(point.period) }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
+        </div>
+
+        <div v-if="loading && !financialYear" class="state">
+          <q-spinner color="primary" size="2rem" />
+          <span>{{ t('progress.loading') }}</span>
+        </div>
+        <section v-else-if="error && !financialYear" class="state">
+          <q-icon name="cloud_off" size="2rem" />
+          <p>{{ t('progress.error') }}</p>
+          <q-btn
+            unelevated
+            no-caps
+            color="primary"
+            icon="refresh"
+            :label="t('common.retry')"
+            @click="load(true)"
+          />
+        </section>
+        <section v-else-if="!hasComparison" class="empty-state">
+          <span class="empty-state__icon"><q-icon name="timeline" /></span>
+          <div>
+            <h2>{{ t('progress.empty.title') }}</h2>
+            <p>{{ t('progress.empty.description') }}</p>
+          </div>
+        </section>
+
+        <section v-else class="evolution-workspace">
+          <nav class="perspective-nav" :aria-label="t('progress.evolution.navigationLabel')">
+            <button
+              v-for="perspective in perspectives"
+              :key="perspective.id"
+              type="button"
+              :class="{ active: activePerspective === perspective.id }"
+              :aria-current="activePerspective === perspective.id ? 'page' : undefined"
+              @click="selectPerspective(perspective.id)"
+            >
+              <span class="perspective-icon" :class="`perspective-icon--${perspective.tone}`">
+                <q-icon :name="perspective.icon" />
+              </span>
+              <span>
+                <strong>{{ perspective.label }}</strong>
+                <small>{{ perspective.question }}</small>
+              </span>
+              <q-icon name="chevron_right" class="perspective-chevron" />
+            </button>
+          </nav>
+
+          <article class="perspective-panel">
+            <header class="perspective-header">
+              <div class="perspective-heading">
+                <span class="perspective-eyebrow">{{ activePerspectiveConfig.label }}</span>
+                <h2>{{ activePerspectiveConfig.title }}</h2>
+                <p>{{ activePerspectiveConfig.description }}</p>
               </div>
-            </div>
+              <div
+                class="metric-highlight"
+                :class="`metric-highlight--${activePerspectiveConfig.tone}`"
+              >
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+                <small :class="{ negative: metric.negative }">{{ metric.change }}</small>
+              </div>
+            </header>
 
-            <q-slide-transition>
-              <div v-if="activeDetail" class="inline-detail">
-                <div class="detail-heading">
-                  <div>
-                    <span>{{ t('progress.detail.label') }}</span>
-                    <h3>{{ activeDetailTitle }}</h3>
-                  </div>
-                  <div
-                    v-if="activeDetail === 'netWorth'"
-                    class="detail-switch"
-                    role="group"
-                    :aria-label="t('progress.chartView.label')"
-                  >
-                    <button
-                      type="button"
-                      :class="{ selected: chartMode === 'netWorth' }"
-                      @click.stop="chartMode = 'netWorth'"
-                    >
-                      {{ t('progress.chartView.netWorth') }}
-                    </button>
-                    <button
-                      type="button"
-                      :class="{ selected: chartMode === 'breakdown' }"
-                      @click.stop="chartMode = 'breakdown'"
-                    >
-                      {{ t('progress.chartView.breakdown') }}
-                    </button>
-                  </div>
-                </div>
-
-                <NetWorthHistoryChart
-                  v-if="activeDetail === 'netWorth'"
-                  :points="filteredNetWorthPoints"
-                  :breakdown-points="filteredBreakdownPoints"
-                  :mode="chartMode"
-                  :loading="historyLoading"
-                  :error="Boolean(historyError)"
-                />
-                <ProgressTrendChart
-                  v-else-if="activeDetail === 'costOfLife'"
-                  :points="annualFlowPoints"
-                  :series="costSeries"
-                  value-type="currency"
-                  period-type="year"
-                  :aria-label="t('progress.detail.costAria')"
+            <div class="analysis-grid">
+              <section class="chart-card">
+                <EvolutionChart
+                  v-if="activePerspective === 'wealth-creation'"
+                  mode="bridge"
+                  :bridge="bridgeItems"
+                  :start-value="startPoint.netWorth"
+                  :end-value="endPoint.netWorth"
+                  :start-label="formatShortPeriod(startPoint.period)"
+                  :end-label="formatShortPeriod(endPoint.period)"
+                  :aria-label="t('progress.evolution.wealthCreation.chartAria')"
                   :empty-label="t('progress.historyEmpty')"
                 />
-                <FreedomDetail v-else compact />
-              </div>
-            </q-slide-transition>
-          </div>
-        </article>
+                <EvolutionChart
+                  v-else-if="activePerspective === 'cost-of-life'"
+                  mode="trend"
+                  :points="filteredFlowPoints"
+                  :series="flowSeries"
+                  :aria-label="t('progress.evolution.costOfLife.chartAria')"
+                  :empty-label="t('progress.historyEmpty')"
+                />
+                <EvolutionChart
+                  v-else-if="activePerspective === 'freedom'"
+                  mode="trend"
+                  value-type="years"
+                  :points="filteredProgressPoints"
+                  :series="freedomSeries"
+                  :aria-label="t('progress.evolution.freedom.chartAria')"
+                  :empty-label="t('progress.historyEmpty')"
+                />
+                <EvolutionChart
+                  v-else
+                  mode="composition"
+                  :points="compositionPoints"
+                  :series="compositionSeries"
+                  :aria-label="t('progress.evolution.composition.chartAria')"
+                  :empty-label="t('progress.historyEmpty')"
+                />
+                <p class="chart-note">{{ activePerspectiveConfig.note }}</p>
+              </section>
 
-        <article class="story-card drivers-card">
-          <div class="story-intro">
-            <span class="story-number story-number--blue">2</span>
-            <div>
-              <h2>{{ t('progress.drivers.title') }}</h2>
-              <p>{{ t('progress.drivers.description') }}</p>
-            </div>
-          </div>
-
-          <div class="drivers-content">
-            <template v-if="drivers.length">
-              <div class="drivers-grid">
-                <div v-for="driver in drivers" :key="driver.key" class="driver-card">
-                  <span class="metric-icon" :class="`metric-icon--${driver.tone}`">
-                    <q-icon :name="driver.icon" />
-                  </span>
-                  <span class="driver-copy">
-                    <strong>{{ driver.title }}</strong>
-                    <small>{{ driver.description }}</small>
-                  </span>
-                  <span
-                    class="delta-pill"
-                    :class="driver.good ? 'delta-pill--good' : 'delta-pill--bad'"
-                  >
-                    {{ driver.value }}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                class="detail-cta"
-                :aria-expanded="driversExpanded"
-                @click="driversExpanded = !driversExpanded"
-              >
-                <span>{{ t('progress.drivers.howCalculated') }}</span>
-                <q-icon :name="driversExpanded ? 'expand_less' : 'expand_more'" />
-              </button>
-              <q-slide-transition>
-                <div v-if="driversExpanded" class="driver-evidence">
-                  <div v-for="driver in drivers" :key="`${driver.key}-evidence`">
-                    <span>{{ driver.evidenceLabel }}</span>
-                    <strong>{{ driver.evidence }}</strong>
+              <aside class="breakdown-card">
+                <h3>{{ breakdownTitle }}</h3>
+                <div class="breakdown-list">
+                  <div v-for="item in breakdownItems" :key="item.key" class="breakdown-row">
+                    <span class="breakdown-marker" :style="{ background: item.color }">
+                      <q-icon v-if="item.icon" :name="item.icon" />
+                    </span>
+                    <span class="breakdown-copy">
+                      <strong>{{ item.label }}</strong>
+                      <small v-if="item.meta">{{ item.meta }}</small>
+                    </span>
+                    <b :class="{ positive: item.positive, negative: item.negative }">
+                      {{ item.value }}
+                    </b>
                   </div>
                 </div>
-              </q-slide-transition>
-            </template>
-            <div v-else class="drivers-empty">
-              <q-icon name="fact_check" />
-              <div>
-                <strong>{{ t('progress.drivers.emptyTitle') }}</strong>
-                <p>{{ t('progress.drivers.emptyDescription') }}</p>
-              </div>
-            </div>
-          </div>
-        </article>
 
-        <article class="story-card milestones-card">
-          <div class="story-intro">
-            <span class="story-number story-number--purple">3</span>
-            <div>
-              <h2>{{ t('progress.milestones.title') }}</h2>
-              <p>{{ t('progress.milestones.description') }}</p>
-            </div>
-          </div>
-
-          <div class="milestones-content">
-            <div class="milestone-highlight milestone-highlight--latest">
-              <span class="milestone-label">{{ t('progress.milestones.latest') }}</span>
-              <template v-if="latestMilestone">
-                <div class="milestone-highlight__main">
-                  <span class="milestone-emblem milestone-emblem--achieved">
-                    <q-icon :name="familyIcon(latestMilestone.family)" />
-                  </span>
-                  <div>
-                    <strong>{{ milestoneTitle(latestMilestone) }}</strong>
-                    <p>{{ milestoneDescription(latestMilestone) }}</p>
-                  </div>
+                <div v-if="activePerspective === 'freedom'" class="formula-card">
+                  <span>{{ t('progress.freedom.infoFormula') }}</span>
+                  <small>{{ t('progress.freedom.calculationNote') }}</small>
                 </div>
-                <span class="milestone-status milestone-status--achieved">
-                  <q-icon name="check_circle" />
-                  {{ latestMilestoneDate }}
-                </span>
-              </template>
-              <div v-else class="milestone-placeholder">
-                <q-icon name="emoji_events" />
-                <span>{{ t('progress.milestones.noAchievement') }}</span>
-              </div>
-            </div>
-
-            <div class="milestone-highlight milestone-highlight--next">
-              <span class="milestone-label">{{ t('progress.milestones.next') }}</span>
-              <template v-if="nextMilestone">
-                <div class="milestone-highlight__main">
-                  <span class="milestone-emblem milestone-emblem--next">
-                    <q-icon :name="familyIcon(nextMilestone.family)" />
-                  </span>
-                  <div>
-                    <strong>{{ milestoneTitle(nextMilestone) }}</strong>
-                    <p>{{ milestoneCurrentTarget(nextMilestone) }}</p>
-                  </div>
+                <div v-if="activePerspective === 'cost-of-life'" class="coverage-note">
+                  <q-icon name="info_outline" />
+                  <span>{{ coverageDescription }}</span>
                 </div>
-                <div class="milestone-progress">
-                  <q-linear-progress
-                    rounded
-                    size="0.62rem"
-                    color="purple"
-                    track-color="deep-purple-1"
-                    :value="nextMilestone.progress"
-                  />
-                  <strong>{{ Math.round(nextMilestone.progress * 100) }}%</strong>
-                </div>
-              </template>
-              <div v-else class="milestone-placeholder">
-                <q-icon name="workspace_premium" />
-                <span>{{ t('progress.milestones.allAchieved') }}</span>
-              </div>
+              </aside>
             </div>
-
-            <div class="milestone-overview">
-              <div class="milestone-count">
-                <strong>{{ achievedMilestoneCount }} / {{ visibleMilestones.length }}</strong>
-                <span>{{ t('progress.milestones.achieved') }}</span>
-              </div>
-              <div class="milestone-family-icons" :aria-label="t('progress.milestones.families')">
-                <span
-                  v-for="family in milestoneFamilySummaries"
-                  :key="family.id"
-                  class="milestone-family-icon"
-                  :class="[`milestone-family-icon--${family.id}`, { complete: family.complete }]"
-                  :title="family.label"
-                >
-                  <q-icon :name="family.icon" />
-                </span>
-              </div>
-              <q-btn
-                outline
-                no-caps
-                color="primary"
-                icon-right="arrow_forward"
-                :label="t('progress.milestones.viewAll')"
-                class="milestones-cta"
-                @click="openMilestones"
-              />
-            </div>
-          </div>
-        </article>
-      </div>
-
-      <q-dialog v-model="yearsFundedInfoOpen" position="bottom">
-        <q-card class="years-funded-info-sheet responsive-info-card">
-          <span class="info-sheet-handle" aria-hidden="true" />
-          <q-card-section class="years-funded-info-heading">
-            <span class="years-funded-info-icon"><q-icon name="shield" /></span>
-            <h2>{{ t('progress.freedom.infoTitle') }}</h2>
-            <q-btn v-close-popup flat round dense icon="close" :aria-label="t('common.close')" />
-          </q-card-section>
-          <q-card-section class="years-funded-info-copy">
-            <p>{{ t('progress.freedom.infoSummary') }}</p>
-            <strong>{{ t('progress.freedom.infoIncludedTitle') }}</strong>
-            <p>{{ t('progress.freedom.infoIncluded') }}</p>
-            <strong>{{ t('progress.freedom.infoExcludedTitle') }}</strong>
-            <p>{{ t('progress.freedom.infoExcluded') }}</p>
-            <div class="years-funded-formula">{{ t('progress.freedom.infoFormula') }}</div>
-            <p>{{ t('progress.freedom.infoRule') }}</p>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
+          </article>
+        </section>
+      </template>
     </main>
   </q-page>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import NetWorthHistoryChart from '@/components/dashboard/NetWorthHistoryChart.vue'
 import AppPageHeader from '@/components/layout/AppPageHeader.vue'
-import ProgressTrendChart from '@/components/progress/ProgressTrendChart.vue'
-import { milestoneFamilies } from '@/config/milestone-families'
-import { buildNetWorthBreakdownSeries, buildProgressSeries } from '@/domain/financial/history'
-import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
+import EvolutionChart from '@/components/progress/EvolutionChart.vue'
+import { assetCategories } from '@/config/asset-categories'
+import { CHART_COLORS } from '@/config/chart-theme'
+import { liabilityCategories } from '@/config/liability-categories'
+import {
+  buildMonthlyFlowSeries,
+  buildNetWorthBreakdownSeries,
+  buildNetWorthBridge,
+  buildProgressSeries,
+} from '@/domain/financial/history'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
+import AchievementsPage from './AchievementsPage.vue'
 
 const { t, locale } = useI18n()
-const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
 const milestonesStore = useMilestonesStore()
@@ -408,31 +238,70 @@ const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const selectedPeriod = ref('1')
 const customStartPeriod = ref(null)
-const activeDetail = ref(null)
-const chartMode = ref('netWorth')
-const driversExpanded = ref(false)
-const yearsFundedInfoOpen = ref(false)
+
 const {
-  achievements,
   currentMonth,
   currentYear,
   error,
   excludedLiabilityIds,
   financialYear,
   historyDocuments,
-  historyError,
-  historyLoading,
-  liabilities,
   loading,
-  trackingActive,
 } = storeToRefs(milestonesStore)
 
+const tabs = computed(() => [
+  { id: 'evolution', label: t('progress.tabs.evolution') },
+  { id: 'achievements', label: t('progress.tabs.achievements') },
+])
 const periodOptions = computed(() => [
   { value: '1', label: t('progress.filters.oneYear') },
   { value: '3', label: t('progress.filters.threeYears') },
   { value: '5', label: t('progress.filters.fiveYears') },
   { value: 'all', label: t('progress.filters.all') },
 ])
+const perspectives = computed(() => [
+  {
+    id: 'wealth-creation',
+    icon: 'account_balance_wallet',
+    tone: 'green',
+    label: t('progress.evolution.wealthCreation.label'),
+    question: t('progress.evolution.wealthCreation.question'),
+    title: t('progress.evolution.wealthCreation.title'),
+    description: t('progress.evolution.wealthCreation.description'),
+    note: t('progress.evolution.wealthCreation.note'),
+  },
+  {
+    id: 'cost-of-life',
+    icon: 'savings',
+    tone: 'blue',
+    label: t('progress.evolution.costOfLife.label'),
+    question: t('progress.evolution.costOfLife.question'),
+    title: t('progress.evolution.costOfLife.title'),
+    description: t('progress.evolution.costOfLife.description'),
+    note: t('progress.evolution.costOfLife.note'),
+  },
+  {
+    id: 'freedom',
+    icon: 'shield',
+    tone: 'purple',
+    label: t('progress.evolution.freedom.label'),
+    question: t('progress.evolution.freedom.question'),
+    title: t('progress.evolution.freedom.title'),
+    description: t('progress.evolution.freedom.description'),
+    note: t('progress.evolution.freedom.note'),
+  },
+  {
+    id: 'composition',
+    icon: 'donut_large',
+    tone: 'violet',
+    label: t('progress.evolution.composition.label'),
+    question: t('progress.evolution.composition.question'),
+    title: t('progress.evolution.composition.title'),
+    description: t('progress.evolution.composition.description'),
+    note: t('progress.evolution.composition.note'),
+  },
+])
+
 const workspaceId = computed(() => String(route.params.workspaceId))
 const workspace = computed(
   () => workspaceStore.workspaces.find(({ id }) => id === workspaceId.value) || null,
@@ -446,6 +315,18 @@ const homeRoute = computed(() => ({
   name: 'workspace-dashboard',
   params: { workspaceId: workspaceId.value },
 }))
+const activeTab = computed(() =>
+  route.query.tab === 'achievements' ? 'achievements' : 'evolution',
+)
+const activePerspective = computed(() => {
+  const requested = String(route.query.view || '')
+  return perspectives.value.some(({ id }) => id === requested) ? requested : 'wealth-creation'
+})
+const activePerspectiveConfig = computed(
+  () =>
+    perspectives.value.find(({ id }) => id === activePerspective.value) || perspectives.value[0],
+)
+
 const progressDocuments = computed(() => {
   if (!financialYear.value) return historyDocuments.value
   const year = Number(financialYear.value.year || financialYear.value.id)
@@ -461,6 +342,12 @@ const historyOptions = computed(() => ({
 }))
 const progressPoints = computed(() =>
   buildProgressSeries(progressDocuments.value, historyOptions.value),
+)
+const breakdownPoints = computed(() =>
+  buildNetWorthBreakdownSeries(progressDocuments.value, historyOptions.value),
+)
+const flowPoints = computed(() =>
+  buildMonthlyFlowSeries(progressDocuments.value, historyOptions.value),
 )
 const endPoint = computed(() => progressPoints.value.at(-1) || null)
 const startPoint = computed(() => {
@@ -481,241 +368,231 @@ const startPoint = computed(() => {
 const hasComparison = computed(() =>
   Boolean(startPoint.value && endPoint.value && startPoint.value.period !== endPoint.value.period),
 )
-const filteredProgressPoints = computed(() => {
-  if (!startPoint.value) return []
-  return progressPoints.value.filter(({ period }) => period >= startPoint.value.period)
-})
-const filteredNetWorthPoints = computed(() =>
-  filteredProgressPoints.value.map(({ period, netWorth }) => ({ period, value: netWorth })),
+const filteredProgressPoints = computed(() =>
+  startPoint.value
+    ? progressPoints.value.filter(({ period }) => period >= startPoint.value.period)
+    : [],
 )
-const filteredBreakdownPoints = computed(() => {
-  const allowed = new Set(filteredProgressPoints.value.map(({ period }) => period))
-  return buildNetWorthBreakdownSeries(progressDocuments.value, historyOptions.value).filter(
-    ({ period }) => allowed.has(period),
-  )
-})
-const annualFlowPoints = computed(() => {
-  const byYear = new Map()
-  for (const point of filteredProgressPoints.value) byYear.set(point.period.slice(0, 4), point)
-  return [...byYear.values()]
-})
-const annualFreedomPoints = computed(() => {
-  const byYear = new Map()
-  for (const point of filteredProgressPoints.value) byYear.set(point.period.slice(0, 4), point)
-  return [...byYear.values()]
-})
+const filteredBreakdownPoints = computed(() =>
+  startPoint.value
+    ? breakdownPoints.value.filter(({ period }) => period >= startPoint.value.period)
+    : [],
+)
+const filteredFlowPoints = computed(() =>
+  startPoint.value
+    ? flowPoints.value.filter(({ period }) => period >= startPoint.value.period)
+    : [],
+)
+const startBreakdown = computed(() => filteredBreakdownPoints.value[0] || null)
+const endBreakdown = computed(() => filteredBreakdownPoints.value.at(-1) || null)
 const availableStartPoints = computed(() => progressPoints.value.slice(0, -1).reverse())
 const rangeLabel = computed(() => {
   if (!startPoint.value || !endPoint.value) return t('progress.filters.noHistory')
   return `${formatShortPeriod(startPoint.value.period)} – ${formatShortPeriod(endPoint.value.period)}`
 })
-const transformationRows = computed(() => [
-  metricRow('netWorth', 'account_balance_wallet', 'green', t('progress.netWorth')),
-  metricRow('costOfLife', 'credit_card', 'blue', t('progress.transformation.costOfLife')),
-  metricRow('yearsFunded', 'shield', 'purple', t('progress.transformation.yearsFunded')),
-])
-const activeDetailTitle = computed(
-  () => transformationRows.value.find(({ key }) => key === activeDetail.value)?.label || '',
-)
-const costSeries = computed(() => [
-  {
-    key: 'income',
-    name: t('progress.detail.income'),
-    color: '#16815f',
-    area: 'rgba(22,129,95,0.2)',
-  },
-  {
-    key: 'costOfLife',
-    name: t('progress.detail.expenses'),
-    color: '#c44750',
-    area: 'rgba(196,71,80,0.15)',
-  },
+
+const bridgeItems = computed(() => {
+  const items = buildNetWorthBridge(startBreakdown.value, endBreakdown.value).map((item) => ({
+    ...item,
+    label: categoryLabel(item.section, item.categoryId),
+  }))
+  if (items.length <= 6) return items
+  const visible = items.slice(0, 5)
+  const remainder = items.slice(5).reduce((sum, item) => sum + item.value, 0)
+  return [
+    ...visible,
+    { key: 'other', label: t('progress.evolution.otherChanges'), value: remainder },
+  ]
+})
+
+const flowSeries = computed(() => [
+  { key: 'income', name: t('progress.detail.income'), color: CHART_COLORS.success, type: 'line' },
+  { key: 'costOfLife', name: t('progress.detail.expenses'), color: '#c44750', type: 'line' },
   {
     key: 'savingsCapacity',
     name: t('progress.detail.savings'),
-    color: '#0870d8',
-    area: 'rgba(8,112,216,0.16)',
+    color: CHART_COLORS.primary,
+    type: 'bar',
   },
 ])
 const freedomSeries = computed(() => [
   {
     key: 'yearsFunded',
     name: t('progress.transformation.yearsFunded'),
-    color: '#8754ed',
-    area: 'rgba(135,84,237,0.22)',
+    color: CHART_COLORS.purple,
   },
 ])
-const drivers = computed(() => {
-  if (!startPoint.value || !endPoint.value) return []
-  const result = []
-  const investmentDelta = endPoint.value.investmentAssets - startPoint.value.investmentAssets
-  const costDelta = endPoint.value.costOfLife - startPoint.value.costOfLife
-  const mortgageDelta = endPoint.value.mortgageBalance - startPoint.value.mortgageBalance
 
-  if (Math.abs(investmentDelta) >= 1) {
-    result.push({
-      key: 'investments',
-      tone: 'green',
-      icon: investmentDelta >= 0 ? 'trending_up' : 'trending_down',
-      title: t(
-        investmentDelta >= 0
-          ? 'progress.drivers.investmentsGrew'
-          : 'progress.drivers.investmentsFell',
-      ),
-      description: t('progress.drivers.investmentsDescription'),
-      value: signedCurrency(investmentDelta),
-      good: investmentDelta >= 0,
-      evidenceLabel: t('progress.drivers.investmentsEvidence'),
-      evidence: `${formatCurrency(startPoint.value.investmentAssets)} → ${formatCurrency(endPoint.value.investmentAssets)}`,
-      weight: Math.abs(investmentDelta),
-    })
-  }
-  if (Math.abs(costDelta) >= 1) {
-    result.push({
-      key: 'cost',
-      tone: 'blue',
-      icon: 'credit_card',
-      title: t(
-        costDelta <= 0 ? 'progress.drivers.costDecreased' : 'progress.drivers.costIncreased',
-      ),
-      description: t('progress.drivers.costDescription'),
-      value: `${signedCurrency(costDelta)}/${t('progress.year')}`,
-      good: costDelta <= 0,
-      evidenceLabel: t('progress.drivers.costEvidence'),
-      evidence: `${formatCurrency(startPoint.value.costOfLife)} → ${formatCurrency(endPoint.value.costOfLife)}`,
-      weight: Math.abs(costDelta),
-    })
-  }
-  if (Math.abs(mortgageDelta) >= 1) {
-    result.push({
-      key: 'mortgage',
-      tone: 'purple',
-      icon: 'home',
-      title: t(
-        mortgageDelta <= 0
-          ? 'progress.drivers.mortgageDecreased'
-          : 'progress.drivers.mortgageIncreased',
-      ),
-      description: t('progress.drivers.mortgageDescription'),
-      value: signedCurrency(mortgageDelta),
-      good: mortgageDelta <= 0,
-      evidenceLabel: t('progress.drivers.mortgageEvidence'),
-      evidence: `${formatCurrency(startPoint.value.mortgageBalance)} → ${formatCurrency(endPoint.value.mortgageBalance)}`,
-      weight: Math.abs(mortgageDelta),
-    })
-  }
-  return result.sort((first, second) => second.weight - first.weight).slice(0, 3)
-})
-const progressMilestones = computed(() =>
-  calculateMilestoneProgress({
-    financialYear: financialYear.value,
-    financialHistory: historyDocuments.value,
-    liabilities: liabilities.value,
-    excludedLiabilityIds: excludedLiabilityIds.value,
-    achievements: trackingActive.value ? achievements.value : [],
-    month: currentMonth.value,
-    memberId: selectedMemberId.value,
-  }),
-)
-const visibleMilestones = computed(() =>
-  progressMilestones.value.filter(
-    (milestone) => milestone.family !== 'debt' || milestone.relevant || milestone.achieved,
-  ),
-)
-const achievedMilestoneCount = computed(
-  () => visibleMilestones.value.filter(milestoneIsUnlocked).length,
-)
-const achievementById = computed(
-  () => new Map(achievements.value.map((achievement) => [achievement.milestoneId, achievement])),
-)
-const latestMilestone = computed(() => {
-  const unlocked = visibleMilestones.value.filter(milestoneIsUnlocked)
-  if (!unlocked.length) return null
-  if (!trackingActive.value) return unlocked.at(-1)
-
-  return [...unlocked]
-    .sort((first, second) => {
-      const firstDate = achievementDate(achievementById.value.get(first.id))?.getTime() || 0
-      const secondDate = achievementDate(achievementById.value.get(second.id))?.getTime() || 0
-      return firstDate - secondDate
-    })
-    .at(-1)
-})
-const latestMilestoneDate = computed(() => {
-  if (!latestMilestone.value) return ''
-  const date = achievementDate(achievementById.value.get(latestMilestone.value.id))
-  if (!date) {
-    return t(trackingActive.value ? 'milestones.status.achieved' : 'milestones.status.reached')
-  }
-  return t('milestones.achievedOn', {
-    date: new Intl.DateTimeFormat(locale.value, { month: 'short', year: 'numeric' }).format(date),
-  })
-})
-const nextMilestone = computed(
-  () =>
-    visibleMilestones.value
-      .filter((milestone) => !milestoneIsUnlocked(milestone))
-      .sort((first, second) => second.progress - first.progress)[0] || null,
-)
-const milestoneFamilySummaries = computed(() =>
-  milestoneFamilies.map((family) => {
-    const milestones = visibleMilestones.value.filter(({ family: id }) => id === family.id)
-    return {
-      ...family,
-      label: t(`milestones.families.${family.id}.title`),
-      complete: milestones.length > 0 && milestones.every(milestoneIsUnlocked),
-    }
-  }),
-)
-
-const FreedomDetail = defineComponent({
-  props: { compact: { type: Boolean, default: false } },
-  setup(props) {
-    return () =>
-      h(
-        'div',
-        {
-          class: ['freedom-detail-content', { 'freedom-detail-content--compact': props.compact }],
-        },
-        [
-          h(ProgressTrendChart, {
-            points: annualFreedomPoints.value,
-            series: freedomSeries.value,
-            valueType: 'years',
-            periodType: 'year',
-            ariaLabel: t('progress.detail.freedomAria'),
-            emptyLabel: t('progress.historyEmpty'),
-          }),
-          h('div', { class: 'freedom-formula' }, [
-            h('div', [
-              h('span', t('progress.freedom.investableWealth')),
-              h('strong', formatCurrency(endPoint.value?.investableWealth || 0)),
-            ]),
-            h('span', { class: 'formula-divider', 'aria-hidden': 'true' }),
-            h('div', [
-              h('span', t('progress.freedom.annualCost')),
-              h('strong', formatCurrency(endPoint.value?.costOfLife || 0)),
-            ]),
-            h('span', { class: 'formula-equals', 'aria-hidden': 'true' }, '='),
-            h('div', [
-              h('span', t('progress.freedom.yearsFunded')),
-              h('strong', formatYears(endPoint.value?.yearsFunded || 0)),
-            ]),
-          ]),
-          h('p', { class: 'formula-note' }, t('progress.freedom.calculationNote')),
-        ],
+const compositionSeries = computed(() => {
+  const colors = ['#16815f', '#0870d8', '#39a8a3', '#8754ed', '#4f7cac', '#73bfb8']
+  const debtColors = ['#c44750', '#e58b43', '#d95568', '#b66d57', '#a85567', '#ef6c57']
+  return [
+    ...assetCategories
+      .filter(({ id }) =>
+        filteredBreakdownPoints.value.some((point) => Number(point.assets?.[id] || 0) !== 0),
       )
-  },
+      .map((category, index) => ({
+        key: `assets:${category.id}`,
+        name: t(category.nameKey),
+        color: colors[index % colors.length],
+        section: 'assets',
+      })),
+    ...liabilityCategories
+      .filter(({ id }) =>
+        filteredBreakdownPoints.value.some((point) => Number(point.liabilities?.[id] || 0) !== 0),
+      )
+      .map((category, index) => ({
+        key: `liabilities:${category.id}`,
+        name: t(category.nameKey),
+        color: debtColors[index % debtColors.length],
+        section: 'liabilities',
+      })),
+  ]
+})
+const compositionPoints = computed(() =>
+  filteredBreakdownPoints.value.map((point) => ({
+    period: point.period,
+    ...Object.fromEntries(
+      Object.entries(point.assets || {}).map(([key, value]) => [`assets:${key}`, value]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(point.liabilities || {}).map(([key, value]) => [`liabilities:${key}`, value]),
+    ),
+  })),
+)
+
+const metric = computed(() => {
+  if (!startPoint.value || !endPoint.value) return { label: '', value: '', change: '' }
+  if (activePerspective.value === 'cost-of-life') {
+    const current = filteredFlowPoints.value.at(-1)
+    const first = filteredFlowPoints.value[0]
+    const value = current?.savingsCapacity || 0
+    const delta = value - (first?.savingsCapacity || 0)
+    return metricValue(t('progress.evolution.metrics.monthlySavingsCapacity'), value, delta)
+  }
+  if (activePerspective.value === 'freedom') {
+    const delta = endPoint.value.yearsFunded - startPoint.value.yearsFunded
+    return {
+      label: t('progress.evolution.metrics.yearsFunded'),
+      value: formatYears(endPoint.value.yearsFunded),
+      change: signedYears(delta),
+      negative: delta < 0,
+    }
+  }
+  const delta = endPoint.value.netWorth - startPoint.value.netWorth
+  return metricValue(
+    activePerspective.value === 'composition'
+      ? t('progress.evolution.metrics.netPosition')
+      : t('progress.evolution.metrics.netWorthChange'),
+    activePerspective.value === 'composition' ? endPoint.value.netWorth : delta,
+    activePerspective.value === 'composition'
+      ? delta
+      : percentChange(delta, startPoint.value.netWorth),
+    activePerspective.value !== 'composition',
+  )
+})
+
+const breakdownTitle = computed(() => {
+  const keys = {
+    'wealth-creation': 'progress.evolution.breakdown.wealth',
+    'cost-of-life': 'progress.evolution.breakdown.flows',
+    freedom: 'progress.evolution.breakdown.freedom',
+    composition: 'progress.evolution.breakdown.composition',
+  }
+  return t(keys[activePerspective.value])
+})
+
+const breakdownItems = computed(() => {
+  if (!endPoint.value) return []
+  if (activePerspective.value === 'wealth-creation') {
+    return bridgeItems.value.map((item) => ({
+      key: item.key,
+      label: item.label,
+      value: signedCurrency(item.value),
+      color: item.value >= 0 ? CHART_COLORS.success : '#c44750',
+      positive: item.value > 0,
+      negative: item.value < 0,
+    }))
+  }
+  if (activePerspective.value === 'cost-of-life') {
+    const current = filteredFlowPoints.value.at(-1) || {}
+    return [
+      valueItem(
+        'income',
+        t('progress.detail.income'),
+        current.income,
+        CHART_COLORS.success,
+        'payments',
+      ),
+      valueItem(
+        'expenses',
+        t('progress.detail.expenses'),
+        current.costOfLife,
+        '#c44750',
+        'receipt_long',
+      ),
+      valueItem(
+        'savings',
+        t('progress.detail.savings'),
+        current.savingsCapacity,
+        CHART_COLORS.primary,
+        'savings',
+      ),
+    ]
+  }
+  if (activePerspective.value === 'freedom') {
+    return [
+      valueItem(
+        'investable',
+        t('progress.freedom.investableWealth'),
+        endPoint.value.investableWealth,
+        CHART_COLORS.purple,
+        'account_balance_wallet',
+      ),
+      valueItem(
+        'cost',
+        t('progress.freedom.annualCost'),
+        endPoint.value.costOfLife,
+        '#c44750',
+        'credit_card',
+      ),
+      {
+        key: 'years',
+        label: t('progress.freedom.yearsFunded'),
+        value: formatYears(endPoint.value.yearsFunded),
+        color: CHART_COLORS.purple,
+        icon: 'shield',
+      },
+    ]
+  }
+  return compositionSeries.value.map((series) => ({
+    key: series.key,
+    label: series.name,
+    value: formatCurrency(Number(compositionPoints.value.at(-1)?.[series.key] || 0)),
+    color: series.color,
+  }))
+})
+
+const coverageDescription = computed(() => {
+  const coverage = filteredFlowPoints.value.at(-1)?.coverage || 'model'
+  return t(`progress.evolution.coverage.${coverage}`)
 })
 
 watch(workspaceId, () => load(), { immediate: true })
 watch(selectedMemberId, () => {
-  activeDetail.value = null
-  driversExpanded.value = false
+  customStartPeriod.value = null
 })
 
 function load(force = false) {
   return milestonesStore.load(workspaceId.value, force)
+}
+
+function selectTab(tab) {
+  router.replace({ query: { ...route.query, tab: tab === 'achievements' ? tab : undefined } })
+}
+
+function selectPerspective(view) {
+  router.replace({ query: { ...route.query, view: view === 'wealth-creation' ? undefined : view } })
 }
 
 function selectPeriod(value) {
@@ -728,99 +605,30 @@ function selectStartPeriod(period) {
   selectedPeriod.value = 'custom'
 }
 
-function toggleDetail(key) {
-  activeDetail.value = activeDetail.value === key ? null : key
+function categoryLabel(section, categoryId) {
+  const categories = section === 'assets' ? assetCategories : liabilityCategories
+  const category = categories.find(({ id }) => id === categoryId)
+  return category ? t(category.nameKey) : categoryId
 }
 
-function openYearsFundedInfo() {
-  if ($q.screen.lt.sm) yearsFundedInfoOpen.value = true
+function valueItem(key, label, value, color, icon) {
+  return { key, label, value: formatCurrency(value), color, icon }
 }
 
-function openMilestones() {
-  router.push({ name: 'achievements', params: { workspaceId: workspaceId.value } })
-}
-
-function milestoneIsUnlocked(milestone) {
-  return trackingActive.value ? milestone.achieved : milestone.reached
-}
-
-function familyIcon(familyId) {
-  return milestoneFamilies.find(({ id }) => id === familyId)?.icon || 'flag'
-}
-
-function milestoneTitle(milestone) {
-  return t(`milestones.items.${milestone.id}`, {
-    amount: formatCurrency(milestone.target),
-  })
-}
-
-function milestoneDescription(milestone) {
-  if (milestone.family === 'safety') {
-    return t('milestones.descriptions.safety', { target: milestone.target })
-  }
-  if (milestone.family === 'freedom') {
-    return t('milestones.descriptions.freedom', { target: milestone.target })
-  }
-  if (milestone.family === 'netWorth') {
-    return milestone.id === 'net_worth_positive'
-      ? t('milestones.descriptions.netWorthPositive')
-      : t('milestones.descriptions.netWorth', { target: formatCurrency(milestone.target) })
-  }
-  return t(`milestones.descriptions.${milestone.id}`)
-}
-
-function milestoneCurrentTarget(milestone) {
-  const currentValue = milestone.currentValue
-  if (milestone.family === 'safety') {
-    return t('milestones.values.monthsCurrentTarget', {
-      current: formatDecimal(currentValue),
-      target: milestone.target,
-    })
-  }
-  if (milestone.family === 'freedom') {
-    return t('milestones.values.yearsCurrentTarget', {
-      current: formatDecimal(currentValue),
-      target: milestone.target,
-    })
-  }
-  if (milestone.family === 'debt') {
-    return t('milestones.values.remaining', { value: formatCurrency(currentValue) })
-  }
-  if (milestone.id === 'net_worth_positive') {
-    return t('milestones.values.netWorth', { value: formatCurrency(currentValue) })
-  }
-  return `${formatCurrency(currentValue)} / ${formatCurrency(milestone.target)}`
-}
-
-function achievementDate(achievement) {
-  const value = achievement?.achievedAt
-  if (typeof value?.toDate === 'function') return value.toDate()
-  if (!value) return null
-  const date = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-function formatDecimal(value) {
-  return new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }).format(
-    Number(value || 0),
-  )
-}
-
-function metricRow(key, icon, tone, label) {
-  const start = startPoint.value[key]
-  const current = endPoint.value[key]
-  const delta = current - start
-  const years = key === 'yearsFunded'
+function metricValue(label, value, change, valueIsDelta = false) {
+  const changeIsPercent = typeof change === 'string'
   return {
-    key,
-    icon,
-    tone,
     label,
-    start: years ? formatYears(start) : formatCurrency(start),
-    current: years ? formatYears(current) : formatCurrency(current),
-    delta: years ? signedYears(delta) : signedCurrency(delta),
-    beneficial: key === 'costOfLife' ? delta <= 0 : delta >= 0,
+    value: valueIsDelta ? signedCurrency(value) : formatCurrency(value),
+    change: changeIsPercent ? change : signedCurrency(change),
+    negative: changeIsPercent ? String(change).startsWith('−') : change < 0,
   }
+}
+
+function percentChange(delta, start) {
+  if (!start) return t('progress.evolution.metrics.noPercentage')
+  const value = (delta / Math.abs(start)) * 100
+  return `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(1)}%`
 }
 
 function periodIndex(period) {
@@ -830,7 +638,7 @@ function periodIndex(period) {
 
 function formatPeriod(period) {
   const [year, month] = period.split('-').map(Number)
-  return new Intl.DateTimeFormat(locale.value, { month: 'short', year: 'numeric' }).format(
+  return new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(
     new Date(Date.UTC(year, month - 1, 1)),
   )
 }
@@ -843,15 +651,17 @@ function formatShortPeriod(period) {
 }
 
 function formatYears(value) {
-  return t('progress.yearsValue', { value: Number(value || 0).toFixed(1) })
+  return t('progress.yearsValue', {
+    value: new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }).format(value || 0),
+  })
 }
 
 function signedYears(value) {
-  return `${value >= 0 ? '+' : '−'}${Math.abs(Number(value || 0)).toFixed(1)} ${t('progress.years')}`
+  return `${value >= 0 ? '+' : '−'}${new Intl.NumberFormat(locale.value, { maximumFractionDigits: 1 }).format(Math.abs(value || 0))} ${t('progress.years')}`
 }
 
 function signedCurrency(value) {
-  return `${value >= 0 ? '+' : '−'}${formatCurrency(Math.abs(value))}`
+  return `${value >= 0 ? '+' : '−'}${formatCurrency(Math.abs(value || 0))}`
 }
 </script>
 
@@ -861,944 +671,457 @@ function signedCurrency(value) {
 .progress-page {
   @include financial-page;
 }
-
 .progress-shell {
   @include financial-shell(analytical);
 }
 
-.progress-filters {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
+.progress-tabs,
 .period-switch {
-  display: flex;
-  padding: 0.22rem;
-  border: 1px solid var(--color-line);
+  display: inline-flex;
+  padding: 0.25rem;
+  border: 1px solid var(--color-line-strong);
   border-radius: 999px;
   background: var(--color-surface);
   box-shadow: var(--shadow-control);
 }
 
-.period-switch button,
-.detail-switch button {
-  @include button-reset;
-  min-width: 3.6rem;
-  padding: 0.48rem 0.8rem;
-  border-radius: 999px;
+.progress-tabs button,
+.period-switch button {
+  @include segmented-button;
+  min-width: 8.6rem;
+  padding: 0.55rem 1rem;
   color: var(--color-copy);
-  font-size: 0.78rem;
-  font-weight: 750;
-  text-align: center;
+  transition: 160ms ease;
 }
-
-.period-switch button.selected,
-.detail-switch button.selected {
+.period-switch button {
+  min-width: 3.2rem;
+  padding: 0.4rem 0.75rem;
+}
+.progress-tabs button.active,
+.period-switch button.selected {
   background: var(--color-ink);
   color: var(--color-inverse);
+  box-shadow: 0 6px 14px rgb(11 22 51 / 16%);
 }
 
-.period-switch button:focus-visible,
-.detail-switch button:focus-visible,
-.comparison-card:focus-visible,
-.detail-cta:focus-visible {
-  @include focus-ring;
-}
-
-.date-filter {
-  min-height: 2.7rem;
-  border-color: var(--color-line);
-  border-radius: 0.9rem;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.date-filter__chevron {
-  margin-left: 0.35rem;
-}
-
-.snapshot-menu {
-  width: min(19rem, calc(100vw - 2rem));
-  max-height: 24rem;
-  border-radius: 1rem;
-}
-
-.snapshot-menu__heading {
-  padding: 1rem 1rem 0.6rem;
-  color: var(--color-muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.snapshot-menu__active {
-  background: var(--color-blue-soft);
-  color: var(--color-primary-dark);
-}
-
-.story-stack {
-  display: grid;
-  gap: 1.15rem;
+.evolution-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
   margin-top: 1.25rem;
 }
+.date-filter {
+  min-width: 12rem;
+  border-radius: 999px;
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+.date-filter__chevron {
+  margin-left: 0.4rem;
+}
+.snapshot-menu {
+  min-width: 14rem;
+  max-height: 22rem;
+  border-radius: var(--radius-md);
+}
+.snapshot-menu__heading {
+  padding: 0.8rem 1rem 0.45rem;
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.snapshot-menu__active {
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
+}
 
-.story-card,
-.empty-story {
+.evolution-workspace {
+  display: grid;
+  grid-template-columns: minmax(17rem, 0.27fr) minmax(0, 1fr);
+  min-height: 39rem;
+  margin-top: 1rem;
+  overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
 }
-
-.story-card {
-  overflow: hidden;
+.perspective-nav {
+  padding: 1.35rem;
+  border-right: 1px solid var(--color-line);
+  background: linear-gradient(180deg, var(--color-surface), var(--color-surface-soft));
 }
-
-.story-intro {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem 1rem;
-}
-
-.story-number {
+.perspective-nav button {
+  @include button-reset;
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 1rem 0.8rem;
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  transition: 160ms ease;
+}
+.perspective-nav button + button {
+  margin-top: 0.45rem;
+}
+.perspective-nav button:hover {
+  background: var(--color-surface-muted);
+}
+.perspective-nav button.active {
+  background: linear-gradient(135deg, var(--color-green-soft), var(--color-surface));
+  box-shadow: inset 0 0 0 1px rgb(22 129 95 / 10%);
+}
+.perspective-nav button:focus-visible {
+  outline: 3px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+.perspective-nav strong,
+.perspective-nav small {
+  display: block;
+}
+.perspective-nav strong {
+  font-size: 0.92rem;
+}
+.perspective-nav small {
+  margin-top: 0.18rem;
+  color: var(--color-copy);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+.perspective-icon,
+.breakdown-marker {
+  display: grid;
   place-items: center;
   flex: 0 0 auto;
+  width: 2.65rem;
+  height: 2.65rem;
   border-radius: 50%;
+  font-size: 1.25rem;
+}
+.perspective-icon--green {
   background: var(--color-green-soft);
   color: var(--color-success);
-  font-size: 1.2rem;
-  font-weight: 850;
 }
-
-.story-number--blue {
+.perspective-icon--blue {
   background: var(--color-blue-soft);
   color: var(--color-primary);
 }
-
-.story-number--purple {
+.perspective-icon--purple,
+.perspective-icon--violet {
   background: var(--color-purple-soft);
   color: var(--color-purple);
 }
-
-.story-intro h2,
-.empty-story h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: clamp(1.3rem, 2vw, 1.65rem);
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+.perspective-chevron {
+  color: var(--color-muted);
+  opacity: 0;
+}
+.perspective-nav button.active .perspective-chevron {
+  opacity: 1;
 }
 
-.story-intro p,
-.empty-story p {
-  margin: 0.25rem 0 0;
-  color: var(--color-copy);
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-.transformation-content,
-.drivers-content {
+.perspective-panel {
   min-width: 0;
-  padding: 0 1.5rem 1.35rem;
+  padding: clamp(1.4rem, 3vw, 2.4rem);
 }
-
-.comparison-grid {
+.perspective-header {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 18rem);
+  align-items: center;
+  gap: 2rem;
 }
-
-.comparison-card {
-  @include button-reset;
-  position: relative;
-  display: grid;
-  gap: 1rem;
-  width: 100%;
-  min-height: 8.4rem;
-  padding: 0.9rem 1rem 1rem;
-  overflow: hidden;
-  border: 1px solid var(--color-line);
+.perspective-eyebrow {
+  color: var(--color-success);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.perspective-heading h2 {
+  margin: 0.45rem 0 0;
+  color: var(--color-ink);
+  font-size: clamp(1.8rem, 3vw, 2.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+.perspective-heading p {
+  max-width: 48rem;
+  margin: 0.65rem 0 0;
+  color: var(--color-copy);
+  line-height: 1.5;
+}
+.metric-highlight {
+  padding: 1.2rem 1.35rem;
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+  background: var(--color-green-soft);
 }
-
-.comparison-card::before {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(145deg, transparent 42%, rgb(22 129 95 / 8%));
-  content: '';
-  pointer-events: none;
+.metric-highlight--blue {
+  background: var(--color-blue-soft);
 }
-
-.comparison-card--blue::before {
-  background: linear-gradient(145deg, transparent 42%, rgb(8 112 216 / 9%));
-}
-
-.comparison-card--purple::before {
-  background: linear-gradient(145deg, transparent 42%, rgb(135 84 237 / 9%));
-}
-
-.comparison-card:hover,
-.comparison-card--open {
-  border-color: var(--color-line-strong);
-  box-shadow: var(--shadow-control);
-  transform: translateY(-1px);
-}
-
-.comparison-card__heading,
-.comparison-card__values {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-}
-
-.comparison-card__heading {
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.comparison-card__values {
-  align-self: end;
-  gap: 0.65rem;
-}
-
-.metric-name {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  text-align: left;
-}
-
-.metric-name strong {
-  font-size: 0.92rem;
-}
-
-.years-funded-info {
-  margin-left: -0.45rem;
-  color: var(--color-copy);
-}
-
-.years-funded-tooltip {
-  display: grid;
-  gap: 0.45rem;
-  line-height: 1.4;
-}
-
-.years-funded-info-sheet {
-  width: min(32rem, calc(100vw - 2rem));
-  border-radius: var(--radius-card);
-  color: var(--color-ink);
-}
-
-.years-funded-info-heading {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding-bottom: 0.75rem;
-}
-
-.years-funded-info-heading h2 {
-  flex: 1;
-  margin: 0;
-  font-size: 1.2rem;
-}
-
-.years-funded-info-icon {
-  display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
-  place-items: center;
-  border-radius: 0.8rem;
+.metric-highlight--purple,
+.metric-highlight--violet {
   background: var(--color-purple-soft);
+}
+.metric-highlight span,
+.metric-highlight strong,
+.metric-highlight small {
+  display: block;
+}
+.metric-highlight span {
+  color: var(--color-copy);
+  font-size: 0.78rem;
+}
+.metric-highlight strong {
+  margin-top: 0.25rem;
+  color: var(--color-success-dark);
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.metric-highlight--blue strong {
+  color: var(--color-primary-dark);
+}
+.metric-highlight--purple strong,
+.metric-highlight--violet strong {
   color: var(--color-purple);
-  font-size: 1.25rem;
 }
-
-.years-funded-info-copy {
-  padding-top: 0;
-  color: var(--color-copy);
-  font-size: 0.9rem;
-  line-height: 1.55;
-}
-
-.years-funded-info-copy p {
-  margin: 0 0 0.9rem;
-}
-
-.years-funded-formula {
-  margin: 0.2rem 0 0.9rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 0.75rem;
-  background: var(--color-purple-soft);
-  color: var(--color-ink);
+.metric-highlight small {
+  margin-top: 0.45rem;
+  color: var(--color-success-dark);
   font-weight: 750;
 }
+.metric-highlight small.negative,
+.breakdown-row b.negative {
+  color: var(--color-danger);
+}
 
-.metric-icon {
+.analysis-grid {
   display: grid;
-  width: 2.7rem;
-  height: 2.7rem;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 0.9rem;
-  font-size: 1.25rem;
+  grid-template-columns: minmax(0, 1.65fr) minmax(15rem, 0.85fr);
+  gap: 1rem;
+  margin-top: 1.65rem;
 }
-
-.metric-icon--green {
-  background: var(--color-green-soft);
-  color: var(--color-success);
-}
-
-.metric-icon--blue {
-  background: var(--color-blue-soft);
-  color: var(--color-primary);
-}
-
-.metric-icon--purple {
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-
-.comparison-value {
-  font-size: 0.98rem;
-  font-weight: 720;
-  white-space: nowrap;
-}
-
-.comparison-value--past {
-  color: var(--color-copy);
-  font-weight: 600;
-}
-
-.comparison-value--today {
-  font-size: 1.08rem;
-  font-weight: 820;
-}
-
-.comparison-card__values .delta-pill {
-  margin-left: auto;
-}
-
-.comparison-arrow,
-.freedom-arrow {
-  color: var(--color-muted);
-}
-
-.delta-pill {
-  display: inline-flex;
-  min-height: 2rem;
-  align-items: center;
-  justify-content: center;
-  padding: 0.32rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.delta-pill--good {
-  background: var(--color-green-soft);
-  color: var(--color-success-dark);
-}
-
-.delta-pill--bad {
-  background: var(--color-red-soft);
-  color: var(--color-danger-dark);
-}
-
-.row-chevron {
-  color: var(--color-muted);
-  transition: transform 160ms ease;
-}
-
-.row-chevron--open {
-  transform: rotate(90deg);
-}
-
-.inline-detail {
-  margin-top: 0.75rem;
+.chart-card,
+.breakdown-card {
+  min-width: 0;
   padding: 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
-}
-
-.detail-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.detail-heading span {
-  color: var(--color-primary);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.detail-heading h3 {
-  margin: 0.15rem 0 0;
-  font-size: 1.15rem;
-}
-
-.detail-switch {
-  display: flex;
-  padding: 0.15rem;
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
   background: var(--color-surface);
 }
-
-.detail-switch button {
-  min-width: 5rem;
-  padding: 0.35rem 0.65rem;
+.chart-note {
+  margin: 0.4rem 0 0;
+  padding: 0 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.breakdown-card h3 {
+  margin: 0 0 0.7rem;
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+.breakdown-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.breakdown-row:last-child {
+  border-bottom: 0;
+}
+.breakdown-marker {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-inverse);
+  font-size: 0.95rem;
+}
+.breakdown-copy strong,
+.breakdown-copy small {
+  display: block;
+}
+.breakdown-copy strong {
+  color: var(--color-ink);
+  font-size: 0.8rem;
+}
+.breakdown-copy small {
+  color: var(--color-muted);
   font-size: 0.7rem;
 }
-
-.inline-detail :deep(.chart-shell),
-.inline-detail :deep(.net-worth-chart) {
-  min-height: 15rem;
-  height: 15rem;
+.breakdown-row b {
+  color: var(--color-ink);
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
-
-.drivers-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.8rem;
+.breakdown-row b.positive {
+  color: var(--color-success-dark);
 }
-
-.driver-card {
-  display: grid;
-  grid-template-columns: 2.7rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 6.4rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.driver-copy {
-  display: grid;
-  gap: 0.12rem;
-  min-width: 0;
-}
-
-.driver-copy strong {
-  font-size: 0.9rem;
-  line-height: 1.25;
-}
-
-.driver-copy small {
-  color: var(--color-copy);
-  font-size: 0.72rem;
-  line-height: 1.35;
-}
-
-.driver-card .delta-pill {
-  align-self: start;
-}
-
-.detail-cta {
-  @include button-reset;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-  width: 100%;
-  margin-top: 0.9rem;
-  color: var(--color-primary-dark);
-  font-size: 0.78rem;
-  font-weight: 750;
-}
-
-.driver-evidence {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-top: 0.8rem;
-}
-
-.driver-evidence > div {
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.75rem;
+.formula-card,
+.coverage-note {
+  margin-top: 1rem;
+  padding: 0.85rem;
   border-radius: var(--radius-sm);
   background: var(--color-surface-soft);
-}
-
-.driver-evidence span {
-  color: var(--color-muted);
-  font-size: 0.68rem;
-}
-
-.driver-evidence strong {
-  font-size: 0.82rem;
-}
-
-.drivers-empty {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  min-height: 8rem;
-  color: var(--color-muted);
-}
-
-.drivers-empty .q-icon {
-  padding: 0.75rem;
-  border-radius: 50%;
-  background: var(--color-surface-muted);
-  font-size: 1.4rem;
-}
-
-.drivers-empty p {
-  margin: 0.25rem 0 0;
   color: var(--color-copy);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
 }
-
-.milestones-content {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(13rem, 1fr) minmax(13rem, 1fr) minmax(11rem, 0.65fr);
-  gap: 0.9rem;
-  min-width: 0;
-  padding: 0 1.5rem 1.35rem;
-  background:
-    radial-gradient(circle at 92% 100%, rgb(51 184 150 / 12%), transparent 12rem),
-    linear-gradient(145deg, #ffffff 45%, #f8fbff);
+.formula-card span,
+.formula-card small {
+  display: block;
 }
-
-.milestone-highlight {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 0.8rem;
-  min-width: 0;
-  min-height: 10.5rem;
-  padding: 1rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-}
-
-.milestone-highlight--latest {
-  border-color: rgb(22 129 95 / 9%);
-  background: linear-gradient(145deg, #f2fbf7, #f8fcfa);
-}
-
-.milestone-highlight--next {
-  border-color: rgb(135 84 237 / 9%);
-  background: linear-gradient(145deg, #f8f5ff, #fbfaff);
-}
-
-.milestone-label {
-  color: var(--color-muted);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.milestone-highlight__main {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  min-width: 0;
-}
-
-.milestone-highlight__main > div {
-  display: grid;
-  gap: 0.25rem;
-  min-width: 0;
-}
-
-.milestone-highlight__main strong {
+.formula-card span {
   color: var(--color-ink);
-  font-size: 1.15rem;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-}
-
-.milestone-highlight__main p {
-  margin: 0;
-  color: var(--color-copy);
-  font-size: 0.75rem;
-  line-height: 1.35;
-}
-
-.milestone-emblem {
-  display: grid;
-  width: 3rem;
-  height: 3rem;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  font-size: 1.45rem;
-}
-
-.milestone-emblem--achieved {
-  background: var(--color-green-soft);
-  color: var(--color-success);
-}
-
-.milestone-emblem--next {
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-
-.milestone-status {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.28rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.67rem;
   font-weight: 750;
 }
-
-.milestone-status--achieved {
-  background: rgb(22 129 95 / 10%);
-  color: var(--color-success-dark);
+.formula-card small {
+  margin-top: 0.35rem;
 }
-
-.milestone-progress {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.65rem;
-  color: var(--color-purple);
-  font-size: 0.72rem;
-}
-
-.milestone-placeholder {
+.coverage-note {
   display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  color: var(--color-copy);
-  font-size: 0.8rem;
+  gap: 0.55rem;
 }
 
-.milestone-placeholder .q-icon {
-  color: var(--color-muted);
-  font-size: 1.5rem;
-}
-
-.milestone-overview {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.85rem;
-  padding: 0.5rem 0.2rem 0.5rem 1rem;
-  border-left: 1px solid var(--color-line);
-}
-
-.milestone-count {
+.state,
+.empty-state {
   display: grid;
-  gap: 0.05rem;
-}
-
-.milestone-count strong {
-  color: var(--color-ink);
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.milestone-count span {
-  color: var(--color-copy);
-  font-size: 0.7rem;
-}
-
-.milestone-family-icons {
-  display: flex;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
-.milestone-family-icon {
-  display: grid;
-  width: 2.3rem;
-  height: 2.3rem;
   place-items: center;
+  gap: 0.8rem;
+  min-height: 25rem;
+  margin-top: 1rem;
   border: 1px solid var(--color-line);
-  border-radius: 50%;
+  border-radius: var(--radius-card);
   background: var(--color-surface);
-  color: var(--color-muted);
-  font-size: 1.05rem;
-}
-
-.milestone-family-icon--safety.complete {
-  background: var(--color-green-soft);
-  color: var(--color-success);
-}
-
-.milestone-family-icon--freedom.complete {
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-
-.milestone-family-icon--debt.complete {
-  background: #fff4e8;
-  color: #c76a13;
-}
-
-.milestone-family-icon--netWorth.complete {
-  background: var(--color-blue-soft);
-  color: var(--color-primary);
-}
-
-.milestones-cta {
-  min-height: 2.25rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 750;
-}
-
-:deep(.freedom-detail-content) {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.55fr);
-  gap: 1rem;
-  align-items: center;
-}
-
-:deep(.freedom-detail-content--compact) {
-  grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.5fr);
-}
-
-:deep(.freedom-formula) {
-  display: grid;
-  grid-template-columns: 1fr;
-  justify-items: stretch;
-  gap: 0.5rem;
-  padding: 1.15rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  color: var(--color-copy);
   text-align: center;
 }
-
-:deep(.freedom-formula > div) {
+.empty-state {
+  grid-template-columns: auto auto;
+  place-content: center;
+  text-align: left;
+}
+.empty-state__icon {
   display: grid;
-  gap: 0.2rem;
-  padding: 0.25rem 0;
-}
-
-:deep(.freedom-formula > div:last-child) {
-  margin-top: 0.1rem;
-  padding: 0.8rem;
-  border-radius: 0.8rem;
-  background: var(--color-purple-soft);
-  color: var(--color-purple);
-}
-
-:deep(.freedom-formula span) {
-  color: var(--color-muted);
-  font-size: 0.68rem;
-}
-
-:deep(.freedom-formula strong) {
-  font-size: 1.08rem;
-}
-
-:deep(.freedom-formula > div:last-child strong) {
-  font-size: 1.25rem;
-}
-
-:deep(.formula-divider) {
-  width: min(10rem, 72%);
-  height: 1px;
-  margin: 0 auto;
-  background: var(--color-line-strong);
-}
-
-:deep(.formula-equals) {
-  color: var(--color-muted);
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-:deep(.formula-note) {
-  grid-column: 2;
-  margin: -0.45rem 0 0;
-  color: var(--color-copy);
-  font-size: 0.72rem;
-  line-height: 1.4;
-}
-
-.empty-story {
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding: 2rem;
-}
-
-.state {
-  display: grid;
-  min-height: 20rem;
   place-items: center;
-  gap: 0.75rem;
-  color: var(--color-copy);
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
+  font-size: 2rem;
+}
+.empty-state h2,
+.empty-state p {
+  margin: 0;
+}
+.empty-state p {
+  max-width: 32rem;
+  margin-top: 0.35rem;
+}
+.achievements-view {
+  margin-top: 1.25rem;
 }
 
 @media (max-width: 1050px) {
-  .comparison-grid,
-  .drivers-grid {
+  .evolution-workspace {
+    grid-template-columns: 1fr;
+  }
+  .perspective-nav {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .perspective-nav button {
+    flex: 0 0 min(15rem, 70vw);
+  }
+  .perspective-nav button + button {
+    margin-top: 0;
+  }
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  .breakdown-list {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .comparison-card:last-child,
-  .driver-card:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .milestones-content {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .milestone-overview {
-    grid-column: 1 / -1;
-    align-items: center;
-    flex-direction: row;
-    justify-content: space-between;
-    padding: 0.8rem 0.25rem 0;
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
+    gap: 0 1rem;
   }
 }
 
 @media (max-width: 760px) {
-  .progress-filters {
-    width: 100%;
-    align-items: stretch;
-    flex-direction: column;
+  :deep(.app-page-header) {
+    display: block;
   }
-
+  :deep(.app-page-header__actions) {
+    margin-top: 1rem;
+  }
+  .progress-tabs {
+    width: 100%;
+  }
+  .progress-tabs button {
+    flex: 1;
+    min-width: 0;
+  }
+  .evolution-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
   .period-switch {
     width: 100%;
   }
-
   .period-switch button {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
   }
-
   .date-filter {
     width: 100%;
   }
-
-  .story-stack {
-    margin-top: 0.9rem;
+  .evolution-workspace {
+    margin-top: 0.75rem;
+    overflow: visible;
   }
-
-  .story-intro {
-    padding: 1rem 1rem 0.85rem;
+  .perspective-nav {
+    margin: 0;
+    padding: 0.75rem;
   }
-
-  .story-number {
-    width: 2.2rem;
-    height: 2.2rem;
-    font-size: 1rem;
+  .perspective-nav button {
+    flex-basis: min(13.5rem, 78vw);
+    padding: 0.75rem;
   }
-
-  .story-intro h2 {
-    font-size: 1.45rem;
+  .perspective-panel {
+    padding: 1rem;
   }
-
-  .transformation-content,
-  .drivers-content {
-    padding: 0 0.8rem 0.8rem;
-  }
-
-  .milestones-content {
+  .perspective-header {
     grid-template-columns: 1fr;
-    padding: 0 0.8rem 0.8rem;
+    gap: 1rem;
   }
-
-  .milestone-highlight {
-    min-height: 9.5rem;
+  .perspective-heading h2 {
+    font-size: 1.8rem;
   }
-
-  .milestone-overview {
-    grid-column: auto;
-    align-items: flex-start;
-    flex-direction: column;
+  .metric-highlight {
+    padding: 1rem;
   }
-
-  .milestones-cta {
-    width: 100%;
+  .analysis-grid {
+    margin-top: 1rem;
   }
-
-  .comparison-grid,
-  .drivers-grid {
+  .chart-card,
+  .breakdown-card {
+    padding: 0.65rem;
+  }
+  .breakdown-list {
     grid-template-columns: 1fr;
   }
-
-  .comparison-card:last-child,
-  .driver-card:last-child {
-    grid-column: auto;
-  }
-
-  .comparison-card {
-    min-height: 7.7rem;
-  }
-
-  .comparison-card__values {
-    gap: 0.5rem;
-  }
-
-  .comparison-card__values .delta-pill {
-    margin-left: auto;
-  }
-
-  .detail-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .detail-switch {
-    width: 100%;
-  }
-
-  .detail-switch button {
-    flex: 1;
-  }
-
-  .driver-card {
-    grid-template-columns: 2.4rem minmax(0, 1fr) auto;
-  }
-
-  .driver-evidence {
+  .empty-state {
     grid-template-columns: 1fr;
-  }
-
-  :deep(.freedom-detail-content),
-  :deep(.freedom-detail-content--compact) {
-    grid-template-columns: 1fr;
-  }
-
-  :deep(.formula-note) {
-    grid-column: 1;
+    justify-items: center;
+    padding: 2rem;
+    text-align: center;
   }
 }
 </style>

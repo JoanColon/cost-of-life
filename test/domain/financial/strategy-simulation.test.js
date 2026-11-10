@@ -4,6 +4,7 @@ import {
   latestPositionMonth,
   projectPath,
   simulateStrategy,
+  strategyNetWorthProjection,
   strategyNetWorthPoints,
   strategyStartingPosition,
 } from '../../../src/domain/financial/strategy-simulation'
@@ -247,6 +248,36 @@ describe('strategy simulation', () => {
         liabilities: -32_000,
       },
     })
+  })
+
+  it('reports incomplete mortgage projections instead of silently treating them as unchanged', () => {
+    const result = strategyNetWorthProjection({
+      currentAssets: 10_000,
+      currentLiabilities: 5_000,
+      strategy: {
+        points: [
+          {
+            month: 0,
+            cash: 10_000,
+            investmentValue: 0,
+            investmentBalances: {},
+            investmentContributionBalances: {},
+          },
+        ],
+      },
+      mortgages: [
+        {
+          id: 'broken',
+          currentBalance: 5_000,
+          annualInterestRate: 10,
+          monthlyPayment: 1,
+        },
+      ],
+      asOfDate: '2026-01-01',
+    })
+
+    expect(result.points).toHaveLength(1)
+    expect(result.warnings).toEqual([expect.objectContaining({ type: 'mortgage', id: 'broken' })])
   })
 
   it('counts non-primary real estate toward freedom while keeping cash separate', () => {

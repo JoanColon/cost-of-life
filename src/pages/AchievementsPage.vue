@@ -1,7 +1,8 @@
 <template>
-  <q-page class="achievements-page">
+  <q-page class="achievements-page" :class="{ 'achievements-page--embedded': embedded }">
     <main class="achievements-shell">
       <AppPageHeader
+        v-if="!embedded"
         :title="t('achievements.title')"
         :subtitle="t('achievements.subtitle')"
         :back-label="t('navigation.progress')"
@@ -33,6 +34,34 @@
           </section>
         </template>
       </AppPageHeader>
+
+      <section
+        v-else
+        class="milestone-summary milestone-summary--embedded"
+        :aria-label="t('achievements.summaryLabel')"
+      >
+        <div class="summary-item summary-item--total">
+          <q-icon name="emoji_events" />
+          <span>
+            <strong>{{ achievedCount }} / {{ visibleMilestones.length }}</strong>
+            <small>{{ t('achievements.milestonesAchieved') }}</small>
+          </span>
+        </div>
+        <div class="summary-item summary-item--achieved">
+          <q-icon name="check" />
+          <span>
+            <strong>{{ achievedCount }}</strong>
+            <small>{{ t('achievements.achieved') }}</small>
+          </span>
+        </div>
+        <div class="summary-item summary-item--progress">
+          <span class="summary-progress-ring" />
+          <span>
+            <strong>{{ inProgressCount }}</strong>
+            <small>{{ t('achievements.inProgress') }}</small>
+          </span>
+        </div>
+      </section>
 
       <q-banner v-if="!trackingActive && !loading" rounded class="setup-banner">
         <template #avatar>
@@ -245,6 +274,10 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
+defineProps({
+  embedded: { type: Boolean, default: false },
+})
+
 const { t } = useI18n()
 const $q = useQuasar()
 const route = useRoute()
@@ -433,8 +466,16 @@ function achievedDateLabel(milestoneId) {
 .achievements-page {
   @include financial-page;
 }
+.achievements-page--embedded {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
 .achievements-shell {
   @include financial-shell;
+}
+.achievements-page--embedded .achievements-shell {
+  max-width: none;
 }
 .family-header p,
 .achievement-list p,
@@ -467,6 +508,9 @@ function achievedDateLabel(milestoneId) {
 
 .milestone-summary {
   margin-top: 2rem;
+}
+.milestone-summary--embedded {
+  margin-top: 0;
 }
 
 .family-grid {

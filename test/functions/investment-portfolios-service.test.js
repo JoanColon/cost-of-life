@@ -185,6 +185,145 @@ describe('investment portfolio synchronization', () => {
     )
   })
 
+  it('imports a valid valuation while preserving dividend data after a formula error', async () => {
+    const portfolio = canonicalPortfolio({ refreshAfter: 0 })
+    const { firestore, writes } = createFirestore({
+      portfolio,
+      currentValue: 1000,
+      linkedIncome: [
+        {
+          id: 'dividends-a',
+          categoryId: 'investments',
+          subcategoryId: 'dividends',
+          portfolioAssetId: 'investment-a',
+          calculation: { mode: 'recurring', amount: 100, frequency: 'yearly' },
+        },
+      ],
+    })
+    const rebuildProjection = vi.fn(async () => ({ status: 'rebuilt' }))
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      sheetFetch({ portfolioValue: '2.000', netDividends: '#DIV/0!' }),
+      rebuildProjection,
+      () => 10_000,
+    )
+
+    expect(result).toMatchObject({
+      status: 'partial',
+      currentValue: 2000,
+      summary: { annualDividendIncome: 100 },
+    })
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ scope: 'summary', field: 'annualDividendIncome' }),
+    )
+    expect(writes.find((write) => write.path.endsWith('dividends-a'))).toBeUndefined()
+    expect(rebuildProjection).toHaveBeenCalledWith(
+      firestore,
+      'workspace-a',
+      expect.any(Number),
+      { sections: ['assets'] },
+    )
+  })
+
+  it('preserves the previous valuation when the Summary portfolio value is invalid', async () => {
+    const { firestore, writes } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 0 }),
+      currentValue: 1200,
+    })
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      sheetFetch({ portfolioValue: '#REF!' }),
+      vi.fn(),
+      () => 10_000,
+    )
+
+    expect(result).toMatchObject({ status: 'partial', currentValue: 1200 })
+    const portfolioWrite = writes.find((write) => write.data?.['detail.portfolio'])
+    expect(portfolioWrite.data).not.toHaveProperty('currentValue')
+  })
+
+  it('refreshes holdings from Portfolio when the Summary tab is temporarily unavailable', async () => {
+    const { firestore } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 0 }),
+      currentValue: 1000,
+    })
+    const fetchSpreadsheet = vi.fn(async (url) =>
+      url.searchParams.get('sheet') === 'Summary'
+        ? { ok: false, status: 503, text: async () => '' }
+        : { ok: true, text: async () => portfolioCsv() },
+    )
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      fetchSpreadsheet,
+      vi.fn(),
+      () => 10_000,
+    )
+
+    expect(result).toMatchObject({
+      status: 'partial',
+      currentValue: 1000,
+      summary: { totalPortfolioValue: 1000, annualDividendIncome: 100 },
+    })
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ scope: 'summary', code: 'source_unavailable' }),
+    )
+  })
+
+  it('treats a valid zero dividend as data and updates linked Income', async () => {
+    const { firestore, writes } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 0 }),
+      currentValue: 1000,
+      linkedIncome: [
+        {
+          id: 'dividends-a',
+          categoryId: 'investments',
+          subcategoryId: 'dividends',
+          portfolioAssetId: 'investment-a',
+          calculation: { mode: 'recurring', amount: 100, frequency: 'yearly' },
+        },
+      ],
+    })
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      sheetFetch({ netDividends: '0' }),
+      vi.fn(async () => ({ status: 'rebuilt' })),
+      () => 10_000,
+    )
+
+    expect(result.status).toBe('success')
+    expect(writes.find((write) => write.path.endsWith('dividends-a')).data.calculation.amount).toBe(0)
+  })
+
+  it('preserves the last valid holding field when one formula fails', async () => {
+    const { firestore } = createFirestore({
+      portfolio: canonicalPortfolio({ refreshAfter: 0 }),
+      currentValue: 1000,
+    })
+    const portfolioBody = portfolioCsv().replace('"21,9"', '"#DIV/0!"')
+
+    const result = await syncInvestmentPortfolio(
+      firestore,
+      { workspaceId: 'workspace-a', userId: 'member-a', assetId: 'investment-a', force: true },
+      sheetFetch({ portfolioBody }),
+      vi.fn(),
+      () => 10_000,
+    )
+
+    expect(result.status).toBe('partial')
+    expect(result.holdings[0].priceLocal).toBe(21.9)
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ ticker: 'IBE.MC', field: 'priceLocal', code: 'formula_error' }),
+    )
+  })
+
   it('does not rebuild Income when dividends change without a linked Income', async () => {
     const { firestore } = createFirestore({
       portfolio: canonicalPortfolio({ refreshAfter: 0 }),
@@ -421,13 +560,14 @@ function sheetFetch({
   portfolioValue = '1.000,00',
   grossDividends = '125,00',
   netDividends = '100,00',
+  portfolioBody = null,
 } = {}) {
   return vi.fn(async (url) => ({
     ok: true,
     text: async () =>
       url.searchParams.get('sheet') === 'Summary'
         ? summaryCsv('EUR', portfolioValue, grossDividends, netDividends)
-        : portfolioCsv(),
+        : portfolioBody || portfolioCsv(),
   }))
 }
 

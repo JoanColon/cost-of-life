@@ -304,7 +304,10 @@
             </div>
 
             <p v-if="sheetError" class="sheet-error">
-              {{ t('assets.portfolio.errors.readSheet') }}
+              {{ sheetError }}
+            </p>
+            <p v-else-if="sheetWarningCount" class="sheet-warning">
+              {{ t('assets.portfolio.partialImport', { count: sheetWarningCount }) }}
             </p>
           </section>
 
@@ -460,7 +463,9 @@ const confirmDisconnect = ref(false)
 const readingSheet = ref(false)
 const portfolioHoldings = ref(null)
 const portfolioSummary = ref(null)
-const sheetError = ref(false)
+const sheetError = ref('')
+const sheetWarnings = ref([])
+const sheetWarningCount = ref(0)
 const tablePagination = ref({ sortBy: 'ticker', descending: false, page: 1, rowsPerPage: 25 })
 const portfolioView = ref('holdings')
 const allocationDimension = ref('country')
@@ -696,8 +701,8 @@ async function save() {
     clearSheetResult()
     applyPortfolioResult(result)
     $q.notify({ type: 'positive', message: t('assets.portfolio.saved'), position: 'top' })
-  } catch {
-    $q.notify({ type: 'negative', message: t('assets.portfolio.errors.save'), position: 'top' })
+  } catch (error) {
+    $q.notify({ type: 'negative', message: portfolioErrorMessage(error), position: 'top' })
   } finally {
     saving.value = false
   }
@@ -723,13 +728,17 @@ async function readPortfolio(force = false) {
   const currentRead = ++sheetReadId
   const currentWorkspaceId = workspaceId.value
   const currentAssetId = assetId.value
-  sheetError.value = false
+  sheetError.value = ''
+  sheetWarnings.value = []
+  sheetWarningCount.value = 0
 
   const cache = investmentPortfolioCache(portfolio.value)
   const needsClassificationRefresh = portfolioCacheNeedsClassifications(cache)
   if (cache) {
     portfolioHoldings.value = cache.holdings
     portfolioSummary.value = cache.summary
+    sheetWarnings.value = cache.warnings || []
+    sheetWarningCount.value = Number(cache.warningCount) || sheetWarnings.value.length
   }
   if (!force && !needsClassificationRefresh && investmentPortfolioCacheIsFresh(portfolio.value)) {
     return
@@ -745,9 +754,9 @@ async function readPortfolio(force = false) {
     if (currentRead !== sheetReadId) return
     assetsStore.applyInvestmentPortfolioSync(currentAssetId, result)
     applyPortfolioResult(result)
-  } catch {
+  } catch (error) {
     if (currentRead !== sheetReadId) return
-    sheetError.value = true
+    sheetError.value = portfolioErrorMessage(error)
   } finally {
     if (currentRead === sheetReadId) readingSheet.value = false
   }
@@ -764,6 +773,10 @@ function portfolioCacheNeedsClassifications(cache) {
 function applyPortfolioResult(result) {
   portfolioHoldings.value = Array.isArray(result?.holdings) ? result.holdings : []
   portfolioSummary.value = result?.summary || null
+  sheetWarnings.value = Array.isArray(result?.warnings)
+    ? result.warnings
+    : result?.portfolio?.cache?.warnings || []
+  sheetWarningCount.value = Number(result?.warningCount) || sheetWarnings.value.length
 }
 
 function clearSheetResult() {
@@ -771,8 +784,17 @@ function clearSheetResult() {
   readingSheet.value = false
   portfolioHoldings.value = null
   portfolioSummary.value = null
-  sheetError.value = false
+  sheetError.value = ''
+  sheetWarnings.value = []
+  sheetWarningCount.value = 0
   selectedAllocation.value = null
+}
+
+function portfolioErrorMessage(error) {
+  const message = String(error?.message || '')
+    .replace(/^Firebase:\s*/i, '')
+    .trim()
+  return message && message.length <= 240 ? message : t('assets.portfolio.errors.readSheet')
 }
 
 function openAllocationDetails(group, metric) {
@@ -1144,6 +1166,13 @@ h1 {
   border-top: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
   background: color-mix(in srgb, var(--color-danger) 7%, white);
   color: var(--color-danger);
+}
+.portfolio-content-card .sheet-warning {
+  margin: 0;
+  padding: 0.8rem 1.5rem;
+  border-top: 1px solid color-mix(in srgb, #b7791f 25%, transparent);
+  background: #fff8e8;
+  color: #7a4b00;
 }
 .portfolio-actions {
   display: flex;
