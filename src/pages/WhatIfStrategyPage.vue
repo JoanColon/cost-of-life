@@ -1278,23 +1278,23 @@ import {
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
   financialYearFlowValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import { primaryHomeMortgageLiabilityIds } from '@/domain/financial/investable-wealth'
 import {
-  inflationAdjustedCoverage,
-  inflationFactorAtMonth,
-  latestPositionMonth,
-  presentValue,
-  simulateStrategy,
-  strategyNetWorthProjection,
-} from '@/domain/financial/strategy-simulation'
+  calculateInflationAdjustedCoverage,
+  calculateInflationFactorAtMonth,
+  findLatestObservedPositionMonth,
+  calculatePresentValue,
+  simulateAllocationStrategy,
+  calculateStrategyNetWorthProjection,
+} from '../../functions/shared/plan/strategy-simulation.js'
 import {
-  calculateWhatIf,
+  calculateSavingsCapacityScenario,
   defaultStrategyScenario,
   investmentTypeDefinitions,
   normalizeStrategyForOptions,
   normalizeStrategyScenario,
-} from '@/domain/financial/what-if'
+} from '../../functions/shared/plan/what-if.js'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
@@ -1362,7 +1362,7 @@ const activeScenario = computed(
     config.value.scenarios.find(({ id }) => id === config.value.activeScenarioId) ||
     config.value.scenarios[0],
 )
-const positionMonth = computed(() => latestPositionMonth(financialYear.value))
+const positionMonth = computed(() => findLatestObservedPositionMonth(financialYear.value))
 const calculationContext = computed(() =>
   buildStrategyCalculationContext({
     financialYear: financialYear.value,
@@ -1374,7 +1374,7 @@ const calculationContext = computed(() =>
 )
 const startingPosition = computed(() => calculationContext.value.startingPosition)
 const simulation = computed(() =>
-  calculateWhatIf({
+  calculateSavingsCapacityScenario({
     availableIncome: financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
     costOfLife: financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value),
     discretionary: financialYearExpenseNecessityValue(
@@ -1413,7 +1413,7 @@ const allocation = computed(() =>
   }),
 )
 const projection = computed(() =>
-  simulateStrategy({
+  simulateAllocationStrategy({
     startingPosition: startingPosition.value,
     scenario: { ...activeScenario.value, allocation: allocation.value },
     simulatedMonthlySavings: monthlySavings.value,
@@ -1422,7 +1422,7 @@ const projection = computed(() =>
   }),
 )
 const baselineProjection = computed(() =>
-  simulateStrategy({
+  simulateAllocationStrategy({
     startingPosition: startingPosition.value,
     scenario: { ...activeScenario.value, allocation: allocation.value },
     simulatedMonthlySavings: 0,
@@ -1515,7 +1515,7 @@ const modeledRealEstateAssets = computed(() => calculationContext.value.modeledR
 const modeledMortgages = computed(() => calculationContext.value.modeledMortgages)
 const currentNetWorth = computed(() => calculationContext.value.currentNetWorth)
 const netWorthProjection = computed(() =>
-  strategyNetWorthProjection({
+  calculateStrategyNetWorthProjection({
     currentNetWorth: currentNetWorth.value,
     currentAssets: currentAssets.value,
     currentLiabilities: currentLiabilities.value,
@@ -1531,7 +1531,7 @@ const netWorthProjection = computed(() =>
 )
 const netWorthPoints = computed(() => netWorthProjection.value.points)
 const baselineNetWorthProjection = computed(() =>
-  strategyNetWorthProjection({
+  calculateStrategyNetWorthProjection({
     currentNetWorth: currentNetWorth.value,
     currentAssets: currentAssets.value,
     currentLiabilities: currentLiabilities.value,
@@ -1547,7 +1547,7 @@ const baselineNetWorthProjection = computed(() =>
 )
 const baselineNetWorthPoints = computed(() => baselineNetWorthProjection.value.points)
 const monthlyNetWorthProjection = computed(() =>
-  strategyNetWorthProjection({
+  calculateStrategyNetWorthProjection({
     currentNetWorth: currentNetWorth.value,
     currentAssets: currentAssets.value,
     currentLiabilities: currentLiabilities.value,
@@ -1595,13 +1595,13 @@ const netWorthBreakdownTypes = computed(() => [
 const projectedNetWorth = computed(() => netWorthPoints.value.at(-1)?.value || 0)
 const finalProjectionPoint = computed(() => projection.value.strategy.points.at(-1))
 const horizonInflationFactor = computed(() =>
-  inflationFactorAtMonth(
+  calculateInflationFactorAtMonth(
     activeScenario.value.inflationAnnualPercent,
     activeScenario.value.horizonYears * 12,
   ),
 )
 const projectedRealNetWorth = computed(() =>
-  presentValue(projectedNetWorth.value, horizonInflationFactor.value),
+  calculatePresentValue(projectedNetWorth.value, horizonInflationFactor.value),
 )
 const detailSheetTitle = computed(() => {
   const titleKeys = {
@@ -1621,7 +1621,7 @@ const strategyOutcomes = computed(() => {
   const safety = currentMilestones.value.find(({ id }) => id === safetyId)
   const cashTargetMonth = projection.value.strategy.cashTargetMonth
   const finalPoint = projection.value.strategy.points.at(-1)
-  const inflationAdjustedSafetyMonths = inflationAdjustedCoverage({
+  const inflationAdjustedSafetyMonths = calculateInflationAdjustedCoverage({
     projectedValue: finalPoint.cash,
     currentPeriodCost: simulation.value.monthlyCostOfLife,
     annualInflationPercent: activeScenario.value.inflationAnnualPercent,
@@ -1674,14 +1674,14 @@ const strategyOutcomes = computed(() => {
     const annualCost = simulation.value.monthlyCostOfLife * 12
     const reachedAt = projection.value.strategy.monthlyPoints.find(
       ({ month, investableValue }) =>
-        inflationAdjustedCoverage({
+        calculateInflationAdjustedCoverage({
           projectedValue: investableValue,
           currentPeriodCost: annualCost,
           annualInflationPercent: activeScenario.value.inflationAnnualPercent,
           month,
         }) >= freedom.target,
     )
-    const inflationAdjustedFundedYears = inflationAdjustedCoverage({
+    const inflationAdjustedFundedYears = calculateInflationAdjustedCoverage({
       projectedValue: finalPoint.investableValue,
       currentPeriodCost: annualCost,
       annualInflationPercent: activeScenario.value.inflationAnnualPercent,

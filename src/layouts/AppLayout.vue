@@ -149,7 +149,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MemberScopeSelector from '@/components/dashboard/MemberScopeSelector.vue'
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav.vue'
-import { currentFinancialDate, currentFinancialYear } from '@/domain/financial/financial-year'
+import {
+  currentFinancialDate,
+  currentFinancialYear,
+} from '../../functions/shared/positions/annual-projection.js'
 import { authUser, signOut } from '@/services/auth'
 import { syncWorkspaceInvestmentPortfolios } from '@/services/firebase/investment-portfolios.service'
 import { useAssetsStore } from '@/stores/assets-store'

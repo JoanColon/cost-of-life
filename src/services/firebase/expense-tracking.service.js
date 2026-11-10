@@ -17,8 +17,11 @@ import {
   setTrackingDecision,
   updateTrackedItem,
 } from '@/domain/financial/expense-tracking'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
+import {
+  cloneOwnershipAllocation,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { currentUserId } from '@/services/firebase/current-user'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
 
@@ -157,9 +160,9 @@ async function mutateMonth(workspaceId, period, userId, mutation) {
 }
 
 function normalizeItem(input, memberIds, period, subcategoryId, expenseItems) {
-  const amount = normalizeNonNegativeMoney(input.amount)
+  const amount = normalizeNonNegativeMoneyOrNull(input.amount)
   if (amount === null || amount <= 0) throw new Error('A positive amount is required')
-  if (!isValidOwnership(input.ownership, memberIds)) {
+  if (!isValidOwnershipAllocation(input.ownership, memberIds)) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
   const subcategoryItems = expenseItems.filter((item) => item.subcategoryId === subcategoryId)
@@ -173,7 +176,7 @@ function normalizeItem(input, memberIds, period, subcategoryId, expenseItems) {
     amount,
     date: dateTimestamp(input.date, period),
     notes: String(input.notes || '').trim(),
-    ownership: cloneOwnership(input.ownership),
+    ownership: cloneOwnershipAllocation(input.ownership),
   }
 }
 

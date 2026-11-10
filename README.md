@@ -129,13 +129,20 @@ cost-of-life/
 │   ├── stores/                  Estado, caché y coordinación con servicios
 │   └── utils/                   Formato y utilidades de miembros
 ├── functions/
-│   ├── domain/                  Proyección financiera pura del backend
-│   ├── shared/                  Fórmulas puras compartidas con el frontend
+│   ├── api/                     Callables y endpoints HTTP de Firebase
+│   ├── triggers/                Entradas dirigidas por eventos de Firestore
+│   ├── scheduled/               Tareas programadas de Firebase
+│   ├── domain/                  Lógica de dominio específica del backend
+│   ├── shared/                  Motor financiero puro compartido con el frontend
+│   │   ├── core/                Dinero, tasas, fechas, meses y ownership
+│   │   ├── assets/              Valoración y proyección de activos
+│   │   ├── liabilities/         Amortización y balances de deuda
+│   │   ├── income/              Normalización y periodicidad de ingresos
+│   │   ├── expenses/            Normalización y periodicidad de gastos
+│   │   ├── positions/           Posiciones, proyección anual y métricas
+│   │   ├── plan/                What If y simulaciones Strategy
+│   │   └── progress/            Métricas puras de progreso financiero
 │   ├── services/                Transacciones y lógica de aplicación
-│   ├── financial-model.js       Callable de mutación del modelo
-│   ├── financial-years.js       Callable y triggers de proyección anual
-│   ├── investment-portfolios.js Callables para portfolios de Google Sheets
-│   ├── workspaces.js            Callables de invitación y borrado
 │   └── index.js                 Registro de exports de Functions
 ├── test/                        Tests Vitest, reflejando las capas del código
 ├── docs/PRODUCT_VISION.md       Dirección de producto, no inventario de features
@@ -156,7 +163,10 @@ cost-of-life/
 - **Domain** contiene cálculos deterministas y validaciones sin Vue ni acceso remoto. Es la primera opción para lógica financiera nueva y debe cubrirse con tests.
 - **Config** define IDs estables de categorías, subtipos, valores sugeridos y familias de hitos. Esos IDs forman parte del contrato persistido.
 - **Functions** concentra las operaciones que requieren privilegios, acceso externo, borrado recursivo o atomicidad entre el modelo y su proyección.
-- **Functions/shared** contiene únicamente fórmulas deterministas que deben producir exactamente el mismo resultado en navegador y servidor. No puede depender de Firebase, Vue ni estado remoto.
+- **Functions/api** contiene únicamente callables y endpoints HTTP; valida la petición y delega en servicios.
+- **Functions/triggers** registra funciones dirigidas por eventos, sin mezclar sus handlers con callables.
+- **Functions/scheduled** registra tareas programadas y conserva juntas su cadencia y orquestación.
+- **Functions/shared** es el motor financiero portable. Contiene únicamente modelos y fórmulas deterministas que deben producir exactamente el mismo resultado en navegador y servidor. No puede depender de Firebase, Vue, esquemas de documentos, estado remoto ni IDs de workspace. Sus APIs públicas usan nombres financieros explícitos y comentarios JSDoc.
 
 Se usa el alias `@` para `src`. Mantén la dirección de dependencias `page/component → store → service → Firebase` y extrae la lógica pura a `domain`.
 
@@ -247,7 +257,7 @@ La simulación se divide por compatibilidad en dos documentos escritos en un ún
 - `whatIf`: reducción discrecional, ahorro extra y una representación legacy del escenario activo;
 - `whatIfStrategies`: hasta diez escenarios, el activo y todos sus supuestos (asignación cash/invest/debt, mix y rentabilidades, inflación, horizonte, colchón objetivo y deuda elegida).
 
-Solo se guardan supuestos. Las proyecciones se recomputan con `src/domain/financial/what-if.js` y `strategy-simulation.js`.
+Solo se guardan supuestos. Las proyecciones se recomputan con `functions/shared/plan/what-if.js` y `strategy-simulation.js`.
 
 Cambiar un documento de configuración de `assets`, `liabilities`, `income` o `expenses` dispara `onModelConfigWritten`, que reconstruye esa sección del año actual.
 
@@ -275,7 +285,7 @@ Los borrados limpian relaciones: borrar una inversión desvincula su ingreso; bo
 
 ### Ownership
 
-[`src/domain/financial/ownership.js`](src/domain/financial/ownership.js) define el contrato. Una asignación referencia exclusivamente miembros del workspace y sus porcentajes deben sumar 100. Los cálculos pueden pedir el valor agregado (`all`) o aplicar las participaciones de un miembro concreto.
+[`functions/shared/core/ownership.js`](functions/shared/core/ownership.js) define el contrato. Una asignación referencia exclusivamente miembros del workspace y sus porcentajes deben sumar 100. Los cálculos pueden pedir el valor agregado (`all`) o aplicar las participaciones de un miembro concreto.
 
 ### `expenseTracking/{YYYY-MM}`
 
@@ -293,7 +303,7 @@ El progreso se deriva del año financiero, posiciones actuales e historial. Al a
 
 ### Portfolio conectado a Google Sheets
 
-La hoja se lee únicamente desde Functions mediante endpoints CSV de Google. Debe ser accesible por enlace y contener pestañas exactas `Portfolio` y `Summary`. El parser y sus columnas/aliases canónicos viven en `functions/services/investment-portfolio-schema.js`; si cambia la plantilla, cambia primero ese contrato y sus tests.
+La hoja se lee únicamente desde Functions mediante endpoints CSV de Google. Debe ser accesible por enlace y contener pestañas exactas `Portfolio` y `Summary`. El parser y sus columnas/aliases canónicos viven en `functions/features/investment-portfolios/schema.js`; si cambia la plantilla, cambia primero ese contrato y sus tests.
 
 La caché schema v2 dura 15 minutos. Guarda holdings, resumen, warnings, tiempos y estado de sincronización dentro del activo; tiene límites de tamaño y conserva el último error. Se sincroniza al abrir el workspace, manualmente y antes del cierre mensual. No hay OAuth de Google ni conversión entre la `baseCurrency` de la hoja y la moneda del workspace.
 
@@ -340,7 +350,7 @@ Antes de mutar ítems detallados debe existir el documento del año actual. [`sr
 | `updateWorkspaceSettings`           | Callable          | Valida moneda y nombres y actualiza el workspace sin abrir cambios de membresía.     |
 | `deleteWorkspace`                   | Callable          | Verifica ownership, marca borrado y elimina workspace e invitaciones recursivamente. |
 
-Todas se despliegan en `europe-west1`; las opciones globales limitan cada export a diez instancias salvo override local. `functions/index.js` inicializa Admin SDK una vez y agrega los exports de cada módulo. La lógica transaccional testeable vive en `functions/services`; los wrappers HTTP/evento deben permanecer pequeños.
+Todas se despliegan en `europe-west1`; las opciones globales limitan cada export a diez instancias salvo override local. `functions/index.js` inicializa Admin SDK una vez y agrega los exports de `api/`, `triggers/` y `scheduled/`. La lógica transaccional testeable vive en `functions/services`; los wrappers de entrada deben permanecer pequeños.
 
 ## Seguridad
 
@@ -361,31 +371,34 @@ Las reglas son parte del contrato, pero la validación de dominio también debe 
 
 ## Dónde implementar cada cambio
 
-| Si necesitas cambiar…              | Empieza por…                                                                                                               |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Rutas o acceso autenticado         | `src/router/routes.js`, `src/router/index.js`                                                                              |
-| Navegación y ciclo del workspace   | `src/layouts/AppLayout.vue`                                                                                                |
-| Catálogos o IDs financieros        | `src/config/*-categories.js`                                                                                               |
-| Fórmulas financieras               | `src/domain/financial/` y sus tests                                                                                        |
-| Definición/cálculo de hitos        | `src/domain/milestones/`, `src/config/milestone-families.js`                                                               |
-| Estado y caché de una sección      | `src/stores/<sección>-store.js`                                                                                            |
-| Acceso cliente a Firebase          | `src/services/firebase/`                                                                                                   |
-| Mutaciones atómicas del modelo     | `functions/services/financial-model.js`                                                                                    |
-| Construcción del snapshot anual    | `functions/domain/financial-year.js`, `functions/services/financial-years.js`                                              |
-| Hipoteca o valoración inmobiliaria | `src/domain/financial/mortgage-amortization.js`, `real-estate-*`; equivalentes de `functions/domain/` para materialización |
-| Simulación y escenarios            | `src/domain/financial/what-if.js`, `strategy-simulation.js`, `calculation-context.js`                                      |
-| Portfolio de Google Sheets         | `functions/services/investment-portfolios.js`, `investment-portfolio-schema.js`                                            |
-| Membresía, settings o borrado      | `functions/services/workspaces.js`                                                                                         |
-| Permisos                           | `firestore.rules` y tests de la operación afectada                                                                         |
-| Texto visible                      | `src/i18n/en-US/index.js`                                                                                                  |
-| Diseño global                      | `src/css/_tokens.scss`, `src/css/_mixins.scss`, `src/css/app.scss`                                                         |
+| Si necesitas cambiar…              | Empieza por…                                                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Rutas o acceso autenticado         | `src/router/routes.js`, `src/router/index.js`                                                                                   |
+| Navegación y ciclo del workspace   | `src/layouts/AppLayout.vue`                                                                                                     |
+| Catálogos o IDs financieros        | `src/config/*-categories.js`                                                                                                    |
+| Fórmulas financieras               | `functions/shared/<dominio>/` y sus tests                                                                                       |
+| Definición/cálculo de hitos        | `src/domain/milestones/`, `src/config/milestone-families.js`                                                                    |
+| Estado y caché de una sección      | `src/stores/<sección>-store.js`                                                                                                 |
+| Acceso cliente a Firebase          | `src/services/firebase/`                                                                                                        |
+| Mutaciones atómicas del modelo     | `functions/features/financial-model/`                                                                                           |
+| Construcción del snapshot anual    | `functions/features/financial-years/projection.js`, `service.js`                                                                |
+| Callable o endpoint HTTP           | `functions/features/<funcionalidad>/callable.js`                                                                                |
+| Trigger de Firestore               | `functions/features/financial-years/triggers.js`                                                                                |
+| Tarea programada                   | `functions/features/financial-years/close-month.schedule.js`                                                                    |
+| Hipoteca o valoración inmobiliaria | `src/domain/financial/mortgage-amortization.js`, `real-estate-*`; materialización en `financial-years/position-calculations.js` |
+| Simulación y escenarios            | `functions/shared/plan/what-if.js`, `strategy-simulation.js`; adaptación en `src/domain/financial/calculation-context.js`       |
+| Portfolio de Google Sheets         | `functions/features/investment-portfolios/`                                                                                     |
+| Membresía, settings o borrado      | `functions/features/workspaces/`                                                                                                |
+| Permisos                           | `firestore.rules` y tests de la operación afectada                                                                              |
+| Texto visible                      | `src/i18n/en-US/index.js`                                                                                                       |
+| Diseño global                      | `src/css/_tokens.scss`, `src/css/_mixins.scss`, `src/css/app.scss`                                                              |
 
 Las categorías e IDs de hitos son persistidos. Renombrarlos no es un cambio cosmético: requiere compatibilidad o migración de datos.
 
 ## Convenciones de desarrollo
 
 - Usa Composition API con `<script setup>` y JavaScript, que es el estándar actual del repositorio.
-- Mantén cálculos deterministas en `src/domain` o `functions/domain` y sin dependencias de Vue/Firebase.
+- Mantén cálculos financieros deterministas en `functions/shared/` y sin dependencias de Vue/Firebase.
 - Normaliza y valida datos antes de persistir. No confíes en que un formulario sea el único llamador.
 - Añade estados explícitos de carga, error y vacío en páginas que lean datos remotos.
 - Usa rutas con nombre y el alias `@`; no acoples componentes a URLs literales.
@@ -393,8 +406,8 @@ Las categorías e IDs de hitos son persistidos. Renombrarlos no es un cambio cos
 - Reutiliza tokens CSS y mixins antes de introducir valores globales nuevos.
 - Al cerrar sesión o cambiar de usuario, cualquier store nuevo con estado por workspace debe integrarse en el reseteo de `AppLayout`.
 - No escribas `model*`, `financialYears`, relaciones de hipoteca o caché de portfolio desde la UI: usa el servicio/callable propietario.
-- Mantén sincronizadas las fórmulas duplicadas entre `src/domain` y `functions/domain`/`functions/shared`; hoy no existe un paquete compartido compilado para ambos runtimes.
-- Usa `functions/shared/financial-core.js` para fechas financieras, suma de meses, apreciación inmobiliaria y pasos de amortización compartidos entre navegador y Functions.
+- Cada regla financiera debe tener una única implementación en `functions/shared/`; `src/domain` y `functions/domain` conservan solo adaptadores que traduzcan datos de aplicación u orquesten varias reglas.
+- Importa directamente módulos granulares de `functions/shared/<dominio>/`; no añadas facades ni barrels para reenviar sus exports.
 - Si una mutación afecta métricas del dashboard, comprueba también la proyección anual y los hitos.
 - Añade tests junto a la capa modificada. La suite usa archivos `test/**/*.test.js`.
 - Ejecuta `yarn lint:check`, no `yarn lint`, cuando solo quieras verificar sin reescribir archivos.

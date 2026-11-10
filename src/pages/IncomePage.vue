@@ -217,8 +217,11 @@ import {
   financialYearAvailableIncomeValue,
   financialYearFlowCategoryValue,
   financialYearFlowValue,
-} from '@/domain/financial/financial-year'
-import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
+} from '../../functions/shared/positions/annual-projection.js'
+import {
+  createEqualMemberOwnership,
+  createSingleMemberOwnership,
+} from '../../functions/shared/core/ownership.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useIncomeStore } from '@/stores/income-store'
@@ -406,8 +409,8 @@ async function saveSimpleIncome(category, displayedValue) {
     ownership:
       existing?.ownership ||
       (memberIds.value.length === 1
-        ? createSingleOwnership(memberIds.value[0])
-        : createEqualOwnership(memberIds.value)),
+        ? createSingleMemberOwnership(memberIds.value[0])
+        : createEqualMemberOwnership(memberIds.value)),
     entryMode: 'simple',
   }
 

@@ -514,8 +514,8 @@ import {
   financialYearMonthCategoryValue,
   financialYearMonthSubcategoryValue,
   financialYearSubcategoryValue,
-} from '@/domain/financial/financial-year'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+} from '../../functions/shared/positions/annual-projection.js'
+import { normalizeNonNegativeMoneyOrNull } from '../../functions/shared/core/money.js'
 import { authUser } from '@/services/auth'
 import { useExpenseTrackingStore } from '@/stores/expense-tracking-store'
 import { useExpensesStore } from '@/stores/expenses-store'
@@ -917,7 +917,7 @@ function modelValue(subcategory) {
 
 function currentModelValue(subcategory) {
   return (
-    normalizeNonNegativeMoney(
+    normalizeNonNegativeMoneyOrNull(
       financialYear.value?.months?.[period.value.slice(5, 7)]?.expenses?.categories?.[
         subcategory.categoryId
       ]?.subcategories?.[subcategory.id]?.estimated,

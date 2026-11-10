@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  calculateCashScenario,
-  calculateInvestmentScenario,
+  calculateCashBufferScenario,
+  calculateInvestmentContributionScenario,
   calculateProjectionDelta,
-  calculateSafetyImpact,
-  calculateWhatIf,
+  calculateSafetyCoverageScenario,
+  calculateSavingsCapacityScenario,
   normalizeWhatIfConfig,
   normalizeStrategyForOptions,
-} from '../../../src/domain/financial/what-if'
+} from '../../../functions/shared/plan/what-if.js'
 
 describe('What If calculations', () => {
   it('adds the selected discretionary reduction to current savings capacity', () => {
     expect(
-      calculateWhatIf({
+      calculateSavingsCapacityScenario({
         availableIncome: 36_000,
         costOfLife: 28_320,
         discretionary: 7_440,
@@ -29,7 +29,7 @@ describe('What If calculations', () => {
 
   it('reports the discretionary reduction needed to break even', () => {
     expect(
-      calculateWhatIf({
+      calculateSavingsCapacityScenario({
         availableIncome: 24_000,
         costOfLife: 25_200,
         discretionary: 3_000,
@@ -39,7 +39,7 @@ describe('What If calculations', () => {
 
   it('combines direct extra savings with savings from lower spending', () => {
     expect(
-      calculateWhatIf({
+      calculateSavingsCapacityScenario({
         availableIncome: 36_000,
         costOfLife: 28_320,
         discretionary: 7_440,
@@ -57,7 +57,7 @@ describe('What If calculations', () => {
 
   it('always compares the one-year emergency-fund milestone on both paths', () => {
     expect(
-      calculateCashScenario({
+      calculateCashBufferScenario({
         cash: 5_000,
         currentMonthlyCost: 2_000,
         simulatedMonthlyCost: 1_800,
@@ -75,7 +75,7 @@ describe('What If calculations', () => {
 
   it('keeps the cash scenario visible when the one-year milestone is achieved', () => {
     expect(
-      calculateCashScenario({
+      calculateCashBufferScenario({
         cash: 25_000,
         currentMonthlyCost: 2_000,
         simulatedMonthlyCost: 2_000,
@@ -86,7 +86,7 @@ describe('What If calculations', () => {
   })
 
   it('projects monthly investing and compares it with the current path', () => {
-    const tenYears = calculateInvestmentScenario({
+    const tenYears = calculateInvestmentContributionScenario({
       monthlyContribution: 795,
       currentMonthlyContribution: 640,
       annualReturnPercent: 7,
@@ -96,7 +96,7 @@ describe('What If calculations', () => {
   })
 
   it('keeps an existing portfolio in both paths so the reported result is a delta', () => {
-    const result = calculateInvestmentScenario({
+    const result = calculateInvestmentContributionScenario({
       startingValue: 50_000,
       monthlyContribution: 600,
       currentMonthlyContribution: 500,
@@ -110,7 +110,7 @@ describe('What If calculations', () => {
 
   it('reports additional emergency-fund safety against the baseline path', () => {
     expect(
-      calculateSafetyImpact({
+      calculateSafetyCoverageScenario({
         cash: 10_000,
         currentMonthlyCost: 2_000,
         simulatedMonthlyCost: 2_000,

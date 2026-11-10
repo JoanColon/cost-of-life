@@ -173,18 +173,18 @@ import {
   currentFinancialMonth,
   currentFinancialYear,
   financialYearMonthCategoryValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import {
-  applyOwnership,
-  cloneOwnership,
-  createEqualOwnership,
-  createSingleOwnership,
-} from '@/domain/financial/ownership'
+  moneyForOwnershipScope,
+  cloneOwnershipAllocation,
+  createEqualMemberOwnership,
+  createSingleMemberOwnership,
+} from '../../functions/shared/core/ownership.js'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -232,8 +232,10 @@ const liabilityDefaults = computed(() => {
   const firstItem = allCategoryLiabilities.value.length === 0
   const ownership =
     memberIds.value.length === 1
-      ? createSingleOwnership(authUser.value?.uid)
-      : cloneOwnership(firstItem ? config.ownership : createEqualOwnership(memberIds.value))
+      ? createSingleMemberOwnership(authUser.value?.uid)
+      : cloneOwnershipAllocation(
+          firstItem ? config.ownership : createEqualMemberOwnership(memberIds.value),
+        )
   return {
     categoryId: category.value?.id,
     subcategoryId: category.value?.subcategories?.[0] || null,
@@ -247,7 +249,11 @@ const scopedLiabilities = computed(() =>
   allCategoryLiabilities.value
     .map((liability) => ({
       ...liability,
-      scopedValue: applyOwnership(liability.balance, liability.ownership, selectedMemberId.value),
+      scopedValue: moneyForOwnershipScope(
+        liability.balance,
+        liability.ownership,
+        selectedMemberId.value,
+      ),
     }))
     .sort((left, right) => Number(right.scopedValue || 0) - Number(left.scopedValue || 0)),
 )

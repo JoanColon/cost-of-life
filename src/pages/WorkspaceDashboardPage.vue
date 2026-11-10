@@ -60,17 +60,17 @@ import {
   financialYearExpenseNecessityValue,
   financialYearFlowValue,
   financialYearMonthValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import {
-  latestPositionMonth,
-  simulateStrategy,
-  strategyStartingPosition,
-} from '@/domain/financial/strategy-simulation'
+  findLatestObservedPositionMonth,
+  simulateAllocationStrategy,
+  buildStrategyStartingPosition,
+} from '../../functions/shared/plan/strategy-simulation.js'
 import {
-  calculateWhatIf,
+  calculateSavingsCapacityScenario,
   defaultStrategyScenario,
   normalizeStrategyForOptions,
-} from '@/domain/financial/what-if'
+} from '../../functions/shared/plan/what-if.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useAssetsStore } from '@/stores/assets-store'
@@ -170,7 +170,7 @@ const planData = computed(() => {
 
   if (!hasSavedStrategy && !hasWhatIfInputs) return { state: 'empty' }
 
-  const simulation = calculateWhatIf({
+  const simulation = calculateSavingsCapacityScenario({
     availableIncome: dashboardData.value.income,
     costOfLife: dashboardData.value.annualCost,
     discretionary: financialYearExpenseNecessityValue(
@@ -193,7 +193,7 @@ const planData = computed(() => {
     }
   }
 
-  const positionMonth = latestPositionMonth(financialYear.value, currentMonth.value)
+  const positionMonth = findLatestObservedPositionMonth(financialYear.value, currentMonth.value)
   const liabilities = extractPositionLiabilities(
     financialYear.value,
     positionMonth,
@@ -217,8 +217,8 @@ const planData = computed(() => {
     cash: true,
     debt: debtAvailable,
   })
-  const projection = simulateStrategy({
-    startingPosition: strategyStartingPosition(
+  const projection = simulateAllocationStrategy({
+    startingPosition: buildStrategyStartingPosition(
       financialYear.value,
       positionMonth,
       selectedMemberId.value,

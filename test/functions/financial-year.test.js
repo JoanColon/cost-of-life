@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import financialYearDomain from '../../functions/domain/financial-year.js'
+import {
+  applyTrackingMonth,
+  buildFinancialYear,
+  updateFinancialYearProjection,
+} from '../../functions/features/financial-years/projection.js'
 import {
   financialYearExpenseItemValue,
   financialYearMonthValue,
   financialYearValue,
-} from '../../src/domain/financial/financial-year.js'
+} from '../../functions/shared/positions/annual-projection.js'
 
-const { applyTrackingMonth, buildFinancialYear, updateFinancialYearProjection } =
-  financialYearDomain
 const ownership = { mode: 'single', shares: [{ memberId: 'member-a', percentage: 100 }] }
 
 function projection() {

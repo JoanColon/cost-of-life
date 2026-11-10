@@ -1,19 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import financialModelService from '../../functions/services/financial-model.js'
-import mortgageDomain from '../../functions/domain/mortgage.js'
-import realEstateDomain from '../../functions/domain/real-estate.js'
-import financialYearDomain from '../../functions/domain/financial-year.js'
-import financialYearsService from '../../functions/services/financial-years.js'
+import {
+  financialModelMutationInput,
+  mutateFinancialModel,
+} from '../../functions/features/financial-model/service.js'
+import { calculateMortgageBalanceFromAnchor } from '../../functions/shared/liabilities/mortgage.js'
+import { calculateAnniversaryRealEstateValuation } from '../../functions/shared/assets/real-estate.js'
+import { buildFinancialYear } from '../../functions/features/financial-years/projection.js'
+import { currentYear } from '../../functions/features/financial-years/service.js'
 import {
   financialYearMonthValue,
   financialYearValue,
-} from '../../src/domain/financial/financial-year.js'
-
-const { financialModelMutationInput, mutateFinancialModel } = financialModelService
-const { annualRealEstateValue } = realEstateDomain
-const { effectiveMortgageBalance } = mortgageDomain
-const { buildFinancialYear } = financialYearDomain
-const { currentYear } = financialYearsService
+} from '../../functions/shared/positions/annual-projection.js'
 
 const ownership = {
   mode: 'single',
@@ -209,7 +206,7 @@ describe('atomic financial model mutations', () => {
         },
       },
     }
-    const expectedBalance = effectiveMortgageBalance(mortgage.detail.mortgage, today)
+    const expectedBalance = calculateMortgageBalanceFromAnchor(mortgage.detail.mortgage, today)
     const { firestore, writes } = createFirestore({
       section: 'liabilities',
       collection: 'modelLiabilities',
@@ -269,7 +266,7 @@ describe('atomic financial model mutations', () => {
       },
     })
 
-    const expectedValue = annualRealEstateValue(realEstate, madridToday())
+    const expectedValue = calculateAnniversaryRealEstateValuation(realEstate, madridToday())
     expect(result.asset.currentValue).toBe(expectedValue)
     expect(result.asset.valueSource).toBe('model')
     expect(

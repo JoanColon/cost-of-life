@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import schema from '../../functions/services/investment-portfolio-schema.js'
-
-const {
+import {
   normalizeHoldings,
   normalizeInvestmentPortfolio,
   normalizeSummary,
   parseCsv,
   parseLocalizedNumber,
-} = schema
+} from '../../functions/features/investment-portfolios/schema.js'
 
 describe('Google Sheets investment portfolio schema', () => {
   it('parses CSV quotes, commas, line breaks and empty cells', () => {

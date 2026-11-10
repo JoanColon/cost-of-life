@@ -10,7 +10,7 @@ import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 
 import { init, use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { CHART_COLORS } from '@/config/chart-theme'
-import { currentFinancialYear } from '@/domain/financial/financial-year'
+import { currentFinancialYear } from '../../../functions/shared/positions/annual-projection.js'
 import { calendarYearAtMonth } from '@/utils/chart-time-axis'
 import { formatCurrency, workspaceCurrency } from '@/utils/formatters'
 

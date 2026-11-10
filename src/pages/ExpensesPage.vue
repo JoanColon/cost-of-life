@@ -230,8 +230,11 @@ import {
   currentFinancialYear,
   financialYearFlowCategoryValue,
   financialYearFlowValue,
-} from '@/domain/financial/financial-year'
-import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
+} from '../../functions/shared/positions/annual-projection.js'
+import {
+  createEqualMemberOwnership,
+  createSingleMemberOwnership,
+} from '../../functions/shared/core/ownership.js'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -408,8 +411,8 @@ async function saveSimpleExpense(category, displayedValue) {
     ownership:
       existing?.ownership ||
       (memberIds.value.length === 1
-        ? createSingleOwnership(memberIds.value[0])
-        : createEqualOwnership(memberIds.value)),
+        ? createSingleMemberOwnership(memberIds.value[0])
+        : createEqualMemberOwnership(memberIds.value)),
     entryMode: 'simple',
   }
 
@@ -489,8 +492,8 @@ async function saveCategorySelection(selection) {
 async function createSelectedSubcategoryExpenses(subcategoryIds) {
   const ownership =
     memberIds.value.length === 1
-      ? createSingleOwnership(memberIds.value[0])
-      : createEqualOwnership(memberIds.value)
+      ? createSingleMemberOwnership(memberIds.value[0])
+      : createEqualMemberOwnership(memberIds.value)
 
   for (const category of expenseCategories) {
     const existingSubcategoryIds = new Set(

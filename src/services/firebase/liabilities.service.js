@@ -5,8 +5,8 @@ import {
   deleteFinancialModelItem,
   updateFinancialModelItem,
 } from '@/services/firebase/financial-model-mutations.service'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { cloneOwnership } from '@/domain/financial/ownership'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
+import { cloneOwnershipAllocation } from '../../../functions/shared/core/ownership.js'
 import {
   assertPositionOwnership,
   getCategoryPositionItems,
@@ -80,7 +80,7 @@ function canonicalLiability(liability) {
   if (!category.subcategories.includes(liability.subcategoryId)) {
     throw new Error('A valid liability subcategory is required')
   }
-  const balance = normalizeNonNegativeMoney(liability.balance)
+  const balance = normalizeNonNegativeMoneyOrNull(liability.balance)
   if (balance === null) throw new Error('A non-negative balance is required')
   const itemName = String(liability.itemName || '').trim()
   if (!itemName) throw new Error('A liability name is required')
@@ -90,7 +90,7 @@ function canonicalLiability(liability) {
     itemName,
     notes: String(liability.notes || '').trim(),
     balance,
-    ownership: cloneOwnership(liability.ownership),
+    ownership: cloneOwnershipAllocation(liability.ownership),
   }
   if (category.id === 'mortgage' && liability.detail?.mortgage) {
     canonical.detail = { mortgage: canonicalMortgageDetail(liability.detail.mortgage) }
@@ -99,8 +99,8 @@ function canonicalLiability(liability) {
 }
 
 function canonicalMortgageDetail(mortgage) {
-  const originalPrincipal = normalizeNonNegativeMoney(mortgage.originalPrincipal)
-  const monthlyPayment = normalizeNonNegativeMoney(mortgage.monthlyPayment)
+  const originalPrincipal = normalizeNonNegativeMoneyOrNull(mortgage.originalPrincipal)
+  const monthlyPayment = normalizeNonNegativeMoneyOrNull(mortgage.monthlyPayment)
   const annualInterestRate = Number(mortgage.annualInterestRate)
   const termMonths = Number(mortgage.termMonths)
   const startDate = String(mortgage.startDate || '').trim()
@@ -119,7 +119,7 @@ function canonicalMortgageDetail(mortgage) {
   const schemaVersion = mortgage.schemaVersion === 2 ? 2 : 1
   let balanceAnchor
   if (schemaVersion === 2) {
-    const amount = normalizeNonNegativeMoney(mortgage.balanceAnchor?.amount)
+    const amount = normalizeNonNegativeMoneyOrNull(mortgage.balanceAnchor?.amount)
     const date = String(mortgage.balanceAnchor?.date || '').trim()
     if (amount === null || !isIsoDate(date)) {
       throw new Error('A valid mortgage balance anchor is required')

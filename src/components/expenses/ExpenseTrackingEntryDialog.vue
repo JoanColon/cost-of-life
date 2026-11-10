@@ -125,10 +125,10 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
-  cloneOwnership,
-  createSingleOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  cloneOwnershipAllocation,
+  createSingleMemberOwnership,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
@@ -148,7 +148,7 @@ const amount = ref(null)
 const date = ref('')
 const notes = ref('')
 const itemId = ref(null)
-const ownership = ref(createSingleOwnership(props.preferredMemberId))
+const ownership = ref(createSingleMemberOwnership(props.preferredMemberId))
 const ownershipValid = ref(false)
 
 const dialogModel = computed({
@@ -185,9 +185,9 @@ function seed() {
   itemId.value =
     props.item?.itemId || (props.expenseItems.length === 1 ? props.expenseItems[0].id : null)
   ownership.value = props.item?.ownership
-    ? cloneOwnership(props.item.ownership)
-    : createSingleOwnership(props.preferredMemberId || props.members[0]?.id)
-  ownershipValid.value = isValidOwnership(
+    ? cloneOwnershipAllocation(props.item.ownership)
+    : createSingleMemberOwnership(props.preferredMemberId || props.members[0]?.id)
+  ownershipValid.value = isValidOwnershipAllocation(
     ownership.value,
     props.members.map(({ id }) => id),
   )
@@ -219,7 +219,7 @@ function submit() {
     itemId: itemId.value,
     date: date.value,
     notes: notes.value,
-    ownership: cloneOwnership(ownership.value),
+    ownership: cloneOwnershipAllocation(ownership.value),
   })
 }
 </script>

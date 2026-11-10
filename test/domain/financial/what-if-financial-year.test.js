@@ -4,7 +4,7 @@ import {
   financialYearExpenseNecessityValue,
   financialYearUnclassifiedExpenseValue,
   financialYearValue,
-} from '../../../src/domain/financial/financial-year'
+} from '../../../functions/shared/positions/annual-projection.js'
 
 const item = (total, extra = {}) => ({
   total,

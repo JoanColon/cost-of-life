@@ -17,7 +17,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ownershipDisplayId } from '@/domain/financial/ownership'
+import { ownershipScopeId } from '../../../functions/shared/core/ownership.js'
 
 const props = defineProps({
   ownership: { type: Object, default: null },
@@ -26,7 +26,7 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const displayId = computed(() => ownershipDisplayId(props.ownership))
+const displayId = computed(() => ownershipScopeId(props.ownership))
 const member = computed(() => props.members.find(({ id }) => id === displayId.value) || null)
 const label = computed(() =>
   displayId.value === 'all'

@@ -1,29 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import {
-  allocateValueByOwnership,
-  applyOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-  ownershipDisplayId,
-} from '../../../src/domain/financial/ownership'
+  allocateMoneyByOwnership,
+  moneyForOwnershipScope,
+  createEqualMemberOwnership,
+  isValidOwnershipAllocation,
+  ownershipScopeId,
+} from '../../../functions/shared/core/ownership.js'
 
 describe('ownership', () => {
   it('creates ownership for one member', () => {
-    expect(createEqualOwnership(['a'])).toEqual({
+    expect(createEqualMemberOwnership(['a'])).toEqual({
       mode: 'single',
       shares: [{ memberId: 'a', percentage: 100 }],
     })
   })
 
   it('creates equal ownership for two members', () => {
-    expect(createEqualOwnership(['a', 'b']).shares).toEqual([
+    expect(createEqualMemberOwnership(['a', 'b']).shares).toEqual([
       { memberId: 'a', percentage: 50 },
       { memberId: 'b', percentage: 50 },
     ])
   })
 
   it('creates equal ownership for three members that adds up to 100%', () => {
-    const ownership = createEqualOwnership(['a', 'b', 'c'])
+    const ownership = createEqualMemberOwnership(['a', 'b', 'c'])
 
     expect(ownership.shares).toEqual([
       { memberId: 'a', percentage: 33.333 },
@@ -35,7 +35,7 @@ describe('ownership', () => {
 
   it('accepts valid custom ownership', () => {
     expect(
-      isValidOwnership(
+      isValidOwnershipAllocation(
         {
           mode: 'shared',
           shares: [
@@ -49,10 +49,10 @@ describe('ownership', () => {
   })
 
   it('uses one person for individual ownership and All for shared ownership', () => {
-    expect(ownershipDisplayId(createEqualOwnership(['a']))).toBe('a')
-    expect(ownershipDisplayId(createEqualOwnership(['a', 'b']))).toBe('all')
+    expect(ownershipScopeId(createEqualMemberOwnership(['a']))).toBe('a')
+    expect(ownershipScopeId(createEqualMemberOwnership(['a', 'b']))).toBe('all')
     expect(
-      ownershipDisplayId({
+      ownershipScopeId({
         mode: 'shared',
         shares: [{ memberId: 'a', percentage: 100 }],
       }),
@@ -73,7 +73,7 @@ describe('ownership', () => {
       ['a'],
     ],
   ])('rejects ownership that %s', (_case, shares, memberIds) => {
-    expect(isValidOwnership({ mode: 'shared', shares }, memberIds)).toBe(false)
+    expect(isValidOwnershipAllocation({ mode: 'shared', shares }, memberIds)).toBe(false)
   })
 })
 
@@ -94,15 +94,15 @@ describe('allocation', () => {
       })),
     }
 
-    const allocation = allocateValueByOwnership(value, ownership, memberIds)
+    const allocation = allocateMoneyByOwnership(value, ownership, memberIds)
     expect(allocation).toEqual(expected)
     expect(Object.values(allocation).reduce((sum, amount) => sum + amount, 0)).toBe(value)
   })
 
   it('uses the same remainder allocation for an individual member value', () => {
-    const ownership = createEqualOwnership(['a', 'b', 'c'])
+    const ownership = createEqualMemberOwnership(['a', 'b', 'c'])
 
-    expect(applyOwnership(100, ownership, 'c')).toBe(33.34)
-    expect(applyOwnership(100, ownership, 'unknown')).toBe(0)
+    expect(moneyForOwnershipScope(100, ownership, 'c')).toBe(33.34)
+    expect(moneyForOwnershipScope(100, ownership, 'unknown')).toBe(0)
   })
 })

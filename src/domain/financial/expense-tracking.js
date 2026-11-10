@@ -1,5 +1,6 @@
-import { normalizeNonNegativeMoney } from './money'
-import { financialYearExpenseItemValue } from './financial-year'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
+import { reconcileModeledAndTrackedExpense } from '../../../functions/shared/expenses/reconciliation.js'
+import { roundMoneyOrZero as roundMoney } from '../../../functions/shared/core/money.js'
 
 export function emptyExpenseTrackingMonth(period) {
   return {
@@ -76,18 +77,7 @@ export function setTrackingDecisions(month, subcategoryIds, decision) {
 }
 
 export function resolveExpenseTrackingValue(modelValue, actualValue, decision) {
-  const model = normalizeNonNegativeMoney(modelValue) || 0
-  const actual = actualValue == null ? null : normalizeNonNegativeMoney(actualValue)
-  const usesTracked = decision === 'tracked' && actual !== null
-  const usesCombined = decision === 'combined' && actual !== null
-  const source = usesTracked ? 'tracked' : usesCombined ? 'combined' : 'model'
-  const effective = usesCombined ? model + actual : actual
-  return {
-    model,
-    actual,
-    effective: financialYearExpenseItemValue({ source, effective }, model),
-    source,
-  }
+  return reconcileModeledAndTrackedExpense(modelValue, actualValue, decision)
 }
 
 function categoryItems(month, subcategoryId) {
@@ -111,7 +101,7 @@ function replaceCategoryItems(month, subcategoryId, items) {
 function buildCategory(items) {
   return {
     total: roundMoney(
-      items.reduce((sum, item) => sum + (normalizeNonNegativeMoney(item.amount) || 0), 0),
+      items.reduce((sum, item) => sum + (normalizeNonNegativeMoneyOrNull(item.amount) || 0), 0),
     ),
     items,
   }
@@ -125,8 +115,4 @@ function normalizeReconciliation(value) {
         : []
     }),
   )
-}
-
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }

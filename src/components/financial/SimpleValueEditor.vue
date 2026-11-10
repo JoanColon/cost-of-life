@@ -54,7 +54,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
 import { currencySymbol } from '@/utils/formatters'
 
 const props = defineProps({
@@ -82,7 +82,7 @@ watch(
 )
 
 function isValidValue(value) {
-  return normalizeNonNegativeMoney(value) !== null
+  return normalizeNonNegativeMoneyOrNull(value) !== null
 }
 
 function valueRule(value) {
@@ -94,7 +94,7 @@ function resetEditor() {
 }
 
 function save(value) {
-  const normalizedValue = normalizeNonNegativeMoney(value)
+  const normalizedValue = normalizeNonNegativeMoneyOrNull(value)
   if (normalizedValue !== null) emit('save', normalizedValue)
 }
 </script>

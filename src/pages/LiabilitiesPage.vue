@@ -258,13 +258,16 @@ import {
   financialYearCategoryItemCount,
   financialYearMonthCategoryValue,
   financialYearMonthValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
+import {
+  cloneOwnershipAllocation,
+  isValidOwnershipAllocation,
+} from '../../functions/shared/core/ownership.js'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -437,8 +440,8 @@ function openOwnershipEditor(categoryId) {
   const ownership = liabilitiesStore.config?.categories?.[categoryId]?.ownership
   if (!ownership) return
   editingOwnershipCategoryId.value = categoryId
-  editingOwnership.value = cloneOwnership(ownership)
-  ownershipValid.value = isValidOwnership(editingOwnership.value, memberIds.value)
+  editingOwnership.value = cloneOwnershipAllocation(ownership)
+  ownershipValid.value = isValidOwnershipAllocation(editingOwnership.value, memberIds.value)
   ownershipDialog.value = true
 }
 
@@ -448,7 +451,7 @@ async function saveSimpleOwnership() {
     liabilitiesStore.updateSimpleCategoryOwnership(
       workspaceId.value,
       editingOwnershipCategoryId.value,
-      cloneOwnership(editingOwnership.value),
+      cloneOwnershipAllocation(editingOwnership.value),
       memberIds.value,
     ),
   )

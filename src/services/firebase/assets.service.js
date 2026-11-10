@@ -5,8 +5,8 @@ import {
   deleteFinancialModelItem,
   updateFinancialModelItem,
 } from '@/services/firebase/financial-model-mutations.service'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { cloneOwnership } from '@/domain/financial/ownership'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
+import { cloneOwnershipAllocation } from '../../../functions/shared/core/ownership.js'
 import {
   annualRealEstateValue,
   effectiveRealEstateValue,
@@ -70,7 +70,7 @@ function canonicalAsset(asset, includeDefaultDetail = false) {
   if (!category.subcategories.includes(asset.subcategoryId)) {
     throw new Error('A valid asset subcategory is required')
   }
-  const currentValue = normalizeNonNegativeMoney(asset.currentValue)
+  const currentValue = normalizeNonNegativeMoneyOrNull(asset.currentValue)
   if (currentValue === null) throw new Error('A non-negative numeric value is required')
   const itemName = String(asset.itemName || '').trim()
   if (!itemName) throw new Error('An asset name is required')
@@ -80,7 +80,7 @@ function canonicalAsset(asset, includeDefaultDetail = false) {
     itemName,
     notes: String(asset.notes || '').trim(),
     currentValue,
-    ownership: cloneOwnership(asset.ownership),
+    ownership: cloneOwnershipAllocation(asset.ownership),
     valueSource: 'manual',
   }
   const mortgageEligible =
@@ -106,7 +106,7 @@ function canonicalAsset(asset, includeDefaultDetail = false) {
         throw new Error('A valid annual appreciation rate is required')
       }
       if (detail.realEstate.schemaVersion === 2) {
-        const purchasePrice = normalizeNonNegativeMoney(detail.realEstate.purchasePrice)
+        const purchasePrice = normalizeNonNegativeMoneyOrNull(detail.realEstate.purchasePrice)
         const purchaseDate = String(detail.realEstate.purchaseDate || '').trim()
         if (purchasePrice === null) throw new Error('A valid purchase price is required')
         detail.realEstate = {

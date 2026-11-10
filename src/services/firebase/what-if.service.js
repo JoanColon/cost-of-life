@@ -1,5 +1,5 @@
 import { serverTimestamp, writeBatch } from 'firebase/firestore'
-import { normalizeWhatIfConfig } from '@/domain/financial/what-if'
+import { normalizeWhatIfConfig } from '../../../functions/shared/plan/what-if.js'
 import { db } from '@/firebase/firebase'
 import { currentUserId } from '@/services/firebase/current-user'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'

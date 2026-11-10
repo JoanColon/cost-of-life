@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import financialYearsService from '../../functions/services/financial-years.js'
-import { financialYearMonthValue } from '../../src/domain/financial/financial-year.js'
-
-const {
+import {
   closePreviousFinancialPositionMonth,
   rebuildFinancialYear,
   refreshModeledPositions,
   synchronizeFinancialYearPositions,
   writeFinancialYearPositionMonth,
-} = financialYearsService
+} from '../../functions/features/financial-years/service.js'
+import { financialYearMonthValue } from '../../functions/shared/positions/annual-projection.js'
 
 function documentSnapshot(data) {
   return { exists: data != null, data: () => data ?? undefined }

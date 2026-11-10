@@ -256,13 +256,16 @@ import {
   financialYearCategoryItemCount,
   financialYearMonthCategoryValue,
   financialYearMonthValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
+import {
+  cloneOwnershipAllocation,
+  isValidOwnershipAllocation,
+} from '../../functions/shared/core/ownership.js'
 import { formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
@@ -442,8 +445,8 @@ function openOwnershipEditor(categoryId) {
   if (!ownership) return
 
   editingOwnershipCategoryId.value = categoryId
-  editingOwnership.value = cloneOwnership(ownership)
-  ownershipValid.value = isValidOwnership(editingOwnership.value, memberIds.value)
+  editingOwnership.value = cloneOwnershipAllocation(ownership)
+  ownershipValid.value = isValidOwnershipAllocation(editingOwnership.value, memberIds.value)
   ownershipDialog.value = true
 }
 
@@ -454,7 +457,7 @@ async function saveSimpleOwnership() {
     assetsStore.updateSimpleCategoryOwnership(
       workspaceId.value,
       editingOwnershipCategoryId.value,
-      cloneOwnership(editingOwnership.value),
+      cloneOwnershipAllocation(editingOwnership.value),
       memberIds.value,
     ),
   )

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  inflationAdjustedCoverage,
-  latestPositionMonth,
-  projectPath,
-  simulateStrategy,
-  strategyNetWorthProjection,
-  strategyNetWorthPoints,
-  strategyStartingPosition,
-} from '../../../src/domain/financial/strategy-simulation'
+  calculateInflationAdjustedCoverage,
+  findLatestObservedPositionMonth,
+  projectStrategyAssetPath,
+  simulateAllocationStrategy,
+  calculateStrategyNetWorthProjection,
+  calculateStrategyNetWorthPoints,
+  buildStrategyStartingPosition,
+} from '../../../functions/shared/plan/strategy-simulation.js'
 
 describe('strategy simulation', () => {
   it('uses the same inflation-adjusted coverage calculation for months and years', () => {
     expect(
-      inflationAdjustedCoverage({
+      calculateInflationAdjustedCoverage({
         projectedValue: 24_000,
         currentPeriodCost: 1_000,
         annualInflationPercent: 2,
@@ -21,7 +21,7 @@ describe('strategy simulation', () => {
     ).toBe(19.69)
 
     expect(
-      inflationAdjustedCoverage({
+      calculateInflationAdjustedCoverage({
         projectedValue: 240_000,
         currentPeriodCost: 12_000,
         annualInflationPercent: 2,
@@ -31,8 +31,8 @@ describe('strategy simulation', () => {
   })
   it('uses the current month or latest available financial position', () => {
     const financialYear = { months: { '01': {}, '03': {} } }
-    expect(latestPositionMonth(financialYear, '03')).toBe('03')
-    expect(latestPositionMonth(financialYear, '05')).toBe('03')
+    expect(findLatestObservedPositionMonth(financialYear, '03')).toBe('03')
+    expect(findLatestObservedPositionMonth(financialYear, '05')).toBe('03')
   })
 
   it('maps current assets into investment types without treating the primary home as an investment', () => {
@@ -60,7 +60,7 @@ describe('strategy simulation', () => {
       },
     }
 
-    expect(strategyStartingPosition(financialYear, '03')).toMatchObject({
+    expect(buildStrategyStartingPosition(financialYear, '03')).toMatchObject({
       cash: 5_000,
       investmentTotal: 92_000,
       investmentBalances: { stockMarket: 10_000, fixedIncome: 2_000, realEstate: 80_000 },
@@ -95,7 +95,7 @@ describe('strategy simulation', () => {
       },
     }
 
-    expect(strategyStartingPosition(financialYear, '03', 'member-a')).toMatchObject({
+    expect(buildStrategyStartingPosition(financialYear, '03', 'member-a')).toMatchObject({
       cash: 2_000,
       investmentTotal: 4_000,
       investmentBalances: { stockMarket: 4_000 },
@@ -103,7 +103,7 @@ describe('strategy simulation', () => {
   })
 
   it('keeps the configured monthly cash contribution after reaching the emergency fund target', () => {
-    const result = projectPath({
+    const result = projectStrategyAssetPath({
       startingPosition: { cash: 1_000, investmentBalances: {} },
       allocation: { cash: 50, invest: 50, debt: 0 },
       investmentMix: { stockMarket: { allocation: 100, annualReturnPercent: 0 } },
@@ -120,7 +120,7 @@ describe('strategy simulation', () => {
   })
 
   it('inflates the future safety target while retaining today’s target', () => {
-    const result = projectPath({
+    const result = projectStrategyAssetPath({
       startingPosition: { cash: 0, investmentBalances: {} },
       allocation: { cash: 100, invest: 0, debt: 0 },
       horizonYears: 10,
@@ -144,7 +144,7 @@ describe('strategy simulation', () => {
   })
 
   it('compounds the configured cash return on the balance and new contributions', () => {
-    const result = projectPath({
+    const result = projectStrategyAssetPath({
       startingPosition: { cash: 1_000, investmentBalances: {} },
       allocation: { cash: 100, invest: 0, debt: 0 },
       cashAnnualReturnPercent: 12,
@@ -160,7 +160,7 @@ describe('strategy simulation', () => {
   })
 
   it('keeps unmodeled debt frozen in net worth projections', () => {
-    const points = strategyNetWorthPoints({
+    const points = calculateStrategyNetWorthPoints({
       currentNetWorth: 5_000,
       strategy: {
         startingValue: 10_000,
@@ -182,7 +182,7 @@ describe('strategy simulation', () => {
   })
 
   it('projects net worth from modeled property appreciation and mortgage amortization', () => {
-    const points = strategyNetWorthPoints({
+    const points = calculateStrategyNetWorthPoints({
       currentNetWorth: 110_000,
       currentAssets: 160_000,
       currentLiabilities: 50_000,
@@ -251,7 +251,7 @@ describe('strategy simulation', () => {
   })
 
   it('reports incomplete mortgage projections instead of silently treating them as unchanged', () => {
-    const result = strategyNetWorthProjection({
+    const result = calculateStrategyNetWorthProjection({
       currentAssets: 10_000,
       currentLiabilities: 5_000,
       strategy: {
@@ -281,7 +281,7 @@ describe('strategy simulation', () => {
   })
 
   it('counts non-primary real estate toward freedom while keeping cash separate', () => {
-    const result = projectPath({
+    const result = projectStrategyAssetPath({
       startingPosition: {
         cash: 5_000,
         investmentBalances: { stockMarket: 10_000, realEstate: 80_000 },
@@ -309,7 +309,7 @@ describe('strategy simulation', () => {
   })
 
   it('projects only the user-defined scenario from the current financial position', () => {
-    const result = simulateStrategy({
+    const result = simulateAllocationStrategy({
       startingPosition: { cash: 0, investmentBalances: {} },
       scenario: {
         allocation: { cash: 0, invest: 100, debt: 0 },

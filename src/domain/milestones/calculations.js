@@ -3,10 +3,20 @@ import {
   financialYearFlowValue,
   financialYearMonthCategoryValue,
   financialYearMonthValue,
-} from '@/domain/financial/financial-year'
+} from '../../../functions/shared/positions/annual-projection.js'
 import { positionHistoryDocuments } from '@/domain/financial/history'
 import { investableWealthAt } from '@/domain/financial/investable-wealth'
-import { applyOwnership } from '@/domain/financial/ownership'
+import { moneyForOwnershipScope } from '../../../functions/shared/core/ownership.js'
+import {
+  calculateFundedYears,
+  calculateSafetyCoverageMonths,
+} from '../../../functions/shared/positions/metrics.js'
+import {
+  calculateDebtReductionProgress,
+  calculatePositiveNetWorthProgress,
+  calculateTargetProgress,
+} from '../../../functions/shared/progress/metrics.js'
+import { roundMoneyOrZero as money } from '../../../functions/shared/core/money.js'
 import { milestoneDefinitions } from './definitions'
 
 export function calculateMilestoneProgress({
@@ -42,8 +52,8 @@ export function calculateMilestoneProgress({
     excludedLiabilityIds,
   })
   const netWorth = financialYearMonthValue(financialYear, month, 'netWorth', memberId)
-  const safetyMonths = annualCostOfLife > 0 ? cash / (annualCostOfLife / 12) : 0
-  const fundedYears = annualCostOfLife > 0 ? Math.max(0, freedomAssets / annualCostOfLife) : 0
+  const safetyMonths = calculateSafetyCoverageMonths(cash, annualCostOfLife)
+  const fundedYears = calculateFundedYears(freedomAssets, annualCostOfLife)
 
   return milestoneDefinitions.map((definition) => {
     const result = calculateDefinition(definition, {
@@ -74,21 +84,23 @@ export function calculateMilestoneProgress({
 
 function calculateDefinition(definition, context) {
   if (definition.family === 'safety') {
-    return targetProgress(context.safetyMonths, definition.target, context.annualCostOfLife > 0)
+    return calculateTargetProgress(
+      context.safetyMonths,
+      definition.target,
+      context.annualCostOfLife > 0,
+    )
   }
   if (definition.family === 'freedom') {
-    return targetProgress(context.fundedYears, definition.target, context.annualCostOfLife > 0)
+    return calculateTargetProgress(
+      context.fundedYears,
+      definition.target,
+      context.annualCostOfLife > 0,
+    )
   }
   if (definition.family === 'netWorth') {
-    const reached = definition.positive
-      ? context.netWorth > 0
-      : context.netWorth >= definition.target
-    return {
-      currentValue: context.netWorth,
-      progress: definition.positive ? Number(reached) : ratio(context.netWorth, definition.target),
-      reached,
-      relevant: true,
-    }
+    return definition.positive
+      ? calculatePositiveNetWorthProgress(context.netWorth)
+      : calculateTargetProgress(context.netWorth, definition.target)
   }
 
   return calculateLiabilityProgress({
@@ -129,25 +141,11 @@ export function calculateLiabilityProgress({
     startingValue += Math.max(0, Number(initialValue) || 0)
   }
 
-  const relevant = startingValue > 0
-  const reached = relevant && currentValue <= 0
-  const progress = relevant ? ratio(startingValue - currentValue, startingValue) : 0
+  const result = calculateDebtReductionProgress(currentValue, startingValue)
   return {
-    currentValue: money(currentValue),
-    progress,
-    reached,
-    relevant,
-    startingValue: money(startingValue),
-  }
-}
-
-function targetProgress(currentValue, target, relevant) {
-  const reached = relevant && currentValue >= target
-  return {
-    currentValue,
-    progress: relevant ? ratio(currentValue, target) : 0,
-    reached,
-    relevant,
+    ...result,
+    currentValue: money(result.currentValue),
+    startingValue: money(result.startingValue),
   }
 }
 
@@ -176,7 +174,10 @@ function modeledLiabilityInitialValues(liabilities, categoryIds, memberId) {
       .map((liability) => {
         const originalPrincipal = Number(liability.detail?.mortgage?.originalPrincipal)
         if (!(originalPrincipal > 0)) return null
-        return [liability.id, applyOwnership(originalPrincipal, liability.ownership, memberId)]
+        return [
+          liability.id,
+          moneyForOwnershipScope(originalPrincipal, liability.ownership, memberId),
+        ]
       })
       .filter(Boolean),
   )
@@ -220,13 +221,4 @@ function withCurrentFinancialYear(financialHistory, financialYear, month) {
       },
     },
   ]
-}
-
-function ratio(value, target) {
-  if (!(target > 0)) return 0
-  return Math.min(1, Math.max(0, Number(value || 0) / target))
-}
-
-function money(value) {
-  return Math.round(((Number(value) || 0) + Number.EPSILON) * 100) / 100
 }

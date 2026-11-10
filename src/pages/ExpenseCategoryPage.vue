@@ -177,8 +177,11 @@ import {
   currentFinancialYear,
   financialYearFlowCategoryValue,
   financialYearExpenseModelItemValue,
-} from '@/domain/financial/financial-year'
-import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
+} from '../../functions/shared/positions/annual-projection.js'
+import {
+  createEqualMemberOwnership,
+  createSingleMemberOwnership,
+} from '../../functions/shared/core/ownership.js'
 import { authUser } from '@/services/auth'
 import { useExpensesStore } from '@/stores/expenses-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -279,8 +282,8 @@ const expenseDefaults = computed(() => {
     monthlyAmounts: null,
     ownership:
       memberIds.value.length === 1
-        ? createSingleOwnership(authUser.value?.uid)
-        : createEqualOwnership(memberIds.value),
+        ? createSingleMemberOwnership(authUser.value?.uid)
+        : createEqualMemberOwnership(memberIds.value),
   }
 })
 

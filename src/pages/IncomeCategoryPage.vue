@@ -165,8 +165,11 @@ import {
   currentFinancialYear,
   financialYearFlowCategoryValue,
   financialYearIncomeModelItemValue,
-} from '@/domain/financial/financial-year'
-import { createEqualOwnership, createSingleOwnership } from '@/domain/financial/ownership'
+} from '../../functions/shared/positions/annual-projection.js'
+import {
+  createEqualMemberOwnership,
+  createSingleMemberOwnership,
+} from '../../functions/shared/core/ownership.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useAssetsStore } from '@/stores/assets-store'
@@ -233,8 +236,8 @@ const incomeDefaults = computed(() => {
   if (!categoryConfig.value || !category.value) return null
   const ownership =
     memberIds.value.length === 1
-      ? createSingleOwnership(authUser.value?.uid)
-      : createEqualOwnership(memberIds.value)
+      ? createSingleMemberOwnership(authUser.value?.uid)
+      : createEqualMemberOwnership(memberIds.value)
   return {
     subcategoryId: category.value.subcategories[0],
     itemName: '',

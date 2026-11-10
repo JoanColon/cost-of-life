@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  annualIncomeValue,
-  incomeCalculationBreakdown,
-  normalizeDisposablePercentage,
-  normalizeIncomeCalculation,
-} from '../../../src/domain/financial/income-calculations'
+  calculateAnnualIncomeAmount,
+  calculateIncomeBreakdown,
+  normalizeDisposableIncomePercent,
+  normalizeIncomeCalculationModel,
+} from '../../../functions/shared/income/calculations.js'
 
 describe('income calculations', () => {
   it('uses an annual salary as its annual value and derives both monthly concepts', () => {
     const calculation = { mode: 'annual_salary', annualAmount: 42000, paymentsPerYear: 14 }
 
-    expect(annualIncomeValue(calculation)).toBe(42000)
-    expect(incomeCalculationBreakdown(calculation)).toEqual({
+    expect(calculateAnnualIncomeAmount(calculation)).toBe(42000)
+    expect(calculateIncomeBreakdown(calculation)).toEqual({
       annualValue: 42000,
       perPayment: 3000,
       monthlyAverage: 3500,
@@ -25,8 +25,8 @@ describe('income calculations', () => {
       extrasByMonth: { june: 2500, december: 2500 },
     }
 
-    expect(annualIncomeValue(calculation)).toBe(41000)
-    expect(incomeCalculationBreakdown(calculation).monthlyAverage).toBe(3416.67)
+    expect(calculateAnnualIncomeAmount(calculation)).toBe(41000)
+    expect(calculateIncomeBreakdown(calculation).monthlyAverage).toBe(3416.67)
   })
 
   it.each([
@@ -34,11 +34,11 @@ describe('income calculations', () => {
     ['quarterly', 100, 400],
     ['yearly', 100, 100],
   ])('normalizes %s recurring income', (frequency, amount, expected) => {
-    expect(annualIncomeValue({ mode: 'recurring', amount, frequency })).toBe(expected)
+    expect(calculateAnnualIncomeAmount({ mode: 'recurring', amount, frequency })).toBe(expected)
   })
 
   it('counts one-time income once', () => {
-    expect(annualIncomeValue({ mode: 'one_time', amount: 1234.56 })).toBe(1234.56)
+    expect(calculateAnnualIncomeAmount({ mode: 'one_time', amount: 1234.56 })).toBe(1234.56)
   })
 
   it.each([
@@ -53,13 +53,13 @@ describe('income calculations', () => {
     { mode: 'one_time', amount: -1 },
     { mode: 'unknown', amount: 100 },
   ])('rejects invalid calculation %#', (calculation) => {
-    expect(normalizeIncomeCalculation(calculation)).toBeNull()
-    expect(annualIncomeValue(calculation)).toBeNull()
+    expect(normalizeIncomeCalculationModel(calculation)).toBeNull()
+    expect(calculateAnnualIncomeAmount(calculation)).toBeNull()
   })
 
   it('normalizes an available-income percentage between zero and one hundred', () => {
-    expect(normalizeDisposablePercentage('72.3456')).toBe(72.346)
-    expect(normalizeDisposablePercentage(101)).toBeNull()
-    expect(normalizeDisposablePercentage(undefined, 100)).toBe(100)
+    expect(normalizeDisposableIncomePercent('72.3456')).toBe(72.346)
+    expect(normalizeDisposableIncomePercent(101)).toBeNull()
+    expect(normalizeDisposableIncomePercent(undefined, 100)).toBe(100)
   })
 })

@@ -4,7 +4,7 @@ import {
   financialYearMonthAvailableIncomeValue,
   financialYearMonthCategoryValue,
   financialYearMonthValue,
-} from './financial-year'
+} from '../../../functions/shared/positions/annual-projection.js'
 import { investableWealthAt } from './investable-wealth'
 
 export function withCurrentPosition(historyDocuments, financialYear, month) {

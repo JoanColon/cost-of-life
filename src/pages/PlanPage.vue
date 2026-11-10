@@ -192,14 +192,20 @@ import {
   financialYearAvailableIncomeValue,
   financialYearExpenseNecessityValue,
   financialYearFlowValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import {
-  latestPositionMonth,
-  simulateStrategy,
-  strategyStartingPosition,
-} from '@/domain/financial/strategy-simulation'
-import { calculateWhatIf, normalizeStrategyForOptions } from '@/domain/financial/what-if'
-import { calculateInvestmentScenario, calculateSafetyImpact } from '@/domain/financial/what-if'
+  findLatestObservedPositionMonth,
+  simulateAllocationStrategy,
+  buildStrategyStartingPosition,
+} from '../../functions/shared/plan/strategy-simulation.js'
+import {
+  calculateSavingsCapacityScenario,
+  normalizeStrategyForOptions,
+} from '../../functions/shared/plan/what-if.js'
+import {
+  calculateInvestmentContributionScenario,
+  calculateSafetyCoverageScenario,
+} from '../../functions/shared/plan/what-if.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -278,10 +284,10 @@ const activeScenario = computed(
     whatIfStore.config.scenarios[0],
 )
 const positionMonth = computed(() =>
-  latestPositionMonth(financialYear.value, currentFinancialMonth()),
+  findLatestObservedPositionMonth(financialYear.value, currentFinancialMonth()),
 )
 const startingPosition = computed(() =>
-  strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
+  buildStrategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
 )
 const liabilities = computed(() =>
   extractPositionLiabilities(
@@ -320,7 +326,7 @@ const allocation = computed(() =>
   }),
 )
 const simulation = computed(() =>
-  calculateWhatIf({
+  calculateSavingsCapacityScenario({
     availableIncome: annualIncome.value,
     costOfLife: annualCostOfLife.value,
     discretionary: financialYearExpenseNecessityValue(
@@ -337,7 +343,7 @@ const simulation = computed(() =>
 )
 const strategyMonthlyAmount = computed(() => Math.max(0, simulation.value.currentSavingsCapacity))
 const projection = computed(() =>
-  simulateStrategy({
+  simulateAllocationStrategy({
     startingPosition: startingPosition.value,
     scenario: { ...activeScenario.value, allocation: allocation.value },
     simulatedMonthlySavings: strategyMonthlyAmount.value,
@@ -346,7 +352,7 @@ const projection = computed(() =>
   }),
 )
 const safetyImpact = computed(() =>
-  calculateSafetyImpact({
+  calculateSafetyCoverageScenario({
     cash: startingPosition.value.cash,
     currentMonthlyCost: simulation.value.monthlyCostOfLife,
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
@@ -357,7 +363,7 @@ const safetyImpact = computed(() =>
   }),
 )
 const featuredInvestment = computed(() =>
-  calculateInvestmentScenario({
+  calculateInvestmentContributionScenario({
     monthlyContribution: simulation.value.simulatedSavingsCapacity,
     currentMonthlyContribution: simulation.value.currentSavingsCapacity,
     annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,

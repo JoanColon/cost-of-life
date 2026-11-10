@@ -360,17 +360,17 @@ import {
   financialYearFlowValue,
   financialYearMonthCategoryValue,
   financialYearUnclassifiedExpenseValue,
-} from '@/domain/financial/financial-year'
+} from '../../functions/shared/positions/annual-projection.js'
 import {
-  latestPositionMonth,
-  strategyStartingPosition,
-} from '@/domain/financial/strategy-simulation'
+  findLatestObservedPositionMonth,
+  buildStrategyStartingPosition,
+} from '../../functions/shared/plan/strategy-simulation.js'
 import {
   calculateDebtScenario,
-  calculateInvestmentScenario,
-  calculateSafetyImpact,
-  calculateWhatIf,
-} from '@/domain/financial/what-if'
+  calculateInvestmentContributionScenario,
+  calculateSafetyCoverageScenario,
+  calculateSavingsCapacityScenario,
+} from '../../functions/shared/plan/what-if.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
@@ -410,7 +410,7 @@ const activeScenario = computed(
     config.value.scenarios[0],
 )
 const financialYear = computed(() => financialYearsStore.get(workspaceId.value, currentYear))
-const positionMonth = computed(() => latestPositionMonth(financialYear.value))
+const positionMonth = computed(() => findLatestObservedPositionMonth(financialYear.value))
 const loading = computed(
   () =>
     whatIfStore.loading ||
@@ -437,7 +437,7 @@ const unclassifiedMonthly = computed(
   () => financialYearUnclassifiedExpenseValue(financialYear.value, selectedMemberId.value) / 12,
 )
 const simulation = computed(() =>
-  calculateWhatIf({
+  calculateSavingsCapacityScenario({
     availableIncome: annualAvailableIncome.value,
     costOfLife: annualCost.value,
     discretionary: annualDiscretionary.value,
@@ -447,7 +447,7 @@ const simulation = computed(() =>
   }),
 )
 const startingPosition = computed(() =>
-  strategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
+  buildStrategyStartingPosition(financialYear.value, positionMonth.value, selectedMemberId.value),
 )
 const cash = computed(() =>
   financialYearMonthCategoryValue(
@@ -482,7 +482,7 @@ const recommendedDebt = computed(
 )
 const selectedDebt = computed(() => recommendedDebt.value)
 const safetyImpact = computed(() =>
-  calculateSafetyImpact({
+  calculateSafetyCoverageScenario({
     cash: cash.value,
     currentMonthlyCost: simulation.value.monthlyCostOfLife,
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
@@ -496,7 +496,7 @@ const safetyMeterMonths = computed(() =>
   Math.min(12, Math.max(0, Math.floor(safetyImpact.value?.scenarioSafetyMonths || 0))),
 )
 const investmentScenario = computed(() =>
-  calculateInvestmentScenario({
+  calculateInvestmentContributionScenario({
     monthlyContribution: simulation.value.simulatedSavingsCapacity,
     currentMonthlyContribution: simulation.value.currentSavingsCapacity,
     annualReturnPercent: activeScenario.value.investmentMix.stockMarket?.annualReturnPercent || 7,

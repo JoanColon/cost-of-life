@@ -168,7 +168,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="month in incomeMonths" :key="month">
+              <tr v-for="month in CALENDAR_MONTH_IDS" :key="month">
                 <td>{{ t(`income.months.${month}`) }}</td>
                 <td class="model-amount-cell">
                   <q-btn
@@ -260,23 +260,23 @@ import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import { expenseTrackingCategories } from '@/config/expense-tracking-categories'
 import {
-  expenseNecessities,
-  expenseRecurrences,
-  expenseVariabilities,
-  generateMonthlyExpenseAmounts,
-  normalizeExpenseAttributes,
-  normalizeExpenseEstimate,
-  normalizeMonthlyExpenseAmounts,
-  expenseFrequencies,
-  updateMonthlyExpenseAmounts,
-} from '@/domain/financial/expense-calculations'
-import { incomeMonths } from '@/domain/financial/income-calculations'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+  EXPENSE_NECESSITIES,
+  EXPENSE_RECURRENCES,
+  EXPENSE_VARIABILITIES,
+  buildMonthlyExpenseSchedule,
+  normalizeExpenseClassification,
+  normalizeExpenseEstimateModel,
+  normalizeMonthlyExpenseSchedule,
+  EXPENSE_FREQUENCIES,
+  updateMonthlyExpenseSchedule,
+} from '../../../functions/shared/expenses/calculations.js'
+import { CALENDAR_MONTH_IDS } from '../../../functions/shared/core/calendar-months.js'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
 import {
-  cloneOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  cloneOwnershipAllocation,
+  createEqualMemberOwnership,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
@@ -298,16 +298,16 @@ const frequency = ref('monthly')
 const variability = ref('fixed')
 const recurrence = ref('recurring')
 const necessity = ref(null)
-const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
+const ownership = ref(createEqualMemberOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const monthlyAmounts = ref(null)
 let seeding = false
 
 const option = (namespace) => (value) => ({ value, label: t(`expenses.${namespace}.${value}`) })
-const frequencyOptions = computed(() => expenseFrequencies.map(option('frequencies')))
-const variabilityOptions = computed(() => expenseVariabilities.map(option('variabilities')))
-const recurrenceOptions = computed(() => expenseRecurrences.map(option('recurrences')))
-const necessityOptions = computed(() => expenseNecessities.map(option('necessities')))
+const frequencyOptions = computed(() => EXPENSE_FREQUENCIES.map(option('frequencies')))
+const variabilityOptions = computed(() => EXPENSE_VARIABILITIES.map(option('variabilities')))
+const recurrenceOptions = computed(() => EXPENSE_RECURRENCES.map(option('recurrences')))
+const necessityOptions = computed(() => EXPENSE_NECESSITIES.map(option('necessities')))
 const subcategoryOptions = computed(() =>
   props.category.suggestions.map((item) => ({ value: item.id, label: t(item.nameKey) })),
 )
@@ -322,10 +322,10 @@ const suggestionIcon = computed(
     'category',
 )
 const normalizedEstimate = computed(() =>
-  normalizeExpenseEstimate({ amount: amount.value, frequency: frequency.value }),
+  normalizeExpenseEstimateModel({ amount: amount.value, frequency: frequency.value }),
 )
 const normalizedAttributes = computed(() =>
-  normalizeExpenseAttributes({
+  normalizeExpenseClassification({
     variability: variability.value,
     recurrence: recurrence.value,
     necessity: necessity.value,
@@ -343,7 +343,7 @@ watch(
   [amount, frequency],
   ([nextAmount, nextFrequency], [previousAmount, previousFrequency]) => {
     if (seeding) return
-    monthlyAmounts.value = updateMonthlyExpenseAmounts(
+    monthlyAmounts.value = updateMonthlyExpenseSchedule(
       monthlyAmounts.value,
       { amount: previousAmount, frequency: previousFrequency },
       { amount: nextAmount, frequency: nextFrequency },
@@ -363,15 +363,15 @@ function seed() {
   amount.value = initial.estimate?.amount ?? 0
   frequency.value = initial.estimate?.frequency || suggestion?.defaults.frequency || 'monthly'
   monthlyAmounts.value =
-    normalizeMonthlyExpenseAmounts(initial.monthlyAmounts) ||
-    generateMonthlyExpenseAmounts(initial.estimate || { amount: 0, frequency: frequency.value })
+    normalizeMonthlyExpenseSchedule(initial.monthlyAmounts) ||
+    buildMonthlyExpenseSchedule(initial.estimate || { amount: 0, frequency: frequency.value })
   variability.value = initial.variability || suggestion?.defaults.variability || 'fixed'
   recurrence.value = initial.recurrence || suggestion?.defaults.recurrence || 'recurring'
   necessity.value = initial.necessity ?? suggestion?.defaults.necessity ?? null
   ownership.value = initial.ownership
-    ? cloneOwnership(initial.ownership)
-    : createEqualOwnership(props.members.map((member) => member.id))
-  ownershipValid.value = isValidOwnership(
+    ? cloneOwnershipAllocation(initial.ownership)
+    : createEqualMemberOwnership(props.members.map((member) => member.id))
+  ownershipValid.value = isValidOwnershipAllocation(
     ownership.value,
     props.members.map((member) => member.id),
   )
@@ -379,7 +379,7 @@ function seed() {
 }
 
 function monthAmount(month) {
-  return normalizeNonNegativeMoney(monthlyAmounts.value?.[month]) || 0
+  return normalizeNonNegativeMoneyOrNull(monthlyAmounts.value?.[month]) || 0
 }
 
 function actualAmount(month) {
@@ -387,7 +387,7 @@ function actualAmount(month) {
 }
 
 function financialYearMonthExpense(month) {
-  const monthNumber = incomeMonths.indexOf(month) + 1
+  const monthNumber = CALENDAR_MONTH_IDS.indexOf(month) + 1
   if (monthNumber < 1 || !props.expense?.id) return null
   const monthKey = String(monthNumber).padStart(2, '0')
   return (
@@ -397,7 +397,7 @@ function financialYearMonthExpense(month) {
 }
 
 function setMonthAmount(month, value) {
-  const normalized = normalizeNonNegativeMoney(value)
+  const normalized = normalizeNonNegativeMoneyOrNull(value)
   if (normalized === null) return
   monthlyAmounts.value = { ...monthlyAmounts.value, [month]: normalized }
 }
@@ -428,9 +428,9 @@ function submit() {
     itemName: itemName.value.trim(),
     notes: notes.value.trim(),
     estimate: normalizedEstimate.value,
-    monthlyAmounts: normalizeMonthlyExpenseAmounts(monthlyAmounts.value),
+    monthlyAmounts: normalizeMonthlyExpenseSchedule(monthlyAmounts.value),
     ...normalizedAttributes.value,
-    ownership: cloneOwnership(ownership.value),
+    ownership: cloneOwnershipAllocation(ownership.value),
     liabilityId: props.expense?.liabilityId || null,
   })
 }

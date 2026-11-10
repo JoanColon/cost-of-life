@@ -60,10 +60,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  createEqualOwnership,
-  createSingleOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  createEqualMemberOwnership,
+  createSingleMemberOwnership,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
@@ -87,19 +87,19 @@ const shareTotal = computed(
     ) / 100,
 )
 const valid = computed(() =>
-  isValidOwnership(
+  isValidOwnershipAllocation(
     props.modelValue,
     props.members.map((member) => member.id),
   ),
 )
 
 function selectSingle(memberId) {
-  update(createSingleOwnership(memberId))
+  update(createSingleMemberOwnership(memberId))
 }
 
 function selectShared() {
   if (selection.value === 'shared') return
-  update(createEqualOwnership(props.members.map((member) => member.id)))
+  update(createEqualMemberOwnership(props.members.map((member) => member.id)))
 }
 
 function updateShare(memberId, percentage) {
@@ -115,7 +115,7 @@ function update(ownership) {
   emit('update:modelValue', ownership)
   emit(
     'validity',
-    isValidOwnership(
+    isValidOwnershipAllocation(
       ownership,
       props.members.map((member) => member.id),
     ),

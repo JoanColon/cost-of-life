@@ -3,7 +3,8 @@ import {
   financialYearMonthItemValue,
   financialYearMonthSubcategoryValue,
   financialYearMonthValue,
-} from './financial-year'
+} from '../../../functions/shared/positions/annual-projection.js'
+import { roundMoneyOrZero } from '../../../functions/shared/core/money.js'
 
 export const INVESTABLE_ASSET_CATEGORY_IDS = Object.freeze(['cash', 'investment'])
 export const INVESTABLE_REAL_ESTATE_SUBCATEGORY_IDS = Object.freeze([
@@ -55,5 +56,5 @@ export function investableWealthAt(
   const includedLiabilities =
     financialYearMonthValue(financialYear, month, 'liabilities', memberId) - excludedLiabilities
 
-  return Math.round((investableAssets - includedLiabilities + Number.EPSILON) * 100) / 100
+  return roundMoneyOrZero(investableAssets - includedLiabilities)
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import serverValuation from '../../../functions/domain/real-estate.js'
+import { calculateAnniversaryRealEstateValuation } from '../../../functions/shared/assets/real-estate.js'
 import {
   annualRealEstateValue,
   effectiveRealEstateValue,
@@ -29,7 +29,7 @@ describe('annual real estate valuation', () => {
   })
 
   it('keeps client and server annual valuations aligned', () => {
-    expect(serverValuation.annualRealEstateValue(model, '2026-11-01')).toBe(
+    expect(calculateAnniversaryRealEstateValuation(model, '2026-11-01')).toBe(
       annualRealEstateValue(model, '2026-11-01'),
     )
   })

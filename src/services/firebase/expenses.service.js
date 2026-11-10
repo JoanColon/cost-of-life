@@ -2,12 +2,15 @@ import { collection, getDocs, query, serverTimestamp, where, writeBatch } from '
 import { db } from '@/firebase/firebase'
 import { getExpenseCategory, getExpenseSubcategory } from '@/config/expense-categories'
 import {
-  generateMonthlyExpenseAmounts,
-  normalizeExpenseAttributes,
-  normalizeExpenseEstimate,
-  normalizeMonthlyExpenseAmounts,
-} from '@/domain/financial/expense-calculations'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
+  buildMonthlyExpenseSchedule,
+  normalizeExpenseClassification,
+  normalizeExpenseEstimateModel,
+  normalizeMonthlyExpenseSchedule,
+} from '../../../functions/shared/expenses/calculations.js'
+import {
+  cloneOwnershipAllocation,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
 import {
@@ -105,12 +108,11 @@ function normalizeExpenseItem(expense) {
   const itemName = String(expense.itemName || '').trim()
   if (!itemName) throw new Error('An item name is required')
 
-  const estimate = normalizeExpenseEstimate(expense.estimate)
+  const estimate = normalizeExpenseEstimateModel(expense.estimate)
   if (!estimate) throw new Error('A valid expense estimate is required')
   const monthlyAmounts =
-    normalizeMonthlyExpenseAmounts(expense.monthlyAmounts) ||
-    generateMonthlyExpenseAmounts(estimate)
-  const attributes = normalizeExpenseAttributes(expense)
+    normalizeMonthlyExpenseSchedule(expense.monthlyAmounts) || buildMonthlyExpenseSchedule(estimate)
+  const attributes = normalizeExpenseClassification(expense)
   if (!attributes) throw new Error('Valid expense behavior is required')
 
   const normalized = {
@@ -121,7 +123,7 @@ function normalizeExpenseItem(expense) {
     estimate,
     monthlyAmounts,
     ...attributes,
-    ownership: cloneOwnership(expense.ownership),
+    ownership: cloneOwnershipAllocation(expense.ownership),
     liabilityId:
       subcategoryId === 'mortgage_rent' ? normalizeOptionalId(expense.liabilityId) : null,
   }
@@ -149,7 +151,7 @@ function canonicalExpenseCategories(categories) {
 }
 
 function assertValidOwnership(ownership, memberIds) {
-  if (!isValidOwnership(ownership, memberIds)) {
+  if (!isValidOwnershipAllocation(ownership, memberIds)) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
 }

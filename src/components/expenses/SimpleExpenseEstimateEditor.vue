@@ -78,9 +78,9 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  normalizeExpenseEstimate,
-  expenseFrequencies,
-} from '@/domain/financial/expense-calculations'
+  normalizeExpenseEstimateModel,
+  EXPENSE_FREQUENCIES,
+} from '../../../functions/shared/expenses/calculations.js'
 import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
@@ -96,17 +96,17 @@ const dialog = ref(false)
 const amount = ref(0)
 const frequency = ref('monthly')
 const valid = computed(() =>
-  Boolean(normalizeExpenseEstimate({ amount: amount.value, frequency: frequency.value })),
+  Boolean(normalizeExpenseEstimateModel({ amount: amount.value, frequency: frequency.value })),
 )
 const normalized = computed(
-  () => normalizeExpenseEstimate(props.estimate) || { amount: 0, frequency: 'monthly' },
+  () => normalizeExpenseEstimateModel(props.estimate) || { amount: 0, frequency: 'monthly' },
 )
 const formattedValue = computed(() => formatCurrency(normalized.value.amount))
 const frequencyLabel = computed(() => t(`expenses.frequencies.${normalized.value.frequency}`))
 const shownValue = computed(() => props.displayValue || formattedValue.value)
 const shownPeriod = computed(() => props.displayPeriod || frequencyLabel.value)
 const frequencyOptions = computed(() =>
-  expenseFrequencies.map((value) => ({
+  EXPENSE_FREQUENCIES.map((value) => ({
     value,
     label: t(`expenses.frequencies.${value}`),
   })),
@@ -120,7 +120,10 @@ function open() {
 }
 
 function save() {
-  const estimate = normalizeExpenseEstimate({ amount: amount.value, frequency: frequency.value })
+  const estimate = normalizeExpenseEstimateModel({
+    amount: amount.value,
+    frequency: frequency.value,
+  })
   if (!estimate) return
   emit('save', estimate)
   dialog.value = false

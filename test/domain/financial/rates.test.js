@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  effectiveGrowthFactor,
-  effectiveMonthlyRate,
+  compoundGrowthFactorForMonths,
+  effectiveMonthlyRateFromAnnualPercent,
   normalizeAnnualPercent,
-} from '../../../src/domain/financial/rates.js'
+} from '../../../functions/shared/core/rates.js'
 
 describe('effective annual rates', () => {
   it('converts an effective annual percentage into an equivalent monthly rate', () => {
-    const monthlyRate = effectiveMonthlyRate(7)
+    const monthlyRate = effectiveMonthlyRateFromAnnualPercent(7)
 
     expect(Math.pow(1 + monthlyRate, 12)).toBeCloseTo(1.07, 12)
-    expect(effectiveGrowthFactor(7, 12)).toBeCloseTo(1.07, 12)
+    expect(compoundGrowthFactorForMonths(7, 12)).toBeCloseTo(1.07, 12)
   })
 
   it('normalizes editable percentages without inventing invalid values', () => {

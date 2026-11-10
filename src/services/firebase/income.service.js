@@ -2,10 +2,13 @@ import { collection, getDocs, query, serverTimestamp, where, writeBatch } from '
 import { db } from '@/firebase/firebase'
 import { getIncomeCategory, getIncomeSubcategory } from '@/config/income-categories'
 import {
-  normalizeDisposablePercentage,
-  normalizeIncomeCalculation,
-} from '@/domain/financial/income-calculations'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
+  normalizeDisposableIncomePercent,
+  normalizeIncomeCalculationModel,
+} from '../../../functions/shared/income/calculations.js'
+import {
+  cloneOwnershipAllocation,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
 import {
@@ -79,7 +82,7 @@ export async function createIncome(workspaceId, income, memberIds) {
   const normalized = normalizeIncomeItem(income)
   return createFinancialModelItem(workspaceId, 'income', {
     ...normalized,
-    ownership: cloneOwnership(income.ownership),
+    ownership: cloneOwnershipAllocation(income.ownership),
   })
 }
 
@@ -87,7 +90,7 @@ export async function updateIncome(workspaceId, incomeId, changes, memberIds) {
   assertValidOwnership(changes.ownership, memberIds)
   return updateFinancialModelItem(workspaceId, 'income', incomeId, {
     ...normalizeIncomeItem(changes),
-    ownership: cloneOwnership(changes.ownership),
+    ownership: cloneOwnershipAllocation(changes.ownership),
   })
 }
 
@@ -108,13 +111,13 @@ function normalizeIncomeItem(income) {
   }
   const itemName = String(income.itemName || '').trim()
   if (!itemName) throw new Error('An income item name is required')
-  const calculation = normalizeIncomeCalculation(income.calculation)
+  const calculation = normalizeIncomeCalculationModel(income.calculation)
   if (!calculation || !category.calculationModes.includes(calculation.mode)) {
     throw new Error('A valid income calculation is required')
   }
   const isDividendIncome = category.id === 'investments' && subcategory.id === 'dividends'
   const disposablePercentage = isDividendIncome
-    ? normalizeDisposablePercentage(income.disposablePercentage, 100)
+    ? normalizeDisposableIncomePercent(income.disposablePercentage, 100)
     : 100
   if (disposablePercentage === null) {
     throw new Error('A valid available-income percentage is required')
@@ -140,7 +143,7 @@ function normalizeOptionalId(value) {
 }
 
 function assertValidOwnership(ownership, memberIds) {
-  if (!isValidOwnership(ownership, memberIds)) {
+  if (!isValidOwnershipAllocation(ownership, memberIds)) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
 }

@@ -71,7 +71,7 @@
               lazy-rules
               :rules="[
                 (value) =>
-                  normalizeNonNegativeMoney(value) !== null || t('assets.form.valueInvalid'),
+                  normalizeNonNegativeMoneyOrNull(value) !== null || t('assets.form.valueInvalid'),
               ]"
             />
             <small v-if="modelManagedValue" class="model-managed-hint">
@@ -135,11 +135,11 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
 import {
-  cloneOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+  cloneOwnershipAllocation,
+  createEqualMemberOwnership,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
 import { currencySymbol } from '@/utils/formatters'
 
 const props = defineProps({
@@ -158,7 +158,7 @@ const subcategoryId = ref('')
 const name = ref('')
 const notes = ref('')
 const currentValue = ref('')
-const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
+const ownership = ref(createEqualMemberOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const submitting = ref(false)
 
@@ -202,9 +202,9 @@ function reset() {
   notes.value = initial?.notes || ''
   currentValue.value = initial?.currentValue ?? ''
   ownership.value = initial?.ownership
-    ? cloneOwnership(initial.ownership)
-    : createEqualOwnership(props.members.map((member) => member.id))
-  ownershipValid.value = isValidOwnership(
+    ? cloneOwnershipAllocation(initial.ownership)
+    : createEqualMemberOwnership(props.members.map((member) => member.id))
+  ownershipValid.value = isValidOwnershipAllocation(
     ownership.value,
     props.members.map((member) => member.id),
   )
@@ -214,7 +214,7 @@ async function submit() {
   if (props.saving || submitting.value) return
 
   const formIsValid = await form.value?.validate()
-  const value = normalizeNonNegativeMoney(currentValue.value)
+  const value = normalizeNonNegativeMoneyOrNull(currentValue.value)
   if (!formIsValid || value === null || !ownershipValid.value) return
 
   submitting.value = true
@@ -224,7 +224,7 @@ async function submit() {
     itemName: name.value.trim(),
     notes: notes.value.trim(),
     currentValue: value,
-    ownership: cloneOwnership(ownership.value),
+    ownership: cloneOwnershipAllocation(ownership.value),
     detail: { ...(initialDetail() || {}) },
     mortgageLiabilityId: isMortgageEligible.value ? props.asset?.mortgageLiabilityId || null : null,
   })

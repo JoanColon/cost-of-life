@@ -197,7 +197,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="month in incomeMonths" :key="month">
+                  <tr v-for="month in CALENDAR_MONTH_IDS" :key="month">
                     <td>{{ t(`income.months.${month}`) }}</td>
                     <td class="text-right">{{ formatCurrency(normalizedMonthlyAmount) }}</td>
                     <td class="extra-payment-cell">
@@ -376,19 +376,19 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import OwnershipEditor from '@/components/financial/OwnershipEditor.vue'
+import { CALENDAR_MONTH_IDS } from '../../../functions/shared/core/calendar-months.js'
 import {
-  incomeMonths,
-  incomeCalculationBreakdown,
-  normalizeDisposablePercentage,
-  normalizeIncomeCalculation,
-  recurringIncomeFrequencies,
-} from '@/domain/financial/income-calculations'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
+  calculateIncomeBreakdown,
+  normalizeDisposableIncomePercent,
+  normalizeIncomeCalculationModel,
+  RECURRING_INCOME_FREQUENCIES,
+} from '../../../functions/shared/income/calculations.js'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
 import {
-  cloneOwnership,
-  createEqualOwnership,
-  isValidOwnership,
-} from '@/domain/financial/ownership'
+  cloneOwnershipAllocation,
+  createEqualMemberOwnership,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { currencySymbol, formatCurrency } from '@/utils/formatters'
 
 const props = defineProps({
@@ -413,7 +413,7 @@ const recurringAmount = ref('')
 const frequency = ref('monthly')
 const oneTimeAmount = ref('')
 const oneTimeMonth = ref('january')
-const ownership = ref(createEqualOwnership(props.members.map((member) => member.id)))
+const ownership = ref(createEqualMemberOwnership(props.members.map((member) => member.id)))
 const ownershipValid = ref(true)
 const lastAnnualValue = ref(0)
 const linkedPortfolioId = ref(null)
@@ -430,10 +430,10 @@ const calculationModeOptions = computed(() =>
   })),
 )
 const frequencyOptions = computed(() =>
-  recurringIncomeFrequencies.map((value) => ({ value, label: t(`income.frequencies.${value}`) })),
+  RECURRING_INCOME_FREQUENCIES.map((value) => ({ value, label: t(`income.frequencies.${value}`) })),
 )
 const monthOptions = computed(() =>
-  incomeMonths.map((value) => ({ value, label: t(`income.months.${value}`) })),
+  CALENDAR_MONTH_IDS.map((value) => ({ value, label: t(`income.months.${value}`) })),
 )
 const isDividendIncome = computed(
   () => props.category.id === 'investments' && subcategoryId.value === 'dividends',
@@ -466,7 +466,7 @@ const calculation = computed(() => {
   }
   return { mode: 'recurring', amount: recurringAmount.value, frequency: frequency.value }
 })
-const normalizedCalculation = computed(() => normalizeIncomeCalculation(calculation.value))
+const normalizedCalculation = computed(() => normalizeIncomeCalculationModel(calculation.value))
 const formValid = computed(
   () =>
     Boolean(subcategoryId.value) &&
@@ -475,8 +475,10 @@ const formValid = computed(
     (!linkedPortfolioId.value || Boolean(linkedPortfolio.value)) &&
     ownershipValid.value,
 )
-const breakdown = computed(() => incomeCalculationBreakdown(calculation.value))
-const normalizedMonthlyAmount = computed(() => normalizeNonNegativeMoney(monthlyAmount.value) || 0)
+const breakdown = computed(() => calculateIncomeBreakdown(calculation.value))
+const normalizedMonthlyAmount = computed(
+  () => normalizeNonNegativeMoneyOrNull(monthlyAmount.value) || 0,
+)
 
 watch(breakdown, (value) => {
   if (value) lastAnnualValue.value = value.annualValue
@@ -492,12 +494,12 @@ function reset() {
   itemName.value = initial?.itemName || ''
   notes.value = initial?.notes || ''
   linkedPortfolioId.value = initial?.portfolioAssetId || null
-  const disposablePercentage = normalizeDisposablePercentage(initial?.disposablePercentage, 100)
+  const disposablePercentage = normalizeDisposableIncomePercent(initial?.disposablePercentage, 100)
   dividendReinvestmentPercentage.value = 100 - (disposablePercentage ?? 100)
   ownership.value = initial?.ownership
-    ? cloneOwnership(initial.ownership)
-    : createEqualOwnership(props.members.map((member) => member.id))
-  ownershipValid.value = isValidOwnership(
+    ? cloneOwnershipAllocation(initial.ownership)
+    : createEqualMemberOwnership(props.members.map((member) => member.id))
+  ownershipValid.value = isValidOwnershipAllocation(
     ownership.value,
     props.members.map((member) => member.id),
   )
@@ -508,7 +510,7 @@ function reset() {
 function applyLinkedPortfolio(portfolioId) {
   if (!portfolioId) return
   const portfolio = props.portfolios.find((candidate) => candidate.id === portfolioId)
-  const annualDividendIncome = normalizeNonNegativeMoney(portfolio?.annualDividendIncome)
+  const annualDividendIncome = normalizeNonNegativeMoneyOrNull(portfolio?.annualDividendIncome)
   if (!portfolio || annualDividendIncome === null) return
 
   calculationMode.value = 'recurring'
@@ -543,7 +545,7 @@ function defaultCalculation(mode, annualSeed) {
   if (mode === 'monthly_schedule')
     return {
       mode,
-      monthlyAmount: normalizeNonNegativeMoney(annualSeed / 12) || 0,
+      monthlyAmount: normalizeNonNegativeMoneyOrNull(annualSeed / 12) || 0,
       extrasByMonth: {},
     }
   if (mode === 'one_time') return { mode, amount: annualSeed, month: 'january' }
@@ -551,15 +553,15 @@ function defaultCalculation(mode, annualSeed) {
 }
 
 const moneyRule = (value) =>
-  normalizeNonNegativeMoney(value) !== null || t('income.form.valueInvalid')
+  normalizeNonNegativeMoneyOrNull(value) !== null || t('income.form.valueInvalid')
 const positiveIntegerRule = (value) =>
   (Number.isInteger(Number(value)) && Number(value) > 0) || t('income.form.integerInvalid')
 function normalizedExtra(month) {
-  return normalizeNonNegativeMoney(extrasByMonth.value[month]) || 0
+  return normalizeNonNegativeMoneyOrNull(extrasByMonth.value[month]) || 0
 }
 
 function createEmptyExtras() {
-  return Object.fromEntries(incomeMonths.map((month) => [month, 0]))
+  return Object.fromEntries(CALENDAR_MONTH_IDS.map((month) => [month, 0]))
 }
 
 function submit() {
@@ -570,7 +572,7 @@ function submit() {
     itemName: itemName.value.trim(),
     notes: notes.value.trim(),
     calculation: normalizedCalculation.value,
-    ownership: cloneOwnership(ownership.value),
+    ownership: cloneOwnershipAllocation(ownership.value),
     disposablePercentage: isDividendIncome.value ? 100 - dividendReinvestmentPercentage.value : 100,
     portfolioAssetId: isDividendIncome.value ? linkedPortfolioId.value : null,
   })

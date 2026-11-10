@@ -1,4 +1,7 @@
-import { cloneOwnership, createEqualOwnership } from './ownership'
+import {
+  cloneOwnershipAllocation,
+  createEqualMemberOwnership,
+} from '../../../functions/shared/core/ownership.js'
 
 export function buildModelCategories(
   categoryIds,
@@ -13,13 +16,13 @@ export function buildModelCategories(
       const previous = existingCategories[categoryId]
       if (previous) return [categoryId, { ...previous, enabled: selected.has(categoryId) }]
 
-      const ownership = createEqualOwnership(memberIds)
+      const ownership = createEqualMemberOwnership(memberIds)
       return [
         categoryId,
         {
           enabled: selected.has(categoryId),
           manualValue: 0,
-          ownership: cloneOwnership(ownership),
+          ownership: cloneOwnershipAllocation(ownership),
         },
       ]
     }),

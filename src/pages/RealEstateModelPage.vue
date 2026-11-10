@@ -211,9 +211,9 @@ import {
 import {
   DEFAULT_APPRECIATION_RATE,
   projectRealEstate,
-} from '@/domain/financial/real-estate-projection'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { currentFinancialYear } from '@/domain/financial/financial-year'
+} from '../../functions/shared/assets/real-estate-projection.js'
+import { normalizeNonNegativeMoneyOrNull } from '../../functions/shared/core/money.js'
+import { currentFinancialYear } from '../../functions/shared/positions/annual-projection.js'
 import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
@@ -320,13 +320,13 @@ const mortgageRoute = computed(() => ({
 const today = localToday()
 const projection = computed(() => {
   if (
-    normalizeNonNegativeMoney(purchasePrice.value) === null ||
+    normalizeNonNegativeMoneyOrNull(purchasePrice.value) === null ||
     !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate.value)
   ) {
     return []
   }
   return projectRealEstate({
-    purchasePrice: normalizeNonNegativeMoney(purchasePrice.value),
+    purchasePrice: normalizeNonNegativeMoneyOrNull(purchasePrice.value),
     purchaseDate: purchaseDate.value,
     currentDate: today,
     annualAppreciationRate: appreciationRate.value,
@@ -411,7 +411,7 @@ async function saveRealEstateModel() {
           ...(asset.value.detail || {}),
           realEstate: {
             schemaVersion: 2,
-            purchasePrice: normalizeNonNegativeMoney(purchasePrice.value),
+            purchasePrice: normalizeNonNegativeMoneyOrNull(purchasePrice.value),
             purchaseDate: purchaseDate.value,
             annualAppreciationRate: Number(appreciationRate.value),
           },
@@ -437,7 +437,9 @@ function resetModelFields() {
 }
 
 function purchasePriceRule(value) {
-  return normalizeNonNegativeMoney(value) !== null || t('assets.realEstate.invalidPurchasePrice')
+  return (
+    normalizeNonNegativeMoneyOrNull(value) !== null || t('assets.realEstate.invalidPurchasePrice')
+  )
 }
 
 function purchaseDateRule(value) {

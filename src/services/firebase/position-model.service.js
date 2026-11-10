@@ -8,8 +8,11 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { cloneOwnership, isValidOwnership } from '@/domain/financial/ownership'
+import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
+import {
+  cloneOwnershipAllocation,
+  isValidOwnershipAllocation,
+} from '../../../functions/shared/core/ownership.js'
 import { canonicalCategories } from '@/domain/financial/model-categories'
 import { currentUserId } from '@/services/firebase/current-user'
 import { getModelConfig, modelConfigRef } from '@/services/firebase/model-config.service'
@@ -73,7 +76,7 @@ export async function updateSimplePositionValue(workspaceId, section, categoryId
       throw new Error(`Only simple ${definition.singular} categories can be edited directly`)
     }
 
-    const manualValue = normalizeNonNegativeMoney(value)
+    const manualValue = normalizeNonNegativeMoneyOrNull(value)
     if (manualValue === null) throw new Error('A non-negative numeric value is required')
 
     const updatedCategory = { ...category, manualValue }
@@ -104,7 +107,7 @@ export async function updateSimplePositionOwnership(
       throw new Error(`Only simple ${definition.singular} category ownership can be edited`)
     }
 
-    const updatedCategory = { ...category, ownership: cloneOwnership(ownership) }
+    const updatedCategory = { ...category, ownership: cloneOwnershipAllocation(ownership) }
     transaction.update(documentRef, {
       [`categories.${categoryId}`]: updatedCategory,
       updatedAt: serverTimestamp(),
@@ -115,7 +118,7 @@ export async function updateSimplePositionOwnership(
 }
 
 export function assertPositionOwnership(ownership, memberIds) {
-  if (!isValidOwnership(ownership, memberIds)) {
+  if (!isValidOwnershipAllocation(ownership, memberIds)) {
     throw new Error('Ownership must reference workspace members and add up to 100%')
   }
 }

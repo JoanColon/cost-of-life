@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { defaultWhatIfConfig, normalizeWhatIfConfig } from '@/domain/financial/what-if'
+import { defaultWhatIfConfig, normalizeWhatIfConfig } from '../../functions/shared/plan/what-if.js'
 import {
   getWhatIfConfig,
   saveWhatIfConfig as saveWhatIfConfigDocument,

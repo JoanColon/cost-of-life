@@ -1,14 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import investmentPortfolioService from '../../functions/services/investment-portfolios.js'
-
-const {
+import {
   PORTFOLIO_CACHE_TTL_MS,
   canonicalGoogleSheetsUrl,
   portfolioCacheIsFresh,
   syncInvestmentPortfolio,
   syncWorkspaceInvestmentPortfolios,
   updateInvestmentPortfolio,
-} = investmentPortfolioService
+} from '../../functions/features/investment-portfolios/service.js'
 
 describe('investment portfolio synchronization', () => {
   it('accepts canonical Google Sheets URLs and rejects other sources', () => {

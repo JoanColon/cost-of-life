@@ -1,6 +1,9 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { currentFinancialMonth, currentFinancialYear } from '@/domain/financial/financial-year'
+import {
+  currentFinancialMonth,
+  currentFinancialYear,
+} from '../../functions/shared/positions/annual-projection.js'
 import { primaryHomeMortgageLiabilityIds } from '@/domain/financial/investable-wealth'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import {

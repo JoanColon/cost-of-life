@@ -1,6 +1,9 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { currentFinancialDate, currentFinancialYear } from '@/domain/financial/financial-year'
+import {
+  currentFinancialDate,
+  currentFinancialYear,
+} from '../../functions/shared/positions/annual-projection.js'
 import {
   getFinancialYear,
   subscribeFinancialYear,

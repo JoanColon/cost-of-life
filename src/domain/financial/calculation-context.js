@@ -1,6 +1,9 @@
-import { financialYearMonthCategoryValue, financialYearMonthValue } from './financial-year'
-import { applyOwnership } from './ownership'
-import { strategyStartingPosition } from './strategy-simulation'
+import {
+  financialYearMonthCategoryValue,
+  financialYearMonthValue,
+} from '../../../functions/shared/positions/annual-projection.js'
+import { moneyForOwnershipScope } from '../../../functions/shared/core/ownership.js'
+import { buildStrategyStartingPosition } from '../../../functions/shared/plan/strategy-simulation.js'
 
 export function extractPositionItems(
   financialYear,
@@ -73,7 +76,7 @@ export function buildStrategyCalculationContext({
   )
 
   return {
-    startingPosition: strategyStartingPosition(financialYear, month, memberId),
+    startingPosition: buildStrategyStartingPosition(financialYear, month, memberId),
     currentAssets: financialYearMonthValue(financialYear, month, 'assets', memberId),
     currentLiabilities: financialYearMonthValue(financialYear, month, 'liabilities', memberId),
     currentNetWorth: financialYearMonthValue(financialYear, month, 'netWorth', memberId),
@@ -95,7 +98,13 @@ export function buildStrategyCalculationContext({
           model: {
             ...model,
             ...(model.schemaVersion === 2
-              ? { purchasePrice: applyOwnership(model.purchasePrice, asset.ownership, memberId) }
+              ? {
+                  purchasePrice: moneyForOwnershipScope(
+                    model.purchasePrice,
+                    asset.ownership,
+                    memberId,
+                  ),
+                }
               : {}),
           },
         }
@@ -110,7 +119,7 @@ export function buildStrategyCalculationContext({
         id: liability.id,
         currentBalance: liabilityPositions.get(liability.id),
         annualInterestRate: liability.detail.mortgage.annualInterestRate,
-        monthlyPayment: applyOwnership(
+        monthlyPayment: moneyForOwnershipScope(
           liability.detail.mortgage.monthlyPayment,
           liability.ownership,
           memberId,
@@ -141,12 +150,12 @@ export function modeledLiabilitiesForPositions(
                 ...model.detail,
                 mortgage: {
                   ...mortgage,
-                  originalPrincipal: applyOwnership(
+                  originalPrincipal: moneyForOwnershipScope(
                     mortgage.originalPrincipal,
                     model.ownership,
                     memberId,
                   ),
-                  monthlyPayment: applyOwnership(
+                  monthlyPayment: moneyForOwnershipScope(
                     mortgage.monthlyPayment,
                     model.ownership,
                     memberId,

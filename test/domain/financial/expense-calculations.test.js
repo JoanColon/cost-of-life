@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  annualMonthlyExpenseValue,
-  annualExpenseValue,
-  generateMonthlyExpenseAmounts,
-  monthlyExpenseValue,
-  normalizeExpenseAttributes,
-  normalizeExpenseEstimate,
-  expenseFrequencies,
-  updateMonthlyExpenseAmounts,
-} from '../../../src/domain/financial/expense-calculations'
+  calculateAnnualExpenseScheduleAmount,
+  calculateAnnualExpenseAmount,
+  buildMonthlyExpenseSchedule,
+  calculateAverageMonthlyExpenseAmount,
+  normalizeExpenseClassification,
+  normalizeExpenseEstimateModel,
+  EXPENSE_FREQUENCIES,
+  updateMonthlyExpenseSchedule,
+} from '../../../functions/shared/expenses/calculations.js'
 
 describe('expense calculations', () => {
   it('exposes only the supported expense frequencies', () => {
-    expect(expenseFrequencies).toEqual(['monthly', 'every_two_months', 'quarterly', 'yearly'])
+    expect(EXPENSE_FREQUENCIES).toEqual(['monthly', 'every_two_months', 'quarterly', 'yearly'])
   })
 
   it.each([
@@ -21,15 +21,15 @@ describe('expense calculations', () => {
     ['quarterly', 300, 1200],
     ['yearly', 600, 600],
   ])('normalizes %s estimates to an annual value', (frequency, amount, expected) => {
-    expect(annualExpenseValue({ amount, frequency })).toBe(expected)
+    expect(calculateAnnualExpenseAmount({ amount, frequency })).toBe(expected)
   })
 
   it('derives the monthly equivalent from the annual total', () => {
-    expect(monthlyExpenseValue({ amount: 600, frequency: 'yearly' })).toBe(50)
+    expect(calculateAverageMonthlyExpenseAmount({ amount: 600, frequency: 'yearly' })).toBe(50)
   })
 
   it('generates an editable Jan-Dec schedule from the estimate', () => {
-    expect(generateMonthlyExpenseAmounts({ amount: 300, frequency: 'quarterly' })).toEqual({
+    expect(buildMonthlyExpenseSchedule({ amount: 300, frequency: 'quarterly' })).toEqual({
       january: 300,
       february: 0,
       march: 0,
@@ -46,17 +46,17 @@ describe('expense calculations', () => {
   })
 
   it('uses the twelve editable month values for the annual total', () => {
-    const months = generateMonthlyExpenseAmounts({ amount: 100, frequency: 'monthly' })
+    const months = buildMonthlyExpenseSchedule({ amount: 100, frequency: 'monthly' })
     months.april = 250
 
-    expect(annualMonthlyExpenseValue(months)).toBe(1350)
+    expect(calculateAnnualExpenseScheduleAmount(months)).toBe(1350)
   })
 
   it('updates baseline months without losing manual monthly exceptions', () => {
-    const monthlyAmounts = generateMonthlyExpenseAmounts({ amount: 500, frequency: 'monthly' })
+    const monthlyAmounts = buildMonthlyExpenseSchedule({ amount: 500, frequency: 'monthly' })
     monthlyAmounts.august = 800
 
-    const updated = updateMonthlyExpenseAmounts(
+    const updated = updateMonthlyExpenseSchedule(
       monthlyAmounts,
       { amount: 500, frequency: 'monthly' },
       { amount: 550, frequency: 'monthly' },
@@ -68,10 +68,10 @@ describe('expense calculations', () => {
   })
 
   it('preserves exceptions when the baseline frequency changes', () => {
-    const monthlyAmounts = generateMonthlyExpenseAmounts({ amount: 300, frequency: 'quarterly' })
+    const monthlyAmounts = buildMonthlyExpenseSchedule({ amount: 300, frequency: 'quarterly' })
     monthlyAmounts.february = 75
 
-    const updated = updateMonthlyExpenseAmounts(
+    const updated = updateMonthlyExpenseSchedule(
       monthlyAmounts,
       { amount: 300, frequency: 'quarterly' },
       { amount: 100, frequency: 'monthly' },
@@ -87,13 +87,13 @@ describe('expense calculations', () => {
     { amount: Number.NaN, frequency: 'monthly' },
     { amount: 100, frequency: 'daily' },
   ])('rejects invalid estimates %#', (estimate) => {
-    expect(normalizeExpenseEstimate(estimate)).toBeNull()
-    expect(annualExpenseValue(estimate)).toBeNull()
+    expect(normalizeExpenseEstimateModel(estimate)).toBeNull()
+    expect(calculateAnnualExpenseAmount(estimate)).toBeNull()
   })
 
   it('allows necessity to remain unclassified', () => {
     expect(
-      normalizeExpenseAttributes({
+      normalizeExpenseClassification({
         variability: 'variable',
         recurrence: 'recurring',
         necessity: null,
@@ -103,7 +103,7 @@ describe('expense calculations', () => {
 
   it('rejects invalid behavior attributes', () => {
     expect(
-      normalizeExpenseAttributes({
+      normalizeExpenseClassification({
         variability: 'sometimes',
         recurrence: 'recurring',
         necessity: 'essential',

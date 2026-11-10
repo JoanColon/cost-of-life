@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import workspaceService from '../../functions/services/workspaces.js'
-
-const {
+import {
   acceptWorkspaceInvite,
   createWorkspaceInvite,
   deleteWorkspaceData,
@@ -10,7 +8,7 @@ const {
   isWorkspaceMember,
   isWorkspaceOwner,
   updateWorkspaceSettings,
-} = workspaceService
+} from '../../functions/features/workspaces/service.js'
 
 const validToken = 'a'.repeat(43)
 

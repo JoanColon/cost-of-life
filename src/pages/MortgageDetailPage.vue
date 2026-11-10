@@ -357,8 +357,8 @@ import {
   calculateMortgageProjection,
   mortgageDetailFromLiability,
 } from '@/domain/financial/mortgage-amortization'
-import { normalizeNonNegativeMoney } from '@/domain/financial/money'
-import { currentFinancialYear } from '@/domain/financial/financial-year'
+import { normalizeNonNegativeMoneyOrNull } from '../../functions/shared/core/money.js'
+import { currentFinancialYear } from '../../functions/shared/positions/annual-projection.js'
 import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
@@ -578,11 +578,11 @@ async function saveModel() {
   const valid = await modelForm.value?.validate()
   if (!valid) return
 
-  const originalPrincipal = normalizeNonNegativeMoney(form.originalPrincipal)
-  const currentBalance = normalizeNonNegativeMoney(form.currentBalance)
+  const originalPrincipal = normalizeNonNegativeMoneyOrNull(form.originalPrincipal)
+  const currentBalance = normalizeNonNegativeMoneyOrNull(form.currentBalance)
   const annualInterestRate = Number(form.annualInterestRate)
   const termMonths = Number(form.termYears) * 12 + Number(form.termExtraMonths)
-  let monthlyPayment = normalizeNonNegativeMoney(form.monthlyPayment)
+  let monthlyPayment = normalizeNonNegativeMoneyOrNull(form.monthlyPayment)
   if (monthlyPayment === null) {
     monthlyPayment = calculateFrenchMonthlyPayment({
       principal: originalPrincipal,
@@ -671,12 +671,12 @@ function emptyForm() {
 }
 
 function nonNegativeMoneyRule(value) {
-  return normalizeNonNegativeMoney(value) !== null || t('liabilities.mortgage.invalidAmount')
+  return normalizeNonNegativeMoneyOrNull(value) !== null || t('liabilities.mortgage.invalidAmount')
 }
 
 function currentBalanceRule(value) {
-  const balance = normalizeNonNegativeMoney(value)
-  const principal = normalizeNonNegativeMoney(form.originalPrincipal)
+  const balance = normalizeNonNegativeMoneyOrNull(value)
+  const principal = normalizeNonNegativeMoneyOrNull(form.originalPrincipal)
   return (
     (balance !== null && principal !== null && balance <= principal) ||
     t('liabilities.mortgage.invalidBalance')
@@ -685,7 +685,7 @@ function currentBalanceRule(value) {
 
 function optionalPositiveMoneyRule(value) {
   if (value === '' || value == null) return true
-  const amount = normalizeNonNegativeMoney(value)
+  const amount = normalizeNonNegativeMoneyOrNull(value)
   return (amount !== null && amount > 0) || t('liabilities.mortgage.invalidPayment')
 }
 

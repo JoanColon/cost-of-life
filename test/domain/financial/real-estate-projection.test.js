@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { projectRealEstate } from '../../../src/domain/financial/real-estate-projection.js'
+import { projectRealEstate } from '../../../functions/shared/assets/real-estate-projection.js'
 
 const baseModel = {
   purchasePrice: 100_000,

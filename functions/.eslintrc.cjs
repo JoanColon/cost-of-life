@@ -21,6 +21,14 @@ module.exports = {
   },
   overrides: [
     {
+      files: ['shared/**/*.js'],
+      rules: {
+        // Shared APIs use concise descriptive JSDoc. Requiring redundant type tags in this
+        // JavaScript-only engine makes the financial explanation harder to scan.
+        'valid-jsdoc': 'off',
+      },
+    },
+    {
       files: ['**/*.spec.*'],
       env: {
         mocha: true,

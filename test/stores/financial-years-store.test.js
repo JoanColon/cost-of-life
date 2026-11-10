@@ -11,7 +11,7 @@ vi.mock('@/services/firebase/financial-years.service', () => ({
   subscribeFinancialYear,
 }))
 
-import { currentFinancialYear } from '../../src/domain/financial/financial-year'
+import { currentFinancialYear } from '../../functions/shared/positions/annual-projection.js'
 import { useFinancialYearsStore } from '../../src/stores/financial-years-store'
 
 describe('financial years store', () => {
