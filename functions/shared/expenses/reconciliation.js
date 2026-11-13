@@ -1,3 +1,6 @@
+/**
+ * Combines modeled and tracked expense values according to the selected reconciliation decision, both in aggregate and per member.
+ */
 import { normalizeNonNegativeMoneyOrNull, roundMoneyOrZero } from '../core/money.js'
 
 /**

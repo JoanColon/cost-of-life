@@ -1,3 +1,6 @@
+/**
+ * Firebase callable boundaries for connecting, refreshing, and synchronizing Google Sheets investment portfolios while translating service errors for clients.
+ */
 import { getFirestore } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/https'
 import * as logger from 'firebase-functions/logger'
@@ -7,6 +10,9 @@ import {
   updateInvestmentPortfolio as updateInvestmentPortfolioData,
 } from './service.js'
 
+/**
+ * Connects or disconnects a portfolio sheet after validating access and source data.
+ */
 const updateInvestmentPortfolio = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 
@@ -23,6 +29,9 @@ const updateInvestmentPortfolio = onCall({ region: 'europe-west1' }, async (requ
   }
 })
 
+/**
+ * Forces or reuses a portfolio-sheet refresh and returns the normalized portfolio result.
+ */
 const readInvestmentPortfolioSheet = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 
@@ -46,6 +55,9 @@ const readInvestmentPortfolioSheet = onCall({ region: 'europe-west1' }, async (r
   }
 })
 
+/**
+ * Refreshes all linked portfolios in a workspace and aggregates failures.
+ */
 const syncWorkspaceInvestmentPortfolios = onCall(
   { region: 'europe-west1', timeoutSeconds: 120 },
   async (request) => {

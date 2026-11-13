@@ -1,3 +1,6 @@
+/**
+ * Firebase callable boundary for atomic financial-model mutations. It authenticates the caller, converts request data into service input, and maps domain failures to callable errors.
+ */
 import { getFirestore } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/https'
 import {
@@ -5,6 +8,9 @@ import {
   mutateFinancialModel as mutateFinancialModelData,
 } from './service.js'
 
+/**
+ * Validates and applies one model mutation plus all related projection and relationship writes in a Firestore transaction.
+ */
 const mutateFinancialModel = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 

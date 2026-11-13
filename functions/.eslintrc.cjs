@@ -21,10 +21,10 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['shared/**/*.js'],
+      files: ['shared/**/*.js', 'features/**/*.js'],
       rules: {
-        // Shared APIs use concise descriptive JSDoc. Requiring redundant type tags in this
-        // JavaScript-only engine makes the financial explanation harder to scan.
+        // Financial modules use concise descriptive JSDoc. Requiring redundant type tags in
+        // this JavaScript-only code makes the domain explanation harder to scan.
         'valid-jsdoc': 'off',
       },
     },

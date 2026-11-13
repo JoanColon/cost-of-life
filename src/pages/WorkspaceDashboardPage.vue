@@ -62,6 +62,12 @@ import {
   financialYearMonthValue,
 } from '../../functions/shared/positions/annual-projection.js'
 import {
+  calculateCostOfLifeRatioPercent,
+  calculateSavingsCapacity,
+  calculateSavingsRatePercent,
+} from '../../functions/shared/positions/metrics.js'
+import { roundMoneyOrZero } from '../../functions/shared/core/money.js'
+import {
   findLatestObservedPositionMonth,
   simulateAllocationStrategy,
   buildStrategyStartingPosition,
@@ -136,7 +142,7 @@ const dashboardData = computed(() => {
   const annualCostOfLife = financialYear.value
     ? financialYearFlowValue(financialYear.value, 'expenses', selectedMemberId.value)
     : 0
-  const savingsCapacity = Math.round((income - annualCostOfLife + Number.EPSILON) * 100) / 100
+  const savingsCapacity = roundMoneyOrZero(calculateSavingsCapacity(income, annualCostOfLife))
 
   return {
     assets,
@@ -147,8 +153,8 @@ const dashboardData = computed(() => {
     monthlyCost: annualCostOfLife / 12,
     savingsCapacity,
     monthlySavingsCapacity: savingsCapacity / 12,
-    savingsRate: income > 0 ? Math.round((savingsCapacity / income) * 100) : 0,
-    costRatio: income > 0 ? Math.round((annualCostOfLife / income) * 100) : 0,
+    savingsRate: calculateSavingsRatePercent(savingsCapacity, income),
+    costRatio: calculateCostOfLifeRatioPercent(annualCostOfLife, income),
     netWorth: financialYearMonthValue(
       financialYear.value,
       currentMonth.value,

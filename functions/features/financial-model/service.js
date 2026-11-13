@@ -1,7 +1,12 @@
+/**
+ * Owns atomic mutations of editable financial-model documents. It validates canonical shapes and relationships, updates Firestore transactionally, and keeps the current financial-year projection consistent.
+ */
 import { FieldPath, FieldValue } from 'firebase-admin/firestore'
 import { updateFinancialYearProjection } from '../financial-years/projection.js'
 import { calculatePositionsAt } from '../financial-years/position-calculations.js'
 import { calculateAnniversaryRealEstateValuation } from '../../shared/assets/real-estate.js'
+import { roundMoneyOrZero } from '../../shared/core/money.js'
+import { calculateFrenchMortgagePaymentStep } from '../../shared/liabilities/mortgage.js'
 import { currentMonth, currentYear, positionStartMonth } from '../financial-years/service.js'
 
 const MONTHS = [
@@ -28,6 +33,9 @@ const sectionDefinitions = {
 
 const MAX_TRANSACTION_WRITES = 500
 
+/**
+ * Normalizes callable request data into the explicit input accepted by the atomic mutation service.
+ */
 function financialModelMutationInput(data = {}, userId) {
   return {
     workspaceId: String(data.workspaceId || '').trim(),
@@ -41,6 +49,9 @@ function financialModelMutationInput(data = {}, userId) {
   }
 }
 
+/**
+ * Validates and applies one model mutation plus all related projection and relationship writes in a Firestore transaction.
+ */
 async function mutateFinancialModel(
   firestore,
   {
@@ -371,6 +382,9 @@ async function mutateFinancialModel(
   })
 }
 
+/**
+ * Builds and validates the canonical persisted shape for an item in the requested financial section.
+ */
 function validatedCanonicalItem(section, item = {}) {
   const category = item.categoryId
   assertText(category, `A valid ${section} category is required`)
@@ -451,6 +465,9 @@ function validatedCanonicalItem(section, item = {}) {
   return canonicalExpense(item, category)
 }
 
+/**
+ * Validates canonical mortgage and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalMortgage(mortgage, currentBalance) {
   if (!isPlainObject(mortgage) || ![1, 2].includes(mortgage.schemaVersion)) {
     throw new Error('A canonical mortgage model is required')
@@ -498,12 +515,28 @@ function assertCanonicalMortgage(mortgage, currentBalance) {
   if (currentBalance > mortgage.originalPrincipal) {
     throw new Error('The current balance cannot exceed the original principal')
   }
-  const monthlyInterest = roundMoney(currentBalance * (mortgage.annualInterestRate / 100 / 12))
-  if (currentBalance > 0 && mortgage.monthlyPayment <= monthlyInterest) {
-    throw new Error('The monthly payment must cover the accrued interest')
+  if (currentBalance > 0) {
+    try {
+      calculateFrenchMortgagePaymentStep({
+        balance: currentBalance,
+        annualInterestRate: mortgage.annualInterestRate,
+        monthlyPayment: mortgage.monthlyPayment,
+      })
+    } catch (error) {
+      if (
+        error instanceof RangeError &&
+        error.message === 'The monthly payment does not cover the accrued interest'
+      ) {
+        throw new Error('The monthly payment must cover the accrued interest')
+      }
+      throw error
+    }
   }
 }
 
+/**
+ * Validates canonical real estate and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalRealEstate(realEstate, asset) {
   const commonValid =
     isPlainObject(realEstate) &&
@@ -525,6 +558,9 @@ function assertCanonicalRealEstate(realEstate, asset) {
   }
 }
 
+/**
+ * Reports whether a value is a canonical ISO calendar date.
+ */
 function isCanonicalIsoDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!match) return false
@@ -536,6 +572,9 @@ function isCanonicalIsoDate(value) {
   )
 }
 
+/**
+ * Returns today’s canonical date in the Europe/Madrid time zone.
+ */
 function madridToday() {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en', {
@@ -550,6 +589,9 @@ function madridToday() {
   return `${parts.year}-${parts.month}-${parts.day}`
 }
 
+/**
+ * Returns canonical expense derived from the supplied input.
+ */
 function canonicalExpense(item, category) {
   assertCanonicalText(item.categoryId, 'A valid expense category is required')
   assertCanonicalText(item.subcategoryId, 'A valid expense subcategory is required')
@@ -587,6 +629,9 @@ function canonicalExpense(item, category) {
   })
 }
 
+/**
+ * Validates canonical income calculation and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalIncomeCalculation(calculation) {
   if (calculation?.mode === 'annual_salary') {
     assertNonNegativeMoney(calculation.annualAmount, 'A valid income calculation is required')
@@ -619,6 +664,9 @@ function assertCanonicalIncomeCalculation(calculation) {
   }
 }
 
+/**
+ * Validates unique portfolio income link and throws a descriptive error when its contract is not satisfied.
+ */
 function assertUniquePortfolioIncomeLink(items, candidate, candidateId = null) {
   if (!candidate?.portfolioAssetId) return
   if (
@@ -630,6 +678,9 @@ function assertUniquePortfolioIncomeLink(items, candidate, candidateId = null) {
   }
 }
 
+/**
+ * Validates linked mortgage and throws a descriptive error when its contract is not satisfied.
+ */
 function assertLinkedMortgage(section, items, candidate, candidateId, liabilities) {
   const linkField = section === 'assets' ? 'mortgageLiabilityId' : 'liabilityId'
   if (!['assets', 'expenses'].includes(section) || !candidate?.[linkField]) return
@@ -647,6 +698,9 @@ function assertLinkedMortgage(section, items, candidate, candidateId, liabilitie
   }
 }
 
+/**
+ * Validates mortgage managed relationship and throws a descriptive error when its contract is not satisfied.
+ */
 function assertMortgageManagedRelationship(section, previous, candidate) {
   const linkField = section === 'assets' ? 'mortgageLiabilityId' : 'liabilityId'
   if (!['assets', 'expenses'].includes(section)) return
@@ -660,6 +714,9 @@ function assertMortgageManagedRelationship(section, previous, candidate) {
   }
 }
 
+/**
+ * Synchronizes mortgage asset relation with related persisted data.
+ */
 function syncMortgageAssetRelation(
   transaction,
   snapshot,
@@ -708,6 +765,9 @@ function syncMortgageAssetRelation(
   }
 }
 
+/**
+ * Synchronizes expense candidate with its current source of truth.
+ */
 function synchronizeExpenseCandidate(section, candidate, liabilities) {
   if (section !== 'expenses' || !candidate?.liabilityId) return
   const mortgage = liabilities.find(({ id }) => id === candidate.liabilityId)
@@ -720,6 +780,9 @@ function synchronizeExpenseCandidate(section, candidate, liabilities) {
   candidate.recurrence = 'recurring'
 }
 
+/**
+ * Synchronizes mortgage expense relation with related persisted data.
+ */
 function syncMortgageExpenseRelation(
   transaction,
   snapshot,
@@ -785,11 +848,17 @@ function syncMortgageExpenseRelation(
   return nextExpenses
 }
 
+/**
+ * Returns a document array with one item replaced.
+ */
 function replaceDocument(items, itemId, data) {
   const index = items.findIndex(({ id }) => id === itemId)
   if (index >= 0) items[index] = { id: itemId, ...data }
 }
 
+/**
+ * Returns the document reference appropriate for create, update, or delete.
+ */
 function resolveItemReference(itemsReference, operation, itemId) {
   if (operation === 'deleteCategory') return null
   if (operation === 'create') {
@@ -799,6 +868,9 @@ function resolveItemReference(itemsReference, operation, itemId) {
   return itemsReference.doc(itemId)
 }
 
+/**
+ * Adds creation or update audit metadata to a model item.
+ */
 function withAuditFields(item, userId, creating) {
   return {
     ...item,
@@ -808,6 +880,9 @@ function withAuditFields(item, userId, creating) {
   }
 }
 
+/**
+ * Removes tracking preferences from the relevant persisted structures.
+ */
 function removeTrackingPreferences(transaction, reference, subcategoryIds, userId) {
   if (!subcategoryIds.length) return
   transaction.set(
@@ -821,6 +896,9 @@ function removeTrackingPreferences(transaction, reference, subcategoryIds, userI
   )
 }
 
+/**
+ * Removes links for portfolio income while preserving related documents.
+ */
 function unlinkPortfolioIncome(transaction, snapshot, assetIds, userId) {
   for (const document of snapshot?.docs || []) {
     if (!assetIds.has(document.data()?.portfolioAssetId)) continue
@@ -832,6 +910,9 @@ function unlinkPortfolioIncome(transaction, snapshot, assetIds, userId) {
   }
 }
 
+/**
+ * Removes links for mortgage relations while preserving related documents.
+ */
 function unlinkMortgageRelations(transaction, assetsSnapshot, expensesSnapshot, mortgageIds, userId) {
   for (const document of assetsSnapshot?.docs || []) {
     if (!mortgageIds.has(document.data()?.mortgageLiabilityId)) continue
@@ -858,6 +939,9 @@ function unlinkMortgageRelations(transaction, assetsSnapshot, expensesSnapshot, 
   return expensesChanged ? nextExpenses : null
 }
 
+/**
+ * Validates delete category write limit and throws a descriptive error when its contract is not satisfied.
+ */
 function assertDeleteCategoryWriteLimit(
   section,
   categoryItems,
@@ -887,10 +971,16 @@ function assertDeleteCategoryWriteLimit(
   }
 }
 
+/**
+ * Builds the client-visible representation of a persisted item.
+ */
 function clientItem(id, item) {
   return { ...item, id, createdAt: null, updatedAt: null }
 }
 
+/**
+ * Removes non-persistable fields from item.
+ */
 function cleanItem(item) {
   const clean = { ...item }
   delete clean.id
@@ -901,6 +991,9 @@ function cleanItem(item) {
   return clean
 }
 
+/**
+ * Validates canonical ownership and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalOwnership(ownership) {
   const shares = ownership?.shares || []
   const uniqueMembers = new Set(shares.map((share) => share.memberId))
@@ -927,6 +1020,9 @@ function assertCanonicalOwnership(ownership) {
   }
 }
 
+/**
+ * Validates ownership members and throws a descriptive error when its contract is not satisfied.
+ */
 function assertOwnershipMembers(ownership, memberIds = []) {
   const allowed = new Set(memberIds)
   if (ownership.shares.some((share) => !allowed.has(share.memberId))) {
@@ -934,6 +1030,9 @@ function assertOwnershipMembers(ownership, memberIds = []) {
   }
 }
 
+/**
+ * Validates canonical monthly amounts and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalMonthlyAmounts(amounts) {
   if (!isPlainObject(amounts)) throw new Error('Canonical monthly expense amounts are required')
   for (const month of MONTHS) {
@@ -941,6 +1040,9 @@ function assertCanonicalMonthlyAmounts(amounts) {
   }
 }
 
+/**
+ * Validates workspace access and throws a descriptive error when its contract is not satisfied.
+ */
 function assertWorkspaceAccess(snapshot, userId) {
   const workspace = snapshot.data()
   if (!snapshot.exists || workspace?.deletionPendingAt || !workspace?.memberIds?.includes(userId)) {
@@ -949,42 +1051,63 @@ function assertWorkspaceAccess(snapshot, userId) {
   return workspace
 }
 
+/**
+ * Validates category enabled and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCategoryEnabled(config, categoryId, section) {
   if (!config.categories?.[categoryId]?.enabled) {
     throw new Error(`${capitalize(section.slice(0, -1))} category is not enabled`)
   }
 }
 
+/**
+ * Converts a Firestore snapshot into plain documents that include their IDs.
+ */
 function documents(snapshot) {
   return (snapshot?.docs || []).map((document) => ({ id: document.id, ...document.data() }))
 }
 
+/**
+ * Validates non negative money and throws a descriptive error when its contract is not satisfied.
+ */
 function assertNonNegativeMoney(value, message) {
   if (
     typeof value !== 'number' ||
     !Number.isFinite(value) ||
     value < 0 ||
-    roundMoney(value) !== value
+    roundMoneyOrZero(value) !== value
   ) {
     throw new Error(message)
   }
 }
 
+/**
+ * Validates percentage and throws a descriptive error when its contract is not satisfied.
+ */
 function assertPercentage(value, message) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
     throw new Error(message)
   }
 }
 
+/**
+ * Validates canonical text and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalText(value, message) {
   assertText(value, message)
   if (typeof value !== 'string' || value !== value.trim()) throw new Error(message)
 }
 
+/**
+ * Validates canonical text field and throws a descriptive error when its contract is not satisfied.
+ */
 function assertCanonicalTextField(value, message) {
   if (typeof value !== 'string' || value !== value.trim()) throw new Error(message)
 }
 
+/**
+ * Reports whether a relationship ID is absent or canonical.
+ */
 function isOptionalCanonicalId(value) {
   return (
     value == null ||
@@ -992,18 +1115,23 @@ function isOptionalCanonicalId(value) {
   )
 }
 
-function roundMoney(value) {
-  return Math.round((value + Number.EPSILON) * 100) / 100
-}
-
+/**
+ * Reports whether a value is a non-array object.
+ */
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
+/**
+ * Returns text with its first character capitalized for human-readable validation messages.
+ */
 function capitalize(value) {
   return `${value[0]?.toUpperCase() || ''}${value.slice(1)}`
 }
 
+/**
+ * Validates text and throws a descriptive error when its contract is not satisfied.
+ */
 function assertText(value, message) {
   if (!String(value || '').trim()) throw new Error(message)
 }

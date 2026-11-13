@@ -1,3 +1,6 @@
+/**
+ * Firestore event entry points that keep financial-year projections synchronized when model configuration or expense tracking changes.
+ */
 import { getFirestore } from 'firebase-admin/firestore'
 import { onDocumentWritten } from 'firebase-functions/firestore'
 import {
@@ -11,6 +14,9 @@ import {
 const triggerOptions = { region: 'europe-west1', retry: true }
 const modelSections = new Set(['assets', 'liabilities', 'income', 'expenses'])
 
+/**
+ * Rebuilds the affected current-year section after a supported model configuration changes.
+ */
 const onModelConfigWritten = onDocumentWritten(
   { ...triggerOptions, document: 'workspaces/{workspaceId}/modelConfig/{section}' },
   (event) => {
@@ -20,6 +26,9 @@ const onModelConfigWritten = onDocumentWritten(
   },
 )
 
+/**
+ * Reconciles a valid expense-tracking period into its corresponding financial-year month.
+ */
 const onExpenseTrackingWritten = onDocumentWritten(
   { ...triggerOptions, document: 'workspaces/{workspaceId}/expenseTracking/{period}' },
   async (event) => {
@@ -32,6 +41,9 @@ const onExpenseTrackingWritten = onDocumentWritten(
   },
 )
 
+/**
+ * Rebuilds selected sections of the current year after a relevant Firestore event.
+ */
 async function rebuildCurrentFinancialYear(workspaceId, sections) {
   await rebuildFinancialYear(getFirestore(), workspaceId, currentYear(), { sections })
 }

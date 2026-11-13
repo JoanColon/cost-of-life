@@ -5,6 +5,10 @@ import {
   financialYearMonthCategoryValue,
   financialYearMonthValue,
 } from '../../../functions/shared/positions/annual-projection.js'
+import {
+  calculateFundedYears,
+  calculateSavingsCapacity,
+} from '../../../functions/shared/positions/metrics.js'
 import { investableWealthAt } from './investable-wealth'
 
 export function withCurrentPosition(historyDocuments, financialYear, month) {
@@ -111,9 +115,9 @@ export function buildProgressSeries(
       ),
       costOfLife,
       income,
-      savingsCapacity: income - costOfLife,
+      savingsCapacity: calculateSavingsCapacity(income, costOfLife),
       investableWealth,
-      yearsFunded: costOfLife > 0 ? Math.max(0, investableWealth / costOfLife) : 0,
+      yearsFunded: calculateFundedYears(investableWealth, costOfLife),
     }
   })
 }
@@ -129,7 +133,7 @@ export function buildMonthlyFlowSeries(
       period,
       income,
       costOfLife,
-      savingsCapacity: income - costOfLife,
+      savingsCapacity: calculateSavingsCapacity(income, costOfLife),
       coverage: expenseCoverage(history?.months?.[month]?.expenses),
     }
   })

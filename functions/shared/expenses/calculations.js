@@ -1,3 +1,6 @@
+/**
+ * Canonical expense-model normalization and calculations for frequencies, monthly schedules, classifications, and monthly projected amounts.
+ */
 import { CALENDAR_MONTH_IDS } from '../core/calendar-months.js'
 import { normalizeNonNegativeMoneyOrNull } from '../core/money.js'
 

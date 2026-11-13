@@ -1,3 +1,6 @@
+/**
+ * French-mortgage calculation engine. It handles payment steps, forward schedules, payoff comparisons, historical balance anchors, and contractual payment months.
+ */
 import {
   addCalendarMonthsClamped,
   dateInFinancialTimeZone,
@@ -195,6 +198,9 @@ export function isMortgagePaymentDueInCalendarMonth(mortgage, year, monthIndex) 
   return calculateMortgageBalanceFromAnchor(mortgage, dayBeforeMonth) > 0
 }
 
+/**
+ * Returns the first contractual payment index strictly after an anchor.
+ */
 function firstPaymentNumberAfter(startDate, asOfDate) {
   for (let paymentNumber = 1; paymentNumber <= MAX_MORTGAGE_SCHEDULE_MONTHS; paymentNumber += 1) {
     if (addCalendarMonthsClamped(startDate, paymentNumber) > asOfDate) return paymentNumber
@@ -202,28 +208,43 @@ function firstPaymentNumberAfter(startDate, asOfDate) {
   throw new RangeError('The projection date exceeds the supported mortgage schedule')
 }
 
+/**
+ * Sums schedule interest using canonical money precision.
+ */
 function totalScheduleInterest(schedule) {
   return roundMoneyOrZero(schedule.reduce((total, payment) => total + payment.interest, 0))
 }
 
+/**
+ * Returns a canonical date from a supported projection input.
+ */
 function canonicalProjectionDate(value) {
   return value instanceof Date ?
     dateInFinancialTimeZone(value) :
     requireCanonicalDate(value, 'projection date')
 }
 
+/**
+ * Returns validated money with at most two decimals or throws when the supplied value is invalid.
+ */
 function requireMoneyWithAtMostTwoDecimals(value, label) {
   const number = requireNonNegativeNumber(value, label)
   if (roundMoneyOrZero(number) !== number) throw new Error(`A valid ${label} is required`)
   return number
 }
 
+/**
+ * Returns validated non negative number or throws when the supplied value is invalid.
+ */
 function requireNonNegativeNumber(value, label) {
   const number = Number(value)
   if (!Number.isFinite(number) || number < 0) throw new RangeError(`A valid ${label} is required`)
   return number
 }
 
+/**
+ * Returns validated positive integer or throws when the supplied value is invalid.
+ */
 function requirePositiveInteger(value, label) {
   const number = Number(value)
   if (!Number.isInteger(number) || number <= 0) throw new RangeError(`A valid ${label} is required`)

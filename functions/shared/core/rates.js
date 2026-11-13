@@ -1,3 +1,6 @@
+/**
+ * Converts annual percentages into effective or nominal monthly rates and compound growth factors used by financial projections.
+ */
 /** Normalizes an annual percentage in the inclusive 0-100 range. */
 export function normalizeAnnualPercent(value, fallback = null) {
   const number = Number(value)

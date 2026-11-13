@@ -1,3 +1,6 @@
+/**
+ * Scheduled month-close workflow. It refreshes external portfolios before closing each workspace position and reports individual workspace failures for retry.
+ */
 import { getFirestore } from 'firebase-admin/firestore'
 import * as logger from 'firebase-functions/logger'
 import { onSchedule } from 'firebase-functions/scheduler'

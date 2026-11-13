@@ -1,3 +1,6 @@
+/**
+ * Workspace persistence service. It manages secure invitation tokens, membership changes, settings validation, and recursive workspace deletion.
+ */
 import crypto from 'node:crypto'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 
@@ -6,16 +9,25 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 const CURRENCY_PATTERN = /^[A-Z]{3}$/
 
+/**
+ * Creates a service error carrying a Firebase-compatible code.
+ */
 function workspaceError(code, message) {
   const error = new Error(message)
   error.code = code
   return error
 }
 
+/**
+ * Generates a cryptographically secure URL-safe invitation token.
+ */
 function createInviteToken() {
   return crypto.randomBytes(32).toString('base64url')
 }
 
+/**
+ * Derives the non-reversible invitation document ID from its secret token.
+ */
 function inviteDocumentId(token) {
   const normalizedToken = String(token || '').trim()
   if (!INVITE_TOKEN_PATTERN.test(normalizedToken)) {
@@ -24,10 +36,16 @@ function inviteDocumentId(token) {
   return crypto.createHash('sha256').update(normalizedToken).digest('hex')
 }
 
+/**
+ * Reports whether an invitation has expired at the supplied clock value.
+ */
 function inviteHasExpired(invite, now) {
   return !invite?.expiresAt || invite.expiresAt.toMillis() <= now
 }
 
+/**
+ * Creates a time-limited invitation whose secret token is stored only as a hash.
+ */
 async function createWorkspaceInvite(firestore, { workspaceId, userId, now = Date.now() }) {
   const token = createInviteToken()
   const inviteReference = firestore.collection('workspaceInvites').doc(inviteDocumentId(token))
@@ -58,6 +76,9 @@ async function createWorkspaceInvite(firestore, { workspaceId, userId, now = Dat
   return { token, expiresAt: expiresAt.toMillis() }
 }
 
+/**
+ * Loads invitation details while enforcing status, expiry, and workspace availability.
+ */
 async function getWorkspaceInvite(firestore, { token, userId = null, now = Date.now() }) {
   const inviteReference = firestore.collection('workspaceInvites').doc(inviteDocumentId(token))
   const inviteSnapshot = await inviteReference.get()
@@ -91,6 +112,9 @@ async function getWorkspaceInvite(firestore, { token, userId = null, now = Date.
   }
 }
 
+/**
+ * Atomically adds the user to the workspace and marks the invitation accepted.
+ */
 async function acceptWorkspaceInvite(
   firestore,
   { token, userId, displayName = '', photoURL = '', now = Date.now() },
@@ -149,6 +173,9 @@ async function acceptWorkspaceInvite(
   })
 }
 
+/**
+ * Validates and updates workspace currency and all member display names transactionally.
+ */
 async function updateWorkspaceSettings(
   firestore,
   { workspaceId, userId, currency, memberNames },
@@ -195,6 +222,9 @@ async function updateWorkspaceSettings(
   })
 }
 
+/**
+ * Marks a workspace for deletion and recursively removes its invitations and data.
+ */
 async function deleteWorkspaceData(firestore, workspaceReference) {
   await workspaceReference.update({
     deletionPendingAt: FieldValue.serverTimestamp(),
@@ -219,10 +249,16 @@ async function deleteWorkspaceData(firestore, workspaceReference) {
   }
 }
 
+/**
+ * Reports whether workspace owner satisfies the required condition.
+ */
 function isWorkspaceOwner(workspace, userId) {
   return workspace?.members?.[userId]?.role === 'owner'
 }
 
+/**
+ * Reports whether workspace member satisfies the required condition.
+ */
 function isWorkspaceMember(workspace, userId) {
   return workspace?.memberIds?.includes(userId) === true
 }

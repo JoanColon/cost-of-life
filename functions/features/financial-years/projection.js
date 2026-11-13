@@ -1,3 +1,6 @@
+/**
+ * Pure builder for the materialized financial-year document. It projects positions and flows by month, applies ownership and tracking decisions, and preserves closed-month metadata.
+ */
 import { allocateMoneyByOwnership } from '../../shared/core/ownership.js'
 import { roundMoneyOrZero as moneyOrZero } from '../../shared/core/money.js'
 import { calculateExpenseAmountForMonth } from '../../shared/expenses/calculations.js'
@@ -23,6 +26,9 @@ const MONTHS = [
   'december',
 ]
 
+/**
+ * Creates a complete twelve-month projection from editable source models.
+ */
 function buildFinancialYear({
   year,
   config = {},
@@ -47,6 +53,9 @@ function buildFinancialYear({
   )
 }
 
+/**
+ * Rebuilds requested year sections while preserving closed months and unaffected data.
+ */
 function updateFinancialYearProjection(
   financialYear,
   {
@@ -135,6 +144,9 @@ function updateFinancialYearProjection(
   return result
 }
 
+/**
+ * Reports whether position value is present or meaningful.
+ */
 function hasPositionValue(config, items) {
   if (items.some((item) => config?.categories?.[item.categoryId]?.enabled)) return true
   return Object.values(config?.categories || {}).some(
@@ -142,6 +154,9 @@ function hasPositionValue(config, items) {
   )
 }
 
+/**
+ * Builds one position month grouped by category, subcategory, item, and ownership.
+ */
 function buildPositionMonth(categoryConfig, items, valueField) {
   const grouped = groupBy(items, 'categoryId')
   const categories = {}
@@ -192,6 +207,9 @@ function buildPositionMonth(categoryConfig, items, valueField) {
   return { categories }
 }
 
+/**
+ * Builds one expense month and reconciles modeled values with tracked values.
+ */
 function buildExpenseMonth(
   categoryConfig,
   expenses,
@@ -268,6 +286,9 @@ function buildExpenseMonth(
   return { categories }
 }
 
+/**
+ * Returns effective expense month after model and fallback rules.
+ */
 function effectiveExpenseMonth(expense, monthName, liabilities, year, monthIndex) {
   const estimated = expenseMonth(expense, monthName)
   if (!expense.liabilityId || !year) return estimated
@@ -287,6 +308,9 @@ function effectiveExpenseMonth(expense, monthName, liabilities, year, monthIndex
   }
 }
 
+/**
+ * Builds one income month with disposable percentages and ownership allocations.
+ */
 function buildIncomeMonth(categoryConfig, income, monthIndex) {
   const grouped = groupBy(income, 'categoryId')
   const categories = {}
@@ -327,19 +351,31 @@ function buildIncomeMonth(categoryConfig, income, monthIndex) {
   return { categories }
 }
 
+/**
+ * Returns a valid disposable-income percentage with the projection fallback.
+ */
 function disposablePercentage(value) {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 && number <= 100 ? number : 100
 }
 
+/**
+ * Returns one expense model’s value for a named month.
+ */
 function expenseMonth(expense, monthName) {
   return calculateExpenseAmountForMonth(expense, monthName)
 }
 
+/**
+ * Returns one income model’s value for a month index.
+ */
 function incomeMonth(calculation, monthIndex) {
   return calculateIncomeAmountForMonth(calculation, monthIndex)
 }
 
+/**
+ * Returns tracked value, member allocation, and reconciliation source for a subcategory.
+ */
 function trackedValue(month, id) {
   const category = month?.categories?.[id]
   const decision = month?.reconciliation?.[id]?.decision
@@ -370,14 +406,23 @@ function trackedValue(month, id) {
   }
 }
 
+/**
+ * Returns expense value after the selected reconciliation decision.
+ */
 function reconciledExpenseValue(estimated, actual, source) {
   return reconcileModeledAndTrackedExpense(estimated, actual, source).effective
 }
 
+/**
+ * Returns member values after the selected reconciliation decision.
+ */
 function reconciledMemberValues(estimated, actual, source) {
   return reconcileExpenseMemberValues(estimated, actual, source)
 }
 
+/**
+ * Reconciles one tracking period into an existing financial-year expense month.
+ */
 function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
   const previous = financialYear?.months?.[monthKey]
   if (!previous) return financialYear
@@ -444,6 +489,9 @@ function applyTrackingMonth(financialYear, monthKey, trackingMonth) {
   }
 }
 
+/**
+ * Retains only persisted position metadata while rebuilding a month.
+ */
 function positionMetadata(month) {
   return Object.fromEntries(
     ['positionStatus', 'positionAsOf', 'positionCalculatedAt']
@@ -452,6 +500,9 @@ function positionMetadata(month) {
   )
 }
 
+/**
+ * Retains non-derived year metadata while rebuilding projections.
+ */
 function financialYearMetadata(financialYear) {
   return Object.fromEntries(
     ['schemaVersion', 'status', 'generatedAt', 'updatedAt']
@@ -460,6 +511,9 @@ function financialYearMetadata(financialYear) {
   )
 }
 
+/**
+ * Returns canonical section derived from the supplied input.
+ */
 function canonicalSection(section) {
   return {
     categories: Object.fromEntries(
@@ -471,10 +525,16 @@ function canonicalSection(section) {
   }
 }
 
+/**
+ * Allocates a value with canonical ownership rules, or returns an empty map for invalid ownership.
+ */
 function allocate(value, ownership) {
   return allocateMoneyByOwnership(value, ownership)
 }
 
+/**
+ * Groups source items by the requested field.
+ */
 function groupBy(items, field) {
   return items.reduce((groups, item) => {
     groups[item[field]] = [...(groups[item[field]] || []), item]
@@ -482,6 +542,9 @@ function groupBy(items, field) {
   }, {})
 }
 
+/**
+ * Adds two member-value maps key by key at money precision.
+ */
 function addMaps(first = {}, second = {}) {
   const keys = new Set([...Object.keys(first), ...Object.keys(second)])
   return Object.fromEntries(
@@ -492,12 +555,18 @@ function addMaps(first = {}, second = {}) {
   )
 }
 
+/**
+ * Validates year and throws a descriptive error when its contract is not satisfied.
+ */
 function assertYear(year) {
   if (!Number.isInteger(year) || year < 2000 || year > 9999) {
     throw new Error('A valid financial year is required')
   }
 }
 
+/**
+ * Validates month and throws a descriptive error when its contract is not satisfied.
+ */
 function assertMonth(month) {
   if (!/^(0[1-9]|1[0-2])$/.test(month)) {
     throw new Error('A valid projection month is required')

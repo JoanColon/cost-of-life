@@ -1,4 +1,8 @@
+/**
+ * Coordinates Google Sheets portfolio imports with Firestore. It validates access, manages cache freshness, synchronizes linked assets and dividend income, and rebuilds affected financial projections.
+ */
 import { FieldValue } from 'firebase-admin/firestore'
+import { roundMoneyOrNull } from '../../shared/core/money.js'
 import { currentYear, rebuildFinancialYear } from '../financial-years/service.js'
 import {
   PORTFOLIO_SCHEMA,
@@ -15,6 +19,9 @@ const PORTFOLIO_CACHE_TTL_MS = 15 * 60 * 1000
 const MAXIMUM_CACHE_BYTES = 700_000
 const MAXIMUM_STORED_WARNINGS = 100
 
+/**
+ * Connects or disconnects a portfolio sheet after validating access and source data.
+ */
 async function updateInvestmentPortfolio(
   firestore,
   { workspaceId, userId, assetId, spreadsheetUrl = null },
@@ -38,6 +45,9 @@ async function updateInvestmentPortfolio(
   )
 }
 
+/**
+ * Refreshes one linked portfolio, using its cache unless forced.
+ */
 async function syncInvestmentPortfolio(
   firestore,
   { workspaceId, userId, assetId, force = false },
@@ -55,6 +65,9 @@ async function syncInvestmentPortfolio(
   )
 }
 
+/**
+ * Refreshes all linked portfolios in a workspace and aggregates failures.
+ */
 async function syncWorkspaceInvestmentPortfolios(
   firestore,
   { workspaceId, userId = null, force = false, throwOnError = false },
@@ -106,6 +119,9 @@ async function syncWorkspaceInvestmentPortfolios(
   return { results, failures }
 }
 
+/**
+ * Imports one portfolio and synchronizes its asset, cache, dividend income, and projection transactionally.
+ */
 async function synchronizeInvestmentPortfolio(
   firestore,
   { workspaceId, userId, assetId, force },
@@ -157,7 +173,7 @@ async function synchronizeInvestmentPortfolio(
     const importedPortfolioValueIsValid = Number.isFinite(imported.summary.totalPortfolioValue)
     const assetValueChanged =
       importedPortfolioValueIsValid &&
-      roundMoney(context.asset.currentValue) !== normalized.summary.totalPortfolioValue
+      roundMoneyOrNull(context.asset.currentValue) !== normalized.summary.totalPortfolioValue
     const summaryChanged = !sameValue(existingPortfolio?.summary, normalized.summary)
     const holdingsChanged = !sameValue(existingPortfolio?.cache?.holdings, normalized.holdings)
     const pendingSections = existingPortfolio?.sync?.financialProjectionDirty ?
@@ -261,6 +277,9 @@ async function synchronizeInvestmentPortfolio(
   }
 }
 
+/**
+ * Removes a spreadsheet connection while preserving the asset and clearing imported portfolio state.
+ */
 async function disconnectInvestmentPortfolio(firestore, { workspaceId, userId, assetId }) {
   const context = await portfolioContext(firestore, { workspaceId, userId, assetId })
   const linkedIncomeSnapshot = await context.workspaceReference
@@ -284,6 +303,9 @@ async function disconnectInvestmentPortfolio(firestore, { workspaceId, userId, a
   return { portfolio: null }
 }
 
+/**
+ * Loads and validates the workspace, asset, and linked income context for a portfolio.
+ */
 async function portfolioContext(firestore, { workspaceId, userId, assetId }) {
   const workspaceReference = firestore.collection('workspaces').doc(workspaceId)
   const assetReference = workspaceReference.collection('modelAssets').doc(assetId)
@@ -306,6 +328,9 @@ async function portfolioContext(firestore, { workspaceId, userId, assetId }) {
   return { workspaceReference, assetReference, asset }
 }
 
+/**
+ * Downloads and normalizes the required portfolio and summary sheets.
+ */
 async function fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl) {
   const requestId = Date.now()
   const portfolioUrl = googleSheetQueryUrl(spreadsheetId, {
@@ -347,6 +372,9 @@ async function fetchInvestmentPortfolioSource(spreadsheetId, fetchImpl) {
   throw lastError
 }
 
+/**
+ * Merges investment portfolio without discarding valid existing data.
+ */
 function mergeInvestmentPortfolio(imported, existingPortfolio) {
   const previousSummary = existingPortfolio?.summary || {}
   const summary = Object.fromEntries(
@@ -369,10 +397,16 @@ function mergeInvestmentPortfolio(imported, existingPortfolio) {
   return { ...imported, summary, holdings }
 }
 
+/**
+ * Reports whether imported data can safely replace a persisted value.
+ */
 function validImportedValue(value) {
   return typeof value === 'string' ? Boolean(value) : Number.isFinite(value)
 }
 
+/**
+ * Deduplicates holdings by their stable key.
+ */
 function uniqueHoldingsByKey(holdings) {
   const counts = new Map()
   for (const holding of holdings) {
@@ -386,10 +420,16 @@ function uniqueHoldingsByKey(holdings) {
   )
 }
 
+/**
+ * Returns the stable deduplication key for a portfolio holding.
+ */
 function holdingKey(holding) {
   return String(holding?.ticker || '').trim().toUpperCase()
 }
 
+/**
+ * Fetches one sheet CSV endpoint with timeout and bounded retries.
+ */
 async function fetchGoogleSheet(
   url,
   fetchImpl,
@@ -411,6 +451,9 @@ async function fetchGoogleSheet(
   return body
 }
 
+/**
+ * Reports whether a cached import remains inside its configured time-to-live.
+ */
 function portfolioCacheIsFresh(portfolio, now = Date.now()) {
   return Boolean(
     portfolio?.schemaVersion === PORTFOLIO_SCHEMA.version &&
@@ -422,12 +465,15 @@ function portfolioCacheIsFresh(portfolio, now = Date.now()) {
   )
 }
 
+/**
+ * Builds the client-facing portfolio synchronization result.
+ */
 function portfolioResult(portfolio, currentValue, cacheStatus, extra = {}) {
   const warnings = Array.isArray(portfolio?.cache?.warnings) ? portfolio.cache.warnings : []
   const warningCount = Number(portfolio?.cache?.warningCount) || warnings.length
   return {
     portfolio,
-    currentValue: roundMoney(currentValue),
+    currentValue: roundMoneyOrNull(currentValue),
     summary: portfolio.summary,
     holdings: portfolio.cache.holdings,
     cacheStatus,
@@ -438,23 +484,27 @@ function portfolioResult(portfolio, currentValue, cacheStatus, extra = {}) {
   }
 }
 
+/**
+ * Reports whether linked income matches imported annual dividends.
+ */
 function incomeMatchesAnnualDividends(income, summary) {
   return (
     income?.calculation?.mode === 'recurring' &&
     income?.calculation?.frequency === 'yearly' &&
-    roundMoney(income?.calculation?.amount) === summary.annualDividendIncome
+    roundMoneyOrNull(income?.calculation?.amount) === summary.annualDividendIncome
   )
 }
 
+/**
+ * Reports whether two optional values are equivalent for synchronization.
+ */
 function sameValue(first, second) {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
 
-function roundMoney(value) {
-  const number = Number(value)
-  return Number.isFinite(number) ? Math.round((number + Number.EPSILON) * 100) / 100 : null
-}
-
+/**
+ * Builds a CSV export URL for one Google Sheet query.
+ */
 function googleSheetQueryUrl(spreadsheetId, parameters) {
   const url = new URL(
     `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq`,
@@ -463,6 +513,9 @@ function googleSheetQueryUrl(spreadsheetId, parameters) {
   return url
 }
 
+/**
+ * Validates a Sheets URL and returns its stable canonical document URL.
+ */
 function canonicalGoogleSheetsUrl(value) {
   const input = String(value || '').trim()
   if (!input || input.length > 2048) throw new Error('A valid Google Sheets URL is required')
@@ -483,6 +536,9 @@ function canonicalGoogleSheetsUrl(value) {
   return url.toString()
 }
 
+/**
+ * Extracts the document identifier from a validated Sheets URL.
+ */
 function spreadsheetIdFromUrl(value) {
   const url = new URL(canonicalGoogleSheetsUrl(value))
   const match = url.pathname.match(SPREADSHEET_PATH)
@@ -490,16 +546,25 @@ function spreadsheetIdFromUrl(value) {
   return match[1]
 }
 
+/**
+ * Returns a promise that resolves after the requested duration.
+ */
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
+/**
+ * Validates request and throws a descriptive error when its contract is not satisfied.
+ */
 function assertRequest(workspaceId, userId, assetId) {
   assertText(workspaceId, 'A workspace is required')
   assertText(userId, 'Authentication is required')
   assertText(assetId, 'An investment is required')
 }
 
+/**
+ * Validates text and throws a descriptive error when its contract is not satisfied.
+ */
 function assertText(value, message) {
   if (!String(value || '').trim()) throw new Error(message)
 }

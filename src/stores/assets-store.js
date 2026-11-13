@@ -14,6 +14,7 @@ import {
   updateSimpleCategoryValue as updateSimpleCategoryValueDocument,
 } from '@/services/firebase/assets.service'
 import { buildModelCategories } from '@/domain/financial/model-categories'
+import { roundMoneyOrZero } from '../../functions/shared/core/money.js'
 import {
   disconnectInvestmentPortfolio as disconnectInvestmentPortfolioDocument,
   saveInvestmentPortfolio as saveInvestmentPortfolioDocument,
@@ -195,7 +196,7 @@ export const useAssetsStore = defineStore('assets', () => {
 
     replaceAsset(assetId, {
       ...asset,
-      currentValue: Math.round((totalPortfolioValue + Number.EPSILON) * 100) / 100,
+      currentValue: roundMoneyOrZero(totalPortfolioValue),
       detail: {
         ...(asset.detail || {}),
         portfolio: result.portfolio,

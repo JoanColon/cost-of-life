@@ -1,8 +1,8 @@
+import { mortgageDetailFromLiability } from './mortgage-liability-adapter'
 import {
-  buildFrenchAmortizationSchedule,
-  calculateMortgageProjection,
-  mortgageDetailFromLiability,
-} from './mortgage-amortization'
+  buildFrenchMortgageScheduleFromBalance,
+  compareFrenchMortgagePayoffScenarios,
+} from '../../../functions/shared/liabilities/mortgage.js'
 
 export function calculateDebtPayoffImpact({
   liability,
@@ -14,7 +14,7 @@ export function calculateDebtPayoffImpact({
 
   try {
     const historySchedule = mortgageHistorySchedule(mortgage, asOfDate)
-    const projection = calculateMortgageProjection({
+    const projection = compareFrenchMortgagePayoffScenarios({
       currentBalance: mortgage.currentBalance,
       annualInterestRate: mortgage.annualInterestRate,
       monthlyPayment: mortgage.monthlyPayment,
@@ -54,7 +54,7 @@ function dateString(value) {
 
 function mortgageHistorySchedule(mortgage, asOfDate) {
   try {
-    return buildFrenchAmortizationSchedule({
+    return buildFrenchMortgageScheduleFromBalance({
       currentBalance: mortgage.originalPrincipal,
       annualInterestRate: mortgage.annualInterestRate,
       monthlyPayment: mortgage.monthlyPayment,

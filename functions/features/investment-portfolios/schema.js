@@ -1,3 +1,8 @@
+/**
+ * Canonical parser and validator for the supported Google Sheets portfolio schema. It normalizes summary fields, holdings, localized numbers, and import warnings.
+ */
+import { roundMoneyOrZero } from '../../shared/core/money.js'
+
 // Canonical contract for parsing and validating the linked Google Sheets portfolio.
 const PORTFOLIO_SCHEMA = {
   version: 2,
@@ -52,6 +57,9 @@ const PORTFOLIO_SCHEMA = {
   ],
 }
 
+/**
+ * Combines portfolio and summary sheets into the canonical imported model.
+ */
 function normalizeInvestmentPortfolio(portfolioRows, summaryRows) {
   const normalizedSummary = normalizeSummary(summaryRows, { allowPartial: true })
   const normalizedHoldings = normalizeHoldings(portfolioRows, { collectWarnings: true })
@@ -63,6 +71,9 @@ function normalizeInvestmentPortfolio(portfolioRows, summaryRows) {
   }
 }
 
+/**
+ * Reads recognized summary labels and returns validated canonical totals.
+ */
 function normalizeSummary(rows, { allowPartial = false } = {}) {
   const values = {}
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -111,6 +122,9 @@ function normalizeSummary(rows, { allowPartial = false } = {}) {
   }
 }
 
+/**
+ * Maps sheet rows into canonical holdings and optionally collects row warnings.
+ */
 function normalizeHoldings(rows, { collectWarnings = false } = {}) {
   if (!Array.isArray(rows) || !rows.length) {
     throw new Error('The Google Sheet returned an empty Portfolio')
@@ -170,6 +184,9 @@ function normalizeHoldings(rows, { collectWarnings = false } = {}) {
   return collectWarnings ? { holdings, warnings } : holdings
 }
 
+/**
+ * Parses localized numbers with supported decimal and grouping separators.
+ */
 function parseLocalizedNumber(value) {
   if (spreadsheetError(value)) return null
   const input = String(value ?? '')
@@ -201,16 +218,25 @@ function parseLocalizedNumber(value) {
   return Number.isFinite(number) ? number : null
 }
 
+/**
+ * Creates an error tagged as a spreadsheet import failure.
+ */
 function spreadsheetError(value) {
   return /^#(?:N\/A|ERROR!?|REF!?|DIV\/0!?|VALUE!?|NAME\??|NUM!?|NULL!?|SPILL!?|CALC!?|LOADING)(?:\b|$)/i.test(
     String(value ?? '').trim(),
   )
 }
 
+/**
+ * Returns canonical money or null for an empty sheet value.
+ */
 function nullableMoney(value) {
-  return isNonNegativeNumber(value) ? roundMoney(value) : null
+  return isNonNegativeNumber(value) ? roundMoneyOrZero(value) : null
 }
 
+/**
+ * Maps a normalized spreadsheet label to its canonical summary field.
+ */
 function summaryFieldName(label) {
   return {
     'base currency': 'baseCurrency',
@@ -220,6 +246,9 @@ function summaryFieldName(label) {
   }[label]
 }
 
+/**
+ * Parses CSV text including quotes, escaped quotes, commas, and embedded line breaks.
+ */
 function parseCsv(value) {
   const csv = String(value || '').replace(/^\uFEFF/, '')
   if (!csv) return []
@@ -262,6 +291,9 @@ function parseCsv(value) {
   return rows
 }
 
+/**
+ * Returns the first valid three-letter currency candidate.
+ */
 function parseBaseCurrency(...values) {
   const inputs = values.map((value) => String(value ?? '').trim()).filter(Boolean)
   for (const input of inputs) {
@@ -278,6 +310,9 @@ function parseBaseCurrency(...values) {
   return ''
 }
 
+/**
+ * Normalizes a spreadsheet label for alias matching.
+ */
 function normalizeLabel(value) {
   return String(value ?? '')
     .normalize('NFKD')
@@ -287,12 +322,11 @@ function normalizeLabel(value) {
     .toLowerCase()
 }
 
+/**
+ * Reports whether a value is finite and non-negative.
+ */
 function isNonNegativeNumber(value) {
   return Number.isFinite(value) && value >= 0
-}
-
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }
 
 export {

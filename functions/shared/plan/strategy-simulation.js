@@ -1,3 +1,6 @@
+/**
+ * Simulates allocation strategies from an observed financial position. It projects cash, investments, debt, real estate, inflation, net worth, and coverage while reporting incomplete model warnings.
+ */
 import {
   currentFinancialMonth,
   financialYearMonthCategoryValue,
@@ -328,6 +331,9 @@ export function projectStrategyAssetPath({
   }
 }
 
+/**
+ * Creates point metadata for a projected result.
+ */
 function projectionPoint(
   month,
   cash,
@@ -365,6 +371,9 @@ function projectionPoint(
   }
 }
 
+/**
+ * Calculates modeled property-value change at a projection month.
+ */
 function projectedRealEstateChange(asset, month, asOfDate) {
   const currentValue = Math.max(0, Number(asset?.currentValue) || 0)
   const model = asset?.model || {}
@@ -395,6 +404,9 @@ function projectedRealEstateChange(asset, month, asOfDate) {
   }
 }
 
+/**
+ * Builds a simulation mortgage schedule and captures model failures as warnings.
+ */
 function mortgageSchedule(mortgage, extraMonthlyPayment, asOfDate) {
   try {
     return {
@@ -421,6 +433,9 @@ function mortgageSchedule(mortgage, extraMonthlyPayment, asOfDate) {
   }
 }
 
+/**
+ * Returns cumulative mortgage principal reduction at a projection month.
+ */
 function mortgageReductionAtMonth(mortgage, month) {
   const currentBalance = Math.max(0, Number(mortgage.currentBalance) || 0)
   if (!month || !mortgage.schedule.length) return 0
@@ -429,12 +444,18 @@ function mortgageReductionAtMonth(mortgage, month) {
   return Math.max(0, currentBalance - remainingBalance)
 }
 
+/**
+ * Returns the YYYY-MM-DD portion of a date value.
+ */
 function dateString(value) {
   return value instanceof Date ?
     dateInFinancialTimeZone(value) :
     String(value || '').slice(0, 10)
 }
 
+/**
+ * Builds a stable warning for an incomplete projected model.
+ */
 function projectionWarning(key, type, id, error) {
   return {
     key,
@@ -471,6 +492,9 @@ export function calculateInflationAdjustedCoverage({
   return money(realValue / cost)
 }
 
+/**
+ * Adds mapped category to the target aggregate.
+ */
 function addMappedCategory(financialYear, month, categoryId, mapping, target, memberId) {
   const subcategories =
     financialYear?.months?.[month]?.assets?.categories?.[categoryId]?.subcategories || {}
@@ -484,6 +508,9 @@ function addMappedCategory(financialYear, month, categoryId, mapping, target, me
   }
 }
 
+/**
+ * Returns canonical non-negative balances for every investment type.
+ */
 function normalizedStartingBalances(input = {}) {
   return Object.fromEntries(
     ['stockMarket', 'realEstate', 'fixedIncome', 'crypto', 'businessEquity', 'other'].map(
@@ -492,6 +519,9 @@ function normalizedStartingBalances(input = {}) {
   )
 }
 
+/**
+ * Allocates a contribution across balances using the configured mix.
+ */
 function distributeInvestmentContribution(balances, mix, amount) {
   const entries = Object.entries(mix).filter(([, value]) => Number(value?.allocation) > 0)
   const targetEntries = entries.length ?

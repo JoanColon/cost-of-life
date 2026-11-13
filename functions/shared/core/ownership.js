@@ -1,3 +1,6 @@
+/**
+ * Allocates monetary values across workspace ownership shares and validates, clones, or scopes canonical ownership structures.
+ */
 import { normalizeNonNegativeMoneyOrNull, roundMoneyOrZero } from './money.js'
 
 /**

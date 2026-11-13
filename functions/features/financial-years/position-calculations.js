@@ -1,3 +1,6 @@
+/**
+ * Application adapter for dated asset and liability positions. It translates persisted model documents into effective values by delegating financial formulas to the shared engine.
+ */
 import {
   calculateMortgageBalanceFromAnchor,
   isMortgagePaymentDueInCalendarMonth,
@@ -11,6 +14,9 @@ function effectiveRealEstateValue(asset, asOfDate) {
   return calculateAnniversaryRealEstateValuation(asset.detail.realEstate, asOfDate)
 }
 
+/**
+ * Returns asset and liability documents with values recalculated for a specific observation date.
+ */
 function calculatePositionsAt({ assets = [], liabilities = [], asOfDate }) {
   return {
     assets: assets.map((asset) => ({
@@ -24,6 +30,9 @@ function calculatePositionsAt({ assets = [], liabilities = [], asOfDate }) {
   }
 }
 
+/**
+ * Returns a modeled mortgage balance, or its recorded balance when no supported model exists.
+ */
 function effectiveLiabilityBalance(liability, asOfDate) {
   const mortgage = liability?.detail?.mortgage
   if (liability?.categoryId !== 'mortgage' || mortgage?.schemaVersion !== 2) {
@@ -32,6 +41,9 @@ function effectiveLiabilityBalance(liability, asOfDate) {
   return calculateMortgageBalanceFromAnchor(mortgage, asOfDate)
 }
 
+/**
+ * Reports whether a modeled liability has a contractual payment in the requested calendar month.
+ */
 function isLiabilityPaymentDueInMonth(liability, year, monthIndex) {
   const mortgage = liability?.detail?.mortgage
   if (liability?.categoryId !== 'mortgage' || mortgage?.schemaVersion !== 2) return null

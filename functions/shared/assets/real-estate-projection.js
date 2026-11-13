@@ -1,3 +1,6 @@
+/**
+ * Projects property value, mortgage balance, and equity over a requested horizon using canonical dates and the shared real-estate valuation rules.
+ */
 import {
   addCalendarMonthsClamped,
   requireCanonicalDate,
@@ -59,6 +62,9 @@ export function projectRealEstate({
 
 export { DEFAULT_APPRECIATION_RATE }
 
+/**
+ * Builds the ordered dates included in a property projection.
+ */
 function projectionDates(purchaseDate, currentDate, horizonMonths) {
   const dates = []
   let month = 0
@@ -77,6 +83,9 @@ function projectionDates(purchaseDate, currentDate, horizonMonths) {
   return dates
 }
 
+/**
+ * Validates and sorts mortgage points by canonical date.
+ */
 function normalizedMortgageTimeline(timeline) {
   return timeline
     .map(({ date, balance }) => ({
@@ -86,6 +95,9 @@ function normalizedMortgageTimeline(timeline) {
     .sort((left, right) => left.date.localeCompare(right.date))
 }
 
+/**
+ * Returns the latest mortgage balance observed on or before a date.
+ */
 function balanceAt(timeline, date) {
   if (!timeline.length || timeline[0].date > date) return null
   let balance = 0
@@ -96,18 +108,27 @@ function balanceAt(timeline, date) {
   return roundMoneyOrZero(balance)
 }
 
+/**
+ * Returns a finite number or throws a labeled validation error.
+ */
 function finiteNumber(value, label) {
   const number = Number(value)
   if (!Number.isFinite(number)) throw new RangeError(`A valid ${label} is required`)
   return number
 }
 
+/**
+ * Returns a non-negative number or throws a labeled validation error.
+ */
 function nonNegativeNumber(value, label) {
   const number = finiteNumber(value, label)
   if (number < 0) throw new RangeError(`A valid ${label} is required`)
   return number
 }
 
+/**
+ * Returns a non-negative integer or throws a labeled validation error.
+ */
 function nonNegativeInteger(value, label) {
   const number = Number(value)
   if (!Number.isInteger(number) || number < 0) throw new RangeError(`A valid ${label} is required`)

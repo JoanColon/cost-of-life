@@ -1,3 +1,6 @@
+/**
+ * Deterministic real-estate valuation rules based on completed purchase anniversaries and an annual appreciation percentage.
+ */
 import { completedAnniversaryYears, requireCanonicalDate } from '../core/dates.js'
 import { roundMoneyOrZero } from '../core/money.js'
 
@@ -24,12 +27,18 @@ export function calculateAnniversaryRealEstateValuation(model, asOfDate) {
   )
 }
 
+/**
+ * Returns validated finite number or throws when the supplied value is invalid.
+ */
 function requireFiniteNumber(value, label) {
   const number = Number(value)
   if (!Number.isFinite(number)) throw new RangeError(`A valid ${label} is required`)
   return number
 }
 
+/**
+ * Returns validated non negative number or throws when the supplied value is invalid.
+ */
 function requireNonNegativeNumber(value, label) {
   const number = requireFiniteNumber(value, label)
   if (number < 0) throw new RangeError(`A valid ${label} is required`)

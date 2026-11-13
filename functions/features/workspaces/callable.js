@@ -1,3 +1,6 @@
+/**
+ * Firebase callable boundaries for workspace invitations, membership settings, and deletion. It handles authentication and converts service errors into stable callable errors.
+ */
 import { getFirestore } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/https'
 import {
@@ -9,6 +12,9 @@ import {
   updateWorkspaceSettings as updateWorkspaceSettingsData,
 } from './service.js'
 
+/**
+ * Converts service failures into stable Firebase callable error codes.
+ */
 function callableError(error) {
   if (error instanceof HttpsError) return error
   const supportedCodes = new Set([
@@ -24,6 +30,9 @@ function callableError(error) {
   )
 }
 
+/**
+ * Creates a time-limited invitation whose secret token is stored only as a hash.
+ */
 const createWorkspaceInvite = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 
@@ -40,6 +49,9 @@ const createWorkspaceInvite = onCall({ region: 'europe-west1' }, async (request)
   }
 })
 
+/**
+ * Loads invitation details while enforcing status, expiry, and workspace availability.
+ */
 const getWorkspaceInvite = onCall({ region: 'europe-west1' }, async (request) => {
   try {
     return await getWorkspaceInviteData(getFirestore(), {
@@ -51,6 +63,9 @@ const getWorkspaceInvite = onCall({ region: 'europe-west1' }, async (request) =>
   }
 })
 
+/**
+ * Atomically adds the user to the workspace and marks the invitation accepted.
+ */
 const acceptWorkspaceInvite = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 
@@ -66,6 +81,9 @@ const acceptWorkspaceInvite = onCall({ region: 'europe-west1' }, async (request)
   }
 })
 
+/**
+ * Verifies workspace ownership and delegates recursive workspace deletion to the service.
+ */
 const deleteWorkspace = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 
@@ -86,6 +104,9 @@ const deleteWorkspace = onCall({ region: 'europe-west1' }, async (request) => {
   return deleteWorkspaceData(firestore, workspaceReference)
 })
 
+/**
+ * Validates and updates workspace currency and all member display names transactionally.
+ */
 const updateWorkspaceSettings = onCall({ region: 'europe-west1' }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
 

@@ -1,3 +1,6 @@
+/**
+ * Normalizes milestone progress into bounded ratios for target attainment, positive net worth, and debt reduction.
+ */
 /** Calculates bounded progress toward a positive target and whether it has been reached. */
 export function calculateTargetProgress(currentValue, target, relevant = true) {
   const reached = relevant && currentValue >= target
@@ -29,6 +32,9 @@ export function calculateDebtReductionProgress(currentBalance, startingBalance) 
   }
 }
 
+/**
+ * Returns a finite ratio clamped between zero and one.
+ */
 function boundedRatio(value, target) {
   if (!(target > 0)) return 0
   return Math.min(1, Math.max(0, Number(value || 0) / target))

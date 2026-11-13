@@ -1,3 +1,6 @@
+/**
+ * Canonical income-model normalization and calculations for annual totals, disposable income, breakdowns, and monthly distribution.
+ */
 import { CALENDAR_MONTH_IDS } from '../core/calendar-months.js'
 import { normalizeNonNegativeMoneyOrNull, roundMoneyOrZero } from '../core/money.js'
 
@@ -119,11 +122,17 @@ export function distributeAnnualAmountByMonth(value, monthIndex) {
   return roundMoneyOrZero((monthlyCents + (monthIndex < remainder ? 1 : 0)) / 100)
 }
 
+/**
+ * Returns a positive integer or null for invalid input.
+ */
 function normalizePositiveInteger(value) {
   const number = Number(value)
   return Number.isInteger(number) && number > 0 ? number : null
 }
 
+/**
+ * Reports whether a value is a non-array object.
+ */
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }

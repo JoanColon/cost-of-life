@@ -351,13 +351,16 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MortgageBalanceChart from '@/components/liabilities/MortgageBalanceChart.vue'
+import { mortgageDetailFromLiability } from '@/domain/financial/mortgage-liability-adapter'
 import {
-  buildFrenchAmortizationSchedule,
-  calculateFrenchMonthlyPayment,
-  calculateMortgageProjection,
-  mortgageDetailFromLiability,
-} from '@/domain/financial/mortgage-amortization'
-import { normalizeNonNegativeMoneyOrNull } from '../../functions/shared/core/money.js'
+  buildFrenchMortgageScheduleFromBalance,
+  calculateFrenchMortgageMonthlyPayment,
+  compareFrenchMortgagePayoffScenarios,
+} from '../../functions/shared/liabilities/mortgage.js'
+import {
+  normalizeNonNegativeMoneyOrNull,
+  roundMoneyOrZero,
+} from '../../functions/shared/core/money.js'
 import { currentFinancialYear } from '../../functions/shared/positions/annual-projection.js'
 import { authUser } from '@/services/auth'
 import { useAssetsStore } from '@/stores/assets-store'
@@ -442,7 +445,7 @@ const memberIds = computed(() =>
 const projection = computed(() => {
   if (!mortgageModel.value) return null
   try {
-    return calculateMortgageProjection({
+    return compareFrenchMortgagePayoffScenarios({
       ...mortgageModel.value,
       asOfDate: localToday(),
     })
@@ -453,7 +456,7 @@ const projection = computed(() => {
 const originalSchedule = computed(() => {
   if (!mortgageModel.value) return []
   try {
-    return buildFrenchAmortizationSchedule({
+    return buildFrenchMortgageScheduleFromBalance({
       currentBalance: mortgageModel.value.originalPrincipal,
       annualInterestRate: mortgageModel.value.annualInterestRate,
       monthlyPayment: mortgageModel.value.monthlyPayment,
@@ -464,7 +467,7 @@ const originalSchedule = computed(() => {
   }
 })
 const originalScheduleInterest = computed(() =>
-  roundMoney(originalSchedule.value.reduce((total, payment) => total + payment.interest, 0)),
+  roundMoneyOrZero(originalSchedule.value.reduce((total, payment) => total + payment.interest, 0)),
 )
 const amortizationRows = computed(() => [
   {
@@ -584,7 +587,7 @@ async function saveModel() {
   const termMonths = Number(form.termYears) * 12 + Number(form.termExtraMonths)
   let monthlyPayment = normalizeNonNegativeMoneyOrNull(form.monthlyPayment)
   if (monthlyPayment === null) {
-    monthlyPayment = calculateFrenchMonthlyPayment({
+    monthlyPayment = calculateFrenchMortgageMonthlyPayment({
       principal: originalPrincipal,
       annualInterestRate,
       termMonths,
@@ -592,7 +595,7 @@ async function saveModel() {
   }
 
   try {
-    calculateMortgageProjection({
+    compareFrenchMortgagePayoffScenarios({
       currentBalance,
       annualInterestRate,
       monthlyPayment,
@@ -773,10 +776,6 @@ function moneyColumn(name, labelKey) {
     format: (value) => formatCurrency(value),
     sortable: true,
   }
-}
-
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }
 </script>
 

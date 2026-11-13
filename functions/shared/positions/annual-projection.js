@@ -1,4 +1,7 @@
-import { calculateAnnualSavingsCapacity, calculateNetWorth } from './metrics.js'
+/**
+ * Read-only selectors for materialized financial-year documents. They aggregate monthly positions and flows by section, category, item, necessity, and member scope.
+ */
+import { calculateNetWorth, calculateSavingsCapacity } from './metrics.js'
 import { roundMoneyOrZero as moneyOrZero } from '../core/money.js'
 
 export const FINANCIAL_YEAR_TIME_ZONE = 'Europe/Madrid'
@@ -48,9 +51,11 @@ export function financialYearValue(financialYear, section, memberId = 'all') {
     )
   }
   if (section === 'savings') {
-    return calculateAnnualSavingsCapacity(
-      financialYearAvailableIncomeValue(financialYear, memberId),
-      financialYearFlowValue(financialYear, 'expenses', memberId),
+    return moneyOrZero(
+      calculateSavingsCapacity(
+        financialYearAvailableIncomeValue(financialYear, memberId),
+        financialYearFlowValue(financialYear, 'expenses', memberId),
+      ),
     )
   }
   if (POSITION_SECTIONS.has(section)) {
@@ -168,9 +173,11 @@ export function financialYearMonthValue(financialYear, month, section, memberId 
     )
   }
   if (section === 'savings') {
-    return calculateAnnualSavingsCapacity(
-      financialYearMonthAvailableIncomeValue(financialYear, month, memberId),
-      financialYearMonthValue(financialYear, month, 'expenses', memberId),
+    return moneyOrZero(
+      calculateSavingsCapacity(
+        financialYearMonthAvailableIncomeValue(financialYear, month, memberId),
+        financialYearMonthValue(financialYear, month, 'expenses', memberId),
+      ),
     )
   }
   return moneyOrZero(
@@ -349,6 +356,9 @@ export function financialYearIncomeModelItemValue(
   )
 }
 
+/**
+ * Aggregates one category across every month in a materialized year.
+ */
 function annualCategory(financialYear, section, categoryId) {
   if (POSITION_SECTIONS.has(section)) {
     return financialYear?.months?.['12']?.[section]?.categories?.[categoryId]
@@ -368,6 +378,9 @@ function annualCategory(financialYear, section, categoryId) {
   return { subcategories }
 }
 
+/**
+ * Returns a category total for a section and optional member scope.
+ */
 function categoryValue(category, section, memberId) {
   return moneyOrZero(
     Object.values(category?.subcategories || {}).reduce(
@@ -377,12 +390,18 @@ function categoryValue(category, section, memberId) {
   )
 }
 
+/**
+ * Returns an item total for a section and optional member scope.
+ */
 function itemValue(item, section, memberId) {
   if (!item) return 0
   if (memberId && memberId !== 'all') return moneyOrZero(item.memberValues?.[memberId])
   return section === 'expenses' ? financialYearExpenseItemValue(item) : moneyOrZero(item.total)
 }
 
+/**
+ * Returns available monthly income after item disposable percentages.
+ */
 function monthAvailableIncomeValue(month, memberId) {
   return Object.values(month?.income?.categories || {}).reduce(
     (monthTotal, category) =>
@@ -400,6 +419,9 @@ function monthAvailableIncomeValue(month, memberId) {
   )
 }
 
+/**
+ * Returns a valid percentage or the domain default.
+ */
 function percentageOrDefault(value) {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 && number <= 100 ? number : 100

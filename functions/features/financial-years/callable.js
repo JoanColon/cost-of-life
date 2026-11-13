@@ -1,3 +1,6 @@
+/**
+ * Firebase callable boundary for ensuring the current financial year. It validates membership, refreshes modeled positions, rebuilds affected projections, and returns synchronization status.
+ */
 import { getFirestore } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/https'
 import * as logger from 'firebase-functions/logger'
@@ -9,6 +12,9 @@ import {
   synchronizeFinancialYearPositions,
 } from './service.js'
 
+/**
+ * Exposes the authenticated callable that ensures and synchronizes the current financial year.
+ */
 const ensureFinancialYear = onCall({ region: 'europe-west1' }, async (request) => {
   const startedAt = Date.now()
   try {
@@ -33,6 +39,9 @@ const ensureFinancialYear = onCall({ region: 'europe-west1' }, async (request) =
   }
 })
 
+/**
+ * Validates a callable request and coordinates refresh, rebuild, and position synchronization.
+ */
 async function handleFinancialYearRequest(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication is required')
   const workspaceId = String(request.data?.workspaceId || '')

@@ -204,10 +204,8 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import RealEstateProjectionChart from '@/components/assets/RealEstateProjectionChart.vue'
-import {
-  buildFrenchAmortizationSchedule,
-  mortgageDetailFromLiability,
-} from '@/domain/financial/mortgage-amortization'
+import { mortgageDetailFromLiability } from '@/domain/financial/mortgage-liability-adapter'
+import { buildFrenchMortgageScheduleFromBalance } from '../../functions/shared/liabilities/mortgage.js'
 import {
   DEFAULT_APPRECIATION_RATE,
   projectRealEstate,
@@ -260,7 +258,7 @@ const mortgageProjection = computed(() => {
   try {
     return {
       available: true,
-      schedule: buildFrenchAmortizationSchedule({ ...mortgageModel.value, asOfDate: today }),
+      schedule: buildFrenchMortgageScheduleFromBalance({ ...mortgageModel.value, asOfDate: today }),
     }
   } catch {
     return { available: false, schedule: [] }
@@ -269,7 +267,7 @@ const mortgageProjection = computed(() => {
 const originalMortgageSchedule = computed(() => {
   if (!mortgageModel.value) return []
   try {
-    return buildFrenchAmortizationSchedule({
+    return buildFrenchMortgageScheduleFromBalance({
       currentBalance: mortgageModel.value.originalPrincipal,
       annualInterestRate: mortgageModel.value.annualInterestRate,
       monthlyPayment: mortgageModel.value.monthlyPayment,

@@ -1,3 +1,6 @@
+/**
+ * Persistence and orchestration layer for financial years. It loads source documents, invokes projection calculations, writes dated positions, and manages monthly close operations.
+ */
 import { FieldPath, FieldValue } from 'firebase-admin/firestore'
 import {
   applyTrackingMonth,
@@ -7,6 +10,9 @@ import {
 import { calculatePositionsAt } from './position-calculations.js'
 
 const PROJECTION_SECTIONS = ['assets', 'liabilities', 'income', 'expenses']
+/**
+ * Loads sources and transactionally creates or refreshes the requested financial-year sections.
+ */
 async function rebuildFinancialYear(
   firestore,
   workspaceId,
@@ -89,6 +95,9 @@ async function rebuildFinancialYear(
   return { status, workspaceId, year }
 }
 
+/**
+ * Reapplies one persisted tracking period to its materialized financial-year month.
+ */
 async function refreshFinancialYearTrackingMonth(firestore, workspaceId, period) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('A valid period is required')
   const year = Number(period.slice(0, 4))
@@ -125,6 +134,9 @@ async function refreshFinancialYearTrackingMonth(firestore, workspaceId, period)
   return { status: 'updated', workspaceId, year }
 }
 
+/**
+ * Writes observed positions into one month without altering closed historical positions.
+ */
 async function writeFinancialYearPositionMonth(
   firestore,
   workspaceId,
@@ -204,6 +216,9 @@ async function writeFinancialYearPositionMonth(
   return result || { status: 'skipped', period }
 }
 
+/**
+ * Backfills eligible observed position months through the requested date.
+ */
 async function synchronizeFinancialYearPositions(firestore, workspaceId, asOfDate) {
   assertWorkspaceId(workspaceId)
   assertDate(asOfDate)
@@ -248,6 +263,9 @@ async function synchronizeFinancialYearPositions(firestore, workspaceId, asOfDat
   })
 }
 
+/**
+ * Finalizes the previous calendar month as a closed financial position.
+ */
 async function closePreviousFinancialPositionMonth(firestore, workspaceId, today) {
   assertDate(today)
   const period = previousPeriod(today.slice(0, 7))
@@ -265,6 +283,9 @@ async function closePreviousFinancialPositionMonth(firestore, workspaceId, today
   return writeFinancialYearPositionMonth(firestore, workspaceId, request)
 }
 
+/**
+ * Recalculates model-driven assets, liabilities, and linked expenses before projection.
+ */
 async function refreshModeledPositions(
   firestore,
   workspaceId,
@@ -341,6 +362,9 @@ async function refreshModeledPositions(
   return result
 }
 
+/**
+ * Loads config required by the surrounding operation.
+ */
 async function loadConfig(workspace, sections, transaction) {
   const configs = await Promise.all(
     PROJECTION_SECTIONS.map((section) =>
@@ -354,6 +378,9 @@ async function loadConfig(workspace, sections, transaction) {
   )
 }
 
+/**
+ * Validates and converts sections into its canonical representation.
+ */
 function normalizeSections(sections) {
   const normalized = [...new Set(sections)].filter((section) =>
     PROJECTION_SECTIONS.includes(section),
@@ -364,10 +391,16 @@ function normalizeSections(sections) {
   return normalized
 }
 
+/**
+ * Converts a Firestore snapshot into plain documents that include their IDs.
+ */
 function documents(snapshot) {
   return (snapshot?.docs || []).map((document) => ({ id: document.id, ...document.data() }))
 }
 
+/**
+ * Returns the first observed position month matching the requested boundary.
+ */
 function firstObservedPositionMonth(financialYear) {
   const months = [
     financialYear?.projectionState?.assetsInitializedMonth,
@@ -386,6 +419,9 @@ function firstObservedPositionMonth(financialYear) {
   )
 }
 
+/**
+ * Returns every inclusive monthly period between two YYYY-MM boundaries.
+ */
 function periodsBetween(first, last) {
   if (first > last) return []
   const periods = []
@@ -398,21 +434,33 @@ function periodsBetween(first, last) {
   return periods
 }
 
+/**
+ * Returns the calendar period immediately preceding period.
+ */
 function previousPeriod(period) {
   const [year, month] = period.split('-').map(Number)
   return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7)
 }
 
+/**
+ * Returns the canonical last date of a YYYY-MM period.
+ */
 function lastDateOfPeriod(period) {
   const [year, month] = period.split('-').map(Number)
   return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
 }
 
+/**
+ * Returns the earliest month from which a position can be rewritten.
+ */
 function positionStartMonth(financialYear, section, observedMonth) {
   const initializedMonth = financialYear?.projectionState?.[`${section}InitializedMonth`]
   return !initializedMonth || initializedMonth === observedMonth ? '01' : observedMonth
 }
 
+/**
+ * Returns current year in the financial calendar.
+ */
 function currentYear() {
   return Number(
     new Intl.DateTimeFormat('en', { year: 'numeric', timeZone: 'Europe/Madrid' }).format(
@@ -421,6 +469,9 @@ function currentYear() {
   )
 }
 
+/**
+ * Returns current month in the financial calendar.
+ */
 function currentMonth() {
   return new Intl.DateTimeFormat('en', {
     month: '2-digit',
@@ -428,6 +479,9 @@ function currentMonth() {
   }).format(new Date())
 }
 
+/**
+ * Returns today’s canonical date in the Europe/Madrid time zone.
+ */
 function madridToday() {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en', {
@@ -442,22 +496,34 @@ function madridToday() {
   return `${parts.year}-${parts.month}-${parts.day}`
 }
 
+/**
+ * Validates workspace id and throws a descriptive error when its contract is not satisfied.
+ */
 function assertWorkspaceId(value) {
   if (!String(value || '').trim()) throw new Error('A workspace ID is required')
 }
 
+/**
+ * Validates year and throws a descriptive error when its contract is not satisfied.
+ */
 function assertYear(value) {
   if (!Number.isInteger(value) || value < 2000 || value > 9999) {
     throw new Error('A valid financial year is required')
   }
 }
 
+/**
+ * Validates period and throws a descriptive error when its contract is not satisfied.
+ */
 function assertPeriod(value) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || ''))) {
     throw new Error('A valid financial position period is required')
   }
 }
 
+/**
+ * Validates date and throws a descriptive error when its contract is not satisfied.
+ */
 function assertDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!match) throw new Error('A valid financial position date is required')

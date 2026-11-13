@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildFrenchAmortizationSchedule,
-  calculateFrenchMonthlyPayment,
-  calculateMortgageProjection,
-  monthlyInterestRate,
-} from '../../../src/domain/financial/mortgage-amortization.js'
+  buildFrenchMortgageScheduleFromBalance,
+  calculateFrenchMortgageMonthlyPayment,
+  compareFrenchMortgagePayoffScenarios,
+} from '../../../functions/shared/liabilities/mortgage.js'
+import { nominalMonthlyRateFromAnnualPercent } from '../../../functions/shared/core/rates.js'
 
 describe('French mortgage amortization', () => {
   it('converts a nominal annual percentage into a monthly decimal rate', () => {
-    expect(monthlyInterestRate(2.4)).toBeCloseTo(0.002)
+    expect(nominalMonthlyRateFromAnnualPercent(2.4)).toBeCloseTo(0.002)
   })
 
   it('calculates the standard fixed monthly payment', () => {
     expect(
-      calculateFrenchMonthlyPayment({
+      calculateFrenchMortgageMonthlyPayment({
         principal: 200_000,
         annualInterestRate: 3,
         termMonths: 360,
@@ -23,7 +23,7 @@ describe('French mortgage amortization', () => {
 
   it('supports a zero-interest mortgage', () => {
     expect(
-      calculateFrenchMonthlyPayment({
+      calculateFrenchMortgageMonthlyPayment({
         principal: 12_000,
         annualInterestRate: 0,
         termMonths: 12,
@@ -32,7 +32,7 @@ describe('French mortgage amortization', () => {
   })
 
   it('splits payments and uses a smaller final payment', () => {
-    const schedule = buildFrenchAmortizationSchedule({
+    const schedule = buildFrenchMortgageScheduleFromBalance({
       currentBalance: 1_000,
       annualInterestRate: 12,
       monthlyPayment: 400,
@@ -52,7 +52,7 @@ describe('French mortgage amortization', () => {
   })
 
   it('keeps future payments on the contractual mortgage day', () => {
-    const schedule = buildFrenchAmortizationSchedule({
+    const schedule = buildFrenchMortgageScheduleFromBalance({
       currentBalance: 10_000,
       annualInterestRate: 0,
       monthlyPayment: 1_000,
@@ -65,7 +65,7 @@ describe('French mortgage amortization', () => {
   })
 
   it('calculates the effect of an additional monthly payment', () => {
-    const projection = calculateMortgageProjection({
+    const projection = compareFrenchMortgagePayoffScenarios({
       currentBalance: 146_230,
       annualInterestRate: 2.41,
       monthlyPayment: 812,
@@ -83,7 +83,7 @@ describe('French mortgage amortization', () => {
 
   it('returns an empty schedule for a paid-off mortgage', () => {
     expect(
-      buildFrenchAmortizationSchedule({
+      buildFrenchMortgageScheduleFromBalance({
         currentBalance: 0,
         annualInterestRate: 3,
         monthlyPayment: 800,
@@ -94,7 +94,7 @@ describe('French mortgage amortization', () => {
 
   it('rejects a payment that cannot amortize the mortgage', () => {
     expect(() =>
-      buildFrenchAmortizationSchedule({
+      buildFrenchMortgageScheduleFromBalance({
         currentBalance: 100_000,
         annualInterestRate: 12,
         monthlyPayment: 500,

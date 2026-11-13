@@ -1,3 +1,6 @@
+/**
+ * Portable date utilities for canonical ISO dates, calendar-safe month arithmetic, financial time-zone conversion, and anniversary calculations.
+ */
 /** Validates and returns a calendar date in YYYY-MM-DD form without a time-zone shift. */
 export function requireCanonicalDate(value, label = 'date') {
   const date = String(value || '')

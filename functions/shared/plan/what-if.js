@@ -1,3 +1,6 @@
+/**
+ * Normalizes planning assumptions and calculates independent what-if scenarios for savings capacity, cash buffers, investing, debt, and safety coverage.
+ */
 import { normalizeDisposableIncomePercent } from '../income/calculations.js'
 import { roundMoneyOrZero as money } from '../core/money.js'
 import {
@@ -5,6 +8,7 @@ import {
   effectiveMonthlyRateFromAnnualPercent,
   normalizeAnnualPercent,
 } from '../core/rates.js'
+import { calculateSavingsCapacity } from '../positions/metrics.js'
 export const investmentHorizons = Object.freeze([10, 20, 30])
 
 export const investmentTypeDefinitions = Object.freeze([
@@ -131,7 +135,9 @@ export function calculateSavingsCapacityScenario({
   const monthlyAvailableIncome = money(availableIncome / 12)
   const monthlyCostOfLife = money(costOfLife / 12)
   const monthlyDiscretionary = money(discretionary / 12)
-  const currentSavingsCapacity = money(monthlyAvailableIncome - monthlyCostOfLife)
+  const currentSavingsCapacity = money(
+    calculateSavingsCapacity(monthlyAvailableIncome, monthlyCostOfLife),
+  )
   const spendingReductionSavings = money((monthlyDiscretionary * reduction) / 100)
   const directExtraSavings = normalizeMoneyInput(extraMonthlySavings)
   const extraSavings = money(spendingReductionSavings + directExtraSavings)
@@ -251,6 +257,9 @@ export function calculateSafetyCoverageScenario({
   }
 }
 
+/**
+ * Returns projected cash balance for the requested horizon.
+ */
 function projectedCashBalance(startingCash, monthlyContribution, annualReturnPercent, months) {
   const contribution = Math.max(0, Number(monthlyContribution) || 0)
   const monthlyRate = effectiveMonthlyRateFromAnnualPercent(annualReturnPercent)
@@ -311,22 +320,34 @@ export function normalizeStrategy(strategy) {
   return { cash: money(values[0]), invest: money(values[1]), debt: money(values[2]) }
 }
 
+/**
+ * Returns the discretionary reduction required to eliminate negative savings.
+ */
 function breakEvenReduction(currentSavings, discretionary) {
   if (currentSavings >= 0) return 0
   if (!(discretionary > 0)) return null
   return Math.ceil(((-currentSavings / discretionary) * 100 + Number.EPSILON) * 10) / 10
 }
 
+/**
+ * Returns contribution months required to reach a target, or null when unreachable.
+ */
 function monthsToTarget(current, target, monthlyContribution) {
   if (current >= target) return 0
   if (!(monthlyContribution > 0)) return null
   return Math.ceil((target - current) / monthlyContribution)
 }
 
+/**
+ * Returns a finite annual return with a zero fallback.
+ */
 function normalizeReturn(value) {
   return normalizeAnnualPercent(value)
 }
 
+/**
+ * Returns non-negative canonical money with a zero fallback.
+ */
 function normalizeMoneyInput(value) {
   const number = Number(value)
   return Number.isFinite(number) ? money(Math.min(100000, Math.max(0, number))) : 0
