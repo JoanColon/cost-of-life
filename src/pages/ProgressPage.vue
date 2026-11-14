@@ -1,74 +1,42 @@
 <template>
   <q-page class="progress-page">
     <main class="progress-shell">
-      <AppPageHeader
-        :title="t('progress.title')"
-        :subtitle="t('progress.subtitle')"
-        :back-label="t('navigation.backToWorkspaceHome')"
-        :back-to="homeRoute"
-      >
-        <template #actions>
-          <div class="progress-tabs" role="tablist" :aria-label="t('progress.tabs.label')">
-            <button
-              v-for="tab in tabs"
-              :key="tab.id"
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === tab.id"
-              :class="{ active: activeTab === tab.id }"
-              @click="selectTab(tab.id)"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-        </template>
-      </AppPageHeader>
+      <div class="progress-header-layout">
+        <AppPageHeader
+          :title="t('progress.title')"
+          :subtitle="t('progress.subtitle')"
+          :back-label="t('navigation.backToWorkspaceHome')"
+          :back-to="homeRoute"
+        >
+          <template #title-prefix>
+            <span class="progress-title-mark"><q-icon name="bar_chart" /></span>
+          </template>
+          <template #title-action>
+            <q-icon name="info_outline" class="progress-title-info">
+              <q-tooltip>{{ t('progress.subtitle') }}</q-tooltip>
+            </q-icon>
+          </template>
+        </AppPageHeader>
+
+        <div class="progress-tabs" role="tablist" :aria-label="t('progress.tabs.label')">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.id"
+            :class="{ active: activeTab === tab.id }"
+            @click="selectTab(tab.id)"
+          >
+            <q-icon :name="tab.icon" />
+            <span>{{ tab.label }}</span>
+          </button>
+        </div>
+      </div>
 
       <AchievementsPage v-if="activeTab === 'achievements'" embedded class="achievements-view" />
 
       <template v-else>
-        <div class="evolution-toolbar">
-          <div class="period-switch" role="group" :aria-label="t('progress.filters.period')">
-            <button
-              v-for="option in periodOptions"
-              :key="option.value"
-              type="button"
-              :class="{ selected: selectedPeriod === option.value }"
-              :aria-pressed="selectedPeriod === option.value"
-              @click="selectPeriod(option.value)"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-
-          <q-btn
-            outline
-            no-caps
-            icon="calendar_month"
-            class="date-filter"
-            :label="rangeLabel"
-            :aria-label="t('progress.filters.date')"
-          >
-            <q-icon name="expand_more" class="date-filter__chevron" />
-            <q-menu anchor="bottom right" self="top right" class="snapshot-menu">
-              <div class="snapshot-menu__heading">{{ t('progress.filters.chooseSnapshot') }}</div>
-              <q-list dense>
-                <q-item
-                  v-for="point in availableStartPoints"
-                  :key="point.period"
-                  clickable
-                  v-close-popup
-                  :active="startPoint?.period === point.period"
-                  active-class="snapshot-menu__active"
-                  @click="selectStartPeriod(point.period)"
-                >
-                  <q-item-section>{{ formatPeriod(point.period) }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </q-btn>
-        </div>
-
         <div v-if="loading && !financialYear" class="state">
           <q-spinner color="primary" size="2rem" />
           <span>{{ t('progress.loading') }}</span>
@@ -99,7 +67,10 @@
               v-for="perspective in perspectives"
               :key="perspective.id"
               type="button"
-              :class="{ active: activePerspective === perspective.id }"
+              :class="[
+                `perspective-card--${perspective.tone}`,
+                { active: activePerspective === perspective.id },
+              ]"
               :aria-current="activePerspective === perspective.id ? 'page' : undefined"
               @click="selectPerspective(perspective.id)"
             >
@@ -115,14 +86,29 @@
           </nav>
 
           <article class="perspective-panel">
+            <div class="evolution-toolbar">
+              <div class="period-switch" role="group" :aria-label="t('progress.filters.period')">
+                <button
+                  v-for="option in periodOptions"
+                  :key="option.value"
+                  type="button"
+                  :class="{ selected: selectedPeriod === option.value }"
+                  :aria-pressed="selectedPeriod === option.value"
+                  @click="selectPeriod(option.value)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
             <header class="perspective-header">
               <div class="perspective-heading">
                 <span class="perspective-eyebrow">{{ activePerspectiveConfig.label }}</span>
                 <h2>{{ activePerspectiveConfig.title }}</h2>
-                <p>{{ activePerspectiveConfig.description }}</p>
+                <p class="perspective-description">{{ activePerspectiveConfig.description }}</p>
               </div>
               <div
-                class="metric-highlight"
+                class="metric-highlight metric-highlight--mobile"
                 :class="`metric-highlight--${activePerspectiveConfig.tone}`"
               >
                 <span>{{ metric.label }}</span>
@@ -172,31 +158,42 @@
                 <p class="chart-note">{{ activePerspectiveConfig.note }}</p>
               </section>
 
-              <aside class="breakdown-card">
-                <h3>{{ breakdownTitle }}</h3>
-                <div class="breakdown-list">
-                  <div v-for="item in breakdownItems" :key="item.key" class="breakdown-row">
-                    <span class="breakdown-marker" :style="{ background: item.color }">
-                      <q-icon v-if="item.icon" :name="item.icon" />
-                    </span>
-                    <span class="breakdown-copy">
-                      <strong>{{ item.label }}</strong>
-                      <small v-if="item.meta">{{ item.meta }}</small>
-                    </span>
-                    <b :class="{ positive: item.positive, negative: item.negative }">
-                      {{ item.value }}
-                    </b>
-                  </div>
+              <aside class="analysis-aside">
+                <div
+                  class="metric-highlight metric-highlight--desktop"
+                  :class="`metric-highlight--${activePerspectiveConfig.tone}`"
+                >
+                  <span>{{ metric.label }}</span>
+                  <strong>{{ metric.value }}</strong>
+                  <small :class="{ negative: metric.negative }">{{ metric.change }}</small>
                 </div>
 
-                <div v-if="activePerspective === 'freedom'" class="formula-card">
-                  <span>{{ t('progress.freedom.infoFormula') }}</span>
-                  <small>{{ t('progress.freedom.calculationNote') }}</small>
-                </div>
-                <div v-if="activePerspective === 'cost-of-life'" class="coverage-note">
-                  <q-icon name="info_outline" />
-                  <span>{{ coverageDescription }}</span>
-                </div>
+                <section class="breakdown-card">
+                  <h3>{{ breakdownTitle }}</h3>
+                  <div class="breakdown-list">
+                    <div v-for="item in breakdownItems" :key="item.key" class="breakdown-row">
+                      <span class="breakdown-marker" :style="{ background: item.color }">
+                        <q-icon v-if="item.icon" :name="item.icon" />
+                      </span>
+                      <span class="breakdown-copy">
+                        <strong>{{ item.label }}</strong>
+                        <small v-if="item.meta">{{ item.meta }}</small>
+                      </span>
+                      <b :class="{ positive: item.positive, negative: item.negative }">
+                        {{ item.value }}
+                      </b>
+                    </div>
+                  </div>
+
+                  <div v-if="activePerspective === 'freedom'" class="formula-card">
+                    <span>{{ t('progress.freedom.infoFormula') }}</span>
+                    <small>{{ t('progress.freedom.calculationNote') }}</small>
+                  </div>
+                  <div v-if="activePerspective === 'cost-of-life'" class="coverage-note">
+                    <q-icon name="info_outline" />
+                    <span>{{ coverageDescription }}</span>
+                  </div>
+                </section>
               </aside>
             </div>
           </article>
@@ -237,7 +234,6 @@ const milestonesStore = useMilestonesStore()
 const scopeStore = useFinancialScopeStore()
 const workspaceStore = useWorkspaceStore()
 const selectedPeriod = ref('1')
-const customStartPeriod = ref(null)
 
 const {
   currentMonth,
@@ -250,8 +246,8 @@ const {
 } = storeToRefs(milestonesStore)
 
 const tabs = computed(() => [
-  { id: 'evolution', label: t('progress.tabs.evolution') },
-  { id: 'achievements', label: t('progress.tabs.achievements') },
+  { id: 'evolution', icon: 'trending_up', label: t('progress.tabs.evolution') },
+  { id: 'achievements', icon: 'emoji_events', label: t('progress.tabs.achievements') },
 ])
 const periodOptions = computed(() => [
   { value: '1', label: t('progress.filters.oneYear') },
@@ -293,7 +289,7 @@ const perspectives = computed(() => [
   {
     id: 'composition',
     icon: 'donut_large',
-    tone: 'violet',
+    tone: 'warning',
     label: t('progress.evolution.composition.label'),
     question: t('progress.evolution.composition.question'),
     title: t('progress.evolution.composition.title'),
@@ -352,12 +348,6 @@ const flowPoints = computed(() =>
 const endPoint = computed(() => progressPoints.value.at(-1) || null)
 const startPoint = computed(() => {
   if (!progressPoints.value.length) return null
-  if (customStartPeriod.value) {
-    return (
-      progressPoints.value.find(({ period }) => period === customStartPeriod.value) ||
-      progressPoints.value[0]
-    )
-  }
   if (selectedPeriod.value === 'all') return progressPoints.value[0]
   const cutoff = periodIndex(endPoint.value.period) - Number(selectedPeriod.value) * 12
   return (
@@ -385,11 +375,6 @@ const filteredFlowPoints = computed(() =>
 )
 const startBreakdown = computed(() => filteredBreakdownPoints.value[0] || null)
 const endBreakdown = computed(() => filteredBreakdownPoints.value.at(-1) || null)
-const availableStartPoints = computed(() => progressPoints.value.slice(0, -1).reverse())
-const rangeLabel = computed(() => {
-  if (!startPoint.value || !endPoint.value) return t('progress.filters.noHistory')
-  return `${formatShortPeriod(startPoint.value.period)} – ${formatShortPeriod(endPoint.value.period)}`
-})
 
 const bridgeItems = computed(() => {
   const items = buildNetWorthBridge(startBreakdown.value, endBreakdown.value).map((item) => ({
@@ -579,9 +564,6 @@ const coverageDescription = computed(() => {
 })
 
 watch(workspaceId, () => load(), { immediate: true })
-watch(selectedMemberId, () => {
-  customStartPeriod.value = null
-})
 
 function load(force = false) {
   return milestonesStore.load(workspaceId.value, force)
@@ -597,12 +579,6 @@ function selectPerspective(view) {
 
 function selectPeriod(value) {
   selectedPeriod.value = value
-  customStartPeriod.value = null
-}
-
-function selectStartPeriod(period) {
-  customStartPeriod.value = period
-  selectedPeriod.value = 'custom'
 }
 
 function categoryLabel(section, categoryId) {
@@ -634,13 +610,6 @@ function percentChange(delta, start) {
 function periodIndex(period) {
   const [year, month] = period.split('-').map(Number)
   return year * 12 + month - 1
-}
-
-function formatPeriod(period) {
-  const [year, month] = period.split('-').map(Number)
-  return new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(
-    new Date(Date.UTC(year, month - 1, 1)),
-  )
 }
 
 function formatShortPeriod(period) {
@@ -675,7 +644,66 @@ function signedCurrency(value) {
   @include financial-shell(analytical);
 }
 
-.progress-tabs,
+.progress-title-info {
+  color: var(--color-copy);
+  font-size: 1.55rem;
+}
+.progress-title-mark {
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 50%;
+  background: var(--color-green-soft);
+  color: var(--color-success);
+  font-size: 1.65rem;
+}
+
+.progress-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+  border-bottom: 1px solid var(--color-line-strong);
+}
+.progress-tabs button {
+  @include button-reset;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 3.25rem;
+  border-radius: 0;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-shadow: none;
+  transition: 160ms ease;
+}
+.progress-tabs button .q-icon {
+  font-size: 1.55rem;
+}
+.progress-tabs button:hover {
+  color: var(--color-ink);
+  background: transparent;
+}
+.progress-tabs button.active {
+  color: var(--color-ink);
+}
+.progress-tabs button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  background: var(--color-ink);
+  content: '';
+}
+.progress-tabs button:focus-visible {
+  outline: 3px solid var(--color-primary-focus);
+  outline-offset: -3px;
+}
+
 .period-switch {
   display: inline-flex;
   padding: 0.25rem;
@@ -684,20 +712,13 @@ function signedCurrency(value) {
   background: var(--color-surface);
   box-shadow: var(--shadow-control);
 }
-
-.progress-tabs button,
 .period-switch button {
   @include segmented-button;
-  min-width: 8.6rem;
-  padding: 0.55rem 1rem;
+  min-width: 3.2rem;
+  padding: 0.4rem 0.75rem;
   color: var(--color-copy);
   transition: 160ms ease;
 }
-.period-switch button {
-  min-width: 3.2rem;
-  padding: 0.4rem 0.75rem;
-}
-.progress-tabs button.active,
 .period-switch button.selected {
   background: var(--color-ink);
   color: var(--color-inverse);
@@ -706,74 +727,60 @@ function signedCurrency(value) {
 
 .evolution-toolbar {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
-  margin-top: 1.25rem;
-}
-.date-filter {
-  min-width: 12rem;
-  border-radius: 999px;
-  color: var(--color-ink);
-  background: var(--color-surface);
-}
-.date-filter__chevron {
-  margin-left: 0.4rem;
-}
-.snapshot-menu {
-  min-width: 14rem;
-  max-height: 22rem;
-  border-radius: var(--radius-md);
-}
-.snapshot-menu__heading {
-  padding: 0.8rem 1rem 0.45rem;
-  color: var(--color-muted);
-  font-size: 0.72rem;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-.snapshot-menu__active {
-  color: var(--color-primary);
-  background: var(--color-blue-soft);
+  margin-bottom: 1rem;
 }
 
 .evolution-workspace {
-  display: grid;
-  grid-template-columns: minmax(17rem, 0.27fr) minmax(0, 1fr);
-  min-height: 39rem;
-  margin-top: 1rem;
-  overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
+  margin-top: 1.25rem;
 }
 .perspective-nav {
-  padding: 1.35rem;
-  border-right: 1px solid var(--color-line);
-  background: linear-gradient(180deg, var(--color-surface), var(--color-surface-soft));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 .perspective-nav button {
   @include button-reset;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.65rem;
   width: 100%;
-  padding: 1rem 0.8rem;
-  border-radius: var(--radius-md);
+  min-height: 5.25rem;
+  padding: 0.8rem 0.85rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
   color: var(--color-ink);
-  transition: 160ms ease;
-}
-.perspective-nav button + button {
-  margin-top: 0.45rem;
+  box-shadow: 0 8px 24px rgb(34 55 78 / 5%);
+  transition:
+    160ms border-color ease,
+    160ms box-shadow ease,
+    160ms transform ease;
 }
 .perspective-nav button:hover {
-  background: var(--color-surface-muted);
+  border-color: var(--color-line-strong);
+  box-shadow: 0 12px 28px rgb(34 55 78 / 9%);
+  transform: translateY(-1px);
 }
 .perspective-nav button.active {
-  background: linear-gradient(135deg, var(--color-green-soft), var(--color-surface));
-  box-shadow: inset 0 0 0 1px rgb(22 129 95 / 10%);
+  border-color: var(--color-primary);
+  background: var(--color-blue-soft);
+  box-shadow: 0 10px 28px var(--color-primary-glow);
+}
+.perspective-nav button.perspective-card--green.active {
+  border-color: var(--color-success);
+  background: var(--color-green-soft);
+}
+.perspective-nav button.perspective-card--purple.active {
+  border-color: var(--color-purple);
+  background: var(--color-purple-soft);
+}
+.perspective-nav button.perspective-card--warning.active {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
 }
 .perspective-nav button:focus-visible {
   outline: 3px solid var(--color-primary-focus);
@@ -784,7 +791,7 @@ function signedCurrency(value) {
   display: block;
 }
 .perspective-nav strong {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
 }
 .perspective-nav small {
   margin-top: 0.18rem;
@@ -797,10 +804,10 @@ function signedCurrency(value) {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 2.65rem;
-  height: 2.65rem;
+  width: 2.3rem;
+  height: 2.3rem;
   border-radius: 50%;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
 }
 .perspective-icon--green {
   background: var(--color-green-soft);
@@ -810,26 +817,31 @@ function signedCurrency(value) {
   background: var(--color-blue-soft);
   color: var(--color-primary);
 }
-.perspective-icon--purple,
-.perspective-icon--violet {
+.perspective-icon--purple {
   background: var(--color-purple-soft);
   color: var(--color-purple);
 }
+.perspective-icon--warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-dark);
+}
 .perspective-chevron {
   color: var(--color-muted);
-  opacity: 0;
-}
-.perspective-nav button.active .perspective-chevron {
-  opacity: 1;
 }
 
 .perspective-panel {
+  position: relative;
   min-width: 0;
+  margin-top: 1rem;
   padding: clamp(1.4rem, 3vw, 2.4rem);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 .perspective-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(13rem, 18rem);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 2rem;
 }
@@ -847,11 +859,12 @@ function signedCurrency(value) {
   line-height: 1.02;
   letter-spacing: -0.045em;
 }
-.perspective-heading p {
-  max-width: 48rem;
+.perspective-description {
+  max-width: 54rem;
   margin: 0.65rem 0 0;
   color: var(--color-copy);
-  line-height: 1.5;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 .metric-highlight {
   padding: 1.2rem 1.35rem;
@@ -861,9 +874,11 @@ function signedCurrency(value) {
 .metric-highlight--blue {
   background: var(--color-blue-soft);
 }
-.metric-highlight--purple,
-.metric-highlight--violet {
+.metric-highlight--purple {
   background: var(--color-purple-soft);
+}
+.metric-highlight--warning {
+  background: var(--color-warning-soft);
 }
 .metric-highlight span,
 .metric-highlight strong,
@@ -884,9 +899,11 @@ function signedCurrency(value) {
 .metric-highlight--blue strong {
   color: var(--color-primary-dark);
 }
-.metric-highlight--purple strong,
-.metric-highlight--violet strong {
+.metric-highlight--purple strong {
   color: var(--color-purple);
+}
+.metric-highlight--warning strong {
+  color: var(--color-warning-dark);
 }
 .metric-highlight small {
   margin-top: 0.45rem;
@@ -903,6 +920,12 @@ function signedCurrency(value) {
   grid-template-columns: minmax(0, 1.65fr) minmax(15rem, 0.85fr);
   gap: 1rem;
   margin-top: 1.65rem;
+}
+.analysis-aside {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-width: 0;
 }
 .chart-card,
 .breakdown-card {
@@ -1027,22 +1050,75 @@ function signedCurrency(value) {
   margin-top: 1.25rem;
 }
 
-@media (max-width: 1050px) {
-  .evolution-workspace {
-    grid-template-columns: 1fr;
+@media (min-width: 761px) {
+  .progress-tabs {
+    grid-template-columns: repeat(2, 14.5rem);
+    justify-content: start;
   }
-  .perspective-nav {
-    display: flex;
-    gap: 0.5rem;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-line);
+  .progress-tabs button {
+    min-height: 3.7rem;
   }
-  .perspective-nav button {
-    flex: 0 0 min(15rem, 70vw);
+  .perspective-chevron {
+    display: none;
   }
-  .perspective-nav button + button {
+  .perspective-panel {
+    padding: 2.2rem;
+  }
+  .evolution-toolbar {
+    position: absolute;
+    top: 1.8rem;
+    right: 2.2rem;
+    z-index: 1;
+    margin: 0;
+  }
+  .perspective-header {
+    padding-right: 22rem;
+  }
+  .metric-highlight--mobile {
+    display: none;
+  }
+  .metric-highlight--desktop {
+    position: relative;
+    min-height: 7rem;
+    padding: 1.15rem 7.5rem 1.15rem 1.45rem;
+  }
+  .metric-highlight--desktop strong {
+    font-size: clamp(2rem, 3vw, 2.8rem);
+  }
+  .metric-highlight--desktop small {
+    position: absolute;
+    top: 50%;
+    right: 1.25rem;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 45%);
+    transform: translateY(-50%);
+  }
+}
+
+@media (min-width: 900px) {
+  .progress-header-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(24rem, 42%);
+    align-items: end;
+    column-gap: clamp(2rem, 5vw, 5rem);
+  }
+
+  .progress-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
     margin-top: 0;
+  }
+
+  .progress-tabs button {
+    min-height: 3.25rem;
+  }
+}
+
+@media (max-width: 1050px) {
+  .perspective-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .analysis-grid {
     grid-template-columns: 1fr;
@@ -1055,57 +1131,104 @@ function signedCurrency(value) {
 }
 
 @media (max-width: 760px) {
-  :deep(.app-page-header) {
-    display: block;
+  :deep(.app-page-header p) {
+    display: none;
   }
-  :deep(.app-page-header__actions) {
-    margin-top: 1rem;
+  .progress-title-info {
+    font-size: 1.35rem;
+  }
+  .progress-title-mark {
+    display: none;
   }
   .progress-tabs {
-    width: 100%;
+    margin-top: 0.8rem;
   }
   .progress-tabs button {
-    flex: 1;
-    min-width: 0;
+    min-height: 3.25rem;
+    font-size: 0.86rem;
+  }
+  .progress-tabs button .q-icon {
+    font-size: 1.25rem;
+  }
+  .evolution-workspace {
+    margin-top: 0.85rem;
+  }
+  .perspective-nav {
+    gap: 0.65rem;
+  }
+  .perspective-nav button {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    min-height: 3.9rem;
+    padding: 0.55rem;
+    border-radius: var(--radius-md);
+  }
+  .perspective-nav strong {
+    font-size: 0.74rem;
+    line-height: 1.2;
+  }
+  .perspective-nav small {
+    display: none;
+  }
+  .perspective-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.95rem;
+  }
+  .perspective-chevron {
+    font-size: 1.1rem;
+  }
+  .perspective-panel {
+    margin-top: 0.85rem;
+    padding: 1rem 0.9rem;
+    border-radius: var(--radius-lg);
   }
   .evolution-toolbar {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    margin-bottom: 0.85rem;
   }
   .period-switch {
+    grid-row: 1;
     width: 100%;
   }
   .period-switch button {
     flex: 1;
     min-width: 0;
   }
-  .date-filter {
-    width: 100%;
-  }
-  .evolution-workspace {
-    margin-top: 0.75rem;
-    overflow: visible;
-  }
-  .perspective-nav {
-    margin: 0;
-    padding: 0.75rem;
-  }
-  .perspective-nav button {
-    flex-basis: min(13.5rem, 78vw);
-    padding: 0.75rem;
-  }
-  .perspective-panel {
-    padding: 1rem;
-  }
   .perspective-header {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
   .perspective-heading h2 {
-    font-size: 1.8rem;
+    font-size: 1.75rem;
+    line-height: 1.08;
+  }
+  .perspective-description {
+    display: none;
   }
   .metric-highlight {
-    padding: 1rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0.9rem 1rem;
+  }
+  .metric-highlight--desktop {
+    display: none;
+  }
+  .metric-highlight span,
+  .metric-highlight strong {
+    grid-column: 1;
+  }
+  .metric-highlight strong {
+    font-size: 1.8rem;
+  }
+  .metric-highlight small {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    margin: 0;
+    padding: 0.45rem 0.65rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 48%);
   }
   .analysis-grid {
     margin-top: 1rem;
@@ -1116,6 +1239,9 @@ function signedCurrency(value) {
   }
   .breakdown-list {
     grid-template-columns: 1fr;
+  }
+  .chart-note {
+    font-size: 0.68rem;
   }
   .empty-state {
     grid-template-columns: 1fr;

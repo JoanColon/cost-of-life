@@ -358,6 +358,13 @@ function openModel(asset) {
     })
     return
   }
+  if (asset.categoryId === 'cash') {
+    router.push({
+      name: 'cash-model',
+      params: { workspaceId: workspaceId.value, assetId: asset.id },
+    })
+    return
+  }
   router.push({
     name: 'investment-portfolio',
     params: { workspaceId: workspaceId.value, assetId: asset.id },
@@ -365,7 +372,7 @@ function openModel(asset) {
 }
 
 function hasModel(asset) {
-  return asset.categoryId === 'investment' || asset.categoryId === 'real_estate'
+  return ['investment', 'real_estate', 'cash'].includes(asset.categoryId)
 }
 
 function closeAssetDialog() {

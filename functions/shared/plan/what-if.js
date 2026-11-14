@@ -2,11 +2,13 @@
  * Normalizes planning assumptions and calculates independent what-if scenarios for savings capacity, cash buffers, investing, debt, and safety coverage.
  */
 import { normalizeDisposableIncomePercent } from '../income/calculations.js'
+import { compoundCashBalance } from '../assets/cash.js'
 import { roundMoneyOrZero as money } from '../core/money.js'
 import {
   compoundGrowthFactorForMonths,
   effectiveMonthlyRateFromAnnualPercent,
   normalizeAnnualPercent,
+  normalizeAnnualReturnPercent,
 } from '../core/rates.js'
 import { calculateSavingsCapacity } from '../positions/metrics.js'
 export const investmentHorizons = Object.freeze([10, 20, 30])
@@ -27,7 +29,6 @@ export const defaultStrategyScenario = Object.freeze({
   investmentMix: Object.freeze({
     stockMarket: Object.freeze({ allocation: 100, annualReturnPercent: 7 }),
   }),
-  cashAnnualReturnPercent: 1,
   inflationAnnualPercent: 2,
   horizonYears: 20,
   cashTargetMonths: 12,
@@ -53,7 +54,7 @@ export function normalizeWhatIfConfig(config = {}) {
         annualReturnPercent: normalizeReturn(config.expectedAnnualReturnPercent) ?? 7,
       },
     },
-    cashAnnualReturnPercent: normalizeReturn(config.cashAnnualReturnPercent) ?? 1,
+    ...normalizedCashReturnOverride(config),
     inflationAnnualPercent: normalizeReturn(config.inflationAnnualPercent) ?? 2,
     selectedLiabilityId:
       typeof config.selectedLiabilityId === 'string' ? config.selectedLiabilityId : null,
@@ -91,7 +92,7 @@ export function normalizeStrategyScenario(scenario = {}) {
         .slice(0, 80) || 'Strategy',
     allocation: allocation || { ...defaultStrategyScenario.allocation },
     investmentMix,
-    cashAnnualReturnPercent: normalizeReturn(scenario.cashAnnualReturnPercent) ?? 1,
+    ...normalizedCashReturnOverride(scenario),
     inflationAnnualPercent: normalizeReturn(scenario.inflationAnnualPercent) ?? 2,
     horizonYears: Number.isFinite(horizon) ? Math.min(50, Math.max(1, Math.round(horizon))) : 20,
     cashTargetMonths: [3, 6, 12].includes(cashTarget) ? cashTarget : 12,
@@ -100,6 +101,14 @@ export function normalizeStrategyScenario(scenario = {}) {
         scenario.selectedLiabilityId :
         null,
   }
+}
+
+/** Resolves a manual Cash return override, otherwise returning the current asset-model suggestion. */
+export function resolveCashAnnualReturnPercent(scenario = {}, suggestedReturn = 0) {
+  if (Object.hasOwn(scenario, 'cashAnnualReturnPercent')) {
+    return normalizeCashReturn(scenario.cashAnnualReturnPercent) ?? 0
+  }
+  return normalizeCashReturn(suggestedReturn) ?? 0
 }
 
 /** Normalizes an investment allocation mix and its expected annual returns. */
@@ -262,10 +271,10 @@ export function calculateSafetyCoverageScenario({
  */
 function projectedCashBalance(startingCash, monthlyContribution, annualReturnPercent, months) {
   const contribution = Math.max(0, Number(monthlyContribution) || 0)
-  const monthlyRate = effectiveMonthlyRateFromAnnualPercent(annualReturnPercent)
   let balance = Math.max(0, Number(startingCash) || 0)
   for (let month = 0; month < months; month += 1) {
-    balance = balance * (1 + monthlyRate) + contribution
+    balance =
+      compoundCashBalance({ currentBalance: balance, annualReturnPercent, months: 1 }) + contribution
   }
   return money(balance)
 }
@@ -343,6 +352,17 @@ function monthsToTarget(current, target, monthlyContribution) {
  */
 function normalizeReturn(value) {
   return normalizeAnnualPercent(value)
+}
+
+/** Returns a signed finite annual Cash return, or null for invalid input. */
+function normalizeCashReturn(value) {
+  return normalizeAnnualReturnPercent(value)
+}
+
+/** Preserves the distinction between an absent automatic return and an explicit override. */
+function normalizedCashReturnOverride(value) {
+  if (!Object.hasOwn(value, 'cashAnnualReturnPercent')) return {}
+  return { cashAnnualReturnPercent: normalizeCashReturn(value.cashAnnualReturnPercent) ?? 0 }
 }
 
 /**

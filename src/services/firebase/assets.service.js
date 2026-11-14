@@ -7,6 +7,7 @@ import {
 } from '@/services/firebase/financial-model-mutations.service'
 import { normalizeNonNegativeMoneyOrNull } from '../../../functions/shared/core/money.js'
 import { cloneOwnershipAllocation } from '../../../functions/shared/core/ownership.js'
+import { normalizeAnnualReturnPercent } from '../../../functions/shared/core/rates.js'
 import {
   annualRealEstateValue,
   effectiveRealEstateValue,
@@ -120,6 +121,14 @@ function canonicalAsset(asset, includeDefaultDetail = false) {
       } else {
         detail.realEstate = { schemaVersion: 1, annualAppreciationRate }
       }
+    }
+    if (detail.cash != null) {
+      if (category.id !== 'cash') throw new Error('Only Cash assets can have a Cash model')
+      const annualReturnPercent = normalizeAnnualReturnPercent(detail.cash.annualReturnPercent)
+      if (detail.cash.schemaVersion !== 1 || annualReturnPercent == null) {
+        throw new Error('A valid annual Cash return is required')
+      }
+      detail.cash = { schemaVersion: 1, annualReturnPercent }
     }
     canonical.detail = detail
   }

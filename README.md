@@ -18,6 +18,7 @@ La aplicación permite:
 - activar seguimiento y confirmar hitos de seguridad, patrimonio, deuda y libertad financiera;
 - modelar hipotecas de amortización francesa y vincularlas con un inmueble y un gasto;
 - proyectar el valor y el equity de inmuebles;
+- modelar una rentabilidad anual opcional para saldos Cash sin alterar sus balances observados;
 - conectar una inversión con Google Sheets para sincronizar posiciones, valoración y dividendos;
 - simular recortes de gasto, ahorro adicional y estrategias guardadas de efectivo, inversión y deuda;
 - comparar la evolución histórica de patrimonio, activos, deuda, ingresos y coste de vida.
@@ -208,6 +209,7 @@ No construyas URLs de workspace a mano. El mapa funcional es:
 | `asset-category`, `liability-category`, `income-category`, `expense-category` | `.../:section/:category`                      | Edición detallada de una categoría.                    |
 | `investment-portfolio`                                                        | `.../assets/investment/:assetId/portfolio`    | Portfolio conectado a Google Sheets.                   |
 | `real-estate-model`                                                           | `.../assets/real-estate/:assetId/model`       | Valor, hipoteca y equity del inmueble.                 |
+| `cash-model`                                                                  | `.../assets/cash/:assetId/model`              | Rentabilidad y proyección de un saldo Cash.            |
 | `mortgage-detail`                                                             | `.../liabilities/mortgage/:liabilityId/model` | Modelo y amortización de hipoteca.                     |
 | `expense-tracker`                                                             | `.../expenses/tracker`                        | Registro y reconciliación mensual.                     |
 | `progress`                                                                    | `.../progress`                                | Comparación temporal de métricas financieras.          |
@@ -279,6 +281,7 @@ No escribas directamente en estas colecciones desde el cliente. Las reglas permi
 - Una hipoteca solo soporta tipo francés, interés fijo y cuota capaz de cubrir los intereses. Su esquema actual incluye principal original, saldo/ancla de saldo, tasa, cuota, plazo y fecha inicial.
 - La relación hipoteca–inmueble y la relación hipoteca–gasto se gestionan desde la mutación de la hipoteca, no editando los otros documentos. Son uno-a-uno. El gasto enlazado debe ser `housing/mortgage_rent`; su estimación mensual se mantiene alineada con la cuota y deja de proyectarse al terminar la deuda.
 - Un modelo inmobiliario vive en `modelAssets/{id}.detail.realEstate`: precio y fecha de compra, apreciación anual y schema version. Su valoración efectiva se actualiza al abrir/asegurar el año y antes del cierre mensual.
+- Un modelo Cash opcional vive en `modelAssets/{id}.detail.cash`: schema version y rentabilidad anual. Solo proyecta valores futuros; `currentValue` continúa siendo el saldo observado y nunca se actualiza desde el modelo.
 - Un portfolio vive embebido en `modelAssets/{id}.detail.portfolio`; no existe una colección de portfolios. Puede enlazarse como máximo a una fuente `investments/dividends`. Al sincronizar, la Function actualiza `currentValue`, el ingreso anual por dividendos y las secciones afectadas del año financiero.
 
 Los borrados limpian relaciones: borrar una inversión desvincula su ingreso; borrar una hipoteca desvincula inmueble y gasto; borrar gastos retira sus IDs de tracking. `deleteCategory` hace todo dentro del límite transaccional de 500 escrituras y falla si lo excede.

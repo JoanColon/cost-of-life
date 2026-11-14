@@ -14,6 +14,7 @@
       />
 
       <div class="app-page-header__title-row">
+        <slot name="title-prefix" />
         <h1>{{ title }}</h1>
         <slot name="title-action" />
       </div>

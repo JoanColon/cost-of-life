@@ -6,6 +6,7 @@ import {
   financialYearMonthCategoryValue,
 } from '../positions/annual-projection.js'
 import { calculateAnniversaryRealEstateValuation } from '../assets/real-estate.js'
+import { compoundCashBalance } from '../assets/cash.js'
 import { addCalendarMonthsClamped, dateInFinancialTimeZone } from '../core/dates.js'
 import { roundMoneyOrZero as money } from '../core/money.js'
 import {
@@ -240,7 +241,6 @@ export function projectStrategyAssetPath({
 } = {}) {
   const months = Math.max(1, Math.round(Number(horizonYears) * 12))
   const savings = Math.max(0, Number(monthlySavings) || 0)
-  const monthlyCashReturn = effectiveMonthlyRateFromAnnualPercent(cashAnnualReturnPercent)
   const nominalMonthlyCost = Math.max(0, Number(monthlyCost) || 0)
   const initialCashTarget = money(nominalMonthlyCost * cashTargetMonths)
   let cash = Math.max(0, Number(startingPosition.cash) || 0)
@@ -263,7 +263,11 @@ export function projectStrategyAssetPath({
 
   for (let month = 1; month <= months; month += 1) {
     const cashBeforeGrowth = cash
-    cash *= 1 + monthlyCashReturn
+    cash = compoundCashBalance({
+      currentBalance: cash,
+      annualReturnPercent: cashAnnualReturnPercent,
+      months: 1,
+    })
     cashGrowth += cash - cashBeforeGrowth
 
     for (const [type, balance] of Object.entries(balances)) {

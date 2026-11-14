@@ -7,6 +7,26 @@ export function normalizeAnnualPercent(value, fallback = null) {
   return Number.isFinite(number) && number >= 0 && number <= 100 ? number : fallback
 }
 
+/** Normalizes a signed annual investment return in the inclusive -100 to 100 range. */
+export function normalizeAnnualReturnPercent(value, fallback = null) {
+  const number = Number(value)
+  return Number.isFinite(number) && number >= -100 && number <= 100 ? number : fallback
+}
+
+/** Converts a signed effective annual return into its equivalent monthly decimal rate. */
+export function effectiveMonthlyReturnRateFromAnnualPercent(annualPercent = 0) {
+  const annualRate = (normalizeAnnualReturnPercent(annualPercent, 0) || 0) / 100
+  return Math.pow(1 + annualRate, 1 / 12) - 1
+}
+
+/** Returns the compound growth factor for a number of months using a signed annual return. */
+export function compoundReturnFactorForMonths(annualPercent = 0, months = 0) {
+  return Math.pow(
+    1 + effectiveMonthlyReturnRateFromAnnualPercent(annualPercent),
+    Math.max(0, Number(months) || 0),
+  )
+}
+
 /** Converts an effective annual percentage into its equivalent monthly decimal rate. */
 export function effectiveMonthlyRateFromAnnualPercent(annualPercent = 0) {
   const annualRate = (normalizeAnnualPercent(annualPercent, 0) || 0) / 100

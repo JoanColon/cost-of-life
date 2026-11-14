@@ -642,13 +642,13 @@
               <span class="mix-card-icon cash-return"><q-icon name="savings" /></span>
               <div class="mix-card-identity">
                 <strong>{{ t('whatIf.cash.title') }}</strong>
-                <small>{{ t('whatIf.strategy.cashDescription') }}</small>
+                <small>{{ cashReturnSourceLabel }}</small>
               </div>
               <button type="button" class="mix-card-metric editable-metric return-metric">
-                <strong>{{ Number(activeScenario.cashAnnualReturnPercent).toFixed(1) }}%</strong>
+                <strong>{{ Number(effectiveCashAnnualReturnPercent).toFixed(1) }}%</strong>
                 <small>{{ t('whatIf.strategy.expectedReturnShort') }}</small>
                 <q-popup-edit
-                  :model-value="activeScenario.cashAnnualReturnPercent"
+                  :model-value="effectiveCashAnnualReturnPercent"
                   buttons
                   :title="t('whatIf.strategy.cashAnnualReturn')"
                   :label-set="t('common.save')"
@@ -662,7 +662,7 @@
                       dense
                       outlined
                       type="number"
-                      min="0"
+                      min="-100"
                       max="100"
                       step="0.1"
                       suffix="%"
@@ -671,6 +671,16 @@
                   </template>
                 </q-popup-edit>
               </button>
+              <q-btn
+                v-if="cashReturnOverridden"
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="restart_alt"
+                :label="t('whatIf.strategy.useSuggestedCashReturn')"
+                @click="resetCashReturn"
+              />
             </article>
 
             <div class="sheet-subheading">
@@ -1294,6 +1304,7 @@ import {
   investmentTypeDefinitions,
   normalizeStrategyForOptions,
   normalizeStrategyScenario,
+  resolveCashAnnualReturnPercent,
 } from '../../functions/shared/plan/what-if.js'
 import { calculateMilestoneProgress } from '@/domain/milestones/calculations'
 import { authUser } from '@/services/auth'
@@ -1368,11 +1379,28 @@ const calculationContext = computed(() =>
     financialYear: financialYear.value,
     month: positionMonth.value,
     memberId: selectedMemberId.value,
+    cashAssets: assetsStore.itemsForCategory('cash'),
     realEstateAssets: assetsStore.itemsForCategory('real_estate'),
     mortgageLiabilities: liabilitiesStore.itemsForCategory('mortgage'),
   }),
 )
 const startingPosition = computed(() => calculationContext.value.startingPosition)
+const suggestedCashAnnualReturnPercent = computed(
+  () => calculationContext.value.suggestedCashAnnualReturnPercent,
+)
+const cashReturnOverridden = computed(() =>
+  Object.hasOwn(activeScenario.value, 'cashAnnualReturnPercent'),
+)
+const effectiveCashAnnualReturnPercent = computed(() =>
+  resolveCashAnnualReturnPercent(activeScenario.value, suggestedCashAnnualReturnPercent.value),
+)
+const cashReturnSourceLabel = computed(() =>
+  cashReturnOverridden.value
+    ? t('whatIf.strategy.customCashReturn')
+    : t('whatIf.strategy.suggestedCashReturn', {
+        return: Number(suggestedCashAnnualReturnPercent.value).toFixed(1),
+      }),
+)
 const simulation = computed(() =>
   calculateSavingsCapacityScenario({
     availableIncome: financialYearAvailableIncomeValue(financialYear.value, selectedMemberId.value),
@@ -1415,7 +1443,11 @@ const allocation = computed(() =>
 const projection = computed(() =>
   simulateAllocationStrategy({
     startingPosition: startingPosition.value,
-    scenario: { ...activeScenario.value, allocation: allocation.value },
+    scenario: {
+      ...activeScenario.value,
+      allocation: allocation.value,
+      cashAnnualReturnPercent: effectiveCashAnnualReturnPercent.value,
+    },
     simulatedMonthlySavings: monthlySavings.value,
     simulatedMonthlyCost: simulation.value.monthlyCostOfLife,
     debtAvailable: Boolean(selectedDebt.value),
@@ -1424,7 +1456,11 @@ const projection = computed(() =>
 const baselineProjection = computed(() =>
   simulateAllocationStrategy({
     startingPosition: startingPosition.value,
-    scenario: { ...activeScenario.value, allocation: allocation.value },
+    scenario: {
+      ...activeScenario.value,
+      allocation: allocation.value,
+      cashAnnualReturnPercent: effectiveCashAnnualReturnPercent.value,
+    },
     simulatedMonthlySavings: 0,
     simulatedMonthlyCost: simulation.value.monthlyCostOfLife,
     debtAvailable: Boolean(selectedDebt.value),
@@ -1883,8 +1919,15 @@ async function prepare(force = false) {
     await Promise.all([
       financialYearsStore.load(workspaceId.value, year, force),
       whatIfStore.load(workspaceId.value, force),
-      assetsStore.loadCategory(workspaceId.value, 'real_estate', force),
-      liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force),
+      assetsStore.loadConfig(workspaceId.value, force),
+      liabilitiesStore.loadConfig(workspaceId.value, force),
+    ])
+    await Promise.all([
+      assetsStore.loadCategory(workspaceId.value, 'cash'),
+      assetsStore.loadCategory(workspaceId.value, 'real_estate'),
+      liabilitiesStore.config?.categories?.mortgage
+        ? liabilitiesStore.loadCategory(workspaceId.value, 'mortgage')
+        : Promise.resolve(),
     ])
     if (activeScenario.value.id === defaultStrategyScenario.id) {
       initialScenarioName.value = ''
@@ -1962,11 +2005,16 @@ function deleteScenario() {
 }
 
 function resetScenario() {
-  updateScenario({
+  const next = normalizeStrategyScenario({
     ...defaultStrategyScenario,
     id: activeScenario.value.id,
     name: activeScenario.value.name,
     selectedLiabilityId: selectedDebt.value?.id || null,
+  })
+  return persist({
+    scenarios: config.value.scenarios.map((scenario) =>
+      scenario.id === next.id ? next : scenario,
+    ),
   })
 }
 
@@ -2068,8 +2116,19 @@ function setReturn(id, value) {
 }
 
 function setCashReturn(value) {
-  const numeric = Math.min(100, Math.max(0, Number(value) || 0))
+  const numeric = Math.min(100, Math.max(-100, Number(value) || 0))
   updateScenario({ cashAnnualReturnPercent: numeric })
+}
+
+function resetCashReturn() {
+  const candidate = { ...activeScenario.value }
+  delete candidate.cashAnnualReturnPercent
+  const next = normalizeStrategyScenario(candidate)
+  return persist({
+    scenarios: config.value.scenarios.map((scenario) =>
+      scenario.id === next.id ? next : scenario,
+    ),
+  })
 }
 
 function setInflation(value) {
@@ -2371,23 +2430,8 @@ h1 {
   border-radius: var(--radius-lg);
 }
 .desktop-projection-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  @include financial-chart-heading;
   gap: 1.5rem;
-}
-.desktop-projection-heading h2,
-.desktop-projection-heading p {
-  margin: 0;
-}
-.desktop-projection-heading h2 {
-  font-size: 1.2rem;
-  letter-spacing: -0.02em;
-}
-.desktop-projection-heading p {
-  margin-top: 0.2rem;
-  color: var(--color-copy);
-  font-size: 0.76rem;
 }
 .desktop-projection-controls {
   display: flex;

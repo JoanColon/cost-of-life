@@ -132,36 +132,9 @@ const periodLabel = computed(() =>
 
   .period-switch {
     position: static;
-    display: flex;
     width: 100%;
     margin: -0.25rem 0 1rem;
-    padding: 0.22rem;
-    overflow: hidden;
-    border: 1px solid var(--color-ink);
-    border-radius: 999px;
-    background: var(--color-ink);
-  }
-
-  .period-switch button {
-    flex: 1;
-    padding: 0.45rem 0.8rem;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--color-inverse-muted);
-    font-size: 0.8rem;
-    font-weight: 650;
-    cursor: pointer;
-  }
-
-  .period-switch button.selected {
-    background: var(--color-surface);
-    color: var(--color-ink);
-    box-shadow: var(--shadow-control);
-  }
-
-  .period-switch button:focus-visible {
-    @include focus-ring;
+    @include compact-segmented-control;
   }
 
   .desktop-period-switch {
@@ -285,12 +258,6 @@ const periodLabel = computed(() =>
       display: none;
     }
 
-    .period-switch button {
-      min-width: 5.5rem;
-      padding: 0.32rem 0.65rem;
-      font-size: 0.73rem;
-    }
-
     .cost-equation {
       flex: 1;
       min-height: 0;
@@ -371,13 +338,6 @@ const periodLabel = computed(() =>
 
     .card-header p {
       font-size: 0.68rem;
-    }
-
-    .period-switch button {
-      flex: 1;
-      min-height: 1.45rem;
-      padding: 0.12rem 0.2rem;
-      font-size: 0.58rem;
     }
 
     .equation-card {

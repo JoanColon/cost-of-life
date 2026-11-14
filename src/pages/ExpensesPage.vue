@@ -27,13 +27,28 @@
       />
 
       <template v-else>
-        <AppPageHeader
-          :title="t('expenses.title')"
-          :back-label="t('navigation.backToWorkspaceHome')"
-          :back-to="workspaceHomeRoute"
-        />
-
-        <ExpensesSectionNav :workspace-id="workspaceId" active="plan" :context="planContext" />
+        <ExpensesSectionNav :workspace-id="workspaceId" active="plan">
+          <template #header="{ openInfo }">
+            <AppPageHeader
+              :title="t('expenses.title')"
+              :back-label="t('navigation.backToWorkspaceHome')"
+              :back-to="workspaceHomeRoute"
+            >
+              <template #title-action>
+                <q-btn
+                  flat
+                  round
+                  dense
+                  icon="info_outline"
+                  color="primary"
+                  class="expenses-title-info"
+                  :aria-label="t('expenses.views.info.action')"
+                  @click="openInfo"
+                />
+              </template>
+            </AppPageHeader>
+          </template>
+        </ExpensesSectionNav>
 
         <section class="total-card">
           <div class="total-copy">
@@ -270,9 +285,6 @@ const workspaceHomeRoute = computed(() => ({
 }))
 const workspace = computed(
   () => workspaceStore.workspaces.find((item) => item.id === workspaceId.value) || null,
-)
-const planContext = computed(
-  () => `${currentYear} · ${workspace.value?.name || t('navigation.workspaces')}`,
 )
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map((member) => member.id))

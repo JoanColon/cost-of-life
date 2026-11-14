@@ -5,6 +5,7 @@ import { FieldPath, FieldValue } from 'firebase-admin/firestore'
 import { updateFinancialYearProjection } from '../financial-years/projection.js'
 import { calculatePositionsAt } from '../financial-years/position-calculations.js'
 import { calculateAnniversaryRealEstateValuation } from '../../shared/assets/real-estate.js'
+import { normalizeAnnualReturnPercent } from '../../shared/core/rates.js'
 import { roundMoneyOrZero } from '../../shared/core/money.js'
 import { calculateFrenchMortgagePaymentStep } from '../../shared/liabilities/mortgage.js'
 import { currentMonth, currentYear, positionStartMonth } from '../financial-years/service.js'
@@ -416,6 +417,7 @@ function validatedCanonicalItem(section, item = {}) {
         item.valueSource = 'model'
       }
     }
+    if (item.detail.cash != null) assertCanonicalCash(item.detail.cash, item)
     if (
       item.valueSource !== 'manual' &&
       !(item.valueSource === 'model' && item.detail.realEstate?.schemaVersion === 2)
@@ -555,6 +557,19 @@ function assertCanonicalRealEstate(realEstate, asset) {
       throw new Error('A valid purchase date is required')
     }
     calculateAnniversaryRealEstateValuation(realEstate, madridToday())
+  }
+}
+
+/** Validates the optional prospective return model attached to a Cash asset. */
+function assertCanonicalCash(cash, asset) {
+  if (
+    !isPlainObject(cash) ||
+    cash.schemaVersion !== 1 ||
+    asset.categoryId !== 'cash' ||
+    typeof cash.annualReturnPercent !== 'number' ||
+    normalizeAnnualReturnPercent(cash.annualReturnPercent) == null
+  ) {
+    throw new Error('A canonical Cash model is required')
   }
 }
 

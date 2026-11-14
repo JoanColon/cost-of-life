@@ -36,6 +36,28 @@ describe('expense tracking month', () => {
     ).toBe(true)
   })
 
+  it('adds Other as the final subcategory of every expense category without duplicating it', () => {
+    for (const category of expenseCategories) {
+      const otherSuggestions = category.suggestions.filter(
+        ({ nameKey }) => nameKey === 'expenses.suggestions.other',
+      )
+
+      expect(otherSuggestions).toHaveLength(1)
+      expect(category.suggestions.at(-1)).toEqual(otherSuggestions[0])
+      expect(otherSuggestions[0].id).toBe(
+        category.id === 'other' ? 'other' : `${category.id}_other`,
+      )
+    }
+  })
+
+  it('uses the shared Other label for category-specific tracking subcategories', () => {
+    expect(
+      expenseTrackingCategories
+        .filter(({ id }) => id.endsWith('_other'))
+        .every(({ nameKey }) => nameKey === 'expenses.suggestions.other'),
+    ).toBe(true)
+  })
+
   it('exposes the additional expense subcategories to the tracker', () => {
     expect(
       expenseTrackingCategories

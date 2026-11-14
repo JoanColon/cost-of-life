@@ -179,7 +179,12 @@
                   :final="family.milestones.at(-1)?.id === milestone.id"
                   :locked="!milestoneIsUnlocked(milestone) && !family.currentIds.has(milestone.id)"
                 />
-                <strong>{{ milestoneTitle(milestone) }}</strong>
+                <strong class="milestone-title milestone-title--desktop">
+                  {{ milestoneTitle(milestone) }}
+                </strong>
+                <strong class="milestone-title milestone-title--mobile">
+                  {{ mobileMilestoneTitle(milestone) }}
+                </strong>
                 <div v-if="milestoneIsUnlocked(milestone)" class="milestone-state achieved">
                   <q-icon name="check_circle" />
                   <span>{{ achievedDateLabel(milestone.id) }}</span>
@@ -271,7 +276,7 @@ import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useMilestonesStore } from '@/stores/milestones-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { formatCurrency } from '@/utils/formatters'
+import { currencySymbol, formatCurrency } from '@/utils/formatters'
 import { getWorkspaceMembers } from '@/utils/workspace-members'
 
 defineProps({
@@ -418,6 +423,20 @@ function milestoneTitle(milestone) {
   return t(`milestones.items.${milestone.id}`, {
     amount: formatCurrency(milestone.target),
   })
+}
+
+function mobileMilestoneTitle(milestone) {
+  if (milestone.family === 'safety') return `${milestone.target}m`
+  if (milestone.family === 'freedom') return `${milestone.target}y`
+  if (milestone.family === 'netWorth') {
+    if (milestone.id === 'net_worth_positive') return t('achievements.positive')
+    const value = new Intl.NumberFormat(undefined, {
+      notation: 'compact',
+      maximumFractionDigits: 0,
+    }).format(milestone.target)
+    return `${currencySymbol.value}${value}`
+  }
+  return milestoneTitle(milestone)
 }
 
 function milestoneLevel(family, milestone) {
@@ -1084,6 +1103,10 @@ function achievedDateLabel(milestoneId) {
   letter-spacing: -0.015em;
 }
 
+.milestone-title--mobile {
+  display: none;
+}
+
 .milestone-state {
   display: flex;
   align-items: center;
@@ -1152,58 +1175,255 @@ function achievedDateLabel(milestoneId) {
 
 @media (max-width: 760px) {
   .milestone-summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
-    padding: 0.55rem 0.8rem;
+    padding: 0.7rem 0.45rem;
+    border-radius: var(--radius-md);
   }
 
   .summary-item,
   .summary-item:first-child,
   .summary-item:last-child {
-    padding: 0.5rem 0;
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
+    gap: 0.4rem;
+    padding: 0 0.55rem;
+    border-top: 0;
+    border-left: 1px solid var(--color-line);
   }
 
   .summary-item:first-child {
-    border-top: 0;
+    padding-left: 0.2rem;
+    border-left: 0;
+  }
+
+  .summary-item:last-child {
+    padding-right: 0.2rem;
+  }
+
+  .summary-item > .q-icon,
+  .summary-progress-ring {
+    width: 1.9rem;
+    height: 1.9rem;
+  }
+
+  .summary-item > .q-icon {
+    font-size: 1.05rem;
+  }
+
+  .summary-progress-ring {
+    border-width: 0.3rem;
+  }
+
+  .summary-item strong {
+    font-size: 0.82rem;
+  }
+
+  .summary-item small {
+    overflow: hidden;
+    font-size: 0.58rem;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: normal;
   }
 
   .milestone-filters {
     overflow-x: auto;
     padding-bottom: 0.25rem;
+    scrollbar-width: none;
   }
 
   .milestone-filters button {
     min-width: max-content;
+    padding: 0.48rem 0.85rem;
   }
 
   .family-card {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(7.5rem, 36%) minmax(0, 1fr);
+    min-height: 7.2rem;
+    border-radius: var(--radius-md);
   }
 
   .family-header {
-    min-height: 0;
-    padding: 0.9rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-line);
+    display: grid;
+    grid-template-columns: 2.15rem minmax(0, 1fr);
+    grid-template-rows: 2.15rem auto auto auto;
+    align-content: center;
+    align-items: center;
+    min-height: 100%;
+    gap: 0.18rem 0.5rem;
+    padding: 0.75rem 0.65rem;
+    border-right: 1px solid var(--color-line);
+    border-bottom: 0;
+  }
+
+  .family-copy {
+    display: contents;
+  }
+
+  .family-icon {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .family-title {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
   }
 
   .family-header p {
     display: block;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 0.15rem;
+    font-size: 0.64rem;
+    line-height: 1.25;
+  }
+
+  .family-icon {
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: 0.7rem;
+    font-size: 1rem;
+  }
+
+  .family-title {
+    align-items: flex-start;
+  }
+
+  .family-header h2 {
+    font-size: 0.88rem;
+  }
+
+  .family-info-button {
+    display: none;
   }
 
   .family-count {
-    margin-top: 0.45rem;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 0.55rem;
+    font-size: 0.65rem;
+  }
+
+  .family-progress-track {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    height: 0.34rem;
+    margin-top: 0.3rem;
   }
 
   .achievement-list {
-    grid-auto-columns: minmax(8.5rem, 42vw);
+    display: flex;
+    gap: 0.1rem;
+    align-items: center;
+    overflow-x: hidden;
+    padding: 0.65rem 0.2rem;
   }
 
   .achievement-list article {
-    min-width: 8.5rem;
+    grid-template-rows: 2.85rem minmax(1.2rem, auto) 1.2rem;
+    gap: 0.12rem;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 5.8rem;
     margin: 0;
+    padding: 0.25rem 0.1rem;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .achievement-list article.current,
+  .family--freedom .achievement-list article.current,
+  .family--debt .achievement-list article.current {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .achievement-list :deep(.milestone-badge),
+  .achievement-list :deep(.milestone-badge--final) {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
+
+  .achievement-list :deep(.badge-asset) {
+    width: 2.45rem;
+    height: 2.45rem;
+  }
+
+  .achievement-list :deep(.milestone-badge > svg:not(.badge-laurel)) {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+
+  .achievement-list :deep(.badge-laurel) {
+    top: 0;
+    width: 0.75rem;
+    height: 2.2rem;
+  }
+
+  .achievement-list :deep(.badge-lock) {
+    width: 1.45rem;
+    height: 1.45rem;
+    font-size: 0.85rem;
+  }
+
+  .achievement-list article > .milestone-title--desktop {
+    display: none;
+  }
+
+  .achievement-list article > .milestone-title--mobile {
+    display: block;
+    max-width: 100%;
+    font-size: 0.6rem;
+    line-height: 1.05;
+  }
+
+  .milestone-state {
+    gap: 0;
+    font-size: 0.65rem;
+  }
+
+  .milestone-state span {
+    display: none;
+  }
+
+  .milestone-state .q-icon {
+    font-size: 0.9rem;
+  }
+
+  .milestone-current-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    width: 3.2rem;
+    font-size: 0.62rem;
+    text-align: center;
+  }
+
+  .milestone-current-row b {
+    grid-row: 2;
+  }
+
+  .achievement-list article > small {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .family-card {
+    grid-template-columns: 6.8rem minmax(0, 1fr);
+  }
+
+  .achievement-list :deep(.milestone-badge),
+  .achievement-list :deep(.milestone-badge--final) {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .achievement-list :deep(.badge-asset) {
+    width: 2.1rem;
+    height: 2.1rem;
   }
 }
 </style>

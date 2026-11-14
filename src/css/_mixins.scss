@@ -5,6 +5,71 @@
   box-shadow: var(--shadow-card);
 }
 
+@mixin financial-chart-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+
+  h2,
+  p,
+  small {
+    margin: 0;
+  }
+
+  h2 {
+    color: var(--color-ink);
+    font-size: clamp(1.2rem, 1.6vw, 1.5rem);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+
+  p,
+  small {
+    margin-top: 0.25rem;
+    color: var(--color-copy);
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  @media (max-width: 760px) {
+    align-items: center;
+
+    h2 {
+      font-size: 1.2rem;
+    }
+  }
+}
+
+@mixin financial-model-surface {
+  border: 1px solid var(--color-line);
+  border-radius: 1.35rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0.4rem 1.3rem rgba(42, 67, 101, 0.07);
+}
+
+@mixin financial-model-parameters-card {
+  @include financial-model-surface;
+  overflow: hidden;
+
+  :deep(.q-item) {
+    min-height: 5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  :deep(.q-item__label) {
+    color: var(--color-ink);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  :deep(.q-item__label--caption) {
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    font-weight: 400;
+  }
+}
+
 @mixin button-reset {
   appearance: none;
   padding: 0;
@@ -42,6 +107,52 @@
   border-radius: 999px;
   font-weight: var(--button-font-weight);
   text-align: center;
+}
+
+@mixin compact-segmented-control {
+  display: flex;
+  padding: 0.16rem;
+  overflow: hidden;
+  border: 1px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-ink);
+
+  button {
+    @include button-reset;
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 1.75rem;
+    padding: 0.32rem 0.65rem;
+    border-radius: 999px;
+    color: var(--color-inverse-muted);
+    font-size: 0.73rem;
+    font-weight: 650;
+    text-align: center;
+  }
+
+  button.selected,
+  button.active {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-control);
+  }
+
+  button:focus-visible {
+    @include focus-ring;
+  }
+
+  @media (max-width: 599px) {
+    padding: 0.1rem;
+
+    button {
+      min-height: 1.45rem;
+      padding: 0.12rem 0.2rem;
+      font-size: 0.58rem;
+    }
+  }
 }
 
 @mixin financial-page {

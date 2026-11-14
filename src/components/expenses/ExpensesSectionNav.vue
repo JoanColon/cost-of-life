@@ -1,16 +1,7 @@
 <template>
   <div class="expenses-section-context">
-    <div class="expenses-context-meta">
-      <p v-if="context">{{ context }}</p>
-      <q-btn
-        flat
-        round
-        dense
-        icon="info_outline"
-        color="primary"
-        :aria-label="t('expenses.views.info.action')"
-        @click="infoOpen = true"
-      />
+    <div class="expenses-section-header">
+      <slot name="header" :open-info="openInfo" />
     </div>
     <nav class="expenses-section-nav" :aria-label="t('expenses.views.label')">
       <router-link
@@ -57,10 +48,12 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps({
   workspaceId: { type: String, required: true },
   active: { type: String, required: true },
-  context: { type: String, default: '' },
 })
 const { t } = useI18n()
 const infoOpen = ref(false)
+const openInfo = () => {
+  infoOpen.value = true
+}
 const items = computed(() => [
   {
     key: 'plan',
@@ -90,49 +83,67 @@ const items = computed(() => [
 
 <style scoped lang="scss">
 @use '@/css/mixins' as *;
-.expenses-context-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.45rem;
+.expenses-section-header:empty {
+  display: none;
 }
-.expenses-context-meta > p {
-  margin: 0;
-  color: var(--color-copy);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.expenses-context-meta .q-btn {
+.expenses-section-header :deep(.expenses-title-info) {
   min-width: 1.8rem;
   min-height: 1.8rem;
   font-size: 0.85rem;
 }
 .expenses-section-nav {
-  display: inline-flex;
-  gap: 0.2rem;
-  margin-top: 0.65rem;
-  padding: 0.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  background: var(--color-surface);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  margin-top: 0.75rem;
+  border-bottom: 1px solid var(--color-line-strong);
 }
 .expenses-section-nav a {
-  min-width: 5.5rem;
-  padding: 0.5rem 0.85rem;
-  border-radius: 999px;
-  color: var(--color-copy);
-  font-size: 0.82rem;
-  font-weight: 650;
+  position: relative;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  font-weight: 700;
   text-align: center;
   text-decoration: none;
+  transition: color 150ms ease;
 }
 .expenses-section-nav a.active {
-  background: var(--color-ink);
-  color: white;
+  color: var(--color-ink);
+}
+.expenses-section-nav a.active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  background: var(--color-primary);
+  content: '';
+}
+.expenses-section-nav a:hover {
+  color: var(--color-ink);
 }
 .expenses-section-nav a:focus-visible {
   @include focus-ring;
+}
+@media (min-width: 900px) {
+  .expenses-section-context:has(.expenses-section-header:not(:empty)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(24rem, 42%);
+    align-items: end;
+    column-gap: clamp(2rem, 5vw, 5rem);
+  }
+
+  .expenses-section-header {
+    grid-column: 1;
+  }
+
+  .expenses-section-context:has(.expenses-section-header:not(:empty)) .expenses-section-nav {
+    grid-column: 2;
+    align-self: end;
+    margin-top: 0;
+  }
 }
 .expenses-info-dialog {
   width: min(36rem, calc(100vw - 2rem));
@@ -167,22 +178,9 @@ const items = computed(() => [
   font-size: 1.08rem;
 }
 @media (max-width: 599px) {
-  .expenses-section-nav {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    width: 100%;
-    margin-top: 0.5rem;
-  }
   .expenses-section-nav a {
-    min-width: 0;
-    padding: 0.42rem;
-    font-size: 0.75rem;
-  }
-  .expenses-context-meta {
-    margin-top: 0.25rem;
-  }
-  .expenses-context-meta > p {
-    font-size: 0.75rem;
+    padding: 0.75rem 0.4rem;
+    font-size: 0.86rem;
   }
   .info-heading h2 {
     font-size: 1.5rem;

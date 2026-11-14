@@ -63,6 +63,34 @@ describe('financial model service payloads', () => {
     })
   })
 
+  it('canonicalizes a Cash Layer 3 model without changing the recorded balance', async () => {
+    await updateAsset(
+      'workspace-a',
+      'asset-a',
+      {
+        categoryId: 'cash',
+        subcategoryId: 'savings_account',
+        itemName: 'Savings',
+        notes: '',
+        currentValue: 20_000,
+        ownership,
+        detail: { cash: { schemaVersion: 1, annualReturnPercent: '-1.5' } },
+      },
+      ['member-a'],
+    )
+
+    expect(updateFinancialModelItem).toHaveBeenCalledWith(
+      'workspace-a',
+      'assets',
+      'asset-a',
+      expect.objectContaining({
+        currentValue: 20_000,
+        valueSource: 'manual',
+        detail: { cash: { schemaVersion: 1, annualReturnPercent: -1.5 } },
+      }),
+    )
+  })
+
   it('derives a modeled property value from its purchase parameters', async () => {
     const realEstate = {
       schemaVersion: 2,

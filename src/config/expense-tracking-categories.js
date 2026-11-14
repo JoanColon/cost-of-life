@@ -12,12 +12,12 @@ const trackingIcons = {
 }
 
 export const expenseTrackingCategories = expenseCategories.flatMap((category) =>
-  category.suggestions.map(({ id, defaults }) => ({
+  category.suggestions.map(({ id, nameKey, defaults }) => ({
     id,
     categoryId: category.id,
     categoryNameKey: category.nameKey,
     icon: trackingIcons[id] || category.icon,
-    nameKey: `expenses.suggestions.${id}`,
+    nameKey,
     defaults,
     quickAmounts: quickAmountsFor(id),
   })),

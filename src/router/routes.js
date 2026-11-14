@@ -50,6 +50,11 @@ const routes = [
         component: () => import('@/pages/RealEstateModelPage.vue'),
       },
       {
+        path: 'workspaces/:workspaceId/assets/cash/:assetId/model',
+        name: 'cash-model',
+        component: () => import('@/pages/CashModelPage.vue'),
+      },
+      {
         path: 'workspaces/:workspaceId/assets/:category',
         name: 'asset-category',
         component: () => import('@/pages/AssetCategoryPage.vue'),

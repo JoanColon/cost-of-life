@@ -274,6 +274,40 @@ describe('atomic financial model mutations', () => {
     ).toBe(expectedValue)
   })
 
+  it('stores a Cash Layer 3 model without projecting it into the recorded balance', async () => {
+    const { firestore, writes } = createFirestore({
+      section: 'assets',
+      collection: 'modelAssets',
+      category: 'cash',
+    })
+
+    const result = await mutateFinancialModel(firestore, {
+      workspaceId: 'workspace-a',
+      userId: 'member-a',
+      section: 'assets',
+      operation: 'create',
+      item: {
+        categoryId: 'cash',
+        subcategoryId: 'savings_account',
+        itemName: 'Savings',
+        notes: '',
+        currentValue: 20_000,
+        valueSource: 'manual',
+        detail: { cash: { schemaVersion: 1, annualReturnPercent: -1.5 } },
+        ownership,
+      },
+    })
+
+    expect(result.asset).toMatchObject({
+      currentValue: 20_000,
+      valueSource: 'manual',
+      detail: { cash: { schemaVersion: 1, annualReturnPercent: -1.5 } },
+    })
+    expect(writes.find(({ path }) => path.includes('/modelAssets/')).data.currentValue).toBe(20_000)
+    const yearWrite = writes.find(({ path }) => path.includes('/financialYears/'))
+    expect(financialYearMonthValue(yearWrite.data, '01', 'assets')).toBe(20_000)
+  })
+
   it('rejects ownership that references someone outside the workspace', async () => {
     const { firestore, writes } = createFirestore({
       section: 'assets',

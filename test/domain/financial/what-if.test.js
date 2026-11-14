@@ -7,6 +7,7 @@ import {
   calculateSavingsCapacityScenario,
   normalizeWhatIfConfig,
   normalizeStrategyForOptions,
+  resolveCashAnnualReturnPercent,
 } from '../../../functions/shared/plan/what-if.js'
 
 describe('What If calculations', () => {
@@ -153,7 +154,7 @@ describe('What If calculations', () => {
     })
   })
 
-  it('keeps cash return settings while defaulting older scenarios to one percent', () => {
+  it('keeps cash overrides while leaving scenarios without one in automatic mode', () => {
     const configured = normalizeWhatIfConfig({
       activeScenarioId: 'cash-return',
       scenarios: [
@@ -171,6 +172,13 @@ describe('What If calculations', () => {
     })
 
     expect(configured.scenarios[0].cashAnnualReturnPercent).toBe(2.5)
-    expect(legacy.scenarios[0].cashAnnualReturnPercent).toBe(1)
+    expect(legacy.scenarios[0]).not.toHaveProperty('cashAnnualReturnPercent')
+  })
+
+  it('updates automatic Cash returns while preserving manual overrides', () => {
+    expect(resolveCashAnnualReturnPercent({}, 2)).toBe(2)
+    expect(resolveCashAnnualReturnPercent({}, -1.5)).toBe(-1.5)
+    expect(resolveCashAnnualReturnPercent({ cashAnnualReturnPercent: 3 }, 2)).toBe(3)
+    expect(resolveCashAnnualReturnPercent({ cashAnnualReturnPercent: 3 }, 4)).toBe(3)
   })
 })

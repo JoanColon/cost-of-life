@@ -346,6 +346,7 @@ import { useRoute } from 'vue-router'
 import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { getLiabilityCategory } from '@/config/liability-categories'
 import {
+  calculateScopedCashAnnualReturn,
   extractPositionLiabilities,
   modeledLiabilitiesForPositions,
 } from '@/domain/financial/calculation-context'
@@ -370,10 +371,12 @@ import {
   calculateInvestmentContributionScenario,
   calculateSafetyCoverageScenario,
   calculateSavingsCapacityScenario,
+  resolveCashAnnualReturnPercent,
 } from '../../functions/shared/plan/what-if.js'
 import { authUser } from '@/services/auth'
 import { useFinancialScopeStore } from '@/stores/financial-scope-store'
 import { useFinancialYearsStore } from '@/stores/financial-years-store'
+import { useAssetsStore } from '@/stores/assets-store'
 import { useLiabilitiesStore } from '@/stores/liabilities-store'
 import { useWhatIfStore } from '@/stores/what-if-store'
 import { useWorkspaceStore } from '@/stores/workspace-store'
@@ -384,6 +387,7 @@ const $q = useQuasar()
 const { t } = useI18n()
 const route = useRoute()
 const financialYearsStore = useFinancialYearsStore()
+const assetsStore = useAssetsStore()
 const liabilitiesStore = useLiabilitiesStore()
 const scopeStore = useFinancialScopeStore()
 const whatIfStore = useWhatIfStore()
@@ -416,12 +420,15 @@ const loading = computed(
     whatIfStore.loading ||
     financialYearsStore.loading ||
     liabilitiesStore.loading ||
-    liabilitiesStore.categoryLoading,
+    liabilitiesStore.categoryLoading ||
+    assetsStore.loading ||
+    assetsStore.categoryLoading,
 )
 const error = computed(
   () =>
     pageError.value ||
     whatIfStore.error ||
+    assetsStore.error ||
     financialYearsStore.errorFor(workspaceId.value, currentYear),
 )
 const annualCost = computed(() =>
@@ -458,6 +465,17 @@ const cash = computed(() =>
     selectedMemberId.value,
   ),
 )
+const suggestedCashAnnualReturnPercent = computed(() =>
+  calculateScopedCashAnnualReturn({
+    financialYear: financialYear.value,
+    month: positionMonth.value,
+    memberId: selectedMemberId.value,
+    cashAssets: assetsStore.itemsForCategory('cash'),
+  }),
+)
+const effectiveCashAnnualReturnPercent = computed(() =>
+  resolveCashAnnualReturnPercent(activeScenario.value, suggestedCashAnnualReturnPercent.value),
+)
 const liabilities = computed(() =>
   extractPositionLiabilities(
     financialYear.value,
@@ -488,7 +506,7 @@ const safetyImpact = computed(() =>
     simulatedMonthlyCost: simulation.value.simulatedCostOfLife,
     currentMonthlySavings: simulation.value.currentSavingsCapacity,
     simulatedMonthlySavings: simulation.value.simulatedSavingsCapacity,
-    cashAnnualReturnPercent: activeScenario.value.cashAnnualReturnPercent,
+    cashAnnualReturnPercent: effectiveCashAnnualReturnPercent.value,
     inflationAnnualPercent: activeScenario.value.inflationAnnualPercent,
   }),
 )
@@ -557,6 +575,7 @@ async function prepare(force = false) {
     await Promise.all([
       financialYearsStore.load(workspaceId.value, currentYear, force),
       whatIfStore.load(workspaceId.value, force),
+      assetsStore.loadCategory(workspaceId.value, 'cash', force),
       liabilitiesStore.loadCategory(workspaceId.value, 'mortgage', force),
     ])
   } catch (loadError) {

@@ -113,4 +113,49 @@ describe('financial calculation context', () => {
       40_000,
     )
   })
+
+  it('weights Cash returns with ownership-scoped snapshot balances', () => {
+    const cashFinancialYear = {
+      months: {
+        10: {
+          assets: {
+            categories: {
+              cash: {
+                subcategories: {
+                  savings_account: {
+                    items: {
+                      checking: { total: 5_000, memberValues: { alice: 5_000, bob: 0 } },
+                      savings: { total: 20_000, memberValues: { alice: 10_000, bob: 10_000 } },
+                      deposit: { total: 10_000, memberValues: { alice: 0, bob: 10_000 } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+    const cashAssets = [
+      { id: 'checking' },
+      { id: 'savings', detail: { cash: { schemaVersion: 1, annualReturnPercent: 2 } } },
+      { id: 'deposit', detail: { cash: { schemaVersion: 1, annualReturnPercent: 3 } } },
+    ]
+
+    expect(
+      buildStrategyCalculationContext({
+        financialYear: cashFinancialYear,
+        month: '10',
+        cashAssets,
+      }).suggestedCashAnnualReturnPercent,
+    ).toBe(2)
+    expect(
+      buildStrategyCalculationContext({
+        financialYear: cashFinancialYear,
+        month: '10',
+        memberId: 'alice',
+        cashAssets,
+      }).suggestedCashAnnualReturnPercent,
+    ).toBeCloseTo(4 / 3)
+  })
 })

@@ -4,6 +4,11 @@ const suggestion = (id, frequency, variability, recurrence, necessity) => ({
   defaults: { frequency, variability, recurrence, necessity },
 })
 
+const otherSuggestion = (categoryId) => ({
+  ...suggestion(`${categoryId}_other`, 'monthly', 'variable', 'recurring', null),
+  nameKey: 'expenses.suggestions.other',
+})
+
 export const expenseCategories = [
   {
     id: 'housing',
@@ -123,6 +128,10 @@ export const expenseCategories = [
   },
 ].map((category) => ({
   ...category,
+  suggestions:
+    category.id === 'other'
+      ? category.suggestions
+      : [...category.suggestions, otherSuggestion(category.id)],
   nameKey: `expenses.categories.${category.id}.name`,
   descriptionKey: `expenses.categories.${category.id}.description`,
 }))

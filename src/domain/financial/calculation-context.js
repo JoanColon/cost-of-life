@@ -4,6 +4,7 @@ import {
 } from '../../../functions/shared/positions/annual-projection.js'
 import { moneyForOwnershipScope } from '../../../functions/shared/core/ownership.js'
 import { buildStrategyStartingPosition } from '../../../functions/shared/plan/strategy-simulation.js'
+import { calculateWeightedCashAnnualReturn } from '../../../functions/shared/assets/cash.js'
 
 export function extractPositionItems(
   financialYear,
@@ -60,6 +61,7 @@ export function buildStrategyCalculationContext({
   month,
   memberId = 'all',
   realEstateAssets = [],
+  cashAssets = [],
   mortgageLiabilities = [],
 } = {}) {
   const assetPositions = new Map(
@@ -77,6 +79,12 @@ export function buildStrategyCalculationContext({
 
   return {
     startingPosition: buildStrategyStartingPosition(financialYear, month, memberId),
+    suggestedCashAnnualReturnPercent: calculateScopedCashAnnualReturn({
+      financialYear,
+      month,
+      memberId,
+      cashAssets,
+    }),
     currentAssets: financialYearMonthValue(financialYear, month, 'assets', memberId),
     currentLiabilities: financialYearMonthValue(financialYear, month, 'liabilities', memberId),
     currentNetWorth: financialYearMonthValue(financialYear, month, 'netWorth', memberId),
@@ -127,6 +135,24 @@ export function buildStrategyCalculationContext({
       }))
       .filter(({ currentBalance, monthlyPayment }) => currentBalance > 0 && monthlyPayment > 0),
   }
+}
+
+/** Uses observed, ownership-scoped Cash positions as weights for their optional L3 returns. */
+export function calculateScopedCashAnnualReturn({
+  financialYear,
+  month,
+  memberId = 'all',
+  cashAssets = [],
+} = {}) {
+  const modelsById = new Map(cashAssets.map((asset) => [asset.id, asset]))
+  const positions = extractPositionItems(financialYear, month, 'assets', {
+    categoryIds: ['cash'],
+    memberId,
+  }).map(({ id, value }) => ({
+    balance: value,
+    annualReturnPercent: modelsById.get(id)?.detail?.cash?.annualReturnPercent ?? 0,
+  }))
+  return calculateWeightedCashAnnualReturn(positions)
 }
 
 export function modeledLiabilitiesForPositions(

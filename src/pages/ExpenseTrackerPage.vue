@@ -21,27 +21,37 @@
       </section>
 
       <template v-else>
-        <header class="tracker-header">
-          <div class="tracker-heading">
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="grey-7"
-              icon="arrow_back"
-              :label="t('expenseTracker.backToExpenses')"
-              :to="expensesRoute"
-              class="back-button"
-            />
-            <h1>{{ t('expenseTracker.title') }}</h1>
-          </div>
-        </header>
-
-        <ExpensesSectionNav
-          :workspace-id="activeWorkspaceId"
-          :active="tab"
-          :context="trackerContext"
-        />
+        <ExpensesSectionNav :workspace-id="activeWorkspaceId" :active="tab">
+          <template #header="{ openInfo }">
+            <header class="tracker-header">
+              <div class="tracker-heading">
+                <q-btn
+                  flat
+                  dense
+                  no-caps
+                  color="grey-7"
+                  icon="arrow_back"
+                  :label="t('expenseTracker.backToExpenses')"
+                  :to="expensesRoute"
+                  class="back-button"
+                />
+                <div class="tracker-title-row">
+                  <h1>{{ t('expenseTracker.title') }}</h1>
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    icon="info_outline"
+                    color="primary"
+                    class="expenses-title-info"
+                    :aria-label="t('expenses.views.info.action')"
+                    @click="openInfo"
+                  />
+                </div>
+              </div>
+            </header>
+          </template>
+        </ExpensesSectionNav>
 
         <template v-if="tab === 'track'">
           <section class="monthly-overview">
@@ -52,7 +62,6 @@
                 :aria-pressed="trackMode === 'record'"
                 @click="setTrackMode('record')"
               >
-                <q-icon name="edit" />
                 {{ t('expenseTracker.modes.record') }}
               </button>
               <button
@@ -61,7 +70,6 @@
                 :aria-pressed="trackMode === 'reconcile'"
                 @click="setTrackMode('reconcile')"
               >
-                <q-icon name="bar_chart" />
                 {{ t('expenseTracker.modes.reconcile') }}
               </button>
             </nav>
@@ -104,27 +112,6 @@
 
         <template v-else>
           <section class="monthly-overview review-overview">
-            <nav class="track-mode-nav" :aria-label="t('expenseTracker.analytics.period')">
-              <button
-                type="button"
-                :class="{ active: analyticsGranularity === 'annual' }"
-                :aria-pressed="analyticsGranularity === 'annual'"
-                @click="analyticsGranularity = 'annual'"
-              >
-                <q-icon name="calendar_view_month" />
-                {{ t('expenseTracker.analytics.annual') }}
-              </button>
-              <button
-                type="button"
-                :class="{ active: analyticsGranularity === 'monthly' }"
-                :aria-pressed="analyticsGranularity === 'monthly'"
-                @click="analyticsGranularity = 'monthly'"
-              >
-                <q-icon name="calendar_today" />
-                {{ t('expenseTracker.analytics.monthly') }}
-              </button>
-            </nav>
-            <span class="monthly-spacer" aria-hidden="true" />
             <ExpenseMonthMetric
               v-if="analyticsGranularity === 'monthly'"
               v-model="period"
@@ -149,6 +136,25 @@
               <span>{{ t('expenseTracker.analytics.totalSpent') }}</span>
               <strong>{{ formatCurrency(analyticsTotal) }}</strong>
             </div>
+            <span class="monthly-spacer" aria-hidden="true" />
+            <nav class="track-mode-nav" :aria-label="t('expenseTracker.analytics.period')">
+              <button
+                type="button"
+                :class="{ active: analyticsGranularity === 'annual' }"
+                :aria-pressed="analyticsGranularity === 'annual'"
+                @click="analyticsGranularity = 'annual'"
+              >
+                {{ t('expenseTracker.analytics.annual') }}
+              </button>
+              <button
+                type="button"
+                :class="{ active: analyticsGranularity === 'monthly' }"
+                :aria-pressed="analyticsGranularity === 'monthly'"
+                @click="analyticsGranularity = 'monthly'"
+              >
+                {{ t('expenseTracker.analytics.monthly') }}
+              </button>
+            </nav>
           </section>
 
           <ExpenseAnalyticsPanel
@@ -557,8 +563,6 @@ const workspace = computed(
 )
 const members = computed(() => getWorkspaceMembers(workspace.value, authUser.value))
 const memberIds = computed(() => members.value.map(({ id }) => id))
-const trackerWorkspaceName = computed(() => workspace.value?.name || t('navigation.workspaces'))
-const trackerContext = computed(() => trackerWorkspaceName.value)
 const allExpenseItems = computed(() =>
   expensesStore.enabledCategories
     .flatMap((categoryId) => expensesStore.itemsForCategory(categoryId))
@@ -1052,6 +1056,12 @@ function currentPeriod() {
   align-items: center;
 }
 
+.tracker-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .back-button {
   @include financial-back-button;
 }
@@ -1073,73 +1083,92 @@ h1 {
 }
 
 .track-mode-nav {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.25rem;
-  width: 17.4rem;
+  width: min(12.5rem, 100%);
   min-width: 0;
   margin: 0 auto;
-  padding: 0.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  background: var(--color-surface);
-  box-shadow: 0 4px 16px rgb(34 55 78 / 4%);
-}
-
-.track-mode-nav button {
-  @include segmented-button;
-  gap: 0.45rem;
-  min-height: 2rem;
-  color: var(--color-copy);
-  font-size: 0.82rem;
-}
-
-.track-mode-nav button.active {
-  background: var(--color-ink);
-  color: var(--color-inverse);
-  box-shadow: var(--shadow-control);
-}
-
-.track-mode-nav button:focus-visible {
-  @include focus-ring;
+  @include compact-segmented-control;
 }
 
 .monthly-overview {
   display: grid;
-  grid-template-columns: 17.4rem minmax(1rem, 1fr) minmax(13rem, auto) repeat(
-      3,
-      minmax(7rem, auto)
-    );
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding: 0.85rem 1rem;
+  gap: 1.1rem 0;
+  margin-top: 1.25rem;
+  padding: 1.35rem 1.5rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgb(34 55 78 / 4%);
+  box-shadow: var(--shadow-card);
 }
 
 .monthly-spacer {
-  min-width: 0;
+  display: none;
+}
+
+.monthly-overview:not(.review-overview) .track-mode-nav {
+  grid-column: 4 / 7;
+  grid-row: 1;
+  justify-self: end;
+  margin: 0;
+}
+
+.monthly-overview:not(.review-overview) .month-metric {
+  grid-column: 1 / 4;
+  grid-row: 1;
+  padding: 0;
+  border-left: 0;
+}
+
+.monthly-overview:not(.review-overview) .month-metric :deep(.metric-label) {
+  display: none;
+}
+
+.monthly-overview:not(.review-overview) .month-metric :deep(.metric-value) {
+  justify-content: flex-start;
+  gap: 0.7rem;
+}
+
+.monthly-overview:not(.review-overview) .month-metric :deep(.metric-value strong) {
+  font-size: 1.65rem;
+  letter-spacing: -0.025em;
+}
+
+.monthly-overview:not(.review-overview) .month-metric :deep(.metric-value .q-icon) {
+  color: var(--color-primary);
+  font-size: 1.25rem;
 }
 
 .monthly-metric {
   display: grid;
-  min-width: 7.5rem;
-  padding-left: 1rem;
+  grid-row: 2;
+  min-width: 0;
+  padding: 0.35rem 1.25rem;
   border-left: 1px solid var(--color-line);
+}
+
+.monthly-overview:not(.review-overview) .monthly-metric:nth-of-type(1) {
+  grid-column: 1 / 3;
+  border-left: 0;
+}
+
+.monthly-overview:not(.review-overview) .monthly-metric:nth-of-type(2) {
+  grid-column: 3 / 5;
+}
+
+.monthly-overview:not(.review-overview) .monthly-metric:nth-of-type(3) {
+  grid-column: 5 / 7;
 }
 
 .monthly-metric span {
   color: var(--color-copy);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
 }
 
 .monthly-metric strong {
-  margin-top: 0.1rem;
+  margin-top: 0.2rem;
   color: var(--color-ink);
-  font-size: 1.25rem;
+  font-size: 1.65rem;
   line-height: 1.1;
 }
 
@@ -1179,10 +1208,23 @@ h1 {
 }
 
 .review-overview {
-  grid-template-columns: 17.4rem minmax(1rem, 1fr) minmax(9rem, auto) minmax(8.5rem, auto);
+  grid-template-columns: minmax(13rem, 1fr) minmax(8.5rem, auto);
 }
 
-.monthly-metric:last-child strong {
+.review-overview .track-mode-nav {
+  width: min(11.5rem, 100%);
+}
+
+.review-overview .monthly-metric {
+  grid-row: auto;
+}
+
+.review-overview .monthly-spacer {
+  display: block;
+}
+
+.monthly-metric:last-child strong,
+.review-total strong {
   color: var(--color-success);
 }
 
@@ -1684,15 +1726,146 @@ h1 {
   color: var(--color-copy);
 }
 
+@media (min-width: 900px) {
+  .monthly-overview:not(.review-overview) {
+    grid-template-columns:
+      minmax(15rem, 1.35fr) repeat(3, minmax(7rem, 0.65fr))
+      minmax(16rem, auto);
+    gap: 0;
+    padding: 0.85rem 1rem;
+  }
+
+  .monthly-overview:not(.review-overview) .month-metric {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .monthly-overview:not(.review-overview) .month-metric :deep(.metric-value) {
+    gap: 0.75rem;
+  }
+
+  .monthly-overview:not(.review-overview) .month-metric :deep(.metric-value strong) {
+    font-size: 1.25rem;
+  }
+
+  .monthly-overview:not(.review-overview) .month-metric :deep(.metric-value .q-icon) {
+    order: -1;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--color-blue-soft);
+    font-size: 1.15rem;
+  }
+
+  .monthly-overview:not(.review-overview) .monthly-metric {
+    grid-row: 1;
+    padding: 0.15rem 1.15rem;
+  }
+
+  .monthly-overview:not(.review-overview) .monthly-metric:nth-of-type(1) {
+    grid-column: 2;
+    border-left: 1px solid var(--color-line);
+  }
+
+  .monthly-overview:not(.review-overview) .monthly-metric:nth-of-type(2) {
+    grid-column: 3;
+  }
+
+  .monthly-overview:not(.review-overview) .monthly-metric:nth-of-type(3) {
+    grid-column: 4;
+  }
+
+  .monthly-overview:not(.review-overview) .monthly-metric strong {
+    font-size: 1.25rem;
+  }
+
+  .monthly-overview:not(.review-overview) .track-mode-nav {
+    grid-column: 5;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .review-overview {
+    grid-template-columns: minmax(15rem, 1.35fr) minmax(8rem, 0.65fr) minmax(1rem, 1fr) minmax(
+        16rem,
+        auto
+      );
+    gap: 0;
+    padding: 0.85rem 1rem;
+  }
+
+  .review-overview .month-metric,
+  .review-overview .review-year-metric {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0;
+    border-left: 0;
+  }
+
+  .review-overview .month-metric :deep(.metric-label),
+  .review-overview .review-year-metric > span:first-child {
+    display: none;
+  }
+
+  .review-overview .month-metric :deep(.metric-value),
+  .review-overview .review-year-value {
+    justify-content: flex-start;
+    gap: 0.75rem;
+    margin: 0;
+  }
+
+  .review-overview .month-metric :deep(.metric-value .q-icon),
+  .review-overview .review-year-value .q-icon {
+    order: -1;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--color-blue-soft);
+    color: var(--color-primary);
+    font-size: 1.15rem;
+  }
+
+  .review-overview .review-total {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0.15rem 1.15rem;
+    border-left: 1px solid var(--color-line);
+  }
+
+  .review-overview .review-total strong {
+    font-size: 1.25rem;
+  }
+
+  .review-overview .monthly-spacer {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .review-overview .track-mode-nav {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+    margin: 0;
+  }
+}
+
 @media (max-width: 899px) {
   .monthly-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
 
+  .monthly-overview:not(.review-overview) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
   .track-mode-nav {
     grid-column: 1 / -1;
-    width: 100%;
+    width: min(12.5rem, 100%);
   }
 
   .monthly-spacer {
@@ -1705,7 +1878,29 @@ h1 {
   }
 
   .review-overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .review-overview .month-metric,
+  .review-overview .review-year-metric {
+    grid-column: 1 / 4;
+    grid-row: 1;
+  }
+
+  .review-overview .track-mode-nav {
+    grid-column: 4 / 7;
+    grid-row: 1;
+    justify-self: end;
+    width: min(11.5rem, 100%);
+    margin: 0;
+  }
+
+  .review-overview .review-total {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-left: 0;
+    border-left: 0;
+    text-align: left;
   }
 
   .review-year-metric {
@@ -1749,32 +1944,73 @@ h1 {
 
   .track-mode-nav {
     grid-column: 1 / -1;
-    width: 100%;
+    width: min(9.25rem, 100%);
     min-width: 0;
-    margin: 0 0 0.7rem;
+    margin-right: auto;
+    margin-left: auto;
   }
 
   .monthly-overview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem 0;
-    margin-top: 0.75rem;
-    padding: 0.65rem;
+    gap: 1rem 0;
+    margin-top: 0.85rem;
+    padding: 1rem 0.75rem 0.75rem;
+  }
+
+  .monthly-overview:not(.review-overview) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .review-overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.65rem 0;
+    padding-top: 0.8rem;
+  }
+
+  .review-overview .track-mode-nav {
+    width: min(6.75rem, 100%);
+  }
+
+  .review-overview .month-metric :deep(.metric-label),
+  .review-overview .review-year-metric > span:first-child {
+    display: none;
+  }
+
+  .review-overview .month-metric :deep(.metric-value),
+  .review-overview .review-year-value {
+    justify-content: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  .review-overview .month-metric :deep(.metric-value .q-icon),
+  .review-overview .review-year-value .q-icon {
+    color: var(--color-primary);
+  }
+
+  .review-overview .review-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 2.5rem;
+    margin-top: 0.1rem;
+    padding: 0.65rem 0.25rem 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .review-overview .review-total strong {
+    margin: 0;
   }
 
   .monthly-metric {
     grid-column: auto;
     min-width: 0;
-    padding: 0 0.45rem;
+    padding: 0.15rem 0.55rem;
     text-align: center;
   }
 
   .month-metric,
-  .review-year-metric,
-  .monthly-metric:nth-last-child(2) {
+  .review-year-metric {
     padding-left: 0;
     border-left: 0;
   }
@@ -1790,12 +2026,20 @@ h1 {
 
   .monthly-metric strong {
     overflow: hidden;
-    font-size: 1rem;
+    font-size: 1.2rem;
     text-overflow: ellipsis;
   }
 
   .monthly-metric span {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
+  }
+
+  .monthly-overview:not(.review-overview) .month-metric :deep(.metric-value strong) {
+    font-size: 1.4rem;
+  }
+
+  .monthly-overview:not(.review-overview) .track-mode-nav {
+    margin: 0;
   }
 
   .tracker-header {

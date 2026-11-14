@@ -965,10 +965,7 @@ h1 {
 }
 
 .chart-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  @include financial-chart-heading;
 }
 
 .section-icon {
@@ -984,7 +981,7 @@ h1 {
   margin: 0;
 }
 
-.section-heading h2 {
+.section-heading:not(.chart-heading) h2 {
   color: var(--color-ink);
   font-size: 1.2rem;
 }
